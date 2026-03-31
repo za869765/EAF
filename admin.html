@@ -413,7 +413,9 @@ function renderTree() {
       const row = document.createElement('div');
       row.className = 'bp-row';
       const purposeHtml = (bp.purposes || []).map((p, pi) =>
-        `<span class="purpose-tag">${esc(p.code)} ${esc(p.name)}
+        `<span class="purpose-tag">
+           <span class="edit-p" onclick="editPurpose(${ai},${bi},${pi})" title="編輯" style="cursor:pointer; color:#1565c0; margin-right:2px;">✏</span>
+           ${esc(p.code)} ${esc(p.name)}
            <span class="del" onclick="delPurpose(${ai},${bi},${pi})" title="刪除">✕</span>
          </span>`).join('') +
         `<button class="add-purpose-btn" onclick="addPurpose(${ai},${bi})">＋ 用途別</button>`;
@@ -516,7 +518,22 @@ function addPurpose(ai, bi) {
     });
 }
 
+function editPurpose(ai, bi, pi) {
+  const p = subjects.mainAccounts[ai].businessPlans[bi].purposes[pi];
+  openModal('編輯用途別',
+    `<div class="m-row"><label>用途別代碼</label><input id="m-code" value="${esc(p.code)}"></div>
+     <div class="m-row"><label>用途別名稱</label><input id="m-name" value="${esc(p.name)}"></div>`,
+    () => {
+      const code = v('m-code'), name = v('m-name');
+      if (!code || !name) return alert('請填入代碼和名稱');
+      subjects.mainAccounts[ai].businessPlans[bi].purposes[pi] = { code, name };
+      renderTree(); setMsg('subj-msg', '已修改，請記得儲存', false);
+    });
+}
+
 function delPurpose(ai, bi, pi) {
+  const p = subjects.mainAccounts[ai].businessPlans[bi].purposes[pi];
+  if (!confirm(`確定刪除用途別「${p.code} ${p.name}」？`)) return;
   subjects.mainAccounts[ai].businessPlans[bi].purposes.splice(pi, 1);
   renderTree(); setMsg('subj-msg', '已刪除，請記得儲存', false);
 }
