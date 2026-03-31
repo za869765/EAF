@@ -231,13 +231,14 @@ body {
 /* ── Form inactive overlay ── */
 #form-page.inactive { pointer-events: none; }
 #form-page.inactive::after {
-  content: '← 請點選左側按鈕開始填單';
+  content: '請選左上「新增請購單」或「新增動支單」開始填單';
   position: absolute; inset: 0; z-index: 10;
   background: rgba(220,225,232,0.72);
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px; font-weight: bold; color: #37474f;
-  letter-spacing: 3px; border-radius: 0;
+  font-size: 16px; font-weight: bold; color: #37474f;
+  letter-spacing: 2px; border-radius: 0;
   font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif;
+  text-align: center; padding: 0 20px;
 }
 
 /* purchase-sig: only for 請購單 + >= threshold */
@@ -285,7 +286,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.2.3</div>
+    <div id="sb-version">v1.2.4</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -301,7 +302,7 @@ body {
 <!-- ══════════════════════ MAIN ══════════════════════ -->
 <div id="main">
   <div id="actions">
-    <button class="btn btn-save"  onclick="saveRecord()" id="save-btn">💾 存檔取號</button>
+    <button class="btn btn-save"  onclick="saveRecord()" id="save-btn" style="display:none;">💾 存檔取號</button>
     <button class="btn btn-print" onclick="window.print()">🖨️ 列印</button>
     <button class="btn btn-clear" onclick="clearForm()">🗑️ 清除</button>
     <button class="btn" id="cancel-btn" onclick="cancelEdit()"
@@ -859,6 +860,7 @@ async function loadRecord(id) {
     fillForm(rec);
     /* 啟用表單 */
     document.getElementById('form-page').classList.remove('inactive');
+    document.getElementById('save-btn').style.display = '';
     document.getElementById('cancel-btn').style.display = '';
     document.getElementById('draft-item')?.remove();
     document.querySelectorAll('.h-item').forEach(el=>
@@ -874,6 +876,7 @@ function cancelEdit() {
     /* 新單尚未儲存：回到初始反灰狀態 */
     currentId = null;
     document.getElementById('form-page').classList.add('inactive');
+    document.getElementById('save-btn').style.display = 'none';
     document.getElementById('cancel-btn').style.display = 'none';
     document.getElementById('draft-item')?.remove();
     document.getElementById('save-msg').textContent = '';
@@ -918,6 +921,7 @@ function newForm(type) {
   document.getElementById('save-msg').textContent='';
   /* 啟用表單 */
   document.getElementById('form-page').classList.remove('inactive');
+  document.getElementById('save-btn').style.display = '';
   document.getElementById('cancel-btn').style.display = '';
   /* 側欄顯示「編輯中未取號」草稿列 */
   renderDraftItem(type || 'purchase');
