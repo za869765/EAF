@@ -241,7 +241,7 @@ body {
 .it td.td-name, .it td.td-spec { text-align: left; }
 .it td input {
   width: 100%; border: none; background: transparent;
-  font-family: inherit; font-size: 11px; outline: none;
+  font-family: inherit; font-size: 12px; outline: none;
 }
 .it td.td-name input, .it td.td-spec input { text-align: left; }
 .it td.td-r { text-align: right; }
@@ -519,7 +519,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.4.9</div>
+    <div id="sb-version">v1.5.0</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -614,7 +614,7 @@ body {
         <td>
           <span class="cell-lbl">用途說明</span>
           <textarea class="fta" id="purpose-desc" rows="4"
-                    style="font-size:11.5px; min-height:18mm;"></textarea>
+                    style="font-size:12.5px; min-height:18mm;"></textarea>
         </td>
       </tr>
     </table>
@@ -840,7 +840,15 @@ function applyType(type, { regen = true } = {}) {
          </td>
        </tr>`;
 
-  /* 類型切換時重新產生明細列 */
+  /* 類型切換時：清除預算科目、重新產生明細列 */
+  if (regen && changed && !_suppressAutoFill) {
+    document.getElementById('sel-main').value    = '';
+    document.getElementById('sel-bp').value      = '';
+    document.getElementById('wp-text').textContent = '';
+    ['row-bp','row-purpose','row-personnel','row-lecturer']
+      .forEach(id => document.getElementById(id).style.display = 'none');
+    updateCashierNote();
+  }
   if (regen && changed) {
     rowCount = 10;
     generateItemRows();
@@ -948,7 +956,10 @@ function onBpChange() {
   const pRow = document.getElementById('row-purpose');
   pSel.innerHTML = '<option value="">── 選擇用途別 ──</option>';
   if (bp && bp.purposes.length > 0) {
-    bp.purposes.forEach(p => pSel.appendChild(new Option(p.code+'　'+p.name, p.code)));
+    const isExp = formType === 'expense';
+    bp.purposes
+      .filter(p => isExp || !EXPENSE_ONLY_PURPOSES.includes(p.code))
+      .forEach(p => pSel.appendChild(new Option(p.code+'　'+p.name, p.code)));
     pRow.style.display = '';
   } else { pRow.style.display = 'none'; }
   document.getElementById('row-personnel').style.display = 'none';
@@ -963,6 +974,13 @@ function onBpChange() {
 
 /* 人員類別：用途別 1301/1501 → 固定顯示「兼任人員」 */
 const PERSONNEL_CODES = ['1301', '1501'];
+
+/* 僅限動支單的用途別代碼（請購單不得選用） */
+const EXPENSE_ONLY_PURPOSES = [
+  '1301','1501','2102','2104','2202','2204',
+  '2301','2305','2401','2607','2706','2707',
+  '2713','2802','7103'
+];
 
 /* 講師費顯示業務計畫代碼清單 */
 const LECTURER_BP_CODES = ['21020311','21020312','21020313','21020321'];
@@ -982,7 +1000,7 @@ function updateCashierNote() {
   let note = '';
   if (purposeCode === '1501') {
     note = '列入薪資／獎金所得';
-  } else if (purposeCode === '2713') {
+  } else if (['2713','2802','7103'].includes(purposeCode)) {
     note = '列入薪資所得';
   } else if (LECTURER_BP_CODES.includes(bpCode) && isLecturer) {
     note = '列入薪資所得';
@@ -1544,7 +1562,9 @@ function kwSearchCopy() {
   const q   = document.getElementById('copy-kw-input').value.trim().toLowerCase();
   const box = document.getElementById('copy-kw-results');
   if (!q) { box.innerHTML = ''; return; }
+  /* 只搜尋同類型的紀錄 */
   const hits = cachedRecords.filter(r =>
+    r.formType === formType &&
     [r.voucherNo, r.acctName, r.bpLabel, r.purposeDesc, r.notes, r.applyDateRoc]
     .some(f => (f||'').toLowerCase().includes(q))
   ).slice(0, 20);
@@ -1568,15 +1588,32 @@ function doCopyByNo() {
   err.style.display = 'none';
   const rec = cachedRecords.find(r => (r.voucherNo||'').toUpperCase() === q);
   if (!rec) { err.style.display = ''; return; }
+  /* 類型不符則拒絕 */
+  if (rec.formType !== formType) {
+    showAlert(
+      `此單為<strong>${rec.formType==='expense'?'動支單':'請購單'}</strong>，<br>` +
+      `目前正在編輯<strong>${formType==='expense'?'動支單':'請購單'}</strong>，<br>` +
+      `只能複製相同類型的單據。`, '⛔'
+    );
+    return;
+  }
   copyFromRecord(rec.id);
   closeCopyModal();
 }
 function copyFromRecord(id) {
   const rec = cachedRecords.find(r => r.id === id);
   if (!rec) return;
+  /* 類型不符則拒絕 */
+  if (rec.formType !== formType) {
+    showAlert(
+      `只能複製<strong>${formType==='expense'?'動支單':'請購單'}</strong>，` +
+      `此筆為${rec.formType==='expense'?'動支單':'請購單'}。`, '⛔'
+    );
+    return;
+  }
   const copy = JSON.parse(JSON.stringify(rec));
-  copy.voucherNo    = '';                              // 不複製憑證號
-  copy.applyDateRaw = new Date().toISOString().slice(0,10); // 重設為今日
+  copy.voucherNo    = '';
+  copy.applyDateRaw = new Date().toISOString().slice(0,10);
   delete copy.id; delete copy.savedAt;
   rowCount = 10;
   generateItemRows();
