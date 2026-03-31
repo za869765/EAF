@@ -28,23 +28,17 @@ body {
   padding: 13px 14px 10px; border-bottom: 1px solid #2e3f52; flex-shrink: 0;
 }
 #sb-header h2 { font-size: 14px; color: #e8edf2; margin-bottom: 8px; }
-#sb-toolbar { display: flex; gap: 6px; }
 #new-btn {
-  flex: 1; padding: 7px 0;
+  width: 100%; padding: 8px 0;
   background: #2e7d32; color: #fff;
   border: none; border-radius: 5px;
-  font-size: 12px; font-family: inherit; cursor: pointer;
+  font-size: 13px; font-family: inherit; cursor: pointer; letter-spacing: 1px;
 }
 #new-btn:hover { background: #388e3c; }
-#cfg-btn {
-  padding: 7px 10px; background: #37474f; color: #cfd8dc;
-  border: none; border-radius: 5px; font-size: 13px; cursor: pointer;
-}
-#cfg-btn:hover { background: #455a64; }
 
 /* sync status */
 #sync-status {
-  font-size: 10px; padding: 4px 14px 6px;
+  font-size: 10px; padding: 4px 14px 5px;
   color: #78909c; border-bottom: 1px solid #2e3f52; flex-shrink: 0;
 }
 #sync-status.ok   { color: #66bb6a; }
@@ -175,45 +169,13 @@ body {
 .notes-lbl { font-size: 11px; font-weight: bold; margin-bottom: 1.5mm; }
 
 /* ══════════════════════════════════
-   CONFIG MODAL
-   ══════════════════════════════════ */
-#cfg-modal {
-  display: none; position: fixed; inset: 0;
-  background: rgba(0,0,0,.55); z-index: 999;
-  align-items: center; justify-content: center;
-}
-#cfg-modal.open { display: flex; }
-#cfg-box {
-  background: #fff; border-radius: 8px; padding: 24px 28px;
-  width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,.3);
-}
-#cfg-box h3 { font-size: 15px; margin-bottom: 16px; color: #1e2a38; }
-.cfg-row { margin-bottom: 14px; }
-.cfg-row label { display: block; font-size: 12px; color: #546e7a; margin-bottom: 4px; }
-.cfg-row input {
-  width: 100%; padding: 7px 10px; border: 1px solid #b0bec5;
-  border-radius: 4px; font-family: monospace; font-size: 12px; outline: none;
-}
-.cfg-row input:focus { border-color: #1976d2; }
-.cfg-hint { font-size: 11px; color: #90a4ae; margin-top: 3px; line-height: 1.4; }
-.cfg-btns { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; }
-.cfg-btns button {
-  padding: 7px 20px; border: none; border-radius: 5px;
-  font-size: 13px; font-family: inherit; cursor: pointer;
-}
-#cfg-save { background: #1565c0; color: #fff; }
-#cfg-save:hover { background: #1976d2; }
-#cfg-cancel { background: #eceff1; color: #37474f; }
-#cfg-cancel:hover { background: #cfd8dc; }
-
-/* ══════════════════════════════════
    PRINT
    ══════════════════════════════════ */
 @media print {
   @page { size: A4 portrait; margin: 0; }
   body { background: #fff; }
   #app  { display: block; }
-  #sidebar, #actions, #cfg-modal { display: none !important; }
+  #sidebar, #actions { display: none !important; }
   #main { padding: 0; }
   #form-page { width: 210mm; min-height: 297mm; padding: 7mm 7mm 5mm 7mm; box-shadow: none; }
   .fi   { border-bottom-color: transparent; }
@@ -231,14 +193,11 @@ body {
 <aside id="sidebar">
   <div id="sb-header">
     <h2>📋 歷史紀錄</h2>
-    <div id="sb-toolbar">
-      <button id="new-btn" onclick="newForm()">＋ 新增申請單</button>
-      <button id="cfg-btn" onclick="openCfg()" title="設定 GitHub Token">⚙️</button>
-    </div>
+    <button id="new-btn" onclick="newForm()">＋ 新增申請單</button>
   </div>
-  <div id="sync-status">● 尚未連線</div>
+  <div id="sync-status">● 連線中…</div>
   <div id="history-scroll">
-    <div id="no-history">尚無紀錄</div>
+    <div id="no-history">載入中…</div>
   </div>
 </aside>
 
@@ -270,17 +229,19 @@ body {
       <tr>
         <td style="text-align:center; vertical-align:middle;">
           <span class="cell-lbl">憑證編號</span>
-          <input class="fi" id="voucher-no" type="text" style="text-align:center; font-size:11px; margin-top:2mm;">
+          <input class="fi" id="voucher-no" type="text"
+                 style="text-align:center; font-size:11px; margin-top:2mm;">
         </td>
         <td>
           <span class="cell-lbl">預算科目</span>
           <!-- 串聯下拉：第1層 主科目 -->
           <div class="bp-row">
             <label>業務計畫：</label>
-            <select class="fsel" id="sel-main" onchange="onMainChange()" style="width:24mm; margin-right:2mm;">
+            <select class="fsel" id="sel-main" onchange="onMainChange()"
+                    style="width:24mm; margin-right:2mm;">
               <option value="">── 主科目 ──</option>
             </select>
-            <!-- 串聯下拉：第2層 業務計畫（主科目選了才出現） -->
+            <!-- 第2層：主科目選了才顯示 -->
             <select class="fsel" id="sel-bp" onchange="onBpChange()"
                     style="flex:1; display:none;">
             </select>
@@ -289,7 +250,7 @@ body {
             <label>工作計畫：</label>
             <span id="wp-text" style="font-size:11.5px;"></span>
           </div>
-          <!-- 串聯下拉：第3層 用途別（業務計畫選了才出現） -->
+          <!-- 第3層：業務計畫選了且有選項才顯示 -->
           <div class="bp-row" id="row-purpose" style="display:none;">
             <label>用途別　：</label>
             <select class="fsel" id="sel-purpose" style="flex:1;"></select>
@@ -301,7 +262,8 @@ body {
         </td>
         <td>
           <span class="cell-lbl">用途說明</span>
-          <textarea class="fta" id="purpose-desc" rows="4" style="font-size:11.5px; min-height:16mm;"></textarea>
+          <textarea class="fta" id="purpose-desc" rows="4"
+                    style="font-size:11.5px; min-height:16mm;"></textarea>
         </td>
       </tr>
     </table>
@@ -332,7 +294,8 @@ body {
         <div class="l-top-bar"><div class="l-top-title">採購／動支</div></div>
         <div class="l-unit-row">
           <div class="l-unit-cell">
-            <span>單位</span><span style="font-weight:bold;">臺南市佳里區衛生所</span>
+            <span>單位</span>
+            <span style="font-weight:bold;">臺南市佳里區衛生所</span>
           </div>
           <div class="l-date-cell">
             <span>申請日期</span>
@@ -367,7 +330,8 @@ body {
       </td>
       <td class="lower-right">
         <div class="notes-lbl">其他說明事項</div>
-        <textarea class="fta" id="notes" style="min-height:52mm; font-size:11px;" rows="14"></textarea>
+        <textarea class="fta" id="notes"
+                  style="min-height:52mm; font-size:11px;" rows="14"></textarea>
       </td>
     </tr></tbody></table>
 
@@ -387,43 +351,14 @@ body {
 </div><!-- /#main -->
 </div><!-- /#app -->
 
-<!-- ══════════════════════ CONFIG MODAL ══════════════════════ -->
-<div id="cfg-modal">
-  <div id="cfg-box">
-    <h3>⚙️ 連線設定</h3>
-    <div class="cfg-row">
-      <label>Gist ID（共用記錄）</label>
-      <input id="cfg-gist" type="text" placeholder="例：a1b2c3d4e5f6...">
-      <div class="cfg-hint">
-        在 GitHub 建立一個名為 <b>records.json</b> 的 Gist，<br>
-        內容填 <b>[]</b>，把網址最後一段 ID 貼到這裡。
-      </div>
-    </div>
-    <div class="cfg-row">
-      <label>GitHub Token（儲存紀錄用）</label>
-      <input id="cfg-token" type="password" placeholder="ghp_xxxxxxxxxxxx">
-      <div class="cfg-hint">
-        GitHub → Settings → Developer settings → Personal access tokens<br>
-        建立 token，勾選 <b>gist</b> 權限即可。只需在本台電腦設定一次，<br>
-        其他電腦各自設定自己的 token（Gist ID 相同）。
-      </div>
-    </div>
-    <div class="cfg-btns">
-      <button id="cfg-cancel" onclick="closeCfg()">取消</button>
-      <button id="cfg-save"   onclick="saveCfg()">儲存設定</button>
-    </div>
-  </div>
-</div>
-
 <!-- ══════════════════════ JAVASCRIPT ══════════════════════ -->
 <script>
 'use strict';
 
-/* ── Config ── */
-let CFG = { settings: { orgName:'臺南市佳里區衛生所', exemptThreshold:10000, gistId:'' }, mainAccounts:[] };
+let CFG = { settings:{ orgName:'臺南市佳里區衛生所', exemptThreshold:10000 }, mainAccounts:[] };
 let currentId = null;
 const ROWS = 7;
-const GIST_FILE = 'records.json';
+const API  = '/api/records';  /* Cloudflare Pages Function */
 
 /* ══════════════════════
    INIT
@@ -438,8 +373,43 @@ const GIST_FILE = 'records.json';
   generateItemRows();
   setTodayDate();
   calcTotal();
-  await syncFromGist();
+  await loadHistory();
 })();
+
+/* ══════════════════════
+   API HELPERS
+   ══════════════════════ */
+async function apiGet() {
+  const r = await fetch(API);
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+async function apiPost(data) {
+  const r = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r.json();
+}
+
+function setSyncStatus(msg, cls) {
+  const el = document.getElementById('sync-status');
+  el.textContent = msg; el.className = cls || '';
+}
+
+async function loadHistory() {
+  setSyncStatus('⟳ 載入中…', 'busy');
+  try {
+    const records = await apiGet();
+    setSyncStatus(`● 已連線　共 ${records.length} 筆`, 'ok');
+    renderHistory(records);
+  } catch(e) {
+    setSyncStatus('● 連線失敗，請確認網路', 'err');
+    renderHistory([]);
+  }
+}
 
 /* ══════════════════════
    CASCADING DROPDOWNS
@@ -447,33 +417,24 @@ const GIST_FILE = 'records.json';
 function buildMainDropdown() {
   const sel = document.getElementById('sel-main');
   sel.innerHTML = '<option value="">── 選擇主科目 ──</option>';
-  CFG.mainAccounts.forEach(a => {
-    sel.appendChild(new Option(a.name, a.code));
-  });
+  CFG.mainAccounts.forEach(a => sel.appendChild(new Option(a.name, a.code)));
   onMainChange();
 }
 
 function onMainChange() {
   const code = document.getElementById('sel-main').value;
   const acct = CFG.mainAccounts.find(a => a.code === code);
-
-  // 更新左上角文字
   document.getElementById('main-acct-lbl').textContent = acct ? acct.name : '請選擇';
 
-  // 第2層：業務計畫下拉（主科目選了才顯示）
   const bpSel = document.getElementById('sel-bp');
   bpSel.innerHTML = '<option value="">── 選擇業務計畫 ──</option>';
-
   if (acct) {
-    acct.businessPlans.forEach(bp => {
-      bpSel.appendChild(new Option(bp.code + '　' + bp.name, bp.code));
-    });
+    acct.businessPlans.forEach(bp =>
+      bpSel.appendChild(new Option(bp.code + '　' + bp.name, bp.code)));
     bpSel.style.display = '';
   } else {
     bpSel.style.display = 'none';
   }
-
-  // 重置下層
   document.getElementById('wp-text').textContent = '';
   document.getElementById('sel-purpose').innerHTML = '';
   document.getElementById('row-purpose').style.display = 'none';
@@ -485,18 +446,14 @@ function onBpChange() {
   const acct = CFG.mainAccounts.find(a => a.code === acctCode);
   const bp   = acct ? acct.businessPlans.find(b => b.code === bpCode) : null;
 
-  // 工作計畫自動帶入
   document.getElementById('wp-text').textContent = bp ? bp.workPlan : '';
 
-  // 第3層：用途別（業務計畫選了、且有選項才顯示）
   const pSel = document.getElementById('sel-purpose');
   const pRow = document.getElementById('row-purpose');
   pSel.innerHTML = '<option value="">── 選擇用途別 ──</option>';
-
   if (bp && bp.purposes.length > 0) {
-    bp.purposes.forEach(p => {
-      pSel.appendChild(new Option(p.code + '　' + p.name, p.code));
-    });
+    bp.purposes.forEach(p =>
+      pSel.appendChild(new Option(p.code + '　' + p.name, p.code)));
     pRow.style.display = '';
   } else {
     pRow.style.display = 'none';
@@ -514,31 +471,30 @@ function generateItemRows() {
     tr.innerHTML = `
       <td class="td-name"><input type="text"   data-r="${i}" data-c="name"></td>
       <td class="td-spec"><input type="text"   data-r="${i}" data-c="spec"></td>
-      <td class="td-r">  <input type="number" data-r="${i}" data-c="qty"   min="0" step="0.1" oninput="calcRow(${i})"></td>
-      <td style="text-align:center;"><input type="text" data-r="${i}" data-c="unit" style="text-align:center;"></td>
-      <td class="td-r">  <input type="number" data-r="${i}" data-c="price" min="0" step="1"   oninput="calcRow(${i})"></td>
+      <td class="td-r">  <input type="number" data-r="${i}" data-c="qty"
+            min="0" step="0.1" oninput="calcRow(${i})"></td>
+      <td style="text-align:center;">
+            <input type="text" data-r="${i}" data-c="unit" style="text-align:center;"></td>
+      <td class="td-r">  <input type="number" data-r="${i}" data-c="price"
+            min="0" step="1" oninput="calcRow(${i})"></td>
       <td class="td-r" id="sub${i}" style="padding-right:3mm;"></td>`;
     tb.appendChild(tr);
   }
 }
 
 function calcRow(i) {
-  const qty   = parseFloat(qv(i,'qty'))   || 0;
-  const price = parseFloat(qv(i,'price')) || 0;
-  const sub   = Math.round(qty * price);
-  document.getElementById('sub'+i).textContent = sub > 0 ? fmtM(sub) : '';
+  const sub = Math.round((parseFloat(qv(i,'qty'))||0) * (parseFloat(qv(i,'price'))||0));
+  document.getElementById('sub'+i).textContent = sub > 0 ? '$'+fmtN(sub) : '';
   calcTotal();
 }
 
 function calcTotal() {
   let total = 0;
   for (let i = 0; i < ROWS; i++)
-    total += Math.round((parseFloat(qv(i,'qty'))||0) * (parseFloat(qv(i,'price'))||0));
-
-  document.getElementById('amount-disp').textContent = '$' + fmtN(total);
-  document.getElementById('grand-total').textContent  = '$' + fmtN(total);
-
-  const exempt = total > 0 && total < (CFG.settings.exemptThreshold || 10000);
+    total += Math.round((parseFloat(qv(i,'qty'))||0)*(parseFloat(qv(i,'price'))||0));
+  document.getElementById('amount-disp').textContent = '$'+fmtN(total);
+  document.getElementById('grand-total').textContent  = '$'+fmtN(total);
+  const exempt = total > 0 && total < (CFG.settings.exemptThreshold||10000);
   ['ex1','ex2','ex3','ex4'].forEach(id => {
     const td = document.getElementById(id);
     td.textContent = '免核章';
@@ -556,88 +512,25 @@ function setTodayDate() {
 function updateRocDate() {
   const v = document.getElementById('apply-date-input').value;
   if (!v) return;
-  const d = new Date(v + 'T00:00:00');
+  const d = new Date(v+'T00:00:00');
   document.getElementById('roc-date-text').textContent =
-    (d.getFullYear()-1911) + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日';
+    (d.getFullYear()-1911)+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
 }
 
 /* ══════════════════════
-   GIST  (共用歷史記錄)
-   ══════════════════════ */
-function getGistId()  { return (CFG.settings.gistId || '').trim() || localStorage.getItem('gist_id') || ''; }
-function getToken()   { return localStorage.getItem('gh_token') || ''; }
-
-function setSyncStatus(msg, cls) {
-  const el = document.getElementById('sync-status');
-  el.textContent = msg; el.className = cls || '';
-}
-
-async function fetchGist() {
-  const id = getGistId();
-  if (!id) return null;
-  try {
-    const headers = { 'Accept': 'application/vnd.github+json' };
-    const token = getToken();
-    if (token) headers['Authorization'] = 'Bearer ' + token;
-    const res = await fetch(`https://api.github.com/gists/${id}`, { headers });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const content = data.files?.[GIST_FILE]?.content;
-    return content ? JSON.parse(content) : [];
-  } catch(_) { return null; }
-}
-
-async function pushGist(records) {
-  const id    = getGistId();
-  const token = getToken();
-  if (!id || !token) return false;
-  try {
-    const res = await fetch(`https://api.github.com/gists/${id}`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/vnd.github+json'
-      },
-      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(records, null, 2) } } })
-    });
-    return res.ok;
-  } catch(_) { return false; }
-}
-
-async function syncFromGist() {
-  const id = getGistId();
-  if (!id) {
-    setSyncStatus('● 未設定 Gist ID（點 ⚙️ 設定）', 'err');
-    renderHistory([]);
-    return;
-  }
-  setSyncStatus('⟳ 同步中…', 'busy');
-  const records = await fetchGist();
-  if (records === null) {
-    setSyncStatus('● 連線失敗（請確認 Gist ID 及網路）', 'err');
-    renderHistory([]);
-  } else {
-    setSyncStatus(`● 已連線　共 ${records.length} 筆`, 'ok');
-    renderHistory(records);
-  }
-}
-
-/* ══════════════════════
-   SAVE / LOAD / DELETE
+   FORM DATA
    ══════════════════════ */
 function getFormData() {
-  const items = [];
-  let total = 0;
+  const items = []; let total = 0;
   for (let i = 0; i < ROWS; i++) {
-    const qty = qv(i,'qty'), price = qv(i,'price');
+    const qty=qv(i,'qty'), price=qv(i,'price');
     items.push({ name:qv(i,'name'), spec:qv(i,'spec'), qty, unit:qv(i,'unit'), price });
     total += Math.round((parseFloat(qty)||0)*(parseFloat(price)||0));
   }
   const acctCode = document.getElementById('sel-main').value;
   const bpCode   = document.getElementById('sel-bp').value;
-  const acct = CFG.mainAccounts.find(a => a.code === acctCode);
-  const bp   = acct ? acct.businessPlans.find(b => b.code === bpCode) : null;
+  const acct = CFG.mainAccounts.find(a=>a.code===acctCode);
+  const bp   = acct ? acct.businessPlans.find(b=>b.code===bpCode) : null;
   return {
     voucherNo   : document.getElementById('voucher-no').value,
     acctCode, acctName  : acct ? acct.name : '',
@@ -651,113 +544,94 @@ function getFormData() {
   };
 }
 
-async function saveRecord() {
-  const id    = getGistId();
-  const token = getToken();
-  if (!id) { alert('請先點 ⚙️ 設定 Gist ID'); return; }
-  if (!token) { alert('請先點 ⚙️ 設定 GitHub Token 才能儲存'); return; }
+function fillForm(rec) {
+  document.getElementById('voucher-no').value    = rec.voucherNo   || '';
+  document.getElementById('purpose-desc').value  = rec.purposeDesc || '';
+  document.getElementById('notes').value         = rec.notes       || '';
+  document.getElementById('apply-date-input').value = rec.applyDateRaw || '';
+  updateRocDate();
+  document.getElementById('sel-main').value = rec.acctCode || '';
+  onMainChange();
+  document.getElementById('sel-bp').value   = rec.bpCode   || '';
+  onBpChange();
+  document.getElementById('sel-purpose').value = rec.purposeCode || '';
+  (rec.items||[]).forEach((item,i) => {
+    if (i>=ROWS) return;
+    qi(i,'name').value=item.name||''; qi(i,'spec').value=item.spec||'';
+    qi(i,'qty').value=item.qty||'';   qi(i,'unit').value=item.unit||'';
+    qi(i,'price').value=item.price||''; calcRow(i);
+  });
+  calcTotal();
+}
 
+/* ══════════════════════
+   SAVE / LOAD / DELETE
+   ══════════════════════ */
+async function saveRecord() {
   setSyncStatus('⟳ 儲存中…', 'busy');
   const data = getFormData();
   const now  = new Date();
   const ts   = `${now.getFullYear()-1911}/${pad(now.getMonth()+1)}/${pad(now.getDate())} `+
                `${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
-  // 先拉最新版本，避免覆蓋別人的資料
-  let records = await fetchGist() || [];
-
-  if (currentId) {
-    const idx = records.findIndex(r => r.id === currentId);
-    if (idx >= 0) records[idx] = { ...data, id: currentId, savedAt: ts };
-    else          records.push({ ...data, id: currentId, savedAt: ts });
-  } else {
-    currentId = Date.now().toString();
-    records.push({ ...data, id: currentId, savedAt: ts });
-  }
-
-  const ok = await pushGist(records);
-  if (ok) {
+  try {
+    /* 先拉最新，避免覆蓋他人資料 */
+    let records = await apiGet();
+    if (currentId) {
+      const idx = records.findIndex(r=>r.id===currentId);
+      if (idx>=0) records[idx] = {...data, id:currentId, savedAt:ts};
+      else        records.push({...data, id:currentId, savedAt:ts});
+    } else {
+      currentId = Date.now().toString();
+      records.push({...data, id:currentId, savedAt:ts});
+    }
+    await apiPost(records);
     setSyncStatus(`● 已儲存　共 ${records.length} 筆`, 'ok');
     renderHistory(records);
-    showMsg('✓ 已儲存 ' + ts);
-  } else {
-    setSyncStatus('● 儲存失敗（請確認 Token）', 'err');
-    showMsg('✗ 儲存失敗');
+    showMsg('✓ 已儲存 '+ts);
+  } catch(e) {
+    setSyncStatus('● 儲存失敗', 'err');
+    showMsg('✗ 儲存失敗，請確認網路');
   }
 }
 
 async function deleteRecord(id, e) {
   e.stopPropagation();
   if (!confirm('確定刪除此筆紀錄？')) return;
-  const token = getToken();
-  if (!token) { alert('請先設定 GitHub Token'); return; }
   setSyncStatus('⟳ 刪除中…', 'busy');
-  let records = await fetchGist() || [];
-  records = records.filter(r => r.id !== id);
-  const ok = await pushGist(records);
-  if (ok) {
+  try {
+    let records = await apiGet();
+    records = records.filter(r=>r.id!==id);
+    await apiPost(records);
+    if (currentId===id) currentId=null;
     setSyncStatus(`● 已刪除　共 ${records.length} 筆`, 'ok');
-    if (currentId === id) currentId = null;
     renderHistory(records);
-  } else {
+  } catch(_) {
     setSyncStatus('● 刪除失敗', 'err');
   }
 }
 
-function loadRecord(id) {
-  // 從目前渲染的列表中取得資料（已在記憶體中）
-  const items = document.querySelectorAll('.h-item');
-  // 重新從 gist 取，避免用過時快取
-  fetchGist().then(records => {
-    if (!records) return;
-    const rec = records.find(r => r.id === id);
+async function loadRecord(id) {
+  try {
+    const records = await apiGet();
+    const rec = records.find(r=>r.id===id);
     if (!rec) return;
     currentId = id;
     fillForm(rec);
-    // 更新 active 樣式
-    document.querySelectorAll('.h-item').forEach(el => {
-      el.classList.toggle('active', el.dataset.id === id);
-    });
-  });
-}
-
-function fillForm(rec) {
-  document.getElementById('voucher-no').value   = rec.voucherNo   || '';
-  document.getElementById('purpose-desc').value = rec.purposeDesc || '';
-  document.getElementById('notes').value        = rec.notes       || '';
-  document.getElementById('apply-date-input').value = rec.applyDateRaw || '';
-  updateRocDate();
-
-  // 串聯下拉復原
-  document.getElementById('sel-main').value = rec.acctCode || '';
-  onMainChange();
-  document.getElementById('sel-bp').value   = rec.bpCode   || '';
-  onBpChange();
-  document.getElementById('sel-purpose').value = rec.purposeCode || '';
-
-  // 品項
-  (rec.items || []).forEach((item, i) => {
-    if (i >= ROWS) return;
-    qi(i,'name').value  = item.name  || '';
-    qi(i,'spec').value  = item.spec  || '';
-    qi(i,'qty').value   = item.qty   || '';
-    qi(i,'unit').value  = item.unit  || '';
-    qi(i,'price').value = item.price || '';
-    calcRow(i);
-  });
-  calcTotal();
+    document.querySelectorAll('.h-item').forEach(el =>
+      el.classList.toggle('active', el.dataset.id===id));
+  } catch(_) {}
 }
 
 function renderHistory(records) {
   const wrap = document.getElementById('history-scroll');
-  if (!records || records.length === 0) {
-    wrap.innerHTML = '<div id="no-history">尚無紀錄</div>';
-    return;
+  if (!records||records.length===0) {
+    wrap.innerHTML='<div id="no-history">尚無紀錄</div>'; return;
   }
-  wrap.innerHTML = '';
+  wrap.innerHTML='';
   [...records].reverse().forEach(rec => {
     const div = document.createElement('div');
-    div.className = 'h-item' + (rec.id === currentId ? ' active' : '');
+    div.className = 'h-item'+(rec.id===currentId?' active':'');
     div.dataset.id = rec.id;
     div.innerHTML = `
       <button class="h-del" onclick="deleteRecord('${rec.id}',event)">✕</button>
@@ -771,60 +645,30 @@ function renderHistory(records) {
 
 function newForm() {
   currentId = null;
-  document.getElementById('voucher-no').value   = '';
-  document.getElementById('purpose-desc').value = '';
-  document.getElementById('notes').value        = '';
-  for (let i = 0; i < ROWS; i++) {
-    ['name','spec','qty','unit','price'].forEach(c => qi(i,c).value = '');
-    document.getElementById('sub'+i).textContent = '';
+  ['voucher-no','purpose-desc','notes'].forEach(id => document.getElementById(id).value='');
+  for (let i=0;i<ROWS;i++) {
+    ['name','spec','qty','unit','price'].forEach(c=>qi(i,c).value='');
+    document.getElementById('sub'+i).textContent='';
   }
-  setTodayDate();
-  buildMainDropdown();
-  calcTotal();
-  document.getElementById('save-msg').textContent = '';
-  // 移除 active 樣式
-  document.querySelectorAll('.h-item').forEach(el => el.classList.remove('active'));
+  setTodayDate(); buildMainDropdown(); calcTotal();
+  document.getElementById('save-msg').textContent='';
+  document.querySelectorAll('.h-item').forEach(el=>el.classList.remove('active'));
 }
 
 function clearForm() {
-  if (!confirm('確定清除所有填入資料？（Gist 歷史不受影響）')) return;
+  if (!confirm('確定清除所有填入資料？')) return;
   newForm();
-}
-
-/* ══════════════════════
-   CONFIG MODAL
-   ══════════════════════ */
-function openCfg() {
-  document.getElementById('cfg-gist').value  = getGistId();
-  document.getElementById('cfg-token').value = getToken();
-  document.getElementById('cfg-modal').classList.add('open');
-}
-function closeCfg() {
-  document.getElementById('cfg-modal').classList.remove('open');
-}
-async function saveCfg() {
-  const gist  = document.getElementById('cfg-gist').value.trim();
-  const token = document.getElementById('cfg-token').value.trim();
-  localStorage.setItem('gist_id',   gist);
-  localStorage.setItem('gh_token',  token);
-  closeCfg();
-  await syncFromGist();
 }
 
 /* ══════════════════════
    UTILS
    ══════════════════════ */
-function qi(row, col) { return document.querySelector(`[data-r="${row}"][data-c="${col}"]`); }
-function qv(row, col) { return qi(row,col)?.value || ''; }
-function fmtN(n)  { return Number(n).toLocaleString('zh-TW'); }
-function fmtM(n)  { return '$' + fmtN(n); }
-function pad(n)   { return String(n).padStart(2,'0'); }
-function esc(s)   { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function showMsg(t) {
-  const el = document.getElementById('save-msg');
-  el.textContent = t;
-  setTimeout(() => el.textContent = '', 3500);
-}
+function qi(r,c){ return document.querySelector(`[data-r="${r}"][data-c="${c}"]`); }
+function qv(r,c){ return qi(r,c)?.value||''; }
+function fmtN(n){ return Number(n).toLocaleString('zh-TW'); }
+function pad(n) { return String(n).padStart(2,'0'); }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showMsg(t){ const el=document.getElementById('save-msg'); el.textContent=t; setTimeout(()=>el.textContent='',3500); }
 </script>
 </body>
 </html>
