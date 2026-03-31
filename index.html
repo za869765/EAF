@@ -285,6 +285,28 @@ body {
 }
 #form-page.locked #type-badge { pointer-events: none; }
 
+/* ── 通用提示 Modal (showAlert) ── */
+#alert-modal {
+  position: fixed; inset: 0; z-index: 9800;
+  background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+  animation: scmFade .15s ease;
+}
+.alert-box {
+  background: #fff; border-radius: 14px;
+  padding: 28px 36px; min-width: 280px; max-width: 88vw;
+  box-shadow: 0 12px 48px rgba(0,0,0,.28);
+  text-align: center;
+  animation: scmSlide .2s ease;
+}
+.alert-icon  { font-size: 38px; margin-bottom: 10px; }
+.alert-msg   { font-size: 14px; color: #333; line-height: 1.7; margin-bottom: 20px;
+               font-family: 'Microsoft JhengHei','微軟正黑體',sans-serif; }
+.alert-ok    { background: #1565c0; color: #fff; border: none; border-radius: 7px;
+               padding: 9px 36px; font-size: 14px; font-family: inherit;
+               cursor: pointer; transition: background .15s; }
+.alert-ok:hover { background: #1976d2; }
+
 /* ── Save Confirm Modal ── */
 #save-confirm-modal {
   position: fixed; inset: 0; z-index: 9500;
@@ -384,7 +406,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.3.4</div>
+    <div id="sb-version">v1.3.5</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -817,10 +839,19 @@ function delRow() {
   calcTotal();
 }
 
+function showAlert(msg, icon='⚠️') {
+  document.getElementById('alert-icon').textContent = icon;
+  document.getElementById('alert-msg').textContent  = msg;
+  document.getElementById('alert-modal').style.display = '';
+}
+function closeAlert() {
+  document.getElementById('alert-modal').style.display = 'none';
+}
+
 function validateQty(el, i) {
   const raw = el.value.trim();
   if (raw !== '' && isNaN(Number(raw))) {
-    alert('數量請輸入數字（例如：1、2.5）');
+    showAlert('數量請輸入數字\n（例如：1、2.5）', '🔢');
     el.value = '';
   }
   calcRow(i);
@@ -1239,6 +1270,15 @@ function showToast(msg) {
   _toastTimer = setTimeout(()=>el.classList.remove('show'), 2800);
 }
 </script>
+
+<!-- ══ 通用提示 Modal ══ -->
+<div id="alert-modal" style="display:none;">
+  <div class="alert-box">
+    <div class="alert-icon" id="alert-icon">⚠️</div>
+    <div class="alert-msg"  id="alert-msg"></div>
+    <button class="alert-ok" onclick="closeAlert()">確定</button>
+  </div>
+</div>
 
 <!-- ══ 存檔確認 Modal ══ -->
 <div id="save-confirm-modal" style="display:none;">
