@@ -230,7 +230,7 @@ body {
   vertical-align: top; padding: 2mm 1mm;
 }
 .bs tr.label-row td { height: 6mm; vertical-align: top; padding-top: 2mm; }
-.bs tr.sig-box td { height: 22mm; vertical-align: top; }
+.bs tr.sig-box td { height: 32mm; vertical-align: top; }
 .bs tr.exempt-row td {
   height: 8mm; font-size: 12px; font-weight: bold;
   vertical-align: middle; border-top: 1px solid #333;
@@ -256,21 +256,86 @@ body {
 /* exempt-wrap: 請購<threshold OR 動支>0 */
 #exempt-wrap  { display: none; }
 
+/* ── Locked form (read-only after save) ── */
+#form-page.locked input,
+#form-page.locked textarea { pointer-events: none; }
+#form-page.locked select   { pointer-events: none; }
+#form-page.locked .fsel {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+#form-page.locked #type-badge { pointer-events: none; }
+
+/* ── Save Confirm Modal ── */
+#save-confirm-modal {
+  position: fixed; inset: 0; z-index: 9500;
+  background: rgba(0,0,0,.52);
+  display: flex; align-items: center; justify-content: center;
+  animation: scmFade .18s ease;
+}
+@keyframes scmFade { from { opacity:0; } to { opacity:1; } }
+.scm-box {
+  background: #fff; border-radius: 12px; padding: 30px 36px;
+  box-shadow: 0 10px 48px rgba(0,0,0,.35);
+  text-align: center; min-width: 300px;
+  animation: scmSlide .22s ease;
+}
+@keyframes scmSlide { from { transform:translateY(18px); opacity:0; } to { transform:none; opacity:1; } }
+.scm-icon  { font-size: 42px; margin-bottom: 10px; }
+.scm-title { font-size: 17px; font-weight: bold; color: #1a237e; margin-bottom: 8px; }
+.scm-msg   { font-size: 13px; color: #555; margin-bottom: 22px; line-height: 1.7; }
+.scm-btns  { display: flex; gap: 12px; justify-content: center; }
+.scm-ok    { background: #1565c0; color: #fff; border: none; border-radius: 6px;
+             padding: 9px 28px; font-size: 14px; font-family: inherit; cursor: pointer; }
+.scm-ok:hover { background: #1976d2; }
+.scm-cancel{ background: #eceff1; color: #555; border: none; border-radius: 6px;
+             padding: 9px 22px; font-size: 14px; font-family: inherit; cursor: pointer; }
+.scm-cancel:hover { background: #cfd8dc; }
+
+/* ── Copy Modal ── */
+#copy-modal {
+  position: fixed; inset: 0; z-index: 9000;
+  background: rgba(0,0,0,.52);
+  display: flex; align-items: center; justify-content: center;
+}
+.cm-box {
+  background: #fff; border-radius: 10px; padding: 22px 26px;
+  min-width: 380px; max-width: 92vw; max-height: 70vh;
+  overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,.3);
+}
+.cm-box h3 { font-size: 14px; margin-bottom: 12px; color: #1a237e; }
+.copy-item {
+  display: flex; gap: 8px; align-items: center;
+  padding: 8px 10px; border: 1px solid #e0e0e0; border-radius: 5px;
+  margin-bottom: 6px; cursor: pointer; font-size: 12px;
+}
+.copy-item:hover { background: #e3f2fd; border-color: #1565c0; }
+.ci-no   { font-weight: bold; color: #1565c0; min-width: 90px; }
+.ci-type { color: #6a1b9a; min-width: 46px; }
+.ci-acct { color: #444; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ci-amt  { color: #2e7d32; min-width: 58px; text-align: right; }
+
 /* ══════════════════════════════════
    PRINT
    ══════════════════════════════════ */
 @media print {
-  @page { size: A4 portrait; margin: 0; }
+  @page { size: A4 portrait; margin: 6mm 8mm; }
   body { background: #fff; }
   #app  { display: block; }
   #sidebar, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns { display: none !important; }
   #main { padding: 0; }
   #form-page {
-    width: 210mm !important; max-width: 210mm !important;
-    height: 297mm; min-height: unset;
-    padding: 7mm 7mm 5mm 7mm; box-shadow: none;
+    width: 100% !important; max-width: 100% !important;
+    height: auto; min-height: unset;
+    padding: 0; box-shadow: none;
     display: flex; flex-direction: column;
   }
+  /* 加深列印框線與文字 */
+  .ut td, .sg td, .it th, .it td, .bs td,
+  .lower-left, .lower-right,
+  .l-top-bar, .l-unit-row { border-color: #000 !important; }
+  body, .it th, .it td, .sg td, .ut td, .bs td { color: #000 !important; }
   .fi   { border-bottom-color: transparent; }
   .fsel {
     border-color: transparent; background: transparent;
@@ -286,7 +351,7 @@ body {
   #lower-section { flex: 1; display: flex; flex-direction: column; }
   .lower-wrap { flex: 1; }
   .lower-left { height: 100%; }
-  .bs tr.sig-box td { height: 24mm; }
+  .bs tr.sig-box td { height: 32mm; }
 }
 </style>
 </head>
@@ -301,7 +366,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.2.13</div>
+    <div id="sb-version">v1.3.0</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -317,11 +382,16 @@ body {
 <!-- ══════════════════════ MAIN ══════════════════════ -->
 <div id="main">
   <div id="actions">
-    <button class="btn btn-save"  onclick="saveRecord()" id="save-btn" style="display:none;">💾 存檔取號</button>
-    <button class="btn btn-print" onclick="window.print()">🖨️ 列印</button>
-    <button class="btn btn-clear" onclick="clearForm()">🗑️ 清除</button>
+    <button class="btn btn-save"  onclick="confirmSave()"  id="save-btn"       style="display:none;">💾 存檔取號</button>
+    <button class="btn btn-print" onclick="window.print()" id="print-btn"      style="display:none;">🖨️ 列印</button>
+    <button class="btn btn-clear" onclick="clearForm()"    id="clear-btn"      style="display:none;">🗑️ 清除</button>
+    <button class="btn" id="copy-btn" onclick="showCopyModal()"
+            style="display:none; background:#00695c; color:#fff;">📋 複製既有單</button>
     <button class="btn" id="cancel-btn" onclick="cancelEdit()"
-            style="background:#b71c1c; color:#fff; display:none;">✕ 取消</button>
+            style="display:none; background:#b71c1c; color:#fff;">✕ 取消</button>
+    <!-- 測試列印（暫時，正式上線刪除） -->
+    <button class="btn" id="test-print-btn" onclick="window.print()"
+            style="display:none; background:#e65100; color:#fff; font-size:11px;">🧪 測試列印</button>
     <span id="save-msg"></span>
   </div>
 
@@ -864,6 +934,7 @@ async function saveRecord() {
     renderHistory(records);
     showToast('✓ 已儲存 '+ts);
     showMsg('✓ 已儲存 '+ts);
+    lockForm();
   } catch(_) {
     setSyncStatus('● 儲存失敗','err');
     showToast('✗ 儲存失敗，請確認網路');
@@ -895,10 +966,7 @@ async function loadRecord(id) {
     rowCount = 10;
     generateItemRows();
     fillForm(rec);
-    /* 啟用表單 */
-    document.getElementById('form-page').classList.remove('inactive');
-    document.getElementById('save-btn').style.display = '';
-    document.getElementById('cancel-btn').style.display = '';
+    lockForm();
     document.getElementById('draft-item')?.remove();
     document.querySelectorAll('.h-item').forEach(el=>
       el.classList.toggle('active', el.dataset.id===id));
@@ -907,17 +975,14 @@ async function loadRecord(id) {
 
 function cancelEdit() {
   if (currentId) {
-    /* 有既存紀錄：重新載入還原 */
     loadRecord(currentId);
   } else {
-    /* 新單尚未儲存：回到初始反灰狀態 */
     currentId = null;
     document.getElementById('form-page').classList.add('inactive');
-    document.getElementById('save-btn').style.display = 'none';
-    document.getElementById('cancel-btn').style.display = 'none';
+    document.getElementById('form-page').classList.remove('locked');
+    hideAllBtns();
     document.getElementById('draft-item')?.remove();
     document.getElementById('save-msg').textContent = '';
-    /* 若歷史清單空白則還原提示 */
     const wrap = document.getElementById('history-scroll');
     if (!wrap.querySelector('.h-item')) {
       wrap.innerHTML = '<div id="no-history">尚無紀錄</div>';
@@ -947,6 +1012,92 @@ function renderHistory(records) {
   });
 }
 
+/* ══════════════════════
+   LOCK / UNLOCK
+   ══════════════════════ */
+function lockForm() {
+  const page = document.getElementById('form-page');
+  page.classList.remove('inactive');
+  page.classList.add('locked');
+  page.querySelectorAll('input, textarea').forEach(el => el.setAttribute('readonly',''));
+  page.querySelectorAll('select').forEach(el => el.setAttribute('disabled',''));
+  _setBtn('save-btn',   'none');
+  _setBtn('cancel-btn', 'none');
+  _setBtn('clear-btn',  'none');
+  _setBtn('copy-btn',   'none');
+  _setBtn('print-btn',  '');
+  _setBtn('test-print-btn', '');
+}
+function unlockForm() {
+  const page = document.getElementById('form-page');
+  page.classList.remove('inactive');
+  page.classList.remove('locked');
+  page.querySelectorAll('input, textarea').forEach(el => el.removeAttribute('readonly'));
+  page.querySelectorAll('select').forEach(el => el.removeAttribute('disabled'));
+  _setBtn('save-btn',   '');
+  _setBtn('cancel-btn', '');
+  _setBtn('clear-btn',  '');
+  _setBtn('copy-btn',   cachedRecords.length > 0 ? '' : 'none');
+  _setBtn('print-btn',  'none');
+  _setBtn('test-print-btn', '');
+}
+function hideAllBtns() {
+  ['save-btn','cancel-btn','clear-btn','copy-btn','print-btn','test-print-btn']
+    .forEach(id => _setBtn(id,'none'));
+}
+function _setBtn(id, disp) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = disp;
+}
+
+/* ══════════════════════
+   SAVE CONFIRM MODAL
+   ══════════════════════ */
+function confirmSave() {
+  document.getElementById('save-confirm-modal').style.display = '';
+}
+function closeSaveConfirm() {
+  document.getElementById('save-confirm-modal').style.display = 'none';
+}
+function doSave() {
+  closeSaveConfirm();
+  saveRecord();
+}
+
+/* ══════════════════════
+   COPY MODAL
+   ══════════════════════ */
+function showCopyModal() {
+  const records = cachedRecords;
+  if (!records || records.length === 0) { showToast('尚無可複製的紀錄'); return; }
+  const list = document.getElementById('copy-list');
+  list.innerHTML = records.map(r =>
+    `<div class="copy-item" onclick="copyFromRecord('${r.id}')">
+       <span class="ci-no">${r.voucherNo||'(未取號)'}</span>
+       <span class="ci-type">${r.formType==='expense'?'動支單':'請購單'}</span>
+       <span class="ci-acct">${r.acctName||''}</span>
+       <span class="ci-amt">$${fmtN(r.total||0)}</span>
+     </div>`
+  ).join('');
+  document.getElementById('copy-modal').style.display = '';
+}
+function closeCopyModal() {
+  document.getElementById('copy-modal').style.display = 'none';
+}
+function copyFromRecord(id) {
+  const rec = cachedRecords.find(r => r.id === id);
+  if (!rec) return;
+  const copy = JSON.parse(JSON.stringify(rec));
+  copy.voucherNo    = '';                              // 不複製憑證號
+  copy.applyDateRaw = new Date().toISOString().slice(0,10); // 重設為今日
+  delete copy.id; delete copy.savedAt;
+  rowCount = 10;
+  generateItemRows();
+  fillForm(copy);
+  closeCopyModal();
+  showToast('✓ 已複製單據內容，確認後按「存檔取號」');
+}
+
 function newForm(type) {
   currentId = null;
   rowCount = 10;
@@ -956,10 +1107,7 @@ function newForm(type) {
   applyType(type || 'purchase');
   setTodayDate(); buildMainDropdown(); calcTotal();
   document.getElementById('save-msg').textContent='';
-  /* 啟用表單 */
-  document.getElementById('form-page').classList.remove('inactive');
-  document.getElementById('save-btn').style.display = '';
-  document.getElementById('cancel-btn').style.display = '';
+  unlockForm();
   /* 側欄顯示「編輯中未取號」草稿列 */
   renderDraftItem(type || 'purchase');
   showToast('📄 已開啟新' + (type==='expense'?'動支單':'請購單') + '，填寫後按「存檔取號」');
@@ -1007,5 +1155,28 @@ function showToast(msg) {
   _toastTimer = setTimeout(()=>el.classList.remove('show'), 2800);
 }
 </script>
+
+<!-- ══ 存檔確認 Modal ══ -->
+<div id="save-confirm-modal" style="display:none;">
+  <div class="scm-box">
+    <div class="scm-icon">💾</div>
+    <div class="scm-title">確認存檔取號</div>
+    <div class="scm-msg">存檔取號後將<strong>鎖定表單，不可再修改</strong>。<br>確定要儲存並取得憑證編號嗎？</div>
+    <div class="scm-btns">
+      <button class="scm-cancel" onclick="closeSaveConfirm()">✕ 取消</button>
+      <button class="scm-ok"     onclick="doSave()">✓ 確定存檔</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 複製既有單 Modal ══ -->
+<div id="copy-modal" style="display:none;">
+  <div class="cm-box">
+    <h3>📋 選擇要複製的單據</h3>
+    <div id="copy-list"></div>
+    <button class="btn btn-clear" onclick="closeCopyModal()"
+            style="margin-top:12px; width:100%; font-size:12px;">✕ 關閉</button>
+  </div>
+</div>
 </body>
 </html>
