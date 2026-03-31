@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理者入口 — 動支單系統</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
+       background: #f0f2f5; color: #1a1a2e; }
+
+/* ── Login ── */
+#login-wrap {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, #1e2a38 0%, #2e4057 100%);
+}
+#login-box {
+  background: #fff; border-radius: 12px; padding: 40px 44px;
+  width: 360px; box-shadow: 0 8px 40px rgba(0,0,0,.3); text-align: center;
+}
+#login-box h2 { font-size: 20px; margin-bottom: 6px; color: #1e2a38; }
+#login-box p  { font-size: 12px; color: #78909c; margin-bottom: 24px; }
+#pass { width: 100%; padding: 10px 14px; border: 1px solid #cfd8dc;
+        border-radius: 6px; font-size: 14px; outline: none; margin-bottom: 12px; }
+#pass:focus { border-color: #1976d2; }
+#login-btn {
+  width: 100%; padding: 10px; background: #1565c0; color: #fff;
+  border: none; border-radius: 6px; font-size: 14px; cursor: pointer;
+}
+#login-btn:hover { background: #1976d2; }
+#login-err { color: #e53935; font-size: 12px; margin-top: 10px; min-height: 18px; }
+
+/* ── Panel ── */
+#panel { display: none; min-height: 100vh; flex-direction: column; }
+
+#top-bar {
+  background: #1e2a38; color: #fff; padding: 0 24px;
+  display: flex; align-items: center; height: 52px; gap: 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.2);
+}
+#top-bar h1 { font-size: 16px; font-weight: 600; flex: 1; }
+#logout-btn {
+  padding: 5px 14px; background: #37474f; color: #cfd8dc;
+  border: none; border-radius: 4px; font-size: 12px; cursor: pointer;
+}
+#logout-btn:hover { background: #455a64; }
+.link-btn {
+  padding: 5px 14px; background: #1565c0; color: #fff;
+  border: none; border-radius: 4px; font-size: 12px; cursor: pointer; text-decoration: none;
+}
+.link-btn:hover { background: #1976d2; }
+
+/* ── Tab nav ── */
+#tab-nav {
+  background: #263545; display: flex; padding: 0 24px; gap: 2px;
+}
+.tab-btn {
+  padding: 12px 20px; background: transparent; color: #90a4ae;
+  border: none; font-size: 13px; cursor: pointer; border-bottom: 3px solid transparent;
+}
+.tab-btn:hover { color: #cfd8dc; }
+.tab-btn.active { color: #fff; border-bottom-color: #42a5f5; }
+
+/* ── Content ── */
+#content { flex: 1; padding: 24px; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* ── Toolbar ── */
+.toolbar {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.btn { padding: 7px 16px; border: none; border-radius: 5px; font-size: 13px; cursor: pointer; }
+.btn-blue  { background: #1565c0; color: #fff; }
+.btn-blue:hover  { background: #1976d2; }
+.btn-green { background: #2e7d32; color: #fff; }
+.btn-green:hover { background: #388e3c; }
+.btn-red   { background: #c62828; color: #fff; }
+.btn-red:hover   { background: #e53935; }
+.btn-gray  { background: #546e7a; color: #fff; }
+.btn-gray:hover  { background: #607d8b; }
+.toolbar-msg { font-size: 12px; color: #43a047; }
+.toolbar-err { font-size: 12px; color: #e53935; }
+
+/* ── Subjects tree ── */
+.acct-card {
+  background: #fff; border-radius: 8px; margin-bottom: 12px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.1); overflow: hidden;
+}
+.acct-header {
+  background: #1e2a38; color: #fff; padding: 10px 16px;
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+}
+.acct-header .acct-name { flex: 1; font-weight: 600; font-size: 14px; }
+.acct-header .acct-code { font-size: 11px; color: #78909c; }
+.acct-header .icon-btn {
+  background: rgba(255,255,255,.15); color: #fff; border: none;
+  border-radius: 4px; padding: 3px 8px; font-size: 11px; cursor: pointer;
+}
+.acct-header .icon-btn:hover { background: rgba(255,255,255,.25); }
+.acct-body { padding: 0 0 8px 0; }
+
+.bp-row {
+  display: flex; align-items: flex-start; padding: 6px 16px;
+  border-bottom: 1px solid #f5f5f5; gap: 8px;
+}
+.bp-row:last-child { border-bottom: none; }
+.bp-info { flex: 1; }
+.bp-title { font-size: 13px; font-weight: 600; color: #1565c0; }
+.bp-sub   { font-size: 11px; color: #78909c; margin-top: 1px; }
+.bp-purposes { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
+.purpose-tag {
+  background: #e3f2fd; color: #1565c0; border-radius: 12px;
+  padding: 2px 8px; font-size: 11px; display: flex; align-items: center; gap: 4px;
+}
+.purpose-tag .del { cursor: pointer; color: #90a4ae; font-size: 10px; }
+.purpose-tag .del:hover { color: #e53935; }
+.add-purpose-btn {
+  background: #f5f5f5; color: #546e7a; border: 1px dashed #b0bec5;
+  border-radius: 12px; padding: 2px 8px; font-size: 11px; cursor: pointer;
+}
+.add-purpose-btn:hover { background: #e3f2fd; border-color: #1976d2; color: #1976d2; }
+.bp-actions { display: flex; gap: 4px; flex-shrink: 0; padding-top: 2px; }
+.bp-actions button {
+  padding: 3px 8px; border: none; border-radius: 4px; font-size: 11px; cursor: pointer;
+}
+.btn-edit-sm { background: #e3f2fd; color: #1565c0; }
+.btn-edit-sm:hover { background: #bbdefb; }
+.btn-del-sm  { background: #fce4ec; color: #c62828; }
+.btn-del-sm:hover  { background: #f8bbd0; }
+
+.add-bp-btn {
+  margin: 6px 16px 0; padding: 6px 12px; background: #f5f5f5;
+  border: 1px dashed #b0bec5; border-radius: 6px; font-size: 12px;
+  color: #546e7a; cursor: pointer; width: calc(100% - 32px);
+}
+.add-bp-btn:hover { background: #e8f5e9; border-color: #388e3c; color: #2e7d32; }
+.add-acct-btn {
+  width: 100%; padding: 10px; background: #fff; border: 2px dashed #b0bec5;
+  border-radius: 8px; font-size: 13px; color: #546e7a; cursor: pointer; margin-top: 4px;
+}
+.add-acct-btn:hover { background: #e8f5e9; border-color: #388e3c; color: #2e7d32; }
+
+/* ── Records table ── */
+.rec-table { width: 100%; border-collapse: collapse; background: #fff;
+             border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+.rec-table th {
+  background: #263545; color: #cfd8dc; padding: 10px 14px;
+  text-align: left; font-size: 12px; font-weight: 600;
+}
+.rec-table td { padding: 9px 14px; border-bottom: 1px solid #f5f5f5; font-size: 13px; }
+.rec-table tr:last-child td { border-bottom: none; }
+.rec-table tr:hover td { background: #fafafa; }
+.rec-amount { font-weight: bold; color: #1565c0; }
+.no-data { text-align: center; color: #90a4ae; padding: 32px !important; }
+
+/* ── Settings ── */
+.setting-card {
+  background: #fff; border-radius: 8px; padding: 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.1); max-width: 480px;
+}
+.setting-card h3 { font-size: 15px; margin-bottom: 18px; color: #1e2a38; }
+.s-row { margin-bottom: 14px; }
+.s-row label { display: block; font-size: 12px; color: #546e7a; margin-bottom: 4px; }
+.s-row input {
+  width: 100%; padding: 8px 12px; border: 1px solid #cfd8dc;
+  border-radius: 5px; font-size: 14px; outline: none;
+}
+.s-row input:focus { border-color: #1976d2; }
+
+/* ── Modal ── */
+#modal-bg {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.45); z-index: 999;
+  align-items: center; justify-content: center;
+}
+#modal-bg.open { display: flex; }
+#modal-box {
+  background: #fff; border-radius: 10px; padding: 28px 32px;
+  min-width: 380px; max-width: 480px; box-shadow: 0 8px 32px rgba(0,0,0,.25);
+}
+#modal-box h3 { font-size: 16px; margin-bottom: 18px; color: #1e2a38; }
+.m-row { margin-bottom: 12px; }
+.m-row label { display: block; font-size: 12px; color: #546e7a; margin-bottom: 3px; }
+.m-row input {
+  width: 100%; padding: 8px 12px; border: 1px solid #cfd8dc;
+  border-radius: 5px; font-size: 14px; outline: none;
+}
+.m-row input:focus { border-color: #1976d2; }
+.modal-hint { font-size: 11px; color: #90a4ae; margin-top: 3px; }
+.modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.modal-btns button { padding: 8px 20px; border: none; border-radius: 5px; font-size: 13px; cursor: pointer; }
+#modal-ok { background: #1565c0; color: #fff; }
+#modal-ok:hover { background: #1976d2; }
+#modal-cancel { background: #eceff1; color: #37474f; }
+#modal-cancel:hover { background: #cfd8dc; }
+</style>
+</head>
+<body>
+
+<!-- ═══ LOGIN ═══ -->
+<div id="login-wrap">
+  <div id="login-box">
+    <h2>🔒 管理者入口</h2>
+    <p>臺南市佳里區衛生所 — 動支單系統</p>
+    <input type="password" id="pass" placeholder="輸入管理密碼"
+           onkeydown="if(event.key==='Enter')login()">
+    <button id="login-btn" onclick="login()">登入</button>
+    <div id="login-err"></div>
+  </div>
+</div>
+
+<!-- ═══ ADMIN PANEL ═══ -->
+<div id="panel">
+  <div id="top-bar">
+    <h1>⚙️ 動支單 管理者入口</h1>
+    <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
+    <button id="logout-btn" onclick="logout()">登出</button>
+  </div>
+  <div id="tab-nav">
+    <button class="tab-btn active" onclick="showTab('subjects')">📚 科目管理</button>
+    <button class="tab-btn"        onclick="showTab('records')">📋 紀錄管理</button>
+    <button class="tab-btn"        onclick="showTab('settings')">🔧 系統設定</button>
+  </div>
+  <div id="content">
+
+    <!-- ── Tab: subjects ── -->
+    <div id="tab-subjects" class="tab-pane active">
+      <div class="toolbar">
+        <button class="btn btn-green" onclick="addMainAcct()">＋ 新增主科目</button>
+        <button class="btn btn-blue"  onclick="saveSubjects()">💾 儲存全部科目</button>
+        <button class="btn btn-gray"  onclick="loadSubjects()">🔄 重新載入</button>
+        <span id="subj-msg" class="toolbar-msg"></span>
+      </div>
+      <div id="subjects-tree"></div>
+    </div>
+
+    <!-- ── Tab: records ── -->
+    <div id="tab-records" class="tab-pane">
+      <div class="toolbar">
+        <button class="btn btn-gray" onclick="loadRecords()">🔄 重新載入</button>
+        <span id="rec-count" style="font-size:12px; color:#546e7a;"></span>
+        <span id="rec-msg" class="toolbar-msg"></span>
+      </div>
+      <table class="rec-table">
+        <thead>
+          <tr>
+            <th>儲存時間</th><th>主科目</th><th>業務計畫</th>
+            <th>申請日期</th><th>金額</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="records-body"></tbody>
+      </table>
+    </div>
+
+    <!-- ── Tab: settings ── -->
+    <div id="tab-settings" class="tab-pane">
+      <div class="setting-card">
+        <h3>系統設定</h3>
+        <div class="s-row">
+          <label>機關名稱</label>
+          <input id="set-org" type="text">
+        </div>
+        <div class="s-row">
+          <label>免核章門檻（元）— 低於此金額自動顯示「免核章」</label>
+          <input id="set-threshold" type="number" min="0">
+        </div>
+        <div class="toolbar" style="margin-top:16px;">
+          <button class="btn btn-blue" onclick="saveSettings()">💾 儲存設定</button>
+          <span id="set-msg" class="toolbar-msg"></span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ MODAL ═══ -->
+<div id="modal-bg">
+  <div id="modal-box">
+    <h3 id="modal-title">編輯</h3>
+    <div id="modal-body"></div>
+    <div class="modal-btns">
+      <button id="modal-cancel" onclick="closeModal()">取消</button>
+      <button id="modal-ok"     onclick="modalOk()">確定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* ════════════════════
+   STATE
+   ════════════════════ */
+let PASS    = '';
+let subjects = null;  /* current subjects object */
+let modalCb  = null;  /* modal callback */
+
+/* ════════════════════
+   LOGIN / LOGOUT
+   ════════════════════ */
+async function login() {
+  const pw = document.getElementById('pass').value;
+  if (!pw) return;
+  document.getElementById('login-btn').textContent = '驗證中…';
+  try {
+    const r = await fetch('/api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    });
+    if (r.ok) {
+      PASS = pw;
+      document.getElementById('login-wrap').style.display = 'none';
+      document.getElementById('panel').style.display = 'flex';
+      document.getElementById('panel').style.flexDirection = 'column';
+      await loadSubjects();
+      await loadRecords();
+    } else {
+      document.getElementById('login-err').textContent = '❌ 密碼錯誤';
+    }
+  } catch (_) {
+    document.getElementById('login-err').textContent = '❌ 連線失敗';
+  }
+  document.getElementById('login-btn').textContent = '登入';
+}
+
+function logout() {
+  PASS = ''; subjects = null;
+  document.getElementById('panel').style.display = 'none';
+  document.getElementById('login-wrap').style.display = 'flex';
+  document.getElementById('pass').value = '';
+  document.getElementById('login-err').textContent = '';
+}
+
+/* ════════════════════
+   TABS
+   ════════════════════ */
+function showTab(name) {
+  document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+/* ════════════════════
+   SUBJECTS
+   ════════════════════ */
+async function loadSubjects() {
+  setMsg('subj-msg', '⟳ 載入中…', false);
+  try {
+    /* 嘗試從 Gist API 取得最新版；若無則回退靜態檔 */
+    let data = null;
+    const r1 = await fetch('/api/subjects');
+    if (r1.ok) {
+      data = await r1.json();
+      if (!data || !data.mainAccounts) data = null;
+    }
+    if (!data) {
+      const r2 = await fetch('/subjects.json');
+      if (r2.ok) data = await r2.json();
+    }
+    subjects = data || { settings:{ orgName:'臺南市佳里區衛生所', exemptThreshold:10000 }, mainAccounts:[] };
+    renderTree();
+    fillSettings();
+    setMsg('subj-msg', '✓ 載入完成', false);
+  } catch (e) {
+    setMsg('subj-msg', '❌ 載入失敗', true);
+  }
+}
+
+async function saveSubjects() {
+  if (!subjects) return;
+  setMsg('subj-msg', '⟳ 儲存中…', false);
+  try {
+    const r = await fetch('/api/subjects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Pass': PASS },
+      body: JSON.stringify(subjects),
+    });
+    const res = await r.json();
+    if (res.ok) setMsg('subj-msg', '✓ 已儲存', false);
+    else        setMsg('subj-msg', '❌ 儲存失敗', true);
+  } catch (_) {
+    setMsg('subj-msg', '❌ 連線失敗', true);
+  }
+}
+
+/* ── Render subjects tree ── */
+function renderTree() {
+  const wrap = document.getElementById('subjects-tree');
+  wrap.innerHTML = '';
+  (subjects.mainAccounts || []).forEach((acct, ai) => {
+    const card = document.createElement('div');
+    card.className = 'acct-card';
+    card.innerHTML = `
+      <div class="acct-header">
+        <span class="acct-code">${esc(acct.code)}</span>
+        <span class="acct-name">${esc(acct.name)}</span>
+        <button class="icon-btn" onclick="editMainAcct(${ai})">✏️ 編輯</button>
+        <button class="icon-btn" style="background:rgba(255,80,80,.3);"
+                onclick="delMainAcct(${ai})">✕ 刪除</button>
+      </div>
+      <div class="acct-body" id="acct-body-${ai}"></div>
+      <button class="add-bp-btn" onclick="addBp(${ai})">＋ 新增業務計畫</button>`;
+    wrap.appendChild(card);
+
+    const body = document.getElementById(`acct-body-${ai}`);
+    (acct.businessPlans || []).forEach((bp, bi) => {
+      const row = document.createElement('div');
+      row.className = 'bp-row';
+      const purposeHtml = (bp.purposes || []).map((p, pi) =>
+        `<span class="purpose-tag">${esc(p.code)} ${esc(p.name)}
+           <span class="del" onclick="delPurpose(${ai},${bi},${pi})" title="刪除">✕</span>
+         </span>`).join('') +
+        `<button class="add-purpose-btn" onclick="addPurpose(${ai},${bi})">＋ 用途別</button>`;
+
+      row.innerHTML = `
+        <div class="bp-info">
+          <div class="bp-title">${esc(bp.code)}　${esc(bp.name)}</div>
+          <div class="bp-sub">工作計畫：${esc(bp.workPlan)}</div>
+          <div class="bp-purposes">${purposeHtml}</div>
+        </div>
+        <div class="bp-actions">
+          <button class="btn-edit-sm" onclick="editBp(${ai},${bi})">✏️</button>
+          <button class="btn-del-sm"  onclick="delBp(${ai},${bi})">✕</button>
+        </div>`;
+      body.appendChild(row);
+    });
+  });
+
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-acct-btn';
+  addBtn.textContent = '＋ 新增主科目';
+  addBtn.onclick = addMainAcct;
+  wrap.appendChild(addBtn);
+}
+
+/* ── Main account CRUD ── */
+function addMainAcct() {
+  openModal('新增主科目',
+    `<div class="m-row"><label>科目代碼</label><input id="m-code" placeholder="例：11010201"></div>
+     <div class="m-row"><label>科目名稱</label><input id="m-name" placeholder="例：醫療基金專戶"></div>`,
+    () => {
+      const code = v('m-code'), name = v('m-name');
+      if (!code || !name) return alert('請填入代碼和名稱');
+      subjects.mainAccounts.push({ code, name, businessPlans: [] });
+      renderTree(); setMsg('subj-msg', '已新增，請記得儲存', false);
+    });
+}
+
+function editMainAcct(ai) {
+  const acct = subjects.mainAccounts[ai];
+  openModal('編輯主科目',
+    `<div class="m-row"><label>科目代碼</label><input id="m-code" value="${esc(acct.code)}"></div>
+     <div class="m-row"><label>科目名稱</label><input id="m-name" value="${esc(acct.name)}"></div>`,
+    () => {
+      acct.code = v('m-code'); acct.name = v('m-name');
+      renderTree(); setMsg('subj-msg', '已修改，請記得儲存', false);
+    });
+}
+
+function delMainAcct(ai) {
+  if (!confirm(`確定刪除「${subjects.mainAccounts[ai].name}」及其所有業務計畫？`)) return;
+  subjects.mainAccounts.splice(ai, 1);
+  renderTree(); setMsg('subj-msg', '已刪除，請記得儲存', false);
+}
+
+/* ── Business plan CRUD ── */
+function addBp(ai) {
+  openModal('新增業務計畫',
+    `<div class="m-row"><label>業務計畫代碼</label><input id="m-code" placeholder="例：510601"></div>
+     <div class="m-row"><label>業務計畫名稱</label><input id="m-name" placeholder="例：門診醫療成本"></div>
+     <div class="m-row"><label>工作計畫名稱<br><span class="modal-hint">（通常與業務計畫名稱相同）</span></label>
+       <input id="m-wp" placeholder="例：門診醫療成本"></div>`,
+    () => {
+      const code = v('m-code'), name = v('m-name'), wp = v('m-wp') || v('m-name');
+      if (!code || !name) return alert('請填入代碼和名稱');
+      subjects.mainAccounts[ai].businessPlans.push({ code, name, workPlan: wp, purposes: [] });
+      renderTree(); setMsg('subj-msg', '已新增，請記得儲存', false);
+    });
+}
+
+function editBp(ai, bi) {
+  const bp = subjects.mainAccounts[ai].businessPlans[bi];
+  openModal('編輯業務計畫',
+    `<div class="m-row"><label>業務計畫代碼</label><input id="m-code" value="${esc(bp.code)}"></div>
+     <div class="m-row"><label>業務計畫名稱</label><input id="m-name" value="${esc(bp.name)}"></div>
+     <div class="m-row"><label>工作計畫名稱</label><input id="m-wp"   value="${esc(bp.workPlan)}"></div>`,
+    () => {
+      bp.code = v('m-code'); bp.name = v('m-name'); bp.workPlan = v('m-wp');
+      renderTree(); setMsg('subj-msg', '已修改，請記得儲存', false);
+    });
+}
+
+function delBp(ai, bi) {
+  const bp = subjects.mainAccounts[ai].businessPlans[bi];
+  if (!confirm(`確定刪除業務計畫「${bp.name}」？`)) return;
+  subjects.mainAccounts[ai].businessPlans.splice(bi, 1);
+  renderTree(); setMsg('subj-msg', '已刪除，請記得儲存', false);
+}
+
+/* ── Purpose CRUD ── */
+function addPurpose(ai, bi) {
+  openModal('新增用途別',
+    `<div class="m-row"><label>用途別代碼</label><input id="m-code" placeholder="例：2706"></div>
+     <div class="m-row"><label>用途別名稱</label><input id="m-name" placeholder="例：護理人員訓練費"></div>`,
+    () => {
+      const code = v('m-code'), name = v('m-name');
+      if (!code || !name) return alert('請填入代碼和名稱');
+      subjects.mainAccounts[ai].businessPlans[bi].purposes.push({ code, name });
+      renderTree(); setMsg('subj-msg', '已新增，請記得儲存', false);
+    });
+}
+
+function delPurpose(ai, bi, pi) {
+  subjects.mainAccounts[ai].businessPlans[bi].purposes.splice(pi, 1);
+  renderTree(); setMsg('subj-msg', '已刪除，請記得儲存', false);
+}
+
+/* ════════════════════
+   RECORDS
+   ════════════════════ */
+async function loadRecords() {
+  setMsg('rec-msg', '⟳ 載入中…', false);
+  try {
+    const records = await (await fetch('/api/records')).json();
+    document.getElementById('rec-count').textContent = `共 ${records.length} 筆`;
+    const tbody = document.getElementById('records-body');
+    tbody.innerHTML = '';
+    if (records.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="no-data">尚無紀錄</td></tr>';
+    } else {
+      [...records].reverse().forEach(rec => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${esc(rec.savedAt||'')}</td>
+          <td>${esc(rec.acctName||'')}</td>
+          <td>${esc(rec.bpLabel||'')}</td>
+          <td>${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</td>
+          <td class="rec-amount">$${Number(rec.total||0).toLocaleString('zh-TW')}</td>
+          <td><button class="btn btn-red" style="padding:4px 10px; font-size:11px;"
+              onclick="deleteRecord('${rec.id}')">刪除</button></td>`;
+        tbody.appendChild(tr);
+      });
+    }
+    setMsg('rec-msg', '✓ 已載入', false);
+  } catch (_) {
+    setMsg('rec-msg', '❌ 載入失敗', true);
+  }
+}
+
+async function deleteRecord(id) {
+  if (!confirm('確定刪除此筆紀錄？')) return;
+  setMsg('rec-msg', '⟳ 刪除中…', false);
+  try {
+    let records = await (await fetch('/api/records')).json();
+    records = records.filter(r => r.id !== id);
+    const r = await fetch('/api/records', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(records),
+    });
+    if ((await r.json()).ok) { setMsg('rec-msg', '✓ 已刪除', false); loadRecords(); }
+    else setMsg('rec-msg', '❌ 刪除失敗', true);
+  } catch (_) { setMsg('rec-msg', '❌ 連線失敗', true); }
+}
+
+/* ════════════════════
+   SETTINGS
+   ════════════════════ */
+function fillSettings() {
+  if (!subjects) return;
+  document.getElementById('set-org').value       = subjects.settings?.orgName        || '';
+  document.getElementById('set-threshold').value = subjects.settings?.exemptThreshold || 10000;
+}
+
+async function saveSettings() {
+  if (!subjects) return;
+  subjects.settings = subjects.settings || {};
+  subjects.settings.orgName        = document.getElementById('set-org').value;
+  subjects.settings.exemptThreshold = parseInt(document.getElementById('set-threshold').value) || 10000;
+  setMsg('set-msg', '⟳ 儲存中…', false);
+  try {
+    const r = await fetch('/api/subjects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Pass': PASS },
+      body: JSON.stringify(subjects),
+    });
+    const res = await r.json();
+    setMsg('set-msg', res.ok ? '✓ 已儲存' : '❌ 失敗', !res.ok);
+  } catch (_) { setMsg('set-msg', '❌ 連線失敗', true); }
+}
+
+/* ════════════════════
+   MODAL
+   ════════════════════ */
+function openModal(title, bodyHtml, okCallback) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = bodyHtml;
+  modalCb = okCallback;
+  document.getElementById('modal-bg').classList.add('open');
+  /* focus first input */
+  setTimeout(() => document.querySelector('#modal-body input')?.focus(), 50);
+}
+function closeModal() { document.getElementById('modal-bg').classList.remove('open'); }
+function modalOk()    { if (modalCb) modalCb(); closeModal(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+/* ════════════════════
+   UTILS
+   ════════════════════ */
+function v(id)    { return document.getElementById(id)?.value.trim() || ''; }
+function esc(s)   { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function setMsg(id, text, isErr) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.className = isErr ? 'toolbar-err' : 'toolbar-msg';
+  if (!isErr && text.startsWith('✓')) setTimeout(() => { if(el.textContent===text) el.textContent=''; }, 3000);
+}
+</script>
+</body>
+</html>
