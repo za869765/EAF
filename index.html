@@ -428,18 +428,54 @@ body {
     padding: 0; box-shadow: none;
     display: flex; flex-direction: column;
   }
-  /* 加深列印框線與文字 */
+  /* ── 黑白列印：所有文字強制黑色、背景白色 ── */
+  * { color: #000 !important; background: transparent !important;
+      -webkit-print-color-adjust: exact; }
+
+  /* 框線全黑加深 */
   .ut td, .sg td, .it th, .it td, .bs td,
   .lower-left, .lower-right,
   .l-top-bar, .l-unit-row { border-color: #000 !important; }
-  body, .it th, .it td, .sg td, .ut td, .bs td { color: #000 !important; }
-  .fi   { border-bottom-color: transparent; }
-  .fsel {
-    border-color: transparent; background: transparent;
-    -webkit-appearance: none; appearance: none;
-    font-weight: normal; padding: 0; box-shadow: none;
+
+  /* 類型徽章：移除彩色背景，改為黑框黑字 */
+  #type-badge {
+    background: #fff !important; color: #000 !important;
+    border: 2px solid #000 !important;
+    font-size: 14px !important; font-weight: bold !important;
   }
-  .fta  { border-bottom-color: transparent; }
+
+  /* 切割線：黑色、加粗字型 */
+  .cut-line {
+    color: #000 !important; font-weight: bold !important;
+    font-size: 11px !important; letter-spacing: 5px;
+  }
+
+  /* 下拉選單：隱藏框線與背景，純文字黑色 */
+  .fsel {
+    border-color: transparent !important; background: transparent !important;
+    -webkit-appearance: none; appearance: none;
+    font-weight: bold !important; padding: 0; box-shadow: none;
+    color: #000 !important;
+  }
+
+  /* 各輸入欄位底線隱藏 */
+  .fi  { border-bottom-color: transparent; }
+  .fta { border-bottom-color: transparent; }
+
+  /* 表頭背景白 */
+  .it th { background: #fff !important; font-weight: bold !important; }
+  .it tfoot td { background: #fff !important; font-weight: bold !important; }
+
+  /* 人員類別、工作計畫等靜態文字 */
+  span, label, div { color: #000 !important; }
+
+  /* 機構名、副標 */
+  .u-org { color: #000 !important; font-weight: bold !important; }
+  .u-sub { color: #000 !important; }
+
+  /* 金額數字加粗 */
+  .amount-num { color: #000 !important; font-weight: bold !important; }
+
   #apply-date-input { display: none; }
   #roc-date-text    { display: inline !important; }
   /* Items stretch to fill page */
@@ -463,7 +499,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.4.0</div>
+    <div id="sb-version">v1.4.1</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
