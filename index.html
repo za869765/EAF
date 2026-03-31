@@ -371,7 +371,11 @@ body {
           </div>
           <div class="bp-row" id="row-purpose" style="display:none;">
             <label>用途別　：</label>
-            <select class="fsel" id="sel-purpose" style="flex:1;"></select>
+            <select class="fsel" id="sel-purpose" onchange="onPurposeChange()" style="flex:1;"></select>
+          </div>
+          <div class="bp-row" id="row-personnel" style="display:none;">
+            <label>人員類別：</label>
+            <span id="personnel-lbl" style="font-size:11.5px; color:#555;">兼任人員</span>
           </div>
         </td>
         <td style="text-align:center; vertical-align:top;">
@@ -678,6 +682,13 @@ function onBpChange() {
     bp.purposes.forEach(p => pSel.appendChild(new Option(p.code+'　'+p.name, p.code)));
     pRow.style.display = '';
   } else { pRow.style.display = 'none'; }
+  document.getElementById('row-personnel').style.display = 'none';
+}
+
+/* 人員類別：用途別 1501 績效獎金 → 固定顯示「兼任人員」 */
+function onPurposeChange() {
+  const code = document.getElementById('sel-purpose').value;
+  document.getElementById('row-personnel').style.display = (code === '1501') ? '' : 'none';
 }
 
 /* ══════════════════════
@@ -808,6 +819,7 @@ function fillForm(rec) {
   document.getElementById('sel-bp').value   = rec.bpCode   || '';
   onBpChange();
   document.getElementById('sel-purpose').value = rec.purposeCode || '';
+  onPurposeChange();
   /* 確保行數足夠 */
   const needed = (rec.items||[]).length;
   while (rowCount < Math.max(needed, 10)) { appendRow(rowCount); rowCount++; }
