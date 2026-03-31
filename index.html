@@ -5,255 +5,157 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>採購(費用動支)申請單 － 臺南市佳里區衛生所</title>
 <style>
-/* ============================
-   RESET & BASE
-   ============================ */
+/* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'KaiTi', serif;
-  font-size: 13px;
-  background: #e8eaf0;
-  color: #111;
+  font-family: '標楷體','DFKai-SB','BiauKai','KaiTi',serif;
+  font-size: 13px; background: #e8eaf0; color: #111;
 }
 
-/* ============================
+/* ══════════════════════════════════
    SCREEN LAYOUT
-   ============================ */
+   ══════════════════════════════════ */
 #app { display: flex; min-height: 100vh; }
 
-/* ---------- Sidebar ---------- */
+/* ── Sidebar ── */
 #sidebar {
-  width: 255px;
-  min-width: 255px;
-  background: #1e2a38;
-  color: #dde3ea;
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  position: sticky;
-  top: 0;
-  overflow: hidden;
+  width: 260px; min-width: 260px;
+  background: #1e2a38; color: #dde3ea;
+  display: flex; flex-direction: column;
+  height: 100vh; position: sticky; top: 0; overflow: hidden;
 }
-#sidebar-header {
-  padding: 14px 16px 10px;
-  border-bottom: 1px solid #2e3f52;
-  flex-shrink: 0;
+#sb-header {
+  padding: 13px 14px 10px; border-bottom: 1px solid #2e3f52; flex-shrink: 0;
 }
-#sidebar-header h2 { font-size: 14px; color: #e8edf2; margin-bottom: 10px; }
+#sb-header h2 { font-size: 14px; color: #e8edf2; margin-bottom: 8px; }
+#sb-toolbar { display: flex; gap: 6px; }
 #new-btn {
-  width: 100%; padding: 8px 0;
+  flex: 1; padding: 7px 0;
   background: #2e7d32; color: #fff;
   border: none; border-radius: 5px;
-  font-size: 13px; font-family: inherit;
-  cursor: pointer; letter-spacing: 1px;
+  font-size: 12px; font-family: inherit; cursor: pointer;
 }
 #new-btn:hover { background: #388e3c; }
-#history-scroll { flex: 1; overflow-y: auto; padding: 10px 12px; }
+#cfg-btn {
+  padding: 7px 10px; background: #37474f; color: #cfd8dc;
+  border: none; border-radius: 5px; font-size: 13px; cursor: pointer;
+}
+#cfg-btn:hover { background: #455a64; }
+
+/* sync status */
+#sync-status {
+  font-size: 10px; padding: 4px 14px 6px;
+  color: #78909c; border-bottom: 1px solid #2e3f52; flex-shrink: 0;
+}
+#sync-status.ok   { color: #66bb6a; }
+#sync-status.err  { color: #ef5350; }
+#sync-status.busy { color: #ffd54f; }
+
+#history-scroll { flex: 1; overflow-y: auto; padding: 8px 10px; }
 #no-history { color: #607d8b; font-size: 12px; text-align: center; padding: 24px 0; }
+
 .h-item {
-  background: #263545;
-  border-radius: 5px;
-  padding: 8px 10px;
-  margin-bottom: 8px;
-  cursor: pointer;
-  border-left: 3px solid #1976d2;
+  background: #263545; border-radius: 5px; padding: 8px 10px;
+  margin-bottom: 7px; cursor: pointer; border-left: 3px solid #1976d2;
   position: relative;
 }
-.h-item:hover { background: #2d3f52; }
+.h-item:hover  { background: #2d3f52; }
 .h-item.active { border-left-color: #ffd54f; }
-.h-date { font-size: 10px; color: #78909c; margin-bottom: 2px; }
-.h-title { font-size: 12px; font-weight: bold; color: #cfd8dc; margin-bottom: 3px; }
+.h-date   { font-size: 10px; color: #78909c; margin-bottom: 2px; }
+.h-title  { font-size: 12px; font-weight: bold; color: #cfd8dc; margin-bottom: 2px; }
 .h-amount { font-size: 12px; color: #66bb6a; }
 .h-del {
   position: absolute; top: 7px; right: 8px;
-  background: #c62828; color: #fff;
-  border: none; border-radius: 3px;
-  font-size: 10px; padding: 1px 5px;
-  cursor: pointer; line-height: 1.4;
+  background: #c62828; color: #fff; border: none; border-radius: 3px;
+  font-size: 10px; padding: 1px 5px; cursor: pointer;
 }
 .h-del:hover { background: #e53935; }
 
-/* ---------- Main ---------- */
-#main { flex: 1; padding: 18px 24px; overflow-x: auto; }
-
-#actions {
-  display: flex; align-items: center; gap: 8px;
-  margin-bottom: 16px;
-}
+/* ── Main ── */
+#main { flex: 1; padding: 16px 22px; overflow-x: auto; }
+#actions { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .btn {
   padding: 7px 18px; border: none; border-radius: 5px;
-  font-size: 13px; font-family: inherit;
-  cursor: pointer; letter-spacing: 0.5px;
+  font-size: 13px; font-family: inherit; cursor: pointer;
 }
-.btn-save   { background: #1565c0; color: #fff; }
-.btn-save:hover { background: #1976d2; }
-.btn-print  { background: #6a1b9a; color: #fff; }
+.btn-save  { background: #1565c0; color: #fff; }
+.btn-save:hover  { background: #1976d2; }
+.btn-print { background: #6a1b9a; color: #fff; }
 .btn-print:hover { background: #7b1fa2; }
-.btn-clear  { background: #546e7a; color: #fff; }
+.btn-clear { background: #546e7a; color: #fff; }
 .btn-clear:hover { background: #607d8b; }
 #save-msg { font-size: 12px; color: #43a047; margin-left: 4px; }
 
-/* ============================
-   FORM PAGE  (A4 = 210 × 297 mm)
-   ============================ */
+/* ══════════════════════════════════
+   FORM PAGE  (A4)
+   ══════════════════════════════════ */
 #form-page {
-  background: #fff;
-  width: 210mm;
-  min-height: 297mm;
+  background: #fff; width: 210mm; min-height: 297mm;
   padding: 7mm 7mm 5mm 7mm;
   box-shadow: 0 3px 12px rgba(0,0,0,.25);
-  font-family: '標楷體', 'DFKai-SB', 'BiauKai', 'KaiTi', serif;
+  font-family: '標楷體','DFKai-SB','BiauKai','KaiTi',serif;
   font-size: 12px;
-  position: relative;
 }
+.fi  { border: none; border-bottom: 1px solid #555; background: transparent;
+       font-family: inherit; font-size: inherit; outline: none; width: 100%; }
+.fta { border: none; background: transparent; font-family: inherit;
+       font-size: inherit; outline: none; width: 100%; resize: none;
+       overflow: hidden; line-height: 1.45; }
+.fsel { border: none; border-bottom: 1px dashed #777; background: transparent;
+        font-family: inherit; font-size: inherit; outline: none;
+        cursor: pointer; max-width: 100%; }
 
-/* ---- shared input styles ---- */
-.fi {                          /* form-input */
-  border: none;
-  border-bottom: 1px solid #555;
-  background: transparent;
-  font-family: inherit;
-  font-size: inherit;
-  outline: none;
-  width: 100%;
-}
-.fta {                         /* form-textarea */
-  border: none;
-  background: transparent;
-  font-family: inherit;
-  font-size: inherit;
-  outline: none;
-  width: 100%;
-  resize: none;
-  overflow: hidden;
-  line-height: 1.45;
-}
-.fsel {                        /* form-select */
-  border: none;
-  border-bottom: 1px dashed #777;
-  background: transparent;
-  font-family: inherit;
-  font-size: inherit;
-  outline: none;
-  cursor: pointer;
-  max-width: 100%;
-}
-
-/* ============================
-   UPPER SECTION
-   ============================ */
-.u-header {
-  display: flex;
-  align-items: flex-start;
-  margin-bottom: 1.5mm;
-}
-.u-main-acct {
-  font-size: 13px;
-  font-weight: bold;
-  min-width: 18mm;
-  padding-top: 3mm;
-  white-space: nowrap;
-}
+/* ── Upper section ── */
+.u-header { display: flex; align-items: flex-start; margin-bottom: 1.5mm; }
+.u-main-acct { font-size: 13px; font-weight: bold; min-width: 18mm; padding-top: 3mm; white-space: nowrap; }
 .u-title-wrap { flex: 1; text-align: center; }
-.u-org    { font-size: 19px; font-weight: bold; letter-spacing: 3px; }
-.u-sub    { font-size: 12.5px; text-decoration: underline; margin-top: 1mm; }
+.u-org  { font-size: 19px; font-weight: bold; letter-spacing: 3px; }
+.u-sub  { font-size: 12.5px; text-decoration: underline; margin-top: 1mm; }
 
-/* Upper data table */
 .ut { width: 100%; border-collapse: collapse; }
-.ut td {
-  border: 1px solid #333;
-  vertical-align: top;
-  padding: 1.5mm 2mm;
-}
-.cell-lbl {
-  font-size: 10px; color: #444;
-  margin-bottom: 1mm; display: block;
-}
-.bp-row {
-  display: flex; align-items: center; margin: 0.8mm 0; font-size: 11.5px;
-}
+.ut td { border: 1px solid #333; vertical-align: top; padding: 1.5mm 2mm; }
+.cell-lbl { font-size: 10px; color: #444; margin-bottom: 1mm; display: block; }
+.bp-row { display: flex; align-items: center; margin: 0.8mm 0; font-size: 11.5px; }
 .bp-row label { min-width: 14mm; font-size: 11px; flex-shrink: 0; }
-.amount-num {
-  font-size: 20px; font-weight: bold;
-  text-align: center; margin-top: 1.5mm;
-}
+.amount-num { font-size: 20px; font-weight: bold; text-align: center; margin-top: 1.5mm; }
 
 /* Signature grid */
 .sg { width: 100%; border-collapse: collapse; border-top: none; }
 .sg td {
-  border: 1px solid #333;
-  text-align: center;
-  vertical-align: top;
-  font-size: 11px;
-  padding: 1mm;
-  height: 16mm;
+  border: 1px solid #333; text-align: center;
+  vertical-align: top; font-size: 11px; padding: 1mm; height: 16mm;
 }
 .sg td.top-lbl { height: auto; padding: 1mm 2mm; vertical-align: middle; }
-/* diagonal slash for 保管 / 財物登記 */
 .slash {
-  background:
-    linear-gradient(to bottom right,
-      transparent calc(50% - .6px),
-      #555 calc(50% - .6px),
-      #555 calc(50% + .6px),
-      transparent calc(50% + .6px));
+  background: linear-gradient(to bottom right,
+    transparent calc(50% - .6px), #555 calc(50% - .6px),
+    #555 calc(50% + .6px), transparent calc(50% + .6px));
 }
 
 /* Cut line */
 .cut-line {
-  text-align: center;
-  font-size: 9.5px;
-  color: #888;
-  margin: 2mm 0;
-  letter-spacing: 4px;
-  user-select: none;
+  text-align: center; font-size: 9.5px; color: #888;
+  margin: 2mm 0; letter-spacing: 4px; user-select: none;
 }
 
-/* ============================
-   LOWER SECTION
-   ============================ */
+/* ── Lower section ── */
 .lower-wrap { width: 100%; border-collapse: collapse; }
 .lower-wrap > tbody > tr > td { vertical-align: top; }
 .lower-left  { border: 1px solid #333; }
 .lower-right {
-  border: 1px solid #333;
-  border-left: none;
-  width: 42mm;
-  padding: 1.5mm 2mm;
-  font-size: 11px;
-  vertical-align: top;
+  border: 1px solid #333; border-left: none;
+  width: 42mm; padding: 1.5mm 2mm; font-size: 11px; vertical-align: top;
 }
-
-.l-top-bar {
-  display: flex;
-  border-bottom: 1px solid #333;
-  align-items: center;
+.l-top-bar  { display: flex; border-bottom: 1px solid #333; align-items: center; }
+.l-top-title { font-size: 13px; font-weight: bold; padding: 1.5mm 3mm; }
+.l-unit-row { display: flex; border-bottom: 1px solid #333; font-size: 11.5px; }
+.l-unit-cell { padding: 1.5mm 3mm; display: flex; align-items: center; gap: 3mm; }
+.l-date-cell {
+  padding: 1.5mm 3mm; border-left: 1px solid #333;
+  display: flex; align-items: center; gap: 2mm; margin-left: auto;
 }
-.l-top-title {
-  font-size: 13px; font-weight: bold;
-  padding: 1.5mm 3mm;
-}
-.l-unit-row {
-  display: flex;
-  border-bottom: 1px solid #333;
-  font-size: 11.5px;
-}
-.l-unit-cell  { padding: 1.5mm 3mm; display: flex; align-items: center; gap: 3mm; }
-.l-date-cell  {
-  padding: 1.5mm 3mm;
-  border-left: 1px solid #333;
-  display: flex; align-items: center; gap: 2mm;
-  margin-left: auto;
-}
-
-/* Items table */
 .it { width: 100%; border-collapse: collapse; }
-.it th, .it td {
-  border: 1px solid #333;
-  padding: 1mm 1.5mm;
-  font-size: 11px;
-  text-align: center;
-}
+.it th, .it td { border: 1px solid #333; padding: 1mm 1.5mm; font-size: 11px; text-align: center; }
 .it th { background: #f5f5f5; font-size: 10.5px; }
 .it td.td-name, .it td.td-spec { text-align: left; }
 .it td input {
@@ -261,51 +163,62 @@ body {
   font-family: inherit; font-size: 11px; outline: none;
 }
 .it td.td-name input, .it td.td-spec input { text-align: left; }
-.it td.td-r   { text-align: right; }
+.it td.td-r { text-align: right; }
 .it td.td-r input { text-align: right; }
-.it tfoot td  { font-weight: bold; background: #f5f5f5; font-size: 12px; }
+.it tfoot td { font-weight: bold; background: #f5f5f5; font-size: 12px; }
 
-/* Bottom signatures */
 .bs { width: 100%; border-collapse: collapse; border-top: none; }
-.bs td {
-  border: 1px solid #333;
-  text-align: center;
-  font-size: 11px;
-  height: 6mm;
-  vertical-align: middle;
-  padding: 1mm;
-}
+.bs td { border: 1px solid #333; text-align: center; font-size: 11px; height: 6mm; vertical-align: middle; padding: 1mm; }
 .bs tr.sig-box td { height: 14mm; }
 .bs tr.exempt-row td { height: 7mm; font-size: 12px; font-weight: bold; border-top: 1px solid #333; }
 .hidden-cell { visibility: hidden; }
-
-/* Notes area */
 .notes-lbl { font-size: 11px; font-weight: bold; margin-bottom: 1.5mm; }
 
-/* ============================
-   PRINT STYLES
-   ============================ */
+/* ══════════════════════════════════
+   CONFIG MODAL
+   ══════════════════════════════════ */
+#cfg-modal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.55); z-index: 999;
+  align-items: center; justify-content: center;
+}
+#cfg-modal.open { display: flex; }
+#cfg-box {
+  background: #fff; border-radius: 8px; padding: 24px 28px;
+  width: 420px; box-shadow: 0 8px 32px rgba(0,0,0,.3);
+}
+#cfg-box h3 { font-size: 15px; margin-bottom: 16px; color: #1e2a38; }
+.cfg-row { margin-bottom: 14px; }
+.cfg-row label { display: block; font-size: 12px; color: #546e7a; margin-bottom: 4px; }
+.cfg-row input {
+  width: 100%; padding: 7px 10px; border: 1px solid #b0bec5;
+  border-radius: 4px; font-family: monospace; font-size: 12px; outline: none;
+}
+.cfg-row input:focus { border-color: #1976d2; }
+.cfg-hint { font-size: 11px; color: #90a4ae; margin-top: 3px; line-height: 1.4; }
+.cfg-btns { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; }
+.cfg-btns button {
+  padding: 7px 20px; border: none; border-radius: 5px;
+  font-size: 13px; font-family: inherit; cursor: pointer;
+}
+#cfg-save { background: #1565c0; color: #fff; }
+#cfg-save:hover { background: #1976d2; }
+#cfg-cancel { background: #eceff1; color: #37474f; }
+#cfg-cancel:hover { background: #cfd8dc; }
+
+/* ══════════════════════════════════
+   PRINT
+   ══════════════════════════════════ */
 @media print {
   @page { size: A4 portrait; margin: 0; }
-
   body { background: #fff; }
   #app  { display: block; }
-  #sidebar, #actions { display: none !important; }
-
+  #sidebar, #actions, #cfg-modal { display: none !important; }
   #main { padding: 0; }
-  #form-page {
-    width: 210mm;
-    min-height: 297mm;
-    padding: 7mm 7mm 5mm 7mm;
-    box-shadow: none;
-  }
-
-  /* hide input chrome on print */
+  #form-page { width: 210mm; min-height: 297mm; padding: 7mm 7mm 5mm 7mm; box-shadow: none; }
   .fi   { border-bottom-color: transparent; }
   .fsel { border-bottom-color: transparent; -webkit-appearance: none; appearance: none; }
   .fta  { border-bottom-color: transparent; }
-
-  /* hide date picker, show ROC text */
   #apply-date-input { display: none; }
   #roc-date-text    { display: inline !important; }
 }
@@ -314,25 +227,23 @@ body {
 <body>
 <div id="app">
 
-<!-- ================================================
-     SIDEBAR : History
-     ================================================ -->
+<!-- ══════════════════════ SIDEBAR ══════════════════════ -->
 <aside id="sidebar">
-  <div id="sidebar-header">
+  <div id="sb-header">
     <h2>📋 歷史紀錄</h2>
-    <button id="new-btn" onclick="newForm()">＋ 新增申請單</button>
+    <div id="sb-toolbar">
+      <button id="new-btn" onclick="newForm()">＋ 新增申請單</button>
+      <button id="cfg-btn" onclick="openCfg()" title="設定 GitHub Token">⚙️</button>
+    </div>
   </div>
+  <div id="sync-status">● 尚未連線</div>
   <div id="history-scroll">
     <div id="no-history">尚無紀錄</div>
   </div>
 </aside>
 
-<!-- ================================================
-     MAIN
-     ================================================ -->
+<!-- ══════════════════════ MAIN ══════════════════════ -->
 <div id="main">
-
-  <!-- Action buttons -->
   <div id="actions">
     <button class="btn btn-save"  onclick="saveRecord()">💾 儲存</button>
     <button class="btn btn-print" onclick="window.print()">🖨️ 列印</button>
@@ -340,84 +251,66 @@ body {
     <span id="save-msg"></span>
   </div>
 
-  <!-- ============================================
-       FORM PAGE  (mirrors A4 paper)
-       ============================================ -->
+  <!-- ══ FORM PAGE ══ -->
   <div id="form-page">
 
-    <!-- ==========================================
-         UPPER SECTION : 憑證用紙
-         ========================================== -->
-
-    <!-- Header row -->
+    <!-- ── Upper: 憑證用紙 ── -->
     <div class="u-header">
-      <div class="u-main-acct" id="main-acct-lbl">保管款專戶</div>
+      <div class="u-main-acct" id="main-acct-lbl">請選擇</div>
       <div class="u-title-wrap">
         <div class="u-org">臺南市佳里區衛生所</div>
         <div class="u-sub">採購(費用動支)申請單暨黏貼憑證用紙</div>
       </div>
     </div>
 
-    <!-- Top data table -->
     <table class="ut">
       <colgroup>
-        <col style="width:16mm">
-        <col>
-        <col style="width:24mm">
-        <col style="width:46mm">
+        <col style="width:16mm"><col><col style="width:24mm"><col style="width:46mm">
       </colgroup>
       <tr>
-        <!-- 憑證編號 -->
         <td style="text-align:center; vertical-align:middle;">
           <span class="cell-lbl">憑證編號</span>
-          <input class="fi" id="voucher-no" type="text"
-                 style="text-align:center; font-size:11px; margin-top:2mm;">
+          <input class="fi" id="voucher-no" type="text" style="text-align:center; font-size:11px; margin-top:2mm;">
         </td>
-
-        <!-- 預算科目 -->
         <td>
           <span class="cell-lbl">預算科目</span>
+          <!-- 串聯下拉：第1層 主科目 -->
           <div class="bp-row">
             <label>業務計畫：</label>
-            <select class="fsel" id="main-acct-sel" onchange="onMainAcctChange()"
-                    style="width:22mm; margin-right:2mm;">
+            <select class="fsel" id="sel-main" onchange="onMainChange()" style="width:24mm; margin-right:2mm;">
+              <option value="">── 主科目 ──</option>
             </select>
-            <select class="fsel" id="bp-sel" onchange="onBpChange()" style="flex:1;">
+            <!-- 串聯下拉：第2層 業務計畫（主科目選了才出現） -->
+            <select class="fsel" id="sel-bp" onchange="onBpChange()"
+                    style="flex:1; display:none;">
             </select>
           </div>
           <div class="bp-row">
             <label>工作計畫：</label>
-            <span id="wp-display" style="font-size:11.5px;"></span>
+            <span id="wp-text" style="font-size:11.5px;"></span>
           </div>
-          <div class="bp-row">
+          <!-- 串聯下拉：第3層 用途別（業務計畫選了才出現） -->
+          <div class="bp-row" id="row-purpose" style="display:none;">
             <label>用途別　：</label>
-            <select class="fsel" id="purpose-sel" style="flex:1;"></select>
+            <select class="fsel" id="sel-purpose" style="flex:1;"></select>
           </div>
         </td>
-
-        <!-- 金額 -->
         <td style="text-align:center; vertical-align:middle;">
           <span class="cell-lbl">金額</span>
           <div class="amount-num" id="amount-disp">$0</div>
         </td>
-
-        <!-- 用途說明 -->
         <td>
           <span class="cell-lbl">用途說明</span>
-          <textarea class="fta" id="purpose-desc" rows="4"
-                    style="font-size:11.5px; min-height:16mm;"></textarea>
+          <textarea class="fta" id="purpose-desc" rows="4" style="font-size:11.5px; min-height:16mm;"></textarea>
         </td>
       </tr>
     </table>
 
-    <!-- Signature grid (upper) -->
+    <!-- Signature grid -->
     <table class="sg">
       <colgroup>
-        <col style="width:22%">
-        <col style="width:14%">
-        <col style="width:22%">
-        <col style="width:22%">
-        <col style="width:20%">
+        <col style="width:22%"><col style="width:14%"><col style="width:22%">
+        <col style="width:22%"><col style="width:20%">
       </colgroup>
       <tr>
         <td rowspan="2" style="vertical-align:middle;">經(承)辦單位</td>
@@ -428,101 +321,65 @@ body {
         <td rowspan="2" style="vertical-align:middle;">主(會)計單位</td>
         <td rowspan="2" style="vertical-align:middle;">機關長官</td>
       </tr>
-      <tr>
-        <td>驗收</td>
-        <td>出納單位</td>
-      </tr>
+      <tr><td>驗收</td><td>出納單位</td></tr>
     </table>
 
-    <!-- Cut line -->
-    <div class="cut-line">
-      ─────────────憑─────────證─────────粘─────────貼─────────線─────────
-    </div>
+    <div class="cut-line">─────────────憑─────────證─────────粘─────────貼─────────線─────────</div>
 
-    <!-- ==========================================
-         LOWER SECTION : 採購 / 動支
-         ========================================== -->
-    <table class="lower-wrap">
-      <tbody>
-      <tr>
-        <!-- Left : items area -->
-        <td class="lower-left">
-
-          <!-- Section title bar -->
-          <div class="l-top-bar">
-            <div class="l-top-title">採購／動支</div>
+    <!-- ── Lower: 採購/動支 ── -->
+    <table class="lower-wrap"><tbody><tr>
+      <td class="lower-left">
+        <div class="l-top-bar"><div class="l-top-title">採購／動支</div></div>
+        <div class="l-unit-row">
+          <div class="l-unit-cell">
+            <span>單位</span><span style="font-weight:bold;">臺南市佳里區衛生所</span>
           </div>
-
-          <!-- Unit + Date row -->
-          <div class="l-unit-row">
-            <div class="l-unit-cell">
-              <span>單位</span>
-              <span style="font-weight:bold;">臺南市佳里區衛生所</span>
-            </div>
-            <div class="l-date-cell">
-              <span>申請日期</span>
-              <input type="date" id="apply-date-input" class="fi"
-                     style="width:30mm; font-size:11px;"
-                     onchange="updateRocDate()">
-              <span id="roc-date-text" style="font-size:11.5px; display:none;"></span>
-            </div>
+          <div class="l-date-cell">
+            <span>申請日期</span>
+            <input type="date" id="apply-date-input" class="fi"
+                   style="width:30mm; font-size:11px;" onchange="updateRocDate()">
+            <span id="roc-date-text" style="font-size:11.5px; display:none;"></span>
           </div>
+        </div>
+        <table class="it">
+          <thead>
+            <tr>
+              <th rowspan="2" style="width:28%;">採購品名／動支細項</th>
+              <th rowspan="2" style="width:20%;">規格（樣式）</th>
+              <th rowspan="2" style="width:9%;">數量</th>
+              <th rowspan="2" style="width:8%;">單位</th>
+              <th colspan="2">預估金額</th>
+            </tr>
+            <tr>
+              <th style="width:17%;">單價</th>
+              <th style="width:18%;">總額</th>
+            </tr>
+          </thead>
+          <tbody id="items-body"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4" style="text-align:center;">合計</td>
+              <td></td>
+              <td class="td-r" id="grand-total" style="padding-right:3mm;">$0</td>
+            </tr>
+          </tfoot>
+        </table>
+      </td>
+      <td class="lower-right">
+        <div class="notes-lbl">其他說明事項</div>
+        <textarea class="fta" id="notes" style="min-height:52mm; font-size:11px;" rows="14"></textarea>
+      </td>
+    </tr></tbody></table>
 
-          <!-- Items table -->
-          <table class="it">
-            <thead>
-              <tr>
-                <th rowspan="2" style="width:28%;">採購品名／動支細項</th>
-                <th rowspan="2" style="width:20%;">規格（樣式）</th>
-                <th rowspan="2" style="width:9%;">數量</th>
-                <th rowspan="2" style="width:8%;">單位</th>
-                <th colspan="2">預估金額</th>
-              </tr>
-              <tr>
-                <th style="width:17%;">單價</th>
-                <th style="width:18%;">總額</th>
-              </tr>
-            </thead>
-            <tbody id="items-body">
-              <!-- generated by JS -->
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colspan="4" style="text-align:center;">合計</td>
-                <td></td>
-                <td class="td-r" id="grand-total" style="padding-right:3mm;">$0</td>
-              </tr>
-            </tfoot>
-          </table>
-
-        </td>
-
-        <!-- Right : notes area -->
-        <td class="lower-right">
-          <div class="notes-lbl">其他說明事項</div>
-          <textarea class="fta" id="notes"
-                    style="min-height:52mm; font-size:11px;" rows="14"></textarea>
-        </td>
-      </tr>
-      </tbody>
-    </table>
-
-    <!-- Bottom signature table -->
+    <!-- Bottom signatures -->
     <table class="bs">
       <tr>
-        <td>請購單位</td>
-        <td>採購單位</td>
-        <td>主(會)計單位</td>
-        <td>機關長官</td>
+        <td>請購單位</td><td>採購單位</td><td>主(會)計單位</td><td>機關長官</td>
       </tr>
-      <tr class="sig-box">
-        <td></td><td></td><td></td><td></td>
-      </tr>
+      <tr class="sig-box"><td></td><td></td><td></td><td></td></tr>
       <tr class="exempt-row" id="exempt-row">
-        <td id="ex1">免核章</td>
-        <td id="ex2">免核章</td>
-        <td id="ex3">免核章</td>
-        <td id="ex4">免核章</td>
+        <td id="ex1">免核章</td><td id="ex2">免核章</td>
+        <td id="ex3">免核章</td><td id="ex4">免核章</td>
       </tr>
     </table>
 
@@ -530,316 +387,444 @@ body {
 </div><!-- /#main -->
 </div><!-- /#app -->
 
-<!-- ================================================
-     JAVASCRIPT
-     ================================================ -->
+<!-- ══════════════════════ CONFIG MODAL ══════════════════════ -->
+<div id="cfg-modal">
+  <div id="cfg-box">
+    <h3>⚙️ 連線設定</h3>
+    <div class="cfg-row">
+      <label>Gist ID（共用記錄）</label>
+      <input id="cfg-gist" type="text" placeholder="例：a1b2c3d4e5f6...">
+      <div class="cfg-hint">
+        在 GitHub 建立一個名為 <b>records.json</b> 的 Gist，<br>
+        內容填 <b>[]</b>，把網址最後一段 ID 貼到這裡。
+      </div>
+    </div>
+    <div class="cfg-row">
+      <label>GitHub Token（儲存紀錄用）</label>
+      <input id="cfg-token" type="password" placeholder="ghp_xxxxxxxxxxxx">
+      <div class="cfg-hint">
+        GitHub → Settings → Developer settings → Personal access tokens<br>
+        建立 token，勾選 <b>gist</b> 權限即可。只需在本台電腦設定一次，<br>
+        其他電腦各自設定自己的 token（Gist ID 相同）。
+      </div>
+    </div>
+    <div class="cfg-btns">
+      <button id="cfg-cancel" onclick="closeCfg()">取消</button>
+      <button id="cfg-save"   onclick="saveCfg()">儲存設定</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ JAVASCRIPT ══════════════════════ -->
 <script>
 'use strict';
 
-/* ── 預設科目資料（subjects.json 載入失敗時的備用） ── */
-const DEFAULT_SUBJECTS = {
-  settings: { orgName: '臺南市佳里區衛生所', exemptThreshold: 10000 },
-  mainAccounts: []
-};
-
-let CFG = DEFAULT_SUBJECTS;
+/* ── Config ── */
+let CFG = { settings: { orgName:'臺南市佳里區衛生所', exemptThreshold:10000, gistId:'' }, mainAccounts:[] };
 let currentId = null;
+const ROWS = 7;
+const GIST_FILE = 'records.json';
 
-/* ════════════════════════════════
+/* ══════════════════════
    INIT
-   ════════════════════════════════ */
+   ══════════════════════ */
 (async function init() {
   try {
     const r = await fetch('subjects.json');
     if (r.ok) CFG = await r.json();
-  } catch (_) { /* 使用預設值 */ }
+  } catch(_) {}
 
-  buildMainAcctDropdown();
+  buildMainDropdown();
   generateItemRows();
-  renderHistory();
   setTodayDate();
   calcTotal();
+  await syncFromGist();
 })();
 
-/* ════════════════════════════════
-   DROPDOWNS
-   ════════════════════════════════ */
-function buildMainAcctDropdown() {
-  const sel = document.getElementById('main-acct-sel');
-  sel.innerHTML = '';
+/* ══════════════════════
+   CASCADING DROPDOWNS
+   ══════════════════════ */
+function buildMainDropdown() {
+  const sel = document.getElementById('sel-main');
+  sel.innerHTML = '<option value="">── 選擇主科目 ──</option>';
   CFG.mainAccounts.forEach(a => {
-    const o = new Option(a.name, a.code);
-    sel.appendChild(o);
+    sel.appendChild(new Option(a.name, a.code));
   });
-  onMainAcctChange();
+  onMainChange();
 }
 
-function onMainAcctChange() {
-  const code = document.getElementById('main-acct-sel').value;
+function onMainChange() {
+  const code = document.getElementById('sel-main').value;
   const acct = CFG.mainAccounts.find(a => a.code === code);
 
-  document.getElementById('main-acct-lbl').textContent = acct ? acct.name : '';
+  // 更新左上角文字
+  document.getElementById('main-acct-lbl').textContent = acct ? acct.name : '請選擇';
 
-  const bpSel = document.getElementById('bp-sel');
+  // 第2層：業務計畫下拉（主科目選了才顯示）
+  const bpSel = document.getElementById('sel-bp');
   bpSel.innerHTML = '<option value="">── 選擇業務計畫 ──</option>';
-  (acct ? acct.businessPlans : []).forEach(bp => {
-    const o = new Option(bp.code + ' ' + bp.name, bp.code);
-    bpSel.appendChild(o);
-  });
-  onBpChange();
+
+  if (acct) {
+    acct.businessPlans.forEach(bp => {
+      bpSel.appendChild(new Option(bp.code + '　' + bp.name, bp.code));
+    });
+    bpSel.style.display = '';
+  } else {
+    bpSel.style.display = 'none';
+  }
+
+  // 重置下層
+  document.getElementById('wp-text').textContent = '';
+  document.getElementById('sel-purpose').innerHTML = '';
+  document.getElementById('row-purpose').style.display = 'none';
 }
 
 function onBpChange() {
-  const acctCode = document.getElementById('main-acct-sel').value;
-  const bpCode   = document.getElementById('bp-sel').value;
+  const acctCode = document.getElementById('sel-main').value;
+  const bpCode   = document.getElementById('sel-bp').value;
   const acct = CFG.mainAccounts.find(a => a.code === acctCode);
   const bp   = acct ? acct.businessPlans.find(b => b.code === bpCode) : null;
 
-  document.getElementById('wp-display').textContent = bp ? bp.workPlan : '';
+  // 工作計畫自動帶入
+  document.getElementById('wp-text').textContent = bp ? bp.workPlan : '';
 
-  const pSel = document.getElementById('purpose-sel');
+  // 第3層：用途別（業務計畫選了、且有選項才顯示）
+  const pSel = document.getElementById('sel-purpose');
+  const pRow = document.getElementById('row-purpose');
   pSel.innerHTML = '<option value="">── 選擇用途別 ──</option>';
-  (bp ? bp.purposes : []).forEach(p => {
-    const o = new Option(p.code + ' ' + p.name, p.code);
-    pSel.appendChild(o);
-  });
+
+  if (bp && bp.purposes.length > 0) {
+    bp.purposes.forEach(p => {
+      pSel.appendChild(new Option(p.code + '　' + p.name, p.code));
+    });
+    pRow.style.display = '';
+  } else {
+    pRow.style.display = 'none';
+  }
 }
 
-/* ════════════════════════════════
+/* ══════════════════════
    ITEMS TABLE
-   ════════════════════════════════ */
-const ROWS = 7;
-
+   ══════════════════════ */
 function generateItemRows() {
   const tb = document.getElementById('items-body');
   tb.innerHTML = '';
   for (let i = 0; i < ROWS; i++) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td class="td-name"><input type="text" data-r="${i}" data-c="name"></td>
-      <td class="td-spec"><input type="text" data-r="${i}" data-c="spec"></td>
-      <td class="td-r"><input type="number" data-r="${i}" data-c="qty"
-            min="0" step="0.1" oninput="calcRow(${i})"></td>
-      <td style="text-align:center;"><input type="text" data-r="${i}" data-c="unit"
-            style="text-align:center;"></td>
-      <td class="td-r"><input type="number" data-r="${i}" data-c="price"
-            min="0" step="1" oninput="calcRow(${i})"></td>
+      <td class="td-name"><input type="text"   data-r="${i}" data-c="name"></td>
+      <td class="td-spec"><input type="text"   data-r="${i}" data-c="spec"></td>
+      <td class="td-r">  <input type="number" data-r="${i}" data-c="qty"   min="0" step="0.1" oninput="calcRow(${i})"></td>
+      <td style="text-align:center;"><input type="text" data-r="${i}" data-c="unit" style="text-align:center;"></td>
+      <td class="td-r">  <input type="number" data-r="${i}" data-c="price" min="0" step="1"   oninput="calcRow(${i})"></td>
       <td class="td-r" id="sub${i}" style="padding-right:3mm;"></td>`;
     tb.appendChild(tr);
   }
 }
 
 function calcRow(i) {
-  const qty   = parseFloat(q(i,'qty').value)   || 0;
-  const price = parseFloat(q(i,'price').value) || 0;
+  const qty   = parseFloat(qv(i,'qty'))   || 0;
+  const price = parseFloat(qv(i,'price')) || 0;
   const sub   = Math.round(qty * price);
-  document.getElementById('sub' + i).textContent = sub > 0 ? fmtMoney(sub) : '';
+  document.getElementById('sub'+i).textContent = sub > 0 ? fmtM(sub) : '';
   calcTotal();
 }
 
 function calcTotal() {
   let total = 0;
-  for (let i = 0; i < ROWS; i++) {
-    total += Math.round(
-      (parseFloat(q(i,'qty').value)   || 0) *
-      (parseFloat(q(i,'price').value) || 0)
-    );
-  }
-  document.getElementById('amount-disp').textContent  = '$' + fmtNum(total);
-  document.getElementById('grand-total').textContent  = '$' + fmtNum(total);
+  for (let i = 0; i < ROWS; i++)
+    total += Math.round((parseFloat(qv(i,'qty'))||0) * (parseFloat(qv(i,'price'))||0));
 
-  const thr    = CFG.settings.exemptThreshold;
-  const exempt = total > 0 && total < thr;
+  document.getElementById('amount-disp').textContent = '$' + fmtN(total);
+  document.getElementById('grand-total').textContent  = '$' + fmtN(total);
+
+  const exempt = total > 0 && total < (CFG.settings.exemptThreshold || 10000);
   ['ex1','ex2','ex3','ex4'].forEach(id => {
     const td = document.getElementById(id);
-    td.textContent  = '免核章';
-    td.className    = exempt ? '' : 'hidden-cell';
+    td.textContent = '免核章';
+    td.className   = exempt ? '' : 'hidden-cell';
   });
 }
 
-/* ════════════════════════════════
-   DATE HELPERS
-   ════════════════════════════════ */
+/* ══════════════════════
+   DATE
+   ══════════════════════ */
 function setTodayDate() {
-  const inp = document.getElementById('apply-date-input');
-  inp.value = new Date().toISOString().slice(0, 10);
+  document.getElementById('apply-date-input').value = new Date().toISOString().slice(0,10);
   updateRocDate();
 }
-
 function updateRocDate() {
   const v = document.getElementById('apply-date-input').value;
   if (!v) return;
-  const d  = new Date(v + 'T00:00:00');
-  const roc = (d.getFullYear() - 1911) + '年' +
-              (d.getMonth() + 1) + '月' +
-              d.getDate() + '日';
-  document.getElementById('roc-date-text').textContent = roc;
+  const d = new Date(v + 'T00:00:00');
+  document.getElementById('roc-date-text').textContent =
+    (d.getFullYear()-1911) + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日';
 }
 
-/* ════════════════════════════════
-   FORM SERIALISE / FILL
-   ════════════════════════════════ */
+/* ══════════════════════
+   GIST  (共用歷史記錄)
+   ══════════════════════ */
+function getGistId()  { return (CFG.settings.gistId || '').trim() || localStorage.getItem('gist_id') || ''; }
+function getToken()   { return localStorage.getItem('gh_token') || ''; }
+
+function setSyncStatus(msg, cls) {
+  const el = document.getElementById('sync-status');
+  el.textContent = msg; el.className = cls || '';
+}
+
+async function fetchGist() {
+  const id = getGistId();
+  if (!id) return null;
+  try {
+    const headers = { 'Accept': 'application/vnd.github+json' };
+    const token = getToken();
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const res = await fetch(`https://api.github.com/gists/${id}`, { headers });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const content = data.files?.[GIST_FILE]?.content;
+    return content ? JSON.parse(content) : [];
+  } catch(_) { return null; }
+}
+
+async function pushGist(records) {
+  const id    = getGistId();
+  const token = getToken();
+  if (!id || !token) return false;
+  try {
+    const res = await fetch(`https://api.github.com/gists/${id}`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/vnd.github+json'
+      },
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(records, null, 2) } } })
+    });
+    return res.ok;
+  } catch(_) { return false; }
+}
+
+async function syncFromGist() {
+  const id = getGistId();
+  if (!id) {
+    setSyncStatus('● 未設定 Gist ID（點 ⚙️ 設定）', 'err');
+    renderHistory([]);
+    return;
+  }
+  setSyncStatus('⟳ 同步中…', 'busy');
+  const records = await fetchGist();
+  if (records === null) {
+    setSyncStatus('● 連線失敗（請確認 Gist ID 及網路）', 'err');
+    renderHistory([]);
+  } else {
+    setSyncStatus(`● 已連線　共 ${records.length} 筆`, 'ok');
+    renderHistory(records);
+  }
+}
+
+/* ══════════════════════
+   SAVE / LOAD / DELETE
+   ══════════════════════ */
 function getFormData() {
   const items = [];
   let total = 0;
   for (let i = 0; i < ROWS; i++) {
-    const qty   = q(i,'qty').value;
-    const price = q(i,'price').value;
-    items.push({
-      name : q(i,'name').value,
-      spec : q(i,'spec').value,
-      qty, unit: q(i,'unit').value, price
-    });
-    total += Math.round((parseFloat(qty)||0) * (parseFloat(price)||0));
+    const qty = qv(i,'qty'), price = qv(i,'price');
+    items.push({ name:qv(i,'name'), spec:qv(i,'spec'), qty, unit:qv(i,'unit'), price });
+    total += Math.round((parseFloat(qty)||0)*(parseFloat(price)||0));
   }
-
-  const acctCode = document.getElementById('main-acct-sel').value;
-  const bpCode   = document.getElementById('bp-sel').value;
+  const acctCode = document.getElementById('sel-main').value;
+  const bpCode   = document.getElementById('sel-bp').value;
   const acct = CFG.mainAccounts.find(a => a.code === acctCode);
   const bp   = acct ? acct.businessPlans.find(b => b.code === bpCode) : null;
-
   return {
-    voucherNo    : document.getElementById('voucher-no').value,
-    acctCode, acctName   : acct ? acct.name : '',
-    bpCode,   bpLabel    : bp   ? bp.code + ' ' + bp.name : '',
-    purposeCode  : document.getElementById('purpose-sel').value,
-    purposeDesc  : document.getElementById('purpose-desc').value,
-    applyDateRaw : document.getElementById('apply-date-input').value,
-    applyDateRoc : document.getElementById('roc-date-text').textContent,
-    notes : document.getElementById('notes').value,
+    voucherNo   : document.getElementById('voucher-no').value,
+    acctCode, acctName  : acct ? acct.name : '',
+    bpCode,   bpLabel   : bp   ? bp.code+'　'+bp.name : '',
+    purposeCode : document.getElementById('sel-purpose').value,
+    purposeDesc : document.getElementById('purpose-desc').value,
+    applyDateRaw: document.getElementById('apply-date-input').value,
+    applyDateRoc: document.getElementById('roc-date-text').textContent,
+    notes: document.getElementById('notes').value,
     items, total
   };
 }
 
+async function saveRecord() {
+  const id    = getGistId();
+  const token = getToken();
+  if (!id) { alert('請先點 ⚙️ 設定 Gist ID'); return; }
+  if (!token) { alert('請先點 ⚙️ 設定 GitHub Token 才能儲存'); return; }
+
+  setSyncStatus('⟳ 儲存中…', 'busy');
+  const data = getFormData();
+  const now  = new Date();
+  const ts   = `${now.getFullYear()-1911}/${pad(now.getMonth()+1)}/${pad(now.getDate())} `+
+               `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+  // 先拉最新版本，避免覆蓋別人的資料
+  let records = await fetchGist() || [];
+
+  if (currentId) {
+    const idx = records.findIndex(r => r.id === currentId);
+    if (idx >= 0) records[idx] = { ...data, id: currentId, savedAt: ts };
+    else          records.push({ ...data, id: currentId, savedAt: ts });
+  } else {
+    currentId = Date.now().toString();
+    records.push({ ...data, id: currentId, savedAt: ts });
+  }
+
+  const ok = await pushGist(records);
+  if (ok) {
+    setSyncStatus(`● 已儲存　共 ${records.length} 筆`, 'ok');
+    renderHistory(records);
+    showMsg('✓ 已儲存 ' + ts);
+  } else {
+    setSyncStatus('● 儲存失敗（請確認 Token）', 'err');
+    showMsg('✗ 儲存失敗');
+  }
+}
+
+async function deleteRecord(id, e) {
+  e.stopPropagation();
+  if (!confirm('確定刪除此筆紀錄？')) return;
+  const token = getToken();
+  if (!token) { alert('請先設定 GitHub Token'); return; }
+  setSyncStatus('⟳ 刪除中…', 'busy');
+  let records = await fetchGist() || [];
+  records = records.filter(r => r.id !== id);
+  const ok = await pushGist(records);
+  if (ok) {
+    setSyncStatus(`● 已刪除　共 ${records.length} 筆`, 'ok');
+    if (currentId === id) currentId = null;
+    renderHistory(records);
+  } else {
+    setSyncStatus('● 刪除失敗', 'err');
+  }
+}
+
+function loadRecord(id) {
+  // 從目前渲染的列表中取得資料（已在記憶體中）
+  const items = document.querySelectorAll('.h-item');
+  // 重新從 gist 取，避免用過時快取
+  fetchGist().then(records => {
+    if (!records) return;
+    const rec = records.find(r => r.id === id);
+    if (!rec) return;
+    currentId = id;
+    fillForm(rec);
+    // 更新 active 樣式
+    document.querySelectorAll('.h-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.id === id);
+    });
+  });
+}
+
 function fillForm(rec) {
-  document.getElementById('voucher-no').value = rec.voucherNo || '';
+  document.getElementById('voucher-no').value   = rec.voucherNo   || '';
   document.getElementById('purpose-desc').value = rec.purposeDesc || '';
-  document.getElementById('notes').value = rec.notes || '';
-
-  /* dropdowns */
-  document.getElementById('main-acct-sel').value = rec.acctCode || '';
-  onMainAcctChange();
-  document.getElementById('bp-sel').value = rec.bpCode || '';
-  onBpChange();
-  document.getElementById('purpose-sel').value = rec.purposeCode || '';
-
-  /* date */
+  document.getElementById('notes').value        = rec.notes       || '';
   document.getElementById('apply-date-input').value = rec.applyDateRaw || '';
   updateRocDate();
 
-  /* items */
+  // 串聯下拉復原
+  document.getElementById('sel-main').value = rec.acctCode || '';
+  onMainChange();
+  document.getElementById('sel-bp').value   = rec.bpCode   || '';
+  onBpChange();
+  document.getElementById('sel-purpose').value = rec.purposeCode || '';
+
+  // 品項
   (rec.items || []).forEach((item, i) => {
     if (i >= ROWS) return;
-    q(i,'name').value  = item.name  || '';
-    q(i,'spec').value  = item.spec  || '';
-    q(i,'qty').value   = item.qty   || '';
-    q(i,'unit').value  = item.unit  || '';
-    q(i,'price').value = item.price || '';
+    qi(i,'name').value  = item.name  || '';
+    qi(i,'spec').value  = item.spec  || '';
+    qi(i,'qty').value   = item.qty   || '';
+    qi(i,'unit').value  = item.unit  || '';
+    qi(i,'price').value = item.price || '';
     calcRow(i);
   });
   calcTotal();
 }
 
-/* ════════════════════════════════
-   HISTORY  (localStorage)
-   ════════════════════════════════ */
-const LS_KEY = 'eaf_records';
-
-function getHistory()          { return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); }
-function setHistory(h)         { localStorage.setItem(LS_KEY, JSON.stringify(h)); }
-
-function saveRecord() {
-  const data = getFormData();
-  const now  = new Date();
-  const ts   = `${now.getFullYear()-1911}/${pad(now.getMonth()+1)}/${pad(now.getDate())} ` +
-               `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-
-  let history = getHistory();
-  if (currentId) {
-    const idx = history.findIndex(r => r.id === currentId);
-    if (idx >= 0) { history[idx] = { ...data, id: currentId, savedAt: ts }; }
-    else          { history.push({ ...data, id: currentId, savedAt: ts }); }
-  } else {
-    currentId = Date.now().toString();
-    history.push({ ...data, id: currentId, savedAt: ts });
-  }
-  setHistory(history);
-  renderHistory();
-
-  const msg = document.getElementById('save-msg');
-  msg.textContent = '✓ 已儲存 ' + ts;
-  setTimeout(() => msg.textContent = '', 3500);
-}
-
-function loadRecord(id) {
-  const rec = getHistory().find(r => r.id === id);
-  if (!rec) return;
-  currentId = id;
-  fillForm(rec);
-  renderHistory();  /* update active highlight */
-}
-
-function deleteRecord(id, e) {
-  e.stopPropagation();
-  if (!confirm('確定刪除此筆紀錄？')) return;
-  setHistory(getHistory().filter(r => r.id !== id));
-  if (currentId === id) { currentId = null; }
-  renderHistory();
-}
-
-function renderHistory() {
-  const list = document.getElementById('history-scroll');
-  const h    = getHistory();
-  if (h.length === 0) {
-    list.innerHTML = '<div id="no-history">尚無紀錄</div>';
+function renderHistory(records) {
+  const wrap = document.getElementById('history-scroll');
+  if (!records || records.length === 0) {
+    wrap.innerHTML = '<div id="no-history">尚無紀錄</div>';
     return;
   }
-  list.innerHTML = '';
-  [...h].reverse().forEach(rec => {
+  wrap.innerHTML = '';
+  [...records].reverse().forEach(rec => {
     const div = document.createElement('div');
     div.className = 'h-item' + (rec.id === currentId ? ' active' : '');
+    div.dataset.id = rec.id;
     div.innerHTML = `
       <button class="h-del" onclick="deleteRecord('${rec.id}',event)">✕</button>
-      <div class="h-date">${rec.savedAt || ''}</div>
+      <div class="h-date">${esc(rec.savedAt||'')}</div>
       <div class="h-title">${esc(rec.acctName)} / ${esc(rec.bpLabel)}</div>
-      <div class="h-amount">$${fmtNum(rec.total)}　${esc(rec.applyDateRoc||rec.applyDateRaw)}</div>`;
+      <div class="h-amount">$${fmtN(rec.total)}　${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</div>`;
     div.onclick = () => loadRecord(rec.id);
-    list.appendChild(div);
+    wrap.appendChild(div);
   });
 }
 
 function newForm() {
   currentId = null;
-  /* clear all inputs */
-  document.getElementById('voucher-no').value  = '';
+  document.getElementById('voucher-no').value   = '';
   document.getElementById('purpose-desc').value = '';
   document.getElementById('notes').value        = '';
   for (let i = 0; i < ROWS; i++) {
-    ['name','spec','qty','unit','price'].forEach(c => q(i,c).value = '');
+    ['name','spec','qty','unit','price'].forEach(c => qi(i,c).value = '');
     document.getElementById('sub'+i).textContent = '';
   }
   setTodayDate();
-  buildMainAcctDropdown();
+  buildMainDropdown();
   calcTotal();
   document.getElementById('save-msg').textContent = '';
-  renderHistory();
+  // 移除 active 樣式
+  document.querySelectorAll('.h-item').forEach(el => el.classList.remove('active'));
 }
 
 function clearForm() {
-  if (!confirm('確定清除所有填入資料？（歷史紀錄不受影響）')) return;
+  if (!confirm('確定清除所有填入資料？（Gist 歷史不受影響）')) return;
   newForm();
 }
 
-/* ════════════════════════════════
-   UTILITIES
-   ════════════════════════════════ */
-function q(row, col) {
-  return document.querySelector(`[data-r="${row}"][data-c="${col}"]`);
+/* ══════════════════════
+   CONFIG MODAL
+   ══════════════════════ */
+function openCfg() {
+  document.getElementById('cfg-gist').value  = getGistId();
+  document.getElementById('cfg-token').value = getToken();
+  document.getElementById('cfg-modal').classList.add('open');
 }
-function fmtNum(n)   { return Number(n).toLocaleString('zh-TW'); }
-function fmtMoney(n) { return '$' + fmtNum(n); }
-function pad(n)      { return String(n).padStart(2,'0'); }
-function esc(s)      { return (s||'').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function closeCfg() {
+  document.getElementById('cfg-modal').classList.remove('open');
+}
+async function saveCfg() {
+  const gist  = document.getElementById('cfg-gist').value.trim();
+  const token = document.getElementById('cfg-token').value.trim();
+  localStorage.setItem('gist_id',   gist);
+  localStorage.setItem('gh_token',  token);
+  closeCfg();
+  await syncFromGist();
+}
+
+/* ══════════════════════
+   UTILS
+   ══════════════════════ */
+function qi(row, col) { return document.querySelector(`[data-r="${row}"][data-c="${col}"]`); }
+function qv(row, col) { return qi(row,col)?.value || ''; }
+function fmtN(n)  { return Number(n).toLocaleString('zh-TW'); }
+function fmtM(n)  { return '$' + fmtN(n); }
+function pad(n)   { return String(n).padStart(2,'0'); }
+function esc(s)   { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showMsg(t) {
+  const el = document.getElementById('save-msg');
+  el.textContent = t;
+  setTimeout(() => el.textContent = '', 3500);
+}
 </script>
 </body>
 </html>
