@@ -186,6 +186,17 @@ body {
 .cell-lbl { font-size: 11px; color: #222; font-weight: bold; margin-bottom: 1.5mm; display: block; }
 .bp-row { display: flex; align-items: center; margin: 1.2mm 0; font-size: 11.5px; gap: 2mm; }
 .bp-row label { min-width: 14mm; font-size: 11px; color: #444; flex-shrink: 0; }
+/* 講師費切換鈕 */
+.lect-btn {
+  padding: 2px 10px; border: 1px solid #90a4ae; border-radius: 4px;
+  font-size: 11px; cursor: pointer; background: #f5f5f5; color: #546e7a; margin-right: 3px;
+}
+.lect-btn.active { background: #1565c0; color: #fff; border-color: #1565c0; font-weight: bold; }
+/* 出納單位附註（薪資所得等） */
+#cashier-note {
+  font-size: 9.5px; color: #c62828; font-weight: bold;
+  margin-top: 1px; display: none;
+}
 .amount-num { font-size: 20px; font-weight: bold; text-align: center; margin-top: 1.5mm; }
 
 /* Signature grid */
@@ -507,7 +518,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.4.5</div>
+    <div id="sb-version">v1.4.6</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -589,6 +600,11 @@ body {
             <label>人員類別：</label>
             <span id="personnel-lbl" style="font-size:11.5px; color:#555;">兼任人員</span>
           </div>
+          <div class="bp-row" id="row-lecturer" style="display:none;">
+            <label>授課類別：</label>
+            <button class="lect-btn" id="lect-yes" onclick="setLecturer(true)">講師費</button>
+            <button class="lect-btn active" id="lect-no" onclick="setLecturer(false)">非講師費</button>
+          </div>
         </td>
         <td style="text-align:center; vertical-align:middle;">
           <span class="cell-lbl">金額</span>
@@ -624,7 +640,7 @@ body {
       <tr>
         <td id="sg-custody">保管</td>
         <td>驗收</td>
-        <td>出納單位</td>
+        <td id="sg-cashier">出納單位<div id="cashier-note"></div></td>
       </tr>
     </table>
 
@@ -923,8 +939,9 @@ function onMainChange() {
 }
 
 function onBpChange() {
-  const acct = CFG.mainAccounts.find(a=>a.code===document.getElementById('sel-main').value);
-  const bp   = acct ? acct.businessPlans.find(b=>b.code===document.getElementById('sel-bp').value) : null;
+  const acct   = CFG.mainAccounts.find(a=>a.code===document.getElementById('sel-main').value);
+  const bpCode = document.getElementById('sel-bp').value;
+  const bp     = acct ? acct.businessPlans.find(b=>b.code===bpCode) : null;
   document.getElementById('wp-text').textContent = bp ? bp.workPlan : '';
   const pSel = document.getElementById('sel-purpose');
   const pRow = document.getElementById('row-purpose');
@@ -934,13 +951,57 @@ function onBpChange() {
     pRow.style.display = '';
   } else { pRow.style.display = 'none'; }
   document.getElementById('row-personnel').style.display = 'none';
+  /* 講師費切換：特定業務計畫才顯示，且重設為非講師費 */
+  const showLect = LECTURER_BP_CODES.includes(bpCode);
+  document.getElementById('row-lecturer').style.display = showLect ? '' : 'none';
+  if (!_suppressAutoFill) { isLecturer = false; }
+  document.getElementById('lect-yes').classList.remove('active');
+  document.getElementById('lect-no').classList.add('active');
+  updateCashierNote();
 }
 
-/* 人員類別：用途別 1501 績效獎金 → 固定顯示「兼任人員」 */
+/* 人員類別：用途別 1301/1501 → 固定顯示「兼任人員」 */
 const PERSONNEL_CODES = ['1301', '1501'];
+
+/* 講師費顯示業務計畫代碼清單 */
+const LECTURER_BP_CODES = ['21020311','21020312','21020313','21020321'];
+let isLecturer = false;
+let _suppressAutoFill = false;   /* 載入已存記錄時抑制自動填入 */
+
+function setLecturer(val) {
+  isLecturer = val;
+  document.getElementById('lect-yes').classList.toggle('active',  val);
+  document.getElementById('lect-no').classList.toggle('active',  !val);
+  updateCashierNote();
+}
+
+function updateCashierNote() {
+  const purposeCode = document.getElementById('sel-purpose').value;
+  const bpCode      = document.getElementById('sel-bp').value;
+  let note = '';
+  if (purposeCode === '1501') {
+    note = '列入薪資／獎金所得';
+  } else if (LECTURER_BP_CODES.includes(bpCode) && isLecturer) {
+    note = '列入薪資所得';
+  }
+  const el = document.getElementById('cashier-note');
+  el.textContent    = note;
+  el.style.display  = note ? '' : 'none';
+}
+
 function onPurposeChange() {
   const code = document.getElementById('sel-purpose').value;
   document.getElementById('row-personnel').style.display = PERSONNEL_CODES.includes(code) ? '' : 'none';
+  updateCashierNote();
+
+  /* 用途別 2706：動支單第一列自動帶入預設值（僅首次選擇且欄位空白時） */
+  if (!_suppressAutoFill && code === '2706' && formType === 'expense') {
+    const nameEl  = qi(0, 'name');
+    const priceEl = qi(0, 'price');
+    if (nameEl  && !nameEl.value.trim())  nameEl.value  = '檢附支出證明單';
+    if (priceEl && !priceEl.value.trim()) priceEl.value = '30';
+    calcTotal();
+  }
 }
 
 /* ══════════════════════
@@ -1123,6 +1184,7 @@ function getFormData() {
     personnelCode : PERSONNEL_CODES.includes(document.getElementById('sel-purpose').value) ? '4' : '',
     personnelName : PERSONNEL_CODES.includes(document.getElementById('sel-purpose').value)
                     ? (document.getElementById('personnel-lbl')?.textContent||'兼任人員') : '',
+    lecturerType  : isLecturer ? 'lecturer' : 'non-lecturer',
     applyDateRaw: document.getElementById('apply-date-input').value,
     applyDateRoc: document.getElementById('roc-date-text').textContent,
     notes: document.getElementById('notes').value,
@@ -1131,6 +1193,7 @@ function getFormData() {
 }
 
 function fillForm(rec) {
+  _suppressAutoFill = true;   /* 載入記錄時不觸發自動帶值 */
   document.getElementById('voucher-no').value         = rec.voucherNo   || '';
   document.getElementById('purpose-desc').value       = rec.purposeDesc || '';
   document.getElementById('notes').value              = rec.notes       || '';
@@ -1143,6 +1206,12 @@ function fillForm(rec) {
   onBpChange();
   document.getElementById('sel-purpose').value = rec.purposeCode || '';
   onPurposeChange();
+  /* 還原講師費狀態 */
+  isLecturer = rec.lecturerType === 'lecturer';
+  document.getElementById('lect-yes').classList.toggle('active',  isLecturer);
+  document.getElementById('lect-no').classList.toggle('active',  !isLecturer);
+  updateCashierNote();
+  _suppressAutoFill = false;
   /* 確保行數足夠 */
   const needed = (rec.items||[]).length;
   while (rowCount < Math.max(needed, 10)) { appendRow(rowCount); rowCount++; }
@@ -1491,6 +1560,7 @@ function copyFromRecord(id) {
 function newForm(type) {
   currentId = null;
   rowCount = 10;
+  isLecturer = false;
   document.getElementById('voucher-no').value = '';
   ['purpose-desc','notes'].forEach(id=>document.getElementById(id).value='');
   applyType(type || 'purchase', { regen: false });
