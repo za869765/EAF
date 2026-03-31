@@ -238,9 +238,9 @@ body {
 <aside id="sidebar">
   <div id="sb-header">
     <h2>📋 歷史紀錄</h2>
-    <div id="sb-version">v1.1.1 ｜ <a href="admin.html" style="color:#4a8fb5; text-decoration:none;">管理入口</a></div>
+    <div id="sb-version">v1.1.2 ｜ <a href="admin.html" style="color:#4a8fb5; text-decoration:none;">管理入口</a></div>
     <div id="sb-btns">
-      <button id="new-btn" onclick="newForm()">＋ 新增申請單</button>
+      <button id="new-btn" onclick="newForm()">＋ 新增空白單</button>
       <button id="export-btn" onclick="exportCSV()" title="匯出CSV">⬇ 匯出</button>
     </div>
   </div>
@@ -253,7 +253,7 @@ body {
 <!-- ══════════════════════ MAIN ══════════════════════ -->
 <div id="main">
   <div id="actions">
-    <button class="btn btn-save"  onclick="saveRecord()">💾 儲存</button>
+    <button class="btn btn-save"  onclick="saveRecord()" id="save-btn">💾 存檔取號</button>
     <button class="btn btn-print" onclick="window.print()">🖨️ 列印</button>
     <button class="btn btn-clear" onclick="clearForm()">🗑️ 清除</button>
     <span id="save-msg"></span>
@@ -742,6 +742,11 @@ async function saveRecord() {
       if (idx>=0) records[idx] = {...data, id:currentId, savedAt:ts};
       else        records.push({...data, id:currentId, savedAt:ts});
     } else {
+      /* 新紀錄：儲存時才取憑證號 */
+      if (!data.voucherNo) {
+        data.voucherNo = generateVoucherNo(records);
+        document.getElementById('voucher-no').value = data.voucherNo;
+      }
       currentId = Date.now().toString();
       records.push({...data, id:currentId, savedAt:ts});
     }
@@ -810,8 +815,8 @@ function renderHistory(records) {
 
 function newForm() {
   currentId = null;
-  /* 自動產生憑證編號 */
-  document.getElementById('voucher-no').value = generateVoucherNo(cachedRecords);
+  /* 憑證編號留空，儲存時才取號 */
+  document.getElementById('voucher-no').value = '';
   ['purpose-desc','notes'].forEach(id => document.getElementById(id).value='');
   for (let i=0;i<ROWS;i++) {
     ['name','spec','qty','unit','price'].forEach(c=>qi(i,c).value='');
@@ -822,7 +827,7 @@ function newForm() {
   setTodayDate(); buildMainDropdown(); calcTotal();
   document.getElementById('save-msg').textContent='';
   document.querySelectorAll('.h-item').forEach(el=>el.classList.remove('active'));
-  showToast('📄 已開啟新申請單（' + document.getElementById('voucher-no').value + '）');
+  showToast('📄 已開啟空白申請單，填寫後按「存檔取號」');
 }
 
 function clearForm() {
