@@ -239,7 +239,8 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
     <!-- ── Tab: records ── -->
     <div id="tab-records" class="tab-pane">
       <div class="toolbar">
-        <button class="btn btn-gray" onclick="loadRecords()">🔄 重新載入</button>
+        <button class="btn btn-gray"  onclick="loadRecords()">🔄 重新載入</button>
+        <button class="btn btn-blue"  onclick="exportCSV()">⬇ 匯出 CSV</button>
         <span id="rec-count" style="font-size:12px; color:#546e7a;"></span>
         <span id="rec-msg" class="toolbar-msg"></span>
       </div>
@@ -550,6 +551,26 @@ async function loadRecords() {
   } catch (_) {
     setMsg('rec-msg', '❌ 載入失敗', true);
   }
+}
+
+async function exportCSV() {
+  setMsg('rec-msg', '⟳ 匯出中…', false);
+  try {
+    const records = await (await fetch('/api/records')).json();
+    if (!records.length) { setMsg('rec-msg', '尚無紀錄', false); return; }
+    const hdr = ['憑證編號','類型','申請日期','主科目代碼','主科目名稱','業務計畫代碼','業務計畫','用途別代碼','用途說明','金額','儲存時間'];
+    const rows = records.map(r=>[r.voucherNo||'',r.formType==='expense'?'動支單':'請購單',
+      r.applyDateRoc||r.applyDateRaw||'',r.acctCode||'',r.acctName||'',r.bpCode||'',
+      r.bpLabel||'',r.purposeCode||'',r.purposeDesc||'',r.total||0,r.savedAt||'']
+      .map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(','));
+    const csv = '\uFEFF' + hdr.join(',') + '\n' + rows.join('\n');
+    const a = Object.assign(document.createElement('a'),{
+      href: URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
+      download: '動支申請紀錄_'+new Date().toISOString().slice(0,10)+'.csv'
+    });
+    a.click(); URL.revokeObjectURL(a.href);
+    setMsg('rec-msg', `✓ 已匯出 ${records.length} 筆`, false);
+  } catch(_) { setMsg('rec-msg', '❌ 匯出失敗', true); }
 }
 
 async function deleteRecord(id) {

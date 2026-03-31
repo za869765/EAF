@@ -47,13 +47,6 @@ body {
 #new-purchase:hover { background: #1976d2; }
 #new-expense  { background: #6a1b9a; }
 #new-expense:hover  { background: #7b1fa2; }
-#export-btn {
-  width: 100%; padding: 6px 0;
-  background: #37474f; color: #cfd8dc;
-  border: none; border-radius: 5px;
-  font-size: 12px; font-family: inherit; cursor: pointer;
-}
-#export-btn:hover { background: #455a64; }
 
 /* sync status */
 #sync-status {
@@ -158,7 +151,7 @@ body {
 .sg { width: 100%; border-collapse: collapse; border-top: none; }
 .sg td {
   border: 1px solid #333; text-align: center;
-  vertical-align: top; font-size: 11px; padding: 2mm 1mm; height: 18mm;
+  vertical-align: top; font-size: 11px; padding: 2mm 1mm; height: 22mm;
 }
 /* Slash overlay for cells that are N/A */
 .sg td.slash {
@@ -203,14 +196,17 @@ body {
 .it tfoot td { font-weight: bold; background: #f5f5f5; font-size: 12px; vertical-align: middle; }
 .it tfoot td { height: 7mm; }
 
-/* Add row button */
-#add-row-btn {
-  display: block; width: 100%; border: 1px dashed #b0bec5;
-  background: #fafafa; color: #546e7a; font-size: 11px;
-  padding: 3px 0; cursor: pointer; font-family: inherit;
-  border-top: none;
+
+/* Add / Remove row buttons */
+#row-btns { display: flex; border-top: none; }
+#add-row-btn, #del-row-btn {
+  flex: 1; border: 1px dashed #b0bec5; background: #fafafa;
+  font-size: 11px; padding: 3px 0; cursor: pointer; font-family: inherit;
 }
-#add-row-btn:hover { background: #e8f5e9; color: #2e7d32; border-color: #66bb6a; }
+#add-row-btn { color: #2e7d32; border-right: none; }
+#add-row-btn:hover { background: #e8f5e9; border-color: #66bb6a; }
+#del-row-btn { color: #c62828; }
+#del-row-btn:hover { background: #fce4ec; border-color: #ef9a9a; }
 
 /* ── Bottom signatures ── */
 .bs { width: 100%; border-collapse: collapse; border-top: none; }
@@ -218,7 +214,7 @@ body {
   border: 1px solid #333; text-align: center; font-size: 11px;
   vertical-align: top; padding: 2mm 1mm;
 }
-.bs tr.label-row td { height: 6mm; vertical-align: middle; }
+.bs tr.label-row td { height: 6mm; vertical-align: top; padding-top: 2mm; }
 .bs tr.sig-box td { height: 22mm; vertical-align: top; }
 .bs tr.exempt-row td {
   height: 8mm; font-size: 12px; font-weight: bold;
@@ -226,6 +222,18 @@ body {
 }
 .hidden-cell { visibility: hidden; }
 .notes-lbl { font-size: 11px; font-weight: bold; margin-bottom: 1.5mm; }
+
+/* ── Form inactive overlay ── */
+#form-page.inactive { pointer-events: none; }
+#form-page.inactive::after {
+  content: '← 請點選左側按鈕開始填單';
+  position: absolute; inset: 0; z-index: 10;
+  background: rgba(220,225,232,0.72);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: bold; color: #37474f;
+  letter-spacing: 3px; border-radius: 0;
+  font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif;
+}
 
 /* purchase-sig: only for 請購單 + >= threshold */
 #purchase-sig { display: none; }
@@ -272,11 +280,10 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.2.0</div>
+    <div id="sb-version">v1.2.1</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
-      <button id="export-btn" onclick="exportCSV()">⬇ 匯出 CSV</button>
     </div>
   </div>
   <div id="sync-status">● 連線中…</div>
@@ -292,14 +299,23 @@ body {
     <button class="btn btn-save"  onclick="saveRecord()" id="save-btn">💾 存檔取號</button>
     <button class="btn btn-print" onclick="window.print()">🖨️ 列印</button>
     <button class="btn btn-clear" onclick="clearForm()">🗑️ 清除</button>
+    <button class="btn" id="cancel-btn" onclick="cancelEdit()"
+            style="background:#b71c1c; color:#fff; display:none;">✕ 取消</button>
     <span id="save-msg"></span>
   </div>
 
   <!-- ══ FORM PAGE ══ -->
   <div id="form-page">
 
-    <!-- 單據類型徽章（右上角） -->
-    <div id="type-badge">請購單</div>
+    <!-- 單據類型（右上角）：切換按鈕 + 徽章 -->
+    <div id="type-area" style="position:absolute; top:4mm; right:5mm; display:flex; flex-direction:column; align-items:flex-end; gap:1.5mm;">
+      <button id="type-toggle" onclick="toggleType()"
+              style="font-size:10px; padding:2px 8px; border:1px solid #aaa; background:#f5f5f5;
+                     border-radius:3px; cursor:pointer; font-family:inherit; color:#333;">
+        切換類型 ⇄
+      </button>
+      <div id="type-badge">請購單</div>
+    </div>
 
     <!-- ── Upper: 憑證用紙 ── -->
     <div class="u-header">
@@ -372,8 +388,8 @@ body {
         <td id="sg-financial" style="font-size:10px;">
           財物或軟體登記<br><span style="font-size:9px;">(備註財物/軟體編)</span>
         </td>
-        <td rowspan="2" style="vertical-align:middle;">主(會)計單位</td>
-        <td rowspan="2" style="vertical-align:middle;">機關長官</td>
+        <td rowspan="2" style="vertical-align:top; padding-top:2mm;">主(會)計單位</td>
+        <td rowspan="2" style="vertical-align:top; padding-top:2mm;">機關長官</td>
       </tr>
       <tr>
         <td id="sg-custody">保管</td>
@@ -406,7 +422,7 @@ body {
           <table class="it">
             <thead>
               <tr>
-                <th rowspan="2" style="width:30%;">採購品名／動支細項</th>
+                <th rowspan="2" style="width:30%;" id="item-col-hdr">採購品名</th>
                 <th rowspan="2" style="width:20%;">規格（樣式）</th>
                 <th rowspan="2" style="width:8%;">數量</th>
                 <th rowspan="2" style="width:8%;">單位</th>
@@ -426,7 +442,10 @@ body {
               </tr>
             </tfoot>
           </table>
-          <button id="add-row-btn" onclick="addRow()">＋ 新增明細列</button>
+          <div id="row-btns">
+            <button id="add-row-btn" onclick="addRow()">＋ 新增明細列</button>
+            <button id="del-row-btn" onclick="delRow()">－ 減少明細列</button>
+          </div>
         </td>
         <td class="lower-right">
           <div class="notes-lbl">其他說明事項</div>
@@ -497,12 +516,26 @@ const API = '/api/records';
   generateItemRows();
   setTodayDate();
   calcTotal();
+  /* 初始狀態：表單反灰，等待使用者點選 */
+  document.getElementById('form-page').classList.add('inactive');
   await loadHistory();
 })();
 
 /* ══════════════════════
    FORM TYPE
    ══════════════════════ */
+function toggleType() {
+  /* 切換類型，保留表單資料 */
+  applyType(formType === 'purchase' ? 'expense' : 'purchase');
+  /* 更新草稿列（如有）的類型標示 */
+  const draft = document.getElementById('draft-item');
+  if (draft) {
+    draft.className = 'h-item active' + (formType==='expense'?' expense':'');
+    draft.querySelector('.h-date').textContent =
+      (formType==='expense'?'[動支]':'[採購]') + '　編輯中';
+  }
+}
+
 function applyType(type) {
   formType = type;
   const isPurchase = type === 'purchase';
@@ -518,6 +551,9 @@ function applyType(type) {
 
   /* 下方標題 */
   document.getElementById('lower-title').textContent = isPurchase ? '採購' : '動支';
+
+  /* 表格第一欄標題 */
+  document.getElementById('item-col-hdr').textContent = isPurchase ? '採購品名' : '動支細項';
 
   /* 上方核章斜線：動支單 → 保管/採購/財物登記 三格加斜線 */
   ['sg-custody','sg-purchase','sg-financial'].forEach(id => {
@@ -655,6 +691,16 @@ function addRow() {
   rowCount++;
 }
 
+function delRow() {
+  if (rowCount <= 1) { showToast('至少保留一列'); return; }
+  rowCount--;
+  const tb = document.getElementById('items-body');
+  if (tb.lastChild) tb.removeChild(tb.lastChild);
+  const sub = document.getElementById('sub'+rowCount);
+  if (sub) sub.remove();
+  calcTotal();
+}
+
 function calcRow(i) {
   const sub = Math.round((parseFloat(qv(i,'qty'))||0)*(parseFloat(qv(i,'price'))||0));
   document.getElementById('sub'+i).textContent = sub > 0 ? '$'+fmtN(sub) : '';
@@ -673,7 +719,7 @@ function calcTotal() {
 
   /* 下方正式簽章列：請購單 + 金額 >= 門檻 */
   document.getElementById('purchase-sig').style.display =
-    (isPurchase && total >= threshold) ? '' : 'none';
+    (isPurchase && total >= threshold) ? 'block' : 'none';
 
   /* 免核章列：
      請購單：0 < 金額 < 門檻
@@ -681,7 +727,7 @@ function calcTotal() {
   const showExempt = isPurchase
     ? (total > 0 && total < threshold)
     : (total > 0);
-  document.getElementById('exempt-wrap').style.display = showExempt ? '' : 'none';
+  document.getElementById('exempt-wrap').style.display = showExempt ? 'block' : 'none';
 }
 
 /* ══════════════════════
@@ -778,6 +824,7 @@ async function saveRecord() {
     await apiPost(records);
     cachedRecords = records;
     setSyncStatus(`● 已儲存　共 ${records.length} 筆`,'ok');
+    document.getElementById('draft-item')?.remove();
     renderHistory(records);
     showToast('✓ 已儲存 '+ts);
     showMsg('✓ 已儲存 '+ts);
@@ -809,13 +856,36 @@ async function loadRecord(id) {
     const rec = records.find(r=>r.id===id);
     if (!rec) return;
     currentId = id;
-    /* 重設行數 */
     rowCount = 10;
     generateItemRows();
     fillForm(rec);
+    /* 啟用表單 */
+    document.getElementById('form-page').classList.remove('inactive');
+    document.getElementById('cancel-btn').style.display = '';
+    document.getElementById('draft-item')?.remove();
     document.querySelectorAll('.h-item').forEach(el=>
       el.classList.toggle('active', el.dataset.id===id));
   } catch(_) {}
+}
+
+function cancelEdit() {
+  if (currentId) {
+    /* 有既存紀錄：重新載入還原 */
+    loadRecord(currentId);
+  } else {
+    /* 新單尚未儲存：回到初始反灰狀態 */
+    currentId = null;
+    document.getElementById('form-page').classList.add('inactive');
+    document.getElementById('cancel-btn').style.display = 'none';
+    document.getElementById('draft-item')?.remove();
+    document.getElementById('save-msg').textContent = '';
+    /* 若歷史清單空白則還原提示 */
+    const wrap = document.getElementById('history-scroll');
+    if (!wrap.querySelector('.h-item')) {
+      wrap.innerHTML = '<div id="no-history">尚無紀錄</div>';
+    }
+  }
+  showToast('已取消編輯');
 }
 
 function renderHistory(records) {
@@ -848,8 +918,31 @@ function newForm(type) {
   applyType(type || 'purchase');
   setTodayDate(); buildMainDropdown(); calcTotal();
   document.getElementById('save-msg').textContent='';
-  document.querySelectorAll('.h-item').forEach(el=>el.classList.remove('active'));
+  /* 啟用表單 */
+  document.getElementById('form-page').classList.remove('inactive');
+  document.getElementById('cancel-btn').style.display = '';
+  /* 側欄顯示「編輯中未取號」草稿列 */
+  renderDraftItem(type || 'purchase');
   showToast('📄 已開啟新' + (type==='expense'?'動支單':'請購單') + '，填寫後按「存檔取號」');
+}
+
+function renderDraftItem(type) {
+  /* 移除舊草稿列（如有） */
+  document.getElementById('draft-item')?.remove();
+  document.querySelectorAll('.h-item').forEach(el=>el.classList.remove('active'));
+  const wrap = document.getElementById('history-scroll');
+  const div = document.createElement('div');
+  div.id = 'draft-item';
+  div.className = 'h-item active' + (type==='expense'?' expense':'');
+  div.style.borderStyle = 'dashed';
+  div.innerHTML = `
+    <div class="h-date">${type==='expense'?'[動支]':'[採購]'}　編輯中</div>
+    <div class="h-title" style="color:#ffd54f;">⚠ 未取號（尚未儲存）</div>
+    <div class="h-amount" style="color:#90a4ae;">填寫完畢請按「存檔取號」</div>`;
+  /* 插在最前面 */
+  wrap.insertBefore(div, wrap.firstChild);
+  /* 若只有「尚無紀錄」文字則移除 */
+  document.getElementById('no-history')?.remove();
 }
 
 function clearForm() {
