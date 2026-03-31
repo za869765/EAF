@@ -333,6 +333,34 @@ body {
              padding: 9px 22px; font-size: 14px; font-family: inherit; cursor: pointer; }
 .scm-cancel:hover { background: #cfd8dc; }
 
+/* ── 存檔成功 Modal ── */
+#saved-modal {
+  position: fixed; inset: 0; z-index: 9600;
+  background: rgba(0,0,0,.48);
+  display: flex; align-items: center; justify-content: center;
+  animation: scmFade .18s ease;
+}
+.saved-box {
+  background: #fff; border-radius: 14px;
+  padding: 32px 40px; min-width: 300px; max-width: 90vw;
+  box-shadow: 0 12px 48px rgba(0,0,0,.3);
+  text-align: center;
+  animation: scmSlide .22s ease;
+}
+.saved-check { font-size: 48px; margin-bottom: 8px; }
+.saved-title { font-size: 16px; font-weight: bold; color: #1b5e20; margin-bottom: 14px; }
+.saved-no-lbl{ font-size: 12px; color: #777; margin-bottom: 4px; }
+.saved-no    {
+  font-size: 28px; font-weight: bold; color: #1565c0;
+  letter-spacing: 3px; background: #e3f2fd;
+  border-radius: 8px; padding: 8px 24px; margin-bottom: 18px;
+  display: inline-block;
+}
+.saved-ok    { background: #1565c0; color: #fff; border: none; border-radius: 7px;
+               padding: 9px 40px; font-size: 14px; font-family: inherit;
+               cursor: pointer; transition: background .15s; }
+.saved-ok:hover { background: #1976d2; }
+
 /* ── Copy Modal ── */
 #copy-modal {
   position: fixed; inset: 0; z-index: 9000;
@@ -406,7 +434,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.3.6</div>
+    <div id="sb-version">v1.3.7</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -996,6 +1024,9 @@ async function saveRecord() {
     showToast('✓ 已儲存 '+ts);
     showMsg('✓ 已儲存 '+ts);
     lockForm();
+    /* 彈出憑證編號通知 */
+    document.getElementById('saved-no-display').textContent = data.voucherNo || '—';
+    document.getElementById('saved-modal').style.display = '';
   } catch(_) {
     setSyncStatus('● 儲存失敗','err');
     showToast('✗ 儲存失敗，請確認網路');
@@ -1286,6 +1317,18 @@ function showToast(msg) {
     <div class="alert-icon" id="alert-icon">⚠️</div>
     <div class="alert-msg"  id="alert-msg"></div>
     <button class="alert-ok" onclick="closeAlert()">確定</button>
+  </div>
+</div>
+
+<!-- ══ 存檔成功 Modal ══ -->
+<div id="saved-modal" style="display:none;">
+  <div class="saved-box">
+    <div class="saved-check">✅</div>
+    <div class="saved-title">存檔取號成功！</div>
+    <div class="saved-no-lbl">憑證編號</div>
+    <div class="saved-no" id="saved-no-display">—</div>
+    <br>
+    <button class="saved-ok" onclick="document.getElementById('saved-modal').style.display='none'">確認</button>
   </div>
 </div>
 
