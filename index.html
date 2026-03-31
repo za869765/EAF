@@ -111,8 +111,8 @@ body {
    FORM PAGE  (A4)
    ══════════════════════════════════ */
 #form-page {
-  background: #fff; width: 210mm; min-height: 297mm;
-  padding: 7mm 7mm 5mm 7mm;
+  background: #fff; width: 100%; max-width: 960px; min-height: 297mm;
+  padding: 7mm 10mm 5mm 10mm;
   box-shadow: 0 3px 12px rgba(0,0,0,.25);
   font-family: '標楷體','DFKai-SB','BiauKai','KaiTi',serif;
   font-size: 12px;
@@ -266,7 +266,8 @@ body {
   #sidebar, #actions, #toast, #add-row-btn { display: none !important; }
   #main { padding: 0; }
   #form-page {
-    width: 210mm; height: 297mm; min-height: unset;
+    width: 210mm !important; max-width: 210mm !important;
+    height: 297mm; min-height: unset;
     padding: 7mm 7mm 5mm 7mm; box-shadow: none;
     display: flex; flex-direction: column;
   }
