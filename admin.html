@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v1.2.3</title>
+<title>管理者入口 — 動支單系統 v1.2.4</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -294,10 +294,6 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         <div class="stat-card">
           <div class="stat-num" id="rpt-voided" style="color:#b71c1c;">—</div>
           <div class="stat-label">作廢紀錄</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-num" id="rpt-amount" style="color:#1565c0;">—</div>
-          <div class="stat-label">有效總金額</div>
         </div>
       </div>
       <div class="rpt-subtabs">
@@ -725,12 +721,9 @@ function renderReports() {
   const all    = _rptRecords;
   const active = all.filter(r => !r.voided);
   const voided = all.filter(r =>  r.voided);
-  const totalAmt = active.reduce((s,r) => s + (Number(r.total)||0), 0);
-
   document.getElementById('rpt-total').textContent  = all.length;
   document.getElementById('rpt-active').textContent = active.length;
   document.getElementById('rpt-voided').textContent = voided.length;
-  document.getElementById('rpt-amount').textContent = '$' + totalAmt.toLocaleString('zh-TW');
 
   /* 詳細報表 */
   document.getElementById('rpt-all-body').innerHTML = all.length === 0

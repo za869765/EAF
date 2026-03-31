@@ -506,7 +506,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.4.3</div>
+    <div id="sb-version">v1.4.4</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1347,6 +1347,11 @@ function _setBtn(id, disp) {
    SAVE CONFIRM MODAL
    ══════════════════════ */
 function confirmSave() {
+  /* 將申請日期顯示於確認框供使用者核對 */
+  const raw  = document.getElementById('apply-date-input').value;
+  const roc  = document.getElementById('roc-date-text').textContent;
+  const disp = roc || raw || '（未填）';
+  document.getElementById('scm-date-val').textContent = disp;
   document.getElementById('save-confirm-modal').style.display = '';
 }
 function closeSaveConfirm() {
@@ -1549,7 +1554,10 @@ function showToast(msg) {
   <div class="scm-box">
     <div class="scm-icon">💾</div>
     <div class="scm-title">確認存檔取號</div>
-    <div class="scm-msg">存檔取號後將<strong>鎖定表單，不可再修改</strong>。<br>確定要儲存並取得憑證編號嗎？</div>
+    <div class="scm-msg">
+      申請日期：<strong id="scm-date-val" style="color:#1565c0; font-size:15px;">—</strong><br><br>
+      存檔取號後將<strong>鎖定表單，不可再修改</strong>。<br>確定要儲存並取得憑證編號嗎？
+    </div>
     <div class="scm-btns">
       <button class="scm-cancel" onclick="closeSaveConfirm()">✕ 取消</button>
       <button class="scm-ok"     onclick="doSave()">✓ 確定存檔</button>
