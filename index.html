@@ -519,7 +519,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.4.8</div>
+    <div id="sb-version">v1.4.9</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1011,6 +1011,24 @@ function onPurposeChange() {
       calcRow(0);
     }
     calcTotal();
+  }
+
+  /* 離開 2706：若第一列仍是自動帶入的預設值則清除（使用者已修改過的不影響） */
+  if (!_suppressAutoFill && code !== '2706') {
+    const nameEl  = qi(0, 'name');
+    const priceEl = qi(0, 'price');
+    const nameMatch  = nameEl  && nameEl.value.trim()  === '檢附支出證明單';
+    const priceMatch = priceEl && priceEl.value.trim() === '30';
+    if (nameMatch)  nameEl.value  = '';
+    if (priceMatch) priceEl.value = '';
+    if (formType === 'purchase') {
+      const qtyEl  = qi(0, 'qty');
+      const unitEl = qi(0, 'unit');
+      if (qtyEl  && qtyEl.value.trim()  === '1') qtyEl.value  = '';
+      if (unitEl && unitEl.value.trim() === '式') unitEl.value = '';
+      calcRow(0);
+    }
+    if (nameMatch || priceMatch) calcTotal();
   }
 }
 
