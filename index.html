@@ -78,15 +78,16 @@ body {
 .h-amount { font-size: 12px; color: #66bb6a; }
 .h-void {
   position: absolute; top: 7px; right: 8px;
-  background: #546e7a; color: #fff; border: none; border-radius: 3px;
+  background: #c62828; color: #fff; border: none; border-radius: 3px;
   font-size: 10px; padding: 1px 5px; cursor: pointer;
 }
-.h-void:hover { background: #78909c; }
+.h-void:hover { background: #e53935; }
+/* 已作廢：按鈕變灰，表示「可還原」 */
+.h-void.is-voided { background: #546e7a; }
+.h-void.is-voided:hover { background: #78909c; }
 /* 已作廢的歷史列 */
 .h-item.voided { opacity: .65; border-left-color: #b71c1c !important; }
 .h-item.voided .h-title { text-decoration: line-through; color: #b0bec5; }
-.h-void.is-voided { background: #b71c1c; }
-.h-void.is-voided:hover { background: #e53935; }
 /* 作廢浮水印（表單鎖定時） */
 #void-stamp {
   position: absolute; inset: 0; z-index: 8;
@@ -434,7 +435,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.3.7</div>
+    <div id="sb-version">v1.3.8</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1125,9 +1126,7 @@ function renderHistory(records) {
     div.innerHTML = `
       <button class="h-void${isVoid?' is-voided':''}"
               onclick="voidRecord('${rec.id}',event)"
-              title="${isVoid?'已作廢（點擊還原）':'點擊作廢此筆'}">
-        ${isVoid?'作廢':'作廢'}
-      </button>
+              title="${isVoid?'已作廢（點擊還原）':'點擊作廢此筆'}">✕</button>
       <div class="h-date">${esc(rec.savedAt||'')}　${isExp?'[動支]':'[採購]'}${isVoid?' ⛔':''}</div>
       <div class="h-title">${esc(rec.voucherNo||'')} ${esc(rec.acctName)} / ${esc(rec.bpLabel)}</div>
       <div class="h-amount">$${fmtN(rec.total)}　${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</div>`;
