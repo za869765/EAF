@@ -682,7 +682,7 @@ function appendRow(i) {
   tr.innerHTML = `
     <td class="td-name"><input type="text"   data-r="${i}" data-c="name"></td>
     <td class="td-spec"><input type="text"   data-r="${i}" data-c="spec"></td>
-    <td class="td-r"><input type="number" data-r="${i}" data-c="qty"   min="0" step="0.1" oninput="calcRow(${i})"></td>
+    <td class="td-r"><input type="text" inputmode="decimal" data-r="${i}" data-c="qty" style="text-align:right;" oninput="validateQty(this,${i})"></td>
     <td style="text-align:center;"><input type="text" data-r="${i}" data-c="unit" style="text-align:center;"></td>
     <td class="td-r"><input type="number" data-r="${i}" data-c="price" min="0" step="1" oninput="calcRow(${i})"></td>
     <td class="td-r" id="sub${i}" style="padding-right:3mm;"></td>`;
@@ -702,6 +702,15 @@ function delRow() {
   const sub = document.getElementById('sub'+rowCount);
   if (sub) sub.remove();
   calcTotal();
+}
+
+function validateQty(el, i) {
+  const raw = el.value.trim();
+  if (raw !== '' && isNaN(Number(raw))) {
+    alert('數量請輸入數字（例如：1、2.5）');
+    el.value = '';
+  }
+  calcRow(i);
 }
 
 function calcRow(i) {
