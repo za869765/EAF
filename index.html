@@ -76,12 +76,30 @@ body {
 .h-date   { font-size: 10px; color: #78909c; margin-bottom: 2px; }
 .h-title  { font-size: 12px; font-weight: bold; color: #cfd8dc; margin-bottom: 2px; }
 .h-amount { font-size: 12px; color: #66bb6a; }
-.h-del {
+.h-void {
   position: absolute; top: 7px; right: 8px;
-  background: #c62828; color: #fff; border: none; border-radius: 3px;
+  background: #546e7a; color: #fff; border: none; border-radius: 3px;
   font-size: 10px; padding: 1px 5px; cursor: pointer;
 }
-.h-del:hover { background: #e53935; }
+.h-void:hover { background: #78909c; }
+/* 已作廢的歷史列 */
+.h-item.voided { opacity: .65; border-left-color: #b71c1c !important; }
+.h-item.voided .h-title { text-decoration: line-through; color: #b0bec5; }
+.h-void.is-voided { background: #b71c1c; }
+.h-void.is-voided:hover { background: #e53935; }
+/* 作廢浮水印（表單鎖定時） */
+#void-stamp {
+  position: absolute; inset: 0; z-index: 8;
+  display: flex; align-items: center; justify-content: center;
+  pointer-events: none;
+}
+#void-stamp span {
+  font-size: 72px; font-weight: bold; color: rgba(183,28,28,.18);
+  border: 8px solid rgba(183,28,28,.15); padding: 6px 24px;
+  border-radius: 8px; letter-spacing: 8px; transform: rotate(-18deg);
+  font-family: '標楷體','DFKai-SB',serif;
+  user-select: none;
+}
 
 /* ── Main ── */
 #main { flex: 1; padding: 16px 22px; overflow-x: auto; }
@@ -366,7 +384,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.3.3</div>
+    <div id="sb-version">v1.3.4</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -400,6 +418,7 @@ body {
 
     <!-- 單據類型徽章（右上角，點擊切換） -->
     <div id="type-badge" onclick="toggleType()" title="點擊切換類型">請購單</div>
+    <div id="void-stamp" style="display:none;"><span>作　廢</span></div>
 
     <!-- ── Upper: 憑證用紙 ── -->
     <div class="u-header">
@@ -944,6 +963,28 @@ async function saveRecord() {
   }
 }
 
+async function voidRecord(id, e) {
+  e.stopPropagation();
+  const rec = cachedRecords.find(r=>r.id===id);
+  if (!rec) return;
+  const willVoid = !rec.voided;
+  if (!confirm(willVoid ? '確定將此筆標記為「作廢」？（仍可複製，不可修改）'
+                        : '確定還原此筆為正常狀態？')) return;
+  setSyncStatus('⟳ 更新中…','busy');
+  try {
+    let records = await apiGet();
+    const idx = records.findIndex(r=>r.id===id);
+    if (idx>=0) records[idx].voided = willVoid;
+    await apiPost(records);
+    cachedRecords = records;
+    setSyncStatus(`● 已${willVoid?'作廢':'還原'}`, 'ok');
+    renderHistory(records);
+    /* 若目前顯示的就是這筆，重新載入以更新浮水印 */
+    if (currentId === id) loadRecord(id);
+    showToast(willVoid ? '⛔ 已標記作廢' : '✓ 已還原正常');
+  } catch(_) { setSyncStatus('● 更新失敗','err'); }
+}
+
 async function deleteRecord(id, e) {
   e.stopPropagation();
   if (!confirm('確定刪除此筆紀錄？')) return;
@@ -969,6 +1010,8 @@ async function loadRecord(id) {
     generateItemRows();
     fillForm(rec);
     lockForm();
+    /* 作廢浮水印 */
+    document.getElementById('void-stamp').style.display = rec.voided ? '' : 'none';
     document.getElementById('draft-item')?.remove();
     document.querySelectorAll('.h-item').forEach(el=>
       el.classList.toggle('active', el.dataset.id===id));
@@ -1000,13 +1043,21 @@ function renderHistory(records) {
   }
   wrap.innerHTML='';
   [...records].reverse().forEach(rec => {
-    const isExp = rec.formType==='expense';
+    const isExp   = rec.formType==='expense';
+    const isVoid  = !!rec.voided;
     const div = document.createElement('div');
-    div.className = 'h-item'+(rec.id===currentId?' active':'')+(isExp?' expense':'');
+    div.className = 'h-item'
+      +(rec.id===currentId?' active':'')
+      +(isExp?' expense':'')
+      +(isVoid?' voided':'');
     div.dataset.id = rec.id;
     div.innerHTML = `
-      <button class="h-del" onclick="deleteRecord('${rec.id}',event)">✕</button>
-      <div class="h-date">${esc(rec.savedAt||'')}　${isExp?'[動支]':'[採購]'}</div>
+      <button class="h-void${isVoid?' is-voided':''}"
+              onclick="voidRecord('${rec.id}',event)"
+              title="${isVoid?'已作廢（點擊還原）':'點擊作廢此筆'}">
+        ${isVoid?'作廢':'作廢'}
+      </button>
+      <div class="h-date">${esc(rec.savedAt||'')}　${isExp?'[動支]':'[採購]'}${isVoid?' ⛔':''}</div>
       <div class="h-title">${esc(rec.voucherNo||'')} ${esc(rec.acctName)} / ${esc(rec.bpLabel)}</div>
       <div class="h-amount">$${fmtN(rec.total)}　${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</div>`;
     div.onclick = () => loadRecord(rec.id);
