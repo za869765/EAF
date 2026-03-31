@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統</title>
+<title>管理者入口 — 動支單系統 v1.2.3</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -155,6 +155,29 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 .rec-amount { font-weight: bold; color: #1565c0; }
 .no-data { text-align: center; color: #90a4ae; padding: 32px !important; }
 
+/* ── Reports ── */
+.stats-row {
+  display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;
+}
+.stat-card {
+  background: #fff; border-radius: 8px; padding: 16px 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.1); min-width: 130px; text-align: center;
+}
+.stat-num   { font-size: 26px; font-weight: 700; line-height: 1.2; }
+.stat-label { font-size: 12px; color: #78909c; margin-top: 2px; }
+.rpt-subtabs { display: flex; gap: 2px; border-bottom: 2px solid #e0e0e0; margin-bottom: 0; }
+.rpt-tab {
+  padding: 9px 20px; border: none; background: transparent; font-size: 13px;
+  cursor: pointer; color: #78909c; border-bottom: 2px solid transparent; margin-bottom: -2px;
+}
+.rpt-tab:hover { color: #1565c0; }
+.rpt-tab.active { color: #1565c0; border-bottom-color: #1565c0; font-weight: 600; }
+.voided-row td { color: #90a4ae; text-decoration: line-through; }
+.void-badge { background: #fce4ec; color: #c62828; border-radius: 4px; padding: 2px 6px; font-size: 11px; }
+.ok-badge   { background: #e8f5e9; color: #2e7d32;  border-radius: 4px; padding: 2px 6px; font-size: 11px; }
+.th-r { text-align: right; }
+.td-r-admin { text-align: right; }
+
 /* ── Settings ── */
 .setting-card {
   background: #fff; border-radius: 8px; padding: 24px;
@@ -221,6 +244,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="tab-nav">
     <button class="tab-btn active" onclick="showTab('subjects')">📚 科目管理</button>
     <button class="tab-btn"        onclick="showTab('records')">📋 紀錄管理</button>
+    <button class="tab-btn"        onclick="showTab('reports')">📊 報表</button>
     <button class="tab-btn"        onclick="showTab('settings')">🔧 系統設定</button>
   </div>
   <div id="content">
@@ -247,12 +271,65 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
       <table class="rec-table">
         <thead>
           <tr>
-            <th>儲存時間</th><th>主科目</th><th>業務計畫</th>
-            <th>申請日期</th><th>金額</th><th>操作</th>
+            <th>憑證編號</th><th>類型</th><th>主科目</th><th>業務計畫</th>
+            <th>申請日期</th><th style="text-align:right;">金額</th>
+            <th style="text-align:center;">狀態</th><th>儲存時間</th><th>操作</th>
           </tr>
         </thead>
         <tbody id="records-body"></tbody>
       </table>
+    </div>
+
+    <!-- ── Tab: reports ── -->
+    <div id="tab-reports" class="tab-pane">
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-num" id="rpt-total">—</div>
+          <div class="stat-label">全部紀錄</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="rpt-active" style="color:#2e7d32;">—</div>
+          <div class="stat-label">有效紀錄</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="rpt-voided" style="color:#b71c1c;">—</div>
+          <div class="stat-label">作廢紀錄</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="rpt-amount" style="color:#1565c0;">—</div>
+          <div class="stat-label">有效總金額</div>
+        </div>
+      </div>
+      <div class="rpt-subtabs">
+        <button class="rpt-tab active" id="rpt-tab-all"    onclick="showRptTab('all',this)">📋 詳細報表</button>
+        <button class="rpt-tab"        id="rpt-tab-voided" onclick="showRptTab('voided',this)">⛔ 作廢報表</button>
+      </div>
+      <div class="toolbar" style="margin-top:10px;">
+        <button class="btn btn-gray" onclick="loadReports()">🔄 重新載入</button>
+        <button class="btn btn-blue" onclick="exportReportCSV()">⬇ 匯出 CSV</button>
+        <span id="rpt-msg" class="toolbar-msg"></span>
+      </div>
+      <div id="rpt-all-pane">
+        <table class="rec-table">
+          <thead><tr>
+            <th>憑證編號</th><th>類型</th><th>申請日期</th>
+            <th>主科目</th><th>業務計畫</th><th>用途別代碼</th><th>用途別名稱</th>
+            <th style="text-align:right;">金額</th>
+            <th style="text-align:center;">狀態</th><th>儲存時間</th>
+          </tr></thead>
+          <tbody id="rpt-all-body"></tbody>
+        </table>
+      </div>
+      <div id="rpt-voided-pane" style="display:none;">
+        <table class="rec-table">
+          <thead><tr>
+            <th>憑證編號</th><th>類型</th><th>申請日期</th>
+            <th>主科目</th><th>業務計畫</th><th>用途別代碼</th><th>用途別名稱</th>
+            <th style="text-align:right;">金額</th><th>儲存時間</th>
+          </tr></thead>
+          <tbody id="rpt-voided-body"></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- ── Tab: settings ── -->
@@ -344,6 +421,7 @@ function showTab(name) {
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
   event.currentTarget.classList.add('active');
+  if (name === 'reports') loadReports();
 }
 
 /* ════════════════════
@@ -545,22 +623,33 @@ async function loadRecords() {
   setMsg('rec-msg', '⟳ 載入中…', false);
   try {
     const records = await (await fetch('/api/records')).json();
-    document.getElementById('rec-count').textContent = `共 ${records.length} 筆`;
+    const valid   = records.filter(r => !r.voided).length;
+    const voided  = records.filter(r =>  r.voided).length;
+    document.getElementById('rec-count').textContent =
+      `共 ${records.length} 筆（有效 ${valid}，作廢 ${voided}）`;
     const tbody = document.getElementById('records-body');
     tbody.innerHTML = '';
     if (records.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="6" class="no-data">尚無紀錄</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="no-data">尚無紀錄</td></tr>';
     } else {
       [...records].reverse().forEach(rec => {
+        const isVoid = !!rec.voided;
         const tr = document.createElement('tr');
+        if (isVoid) tr.className = 'voided-row';
         tr.innerHTML = `
-          <td>${esc(rec.savedAt||'')}</td>
+          <td>${esc(rec.voucherNo||'—')}</td>
+          <td>${rec.formType==='expense'?'動支單':'請購單'}</td>
           <td>${esc(rec.acctName||'')}</td>
           <td>${esc(rec.bpLabel||'')}</td>
           <td>${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</td>
-          <td class="rec-amount">$${Number(rec.total||0).toLocaleString('zh-TW')}</td>
-          <td><button class="btn btn-red" style="padding:4px 10px; font-size:11px;"
-              onclick="deleteRecord('${rec.id}')">刪除</button></td>`;
+          <td class="rec-amount td-r-admin">$${Number(rec.total||0).toLocaleString('zh-TW')}</td>
+          <td style="text-align:center;">${isVoid
+            ? '<span class="void-badge">⛔ 作廢</span>'
+            : '<span class="ok-badge">✓ 有效</span>'}</td>
+          <td>${esc(rec.savedAt||'')}</td>
+          <td>${isVoid ? '<span style="font-size:11px;color:#90a4ae;">已作廢，留存備查</span>'
+            : `<button class="btn btn-red" style="padding:4px 10px; font-size:11px;"
+                onclick="deleteRecord('${rec.id}')">刪除</button>`}</td>`;
         tbody.appendChild(tr);
       });
     }
@@ -575,19 +664,30 @@ async function exportCSV() {
   try {
     const records = await (await fetch('/api/records')).json();
     if (!records.length) { setMsg('rec-msg', '尚無紀錄', false); return; }
-    const hdr = ['憑證編號','類型','申請日期','主科目代碼','主科目名稱','業務計畫代碼','業務計畫','用途別代碼','用途說明','金額','儲存時間'];
-    const rows = records.map(r=>[r.voucherNo||'',r.formType==='expense'?'動支單':'請購單',
-      r.applyDateRoc||r.applyDateRaw||'',r.acctCode||'',r.acctName||'',r.bpCode||'',
-      r.bpLabel||'',r.purposeCode||'',r.purposeDesc||'',r.total||0,r.savedAt||'']
-      .map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(','));
-    const csv = '\uFEFF' + hdr.join(',') + '\n' + rows.join('\n');
-    const a = Object.assign(document.createElement('a'),{
-      href: URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
-      download: '動支申請紀錄_'+new Date().toISOString().slice(0,10)+'.csv'
-    });
-    a.click(); URL.revokeObjectURL(a.href);
+    downloadCSV(records, '動支申請紀錄_'+new Date().toISOString().slice(0,10)+'.csv');
     setMsg('rec-msg', `✓ 已匯出 ${records.length} 筆`, false);
   } catch(_) { setMsg('rec-msg', '❌ 匯出失敗', true); }
+}
+
+function downloadCSV(records, filename) {
+  const hdr = ['憑證編號','類型','申請日期','主科目代碼','主科目名稱',
+               '業務計畫代碼','業務計畫名稱','用途別代碼','用途別名稱','用途說明',
+               '人員類別代碼','人員類別名稱','金額','狀態','儲存時間'];
+  const rows = records.map(r => [
+    r.voucherNo||'', r.formType==='expense'?'動支單':'請購單',
+    r.applyDateRoc||r.applyDateRaw||'',
+    r.acctCode||'', r.acctName||'',
+    r.bpCode||'',   r.bpLabel||'',
+    r.purposeCode||'', r.purposeName||'', r.purposeDesc||'',
+    r.personnelCode||'', r.personnelName||'',
+    r.total||0, r.voided?'作廢':'有效', r.savedAt||''
+  ].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(','));
+  const csv = '\uFEFF' + hdr.join(',') + '\n' + rows.join('\n');
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
+    download: filename
+  });
+  a.click(); URL.revokeObjectURL(a.href);
 }
 
 async function deleteRecord(id) {
@@ -604,6 +704,87 @@ async function deleteRecord(id) {
     if ((await r.json()).ok) { setMsg('rec-msg', '✓ 已刪除', false); loadRecords(); }
     else setMsg('rec-msg', '❌ 刪除失敗', true);
   } catch (_) { setMsg('rec-msg', '❌ 連線失敗', true); }
+}
+
+/* ════════════════════
+   REPORTS
+   ════════════════════ */
+let _rptRecords = [];
+let _rptTab = 'all';
+
+async function loadReports() {
+  setMsg('rpt-msg', '⟳ 載入中…', false);
+  try {
+    _rptRecords = await (await fetch('/api/records')).json();
+    renderReports();
+    setMsg('rpt-msg', '✓ 已載入', false);
+  } catch (_) { setMsg('rpt-msg', '❌ 載入失敗', true); }
+}
+
+function renderReports() {
+  const all    = _rptRecords;
+  const active = all.filter(r => !r.voided);
+  const voided = all.filter(r =>  r.voided);
+  const totalAmt = active.reduce((s,r) => s + (Number(r.total)||0), 0);
+
+  document.getElementById('rpt-total').textContent  = all.length;
+  document.getElementById('rpt-active').textContent = active.length;
+  document.getElementById('rpt-voided').textContent = voided.length;
+  document.getElementById('rpt-amount').textContent = '$' + totalAmt.toLocaleString('zh-TW');
+
+  /* 詳細報表 */
+  document.getElementById('rpt-all-body').innerHTML = all.length === 0
+    ? '<tr><td colspan="10" class="no-data">尚無紀錄</td></tr>'
+    : [...all].reverse().map(r => `
+        <tr class="${r.voided?'voided-row':''}">
+          <td>${esc(r.voucherNo||'—')}</td>
+          <td>${r.formType==='expense'?'動支單':'請購單'}</td>
+          <td>${esc(r.applyDateRoc||r.applyDateRaw||'')}</td>
+          <td>${esc(r.acctName||'')}</td>
+          <td>${esc(r.bpLabel||'')}</td>
+          <td>${esc(r.purposeCode||'')}</td>
+          <td>${esc(r.purposeName||r.purposeDesc||'')}</td>
+          <td class="rec-amount td-r-admin">$${Number(r.total||0).toLocaleString('zh-TW')}</td>
+          <td style="text-align:center;">${r.voided
+            ? '<span class="void-badge">⛔ 作廢</span>'
+            : '<span class="ok-badge">✓ 有效</span>'}</td>
+          <td>${esc(r.savedAt||'')}</td>
+        </tr>`).join('');
+
+  /* 作廢報表 */
+  document.getElementById('rpt-voided-body').innerHTML = voided.length === 0
+    ? '<tr><td colspan="9" class="no-data">無作廢紀錄</td></tr>'
+    : [...voided].reverse().map(r => `
+        <tr class="voided-row">
+          <td>${esc(r.voucherNo||'—')}</td>
+          <td>${r.formType==='expense'?'動支單':'請購單'}</td>
+          <td>${esc(r.applyDateRoc||r.applyDateRaw||'')}</td>
+          <td>${esc(r.acctName||'')}</td>
+          <td>${esc(r.bpLabel||'')}</td>
+          <td>${esc(r.purposeCode||'')}</td>
+          <td>${esc(r.purposeName||r.purposeDesc||'')}</td>
+          <td class="rec-amount td-r-admin">$${Number(r.total||0).toLocaleString('zh-TW')}</td>
+          <td>${esc(r.savedAt||'')}</td>
+        </tr>`).join('');
+}
+
+function showRptTab(name, btn) {
+  _rptTab = name;
+  document.querySelectorAll('.rpt-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('rpt-all-pane').style.display    = name==='all'    ? '' : 'none';
+  document.getElementById('rpt-voided-pane').style.display = name==='voided' ? '' : 'none';
+}
+
+function exportReportCSV() {
+  const records = _rptTab === 'voided'
+    ? _rptRecords.filter(r => r.voided)
+    : _rptRecords;
+  if (!records.length) { setMsg('rpt-msg', '無資料可匯出', false); return; }
+  const fname = (_rptTab==='voided' ? '作廢報表_' : '詳細報表_') +
+                new Date().toISOString().slice(0,10) + '.csv';
+  downloadCSV(records, fname);
+  setMsg('rpt-msg', `✓ 已匯出 ${records.length} 筆`, false);
 }
 
 /* ════════════════════
