@@ -224,8 +224,9 @@ body {
   display: flex; align-items: center; gap: 2mm; margin-left: auto;
 }
 .it { width: 100%; border-collapse: collapse; }
-.it th, .it td { border: 1px solid #333; padding: 1mm 1.5mm; font-size: 11px; text-align: center; vertical-align: top; }
+.it th, .it td { border: 1px solid #333; padding: 1mm 1.5mm; font-size: 11px; text-align: center; vertical-align: middle; }
 .it th { background: #f5f5f5; font-size: 10.5px; vertical-align: middle; }
+.it tbody tr { height: 11mm; }
 .it td.td-name, .it td.td-spec { text-align: left; }
 .it td input {
   width: 100%; border: none; background: transparent;
@@ -233,7 +234,7 @@ body {
 }
 .it td.td-name input, .it td.td-spec input { text-align: left; }
 .it td.td-r { text-align: right; }
-.it td.td-r input { text-align: right; }
+.it td.td-r input { text-align: right; width:100%; }
 .it tfoot td { font-weight: bold; background: #f5f5f5; font-size: 12px; vertical-align: middle; }
 .it tfoot td { height: 7mm; }
 
@@ -486,7 +487,7 @@ body {
   #apply-date-input { display: none; }
   #roc-date-text    { display: inline !important; }
   /* Items stretch to fill page */
-  .it tbody tr { height: 9mm; }
+  .it tbody tr { height: 10mm; }
   /* Lower section flex-fills remaining space */
   #lower-section { flex: 1; display: flex; flex-direction: column; }
   .lower-wrap { flex: 1; }
@@ -506,7 +507,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.4.4</div>
+    <div id="sb-version">v1.4.5</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1005,7 +1006,7 @@ function showConfirm(msg, { title='請確認', icon='❓', okClass='' } = {}) {
 
 function showAlert(msg, icon='⚠️') {
   document.getElementById('alert-icon').textContent = icon;
-  document.getElementById('alert-msg').textContent  = msg;
+  document.getElementById('alert-msg').innerHTML    = msg;
   document.getElementById('alert-modal').style.display = '';
 }
 function closeAlert() {
@@ -1346,7 +1347,70 @@ function _setBtn(id, disp) {
 /* ══════════════════════
    SAVE CONFIRM MODAL
    ══════════════════════ */
+/* ── 存檔前表單驗證 ── */
+function validateForm() {
+  const errors = [];
+  const isPurchase = formType === 'purchase';
+
+  /* 1. 用途說明不能空白 */
+  const desc = document.getElementById('purpose-desc').value.trim();
+  if (!desc) errors.push('用途說明 不能空白');
+
+  if (isPurchase) {
+    /* 2. 請購單：有資料的列必須全欄齊全；純空白列可略過 */
+    for (let i = 0; i < rowCount; i++) {
+      const name  = qv(i,'name').trim();
+      const spec  = qv(i,'spec').trim();
+      const qty   = qv(i,'qty').trim();
+      const unit  = qv(i,'unit').trim();
+      const price = qv(i,'price').trim();
+      if (!(name||spec||qty||unit||price)) continue;   /* 整列空白，跳過 */
+      const miss = [];
+      if (!name)  miss.push('採購品名');
+      if (!spec)  miss.push('規格(樣式)');
+      if (!qty)   miss.push('數量');
+      if (!unit)  miss.push('單位');
+      if (!price) miss.push('單價');
+      if (miss.length) errors.push(`第 ${i+1} 列缺少：${miss.join('、')}`);
+    }
+    /* 3. 總金額不得為 0 或負數 */
+    let total = 0;
+    for (let i = 0; i < rowCount; i++)
+      total += Math.round((parseFloat(qv(i,'qty'))||0)*(parseFloat(qv(i,'price'))||0));
+    if (total <= 0) errors.push('金額不得為 $0 或負數');
+
+  } else {
+    /* 2. 動支單：動支說明與金額必須同時有值或同時為空 */
+    for (let i = 0; i < rowCount; i++) {
+      const name  = qv(i,'name').trim();
+      const price = qv(i,'price').trim();
+      if (name && !price) errors.push(`第 ${i+1} 列有動支說明但缺少金額`);
+      if (!name && price) errors.push(`第 ${i+1} 列有金額但缺少動支說明`);
+    }
+    /* 3. 總金額不得為 0 或負數 */
+    let total = 0;
+    for (let i = 0; i < rowCount; i++)
+      total += Math.round(parseFloat(qv(i,'price'))||0);
+    if (total <= 0) errors.push('金額不得為 $0 或負數');
+  }
+
+  return errors;
+}
+
 function confirmSave() {
+  /* 先驗證表單 */
+  const errors = validateForm();
+  if (errors.length > 0) {
+    const listHtml = errors.map(e =>
+      `<div style="text-align:left; padding:3px 0 3px 4px; border-left:3px solid #e53935; margin:4px 0;">
+         ${e.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+       </div>`).join('');
+    showAlert(
+      `<div style="font-size:13px; font-weight:bold; margin-bottom:10px;">請修正以下問題後再儲存：</div>` + listHtml,
+      '❌'
+    );
+    return;
+  }
   /* 將申請日期顯示於確認框供使用者核對 */
   const raw  = document.getElementById('apply-date-input').value;
   const roc  = document.getElementById('roc-date-text').textContent;
