@@ -238,7 +238,7 @@ body {
 <aside id="sidebar">
   <div id="sb-header">
     <h2>📋 歷史紀錄</h2>
-    <div id="sb-version">v1.1.0 ｜ <a href="admin.html" style="color:#4a8fb5; text-decoration:none;">管理入口</a></div>
+    <div id="sb-version">v1.1.1 ｜ <a href="admin.html" style="color:#4a8fb5; text-decoration:none;">管理入口</a></div>
     <div id="sb-btns">
       <button id="new-btn" onclick="newForm()">＋ 新增申請單</button>
       <button id="export-btn" onclick="exportCSV()" title="匯出CSV">⬇ 匯出</button>
@@ -524,7 +524,7 @@ function generateVoucherNo(records) {
       if (!isNaN(n) && n > max) max = n;
     }
   });
-  return prefix + String(max + 1).padStart(3, '0');
+  return prefix + String(max + 1).padStart(4, '0');
 }
 
 /* ══════════════════════
