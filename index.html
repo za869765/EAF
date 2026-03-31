@@ -123,14 +123,19 @@ body {
         font-family: inherit; font-size: inherit; outline: none;
         cursor: pointer; max-width: 100%; }
 
-/* Type badge */
+/* Type badge（點擊切換） */
 #type-badge {
-  position: absolute; top: 4mm; right: 5mm;
+  position: absolute; top: 3mm; right: 4mm;
   background: #1565c0; color: #fff;
-  font-size: 12px; font-weight: bold; padding: 2px 10px;
-  border-radius: 4px; letter-spacing: 1px;
+  font-size: 14px; font-weight: bold;
+  padding: 4px 16px; border-radius: 5px;
+  letter-spacing: 2px; cursor: pointer;
+  user-select: none; transition: background .15s;
 }
+#type-badge:hover { background: #1976d2; }
 #type-badge.expense { background: #6a1b9a; }
+#type-badge.expense:hover { background: #7b1fa2; }
+@media print { #type-badge { cursor: default; } }
 
 /* ── Upper section ── */
 .u-header { display: flex; align-items: flex-start; margin-bottom: 1.5mm; }
@@ -280,7 +285,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.2.1</div>
+    <div id="sb-version">v1.2.3</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -307,15 +312,8 @@ body {
   <!-- ══ FORM PAGE ══ -->
   <div id="form-page">
 
-    <!-- 單據類型（右上角）：切換按鈕 + 徽章 -->
-    <div id="type-area" style="position:absolute; top:4mm; right:5mm; display:flex; flex-direction:column; align-items:flex-end; gap:1.5mm;">
-      <button id="type-toggle" onclick="toggleType()"
-              style="font-size:10px; padding:2px 8px; border:1px solid #aaa; background:#f5f5f5;
-                     border-radius:3px; cursor:pointer; font-family:inherit; color:#333;">
-        切換類型 ⇄
-      </button>
-      <div id="type-badge">請購單</div>
-    </div>
+    <!-- 單據類型徽章（右上角，點擊切換） -->
+    <div id="type-badge" onclick="toggleType()" title="點擊切換類型">請購單</div>
 
     <!-- ── Upper: 憑證用紙 ── -->
     <div class="u-header">
