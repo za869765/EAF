@@ -519,7 +519,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.5.0</div>
+    <div id="sb-version">v1.5.1</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -997,6 +997,11 @@ function setLecturer(val) {
 function updateCashierNote() {
   const purposeCode = document.getElementById('sel-purpose').value;
   const bpCode      = document.getElementById('sel-bp').value;
+
+  /* 21020302 各業務差旅費 → 出納單位格加斜線 */
+  document.getElementById('sg-cashier')
+    .classList.toggle('slash', bpCode === '21020302');
+
   let note = '';
   if (purposeCode === '1501') {
     note = '列入薪資／獎金所得';
@@ -1007,7 +1012,7 @@ function updateCashierNote() {
   }
   const el = document.getElementById('cashier-note');
   el.textContent   = note;
-  el.style.display = note ? 'block' : 'none';  /* 不能用 '' — 會讓 CSS display:none 重新生效 */
+  el.style.display = note ? 'block' : 'none';
 }
 
 function onPurposeChange() {
