@@ -263,7 +263,7 @@ body {
   @page { size: A4 portrait; margin: 0; }
   body { background: #fff; }
   #app  { display: block; }
-  #sidebar, #actions, #toast, #add-row-btn { display: none !important; }
+  #sidebar, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns { display: none !important; }
   #main { padding: 0; }
   #form-page {
     width: 210mm !important; max-width: 210mm !important;
@@ -356,14 +356,14 @@ body {
         <td>
           <span class="cell-lbl">預算科目</span>
           <div class="bp-row">
+            <label>主科目　：</label>
+            <select class="fsel" id="sel-main" onchange="onMainChange()" style="flex:1;">
+              <option value="">── 選擇主科目 ──</option>
+            </select>
+          </div>
+          <div class="bp-row" id="row-bp" style="display:none;">
             <label>業務計畫：</label>
-            <select class="fsel" id="sel-main" onchange="onMainChange()"
-                    style="width:22mm; margin-right:2mm;">
-              <option value="">── 主科目 ──</option>
-            </select>
-            <select class="fsel" id="sel-bp" onchange="onBpChange()"
-                    style="flex:1; display:none;">
-            </select>
+            <select class="fsel" id="sel-bp" onchange="onBpChange()" style="flex:1;"></select>
           </div>
           <div class="bp-row">
             <label>工作計畫：</label>
@@ -664,8 +664,8 @@ function onMainChange() {
   bpSel.innerHTML = '<option value="">── 選擇業務計畫 ──</option>';
   if (acct) {
     acct.businessPlans.forEach(bp => bpSel.appendChild(new Option(bp.code+'　'+bp.name, bp.code)));
-    bpSel.style.display = '';
-  } else { bpSel.style.display = 'none'; }
+    document.getElementById('row-bp').style.display = '';
+  } else { document.getElementById('row-bp').style.display = 'none'; }
   document.getElementById('wp-text').textContent = '';
   document.getElementById('sel-purpose').innerHTML = '';
   document.getElementById('row-purpose').style.display = 'none';
