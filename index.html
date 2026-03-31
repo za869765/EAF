@@ -83,8 +83,11 @@ body {
 }
 .h-void:hover { background: #e53935; }
 /* 已作廢：按鈕變灰，表示「可還原」 */
-.h-void.is-voided { background: #546e7a; }
-.h-void.is-voided:hover { background: #78909c; }
+/* 已作廢：靜態圖示，不可點 */
+.h-void-stamp {
+  position: absolute; top: 6px; right: 8px;
+  font-size: 13px; cursor: default; user-select: none;
+}
 /* 已作廢的歷史列 */
 .h-item.voided { opacity: .65; border-left-color: #b71c1c !important; }
 .h-item.voided .h-title { text-decoration: line-through; color: #b0bec5; }
@@ -499,7 +502,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.4.1</div>
+    <div id="sb-version">v1.4.2</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1119,27 +1122,23 @@ async function saveRecord() {
 async function voidRecord(id, e) {
   e.stopPropagation();
   const rec = cachedRecords.find(r=>r.id===id);
-  if (!rec) return;
-  const willVoid = !rec.voided;
+  if (!rec || rec.voided) return; /* 已作廢者不可再操作 */
   const ok = await showConfirm(
-    willVoid ? '此筆將標記為<strong>作廢</strong>，<br>仍可複製，但無法再修改。'
-             : '確定還原此筆為<strong>正常狀態</strong>？',
-    { title: willVoid?'確認作廢':'確認還原', icon: willVoid?'⛔':'♻️',
-      okClass: willVoid?'':'blue' }
+    '此筆將標記為<strong>作廢</strong>，留存備查。<br>作廢後<strong>不可還原</strong>，仍可複製。',
+    { title:'確認作廢', icon:'⛔' }
   );
   if (!ok) return;
   setSyncStatus('⟳ 更新中…','busy');
   try {
     let records = await apiGet();
     const idx = records.findIndex(r=>r.id===id);
-    if (idx>=0) records[idx].voided = willVoid;
+    if (idx>=0) records[idx].voided = true;
     await apiPost(records);
     cachedRecords = records;
-    setSyncStatus(`● 已${willVoid?'作廢':'還原'}`, 'ok');
+    setSyncStatus('● 已作廢，留存備查', 'ok');
     renderHistory(records);
-    /* 若目前顯示的就是這筆，重新載入以更新浮水印 */
     if (currentId === id) loadRecord(id);
-    showToast(willVoid ? '⛔ 已標記作廢' : '✓ 已還原正常');
+    showToast('⛔ 已作廢，留存備查');
   } catch(_) { setSyncStatus('● 更新失敗','err'); }
 }
 
@@ -1212,9 +1211,10 @@ function renderHistory(records) {
       +(isVoid?' voided':'');
     div.dataset.id = rec.id;
     div.innerHTML = `
-      <button class="h-void${isVoid?' is-voided':''}"
-              onclick="voidRecord('${rec.id}',event)"
-              title="${isVoid?'已作廢（點擊還原）':'點擊作廢此筆'}">✕</button>
+      ${isVoid
+        ? '<span class="h-void-stamp" title="已作廢，留存備查">⛔</span>'
+        : `<button class="h-void" onclick="voidRecord('${rec.id}',event)" title="點擊作廢此筆">✕</button>`
+      }
       <div class="h-date">${esc(rec.savedAt||'')}　${isExp?'[動支]':'[採購]'}${isVoid?' ⛔':''}</div>
       <div class="h-title">${esc(rec.voucherNo||'')} ${esc(rec.acctName)} / ${esc(rec.bpLabel)}</div>
       <div class="h-amount">$${fmtN(rec.total)}　${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</div>`;
