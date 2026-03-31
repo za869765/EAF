@@ -439,7 +439,8 @@ body {
   @page { size: A4 portrait; margin: 6mm 8mm; }
   body { background: #fff; }
   #app  { display: block; }
-  #sidebar, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns { display: none !important; }
+  #sidebar, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns,
+  #row-lecturer { display: none !important; }
   #main { padding: 0; }
   #form-page {
     width: 100% !important; max-width: 100% !important;
@@ -518,7 +519,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.4.6</div>
+    <div id="sb-version">v1.4.7</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -985,8 +986,8 @@ function updateCashierNote() {
     note = '列入薪資所得';
   }
   const el = document.getElementById('cashier-note');
-  el.textContent    = note;
-  el.style.display  = note ? '' : 'none';
+  el.textContent   = note;
+  el.style.display = note ? 'block' : 'none';  /* 不能用 '' — 會讓 CSS display:none 重新生效 */
 }
 
 function onPurposeChange() {
@@ -994,12 +995,19 @@ function onPurposeChange() {
   document.getElementById('row-personnel').style.display = PERSONNEL_CODES.includes(code) ? '' : 'none';
   updateCashierNote();
 
-  /* 用途別 2706：動支單第一列自動帶入預設值（僅首次選擇且欄位空白時） */
-  if (!_suppressAutoFill && code === '2706' && formType === 'expense') {
+  /* 用途別 2706：第一列自動帶入預設值（請購單/動支單均適用；欄位空白時才觸發） */
+  if (!_suppressAutoFill && code === '2706') {
     const nameEl  = qi(0, 'name');
     const priceEl = qi(0, 'price');
     if (nameEl  && !nameEl.value.trim())  nameEl.value  = '檢附支出證明單';
     if (priceEl && !priceEl.value.trim()) priceEl.value = '30';
+    if (formType === 'purchase') {
+      const qtyEl  = qi(0, 'qty');
+      const unitEl = qi(0, 'unit');
+      if (qtyEl  && !qtyEl.value.trim())  qtyEl.value  = '1';
+      if (unitEl && !unitEl.value.trim()) unitEl.value = '式';
+      calcRow(0);
+    }
     calcTotal();
   }
 }
