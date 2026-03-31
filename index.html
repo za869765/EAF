@@ -435,7 +435,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.3.8</div>
+    <div id="sb-version">v1.3.9</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1190,22 +1190,43 @@ function doSave() {
 /* ══════════════════════
    COPY MODAL
    ══════════════════════ */
+let _copyFoundId = null;
+
 function showCopyModal() {
-  const records = cachedRecords;
-  if (!records || records.length === 0) { showToast('尚無可複製的紀錄'); return; }
-  const list = document.getElementById('copy-list');
-  list.innerHTML = records.map(r =>
-    `<div class="copy-item" onclick="copyFromRecord('${r.id}')">
-       <span class="ci-no">${r.voucherNo||'(未取號)'}</span>
-       <span class="ci-type">${r.formType==='expense'?'動支單':'請購單'}</span>
-       <span class="ci-acct">${r.acctName||''}</span>
-       <span class="ci-amt">$${fmtN(r.total||0)}</span>
-     </div>`
-  ).join('');
+  if (!cachedRecords || cachedRecords.length === 0) { showToast('尚無可複製的紀錄'); return; }
+  _copyFoundId = null;
+  document.getElementById('copy-search-input').value = '';
+  document.getElementById('copy-preview').style.display    = 'none';
+  document.getElementById('copy-not-found').style.display  = 'none';
   document.getElementById('copy-modal').style.display = '';
+  setTimeout(() => document.getElementById('copy-search-input').focus(), 80);
 }
 function closeCopyModal() {
   document.getElementById('copy-modal').style.display = 'none';
+}
+function searchCopyRecord() {
+  const q = document.getElementById('copy-search-input').value.trim().toUpperCase();
+  const preview  = document.getElementById('copy-preview');
+  const notFound = document.getElementById('copy-not-found');
+  _copyFoundId = null;
+  preview.style.display = notFound.style.display = 'none';
+  if (!q) return;
+  const rec = cachedRecords.find(r => (r.voucherNo||'').toUpperCase() === q);
+  if (!rec) { notFound.style.display = ''; return; }
+  _copyFoundId = rec.id;
+  document.getElementById('copy-preview-content').innerHTML =
+    `<div style="display:flex; gap:12px; flex-wrap:wrap;">
+       <span style="color:#1565c0; font-weight:bold;">${esc(rec.voucherNo)}</span>
+       <span style="color:#6a1b9a;">${rec.formType==='expense'?'動支單':'請購單'}</span>
+       <span>${esc(rec.acctName||'')} / ${esc(rec.bpLabel||'')}</span>
+       <span style="color:#2e7d32; margin-left:auto;">$${fmtN(rec.total||0)}</span>
+     </div>
+     <div style="color:#888; margin-top:4px;">${esc(rec.applyDateRoc||rec.applyDateRaw||'')}　${rec.voided?'⛔ 已作廢':''}</div>`;
+  preview.style.display = '';
+}
+function confirmCopyRecord() {
+  if (!_copyFoundId) { searchCopyRecord(); return; }
+  copyFromRecord(_copyFoundId);
 }
 function copyFromRecord(id) {
   const rec = cachedRecords.find(r => r.id === id);
@@ -1347,10 +1368,35 @@ function showToast(msg) {
 <!-- ══ 複製既有單 Modal ══ -->
 <div id="copy-modal" style="display:none;">
   <div class="cm-box">
-    <h3>📋 選擇要複製的單據</h3>
-    <div id="copy-list"></div>
-    <button class="btn btn-clear" onclick="closeCopyModal()"
-            style="margin-top:12px; width:100%; font-size:12px;">✕ 關閉</button>
+    <h3>📋 複製既有單據</h3>
+    <div style="display:flex; gap:8px; margin-bottom:12px;">
+      <input id="copy-search-input" type="text" placeholder="輸入憑證編號（例：115-0001）"
+             style="flex:1; padding:8px 10px; border:1.5px solid #1565c0; border-radius:6px;
+                    font-size:13px; font-family:inherit; outline:none;"
+             oninput="searchCopyRecord()"
+             onkeydown="if(event.key==='Enter') confirmCopyRecord()">
+      <button onclick="confirmCopyRecord()"
+              style="background:#1565c0; color:#fff; border:none; border-radius:6px;
+                     padding:8px 16px; font-size:13px; font-family:inherit; cursor:pointer;">
+        搜尋
+      </button>
+    </div>
+    <!-- 搜尋結果預覽 -->
+    <div id="copy-preview" style="display:none; background:#f5f9ff; border:1.5px solid #90caf9;
+         border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:12px;">
+      <div id="copy-preview-content"></div>
+      <button onclick="confirmCopyRecord()"
+              style="margin-top:10px; width:100%; background:#1565c0; color:#fff; border:none;
+                     border-radius:6px; padding:8px; font-size:13px; font-family:inherit; cursor:pointer;">
+        ✓ 確定複製此單
+      </button>
+    </div>
+    <div id="copy-not-found" style="display:none; color:#c62828; font-size:12px; margin-bottom:8px;">
+      ⚠ 查無此憑證編號，請確認後再試。
+    </div>
+    <button onclick="closeCopyModal()"
+            style="width:100%; background:#eceff1; color:#555; border:none; border-radius:6px;
+                   padding:8px; font-size:12px; font-family:inherit; cursor:pointer;">✕ 關閉</button>
   </div>
 </div>
 </body>
