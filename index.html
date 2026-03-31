@@ -308,6 +308,34 @@ body {
                cursor: pointer; transition: background .15s; }
 .alert-ok:hover { background: #1976d2; }
 
+/* ── 通用確認 Modal (showConfirm) ── */
+#confirm-modal {
+  position: fixed; inset: 0; z-index: 9700;
+  background: rgba(0,0,0,.48);
+  display: flex; align-items: center; justify-content: center;
+  animation: scmFade .17s ease;
+}
+.confirm-box {
+  background: #fff; border-radius: 14px;
+  padding: 28px 36px; min-width: 290px; max-width: 88vw;
+  box-shadow: 0 12px 48px rgba(0,0,0,.28);
+  text-align: center;
+  animation: scmSlide .21s ease;
+}
+.confirm-icon  { font-size: 38px; margin-bottom: 8px; }
+.confirm-title { font-size: 15px; font-weight: bold; color: #1a237e; margin-bottom: 6px; }
+.confirm-msg   { font-size: 13px; color: #555; margin-bottom: 22px; line-height: 1.65;
+                 font-family: 'Microsoft JhengHei','微軟正黑體',sans-serif; }
+.confirm-btns  { display: flex; gap: 12px; justify-content: center; }
+.confirm-ok    { background: #c62828; color: #fff; border: none; border-radius: 7px;
+                 padding: 9px 28px; font-size: 14px; font-family: inherit; cursor: pointer; }
+.confirm-ok:hover { background: #e53935; }
+.confirm-ok.blue  { background: #1565c0; }
+.confirm-ok.blue:hover { background: #1976d2; }
+.confirm-cancel{ background: #eceff1; color: #555; border: none; border-radius: 7px;
+                 padding: 9px 22px; font-size: 14px; font-family: inherit; cursor: pointer; }
+.confirm-cancel:hover { background: #cfd8dc; }
+
 /* ── Save Confirm Modal ── */
 #save-confirm-modal {
   position: fixed; inset: 0; z-index: 9500;
@@ -435,7 +463,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.3.9</div>
+    <div id="sb-version">v1.4.0</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -868,6 +896,23 @@ function delRow() {
   calcTotal();
 }
 
+/* ── 通用確認 Modal（Promise-based，await 使用） ── */
+let _confirmResolve = () => {};
+function showConfirm(msg, { title='請確認', icon='❓', okClass='' } = {}) {
+  return new Promise(resolve => {
+    _confirmResolve = (val) => {
+      document.getElementById('confirm-modal').style.display = 'none';
+      resolve(val);
+    };
+    document.getElementById('confirm-icon').textContent  = icon;
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-msg').innerHTML     = msg;
+    const okBtn = document.getElementById('confirm-ok-btn');
+    okBtn.className = 'confirm-ok' + (okClass ? ' '+okClass : '');
+    document.getElementById('confirm-modal').style.display = '';
+  });
+}
+
 function showAlert(msg, icon='⚠️') {
   document.getElementById('alert-icon').textContent = icon;
   document.getElementById('alert-msg').textContent  = msg;
@@ -1040,8 +1085,13 @@ async function voidRecord(id, e) {
   const rec = cachedRecords.find(r=>r.id===id);
   if (!rec) return;
   const willVoid = !rec.voided;
-  if (!confirm(willVoid ? '確定將此筆標記為「作廢」？（仍可複製，不可修改）'
-                        : '確定還原此筆為正常狀態？')) return;
+  const ok = await showConfirm(
+    willVoid ? '此筆將標記為<strong>作廢</strong>，<br>仍可複製，但無法再修改。'
+             : '確定還原此筆為<strong>正常狀態</strong>？',
+    { title: willVoid?'確認作廢':'確認還原', icon: willVoid?'⛔':'♻️',
+      okClass: willVoid?'':'blue' }
+  );
+  if (!ok) return;
   setSyncStatus('⟳ 更新中…','busy');
   try {
     let records = await apiGet();
@@ -1059,7 +1109,9 @@ async function voidRecord(id, e) {
 
 async function deleteRecord(id, e) {
   e.stopPropagation();
-  if (!confirm('確定刪除此筆紀錄？')) return;
+  const ok = await showConfirm('此操作<strong>無法復原</strong>，確定要永久刪除？',
+    { title:'確認刪除', icon:'🗑️' });
+  if (!ok) return;
   setSyncStatus('⟳ 刪除中…','busy');
   try {
     let records = await apiGet();
@@ -1190,43 +1242,50 @@ function doSave() {
 /* ══════════════════════
    COPY MODAL
    ══════════════════════ */
-let _copyFoundId = null;
-
 function showCopyModal() {
   if (!cachedRecords || cachedRecords.length === 0) { showToast('尚無可複製的紀錄'); return; }
-  _copyFoundId = null;
-  document.getElementById('copy-search-input').value = '';
-  document.getElementById('copy-preview').style.display    = 'none';
-  document.getElementById('copy-not-found').style.display  = 'none';
-  document.getElementById('copy-modal').style.display = '';
-  setTimeout(() => document.getElementById('copy-search-input').focus(), 80);
+  document.getElementById('copy-kw-input').value  = '';
+  document.getElementById('copy-no-input').value  = '';
+  document.getElementById('copy-kw-results').innerHTML = '';
+  document.getElementById('copy-no-err').style.display = 'none';
+  document.getElementById('copy-modal').style.display  = '';
+  setTimeout(() => document.getElementById('copy-kw-input').focus(), 80);
 }
 function closeCopyModal() {
   document.getElementById('copy-modal').style.display = 'none';
 }
-function searchCopyRecord() {
-  const q = document.getElementById('copy-search-input').value.trim().toUpperCase();
-  const preview  = document.getElementById('copy-preview');
-  const notFound = document.getElementById('copy-not-found');
-  _copyFoundId = null;
-  preview.style.display = notFound.style.display = 'none';
-  if (!q) return;
-  const rec = cachedRecords.find(r => (r.voucherNo||'').toUpperCase() === q);
-  if (!rec) { notFound.style.display = ''; return; }
-  _copyFoundId = rec.id;
-  document.getElementById('copy-preview-content').innerHTML =
-    `<div style="display:flex; gap:12px; flex-wrap:wrap;">
-       <span style="color:#1565c0; font-weight:bold;">${esc(rec.voucherNo)}</span>
-       <span style="color:#6a1b9a;">${rec.formType==='expense'?'動支單':'請購單'}</span>
-       <span>${esc(rec.acctName||'')} / ${esc(rec.bpLabel||'')}</span>
-       <span style="color:#2e7d32; margin-left:auto;">$${fmtN(rec.total||0)}</span>
-     </div>
-     <div style="color:#888; margin-top:4px;">${esc(rec.applyDateRoc||rec.applyDateRaw||'')}　${rec.voided?'⛔ 已作廢':''}</div>`;
-  preview.style.display = '';
+
+/* ① 關鍵字搜尋 */
+function kwSearchCopy() {
+  const q   = document.getElementById('copy-kw-input').value.trim().toLowerCase();
+  const box = document.getElementById('copy-kw-results');
+  if (!q) { box.innerHTML = ''; return; }
+  const hits = cachedRecords.filter(r =>
+    [r.voucherNo, r.acctName, r.bpLabel, r.purposeDesc, r.notes, r.applyDateRoc]
+    .some(f => (f||'').toLowerCase().includes(q))
+  ).slice(0, 20);
+  if (!hits.length) {
+    box.innerHTML = '<div style="color:#888;font-size:12px;padding:6px;">查無符合結果</div>'; return;
+  }
+  box.innerHTML = hits.map(r =>
+    `<div class="copy-item" onclick="copyFromRecord('${r.id}'); closeCopyModal();">
+       <span class="ci-no">${esc(r.voucherNo||'(未取號)')}</span>
+       <span class="ci-type">${r.formType==='expense'?'動支':'採購'}</span>
+       <span class="ci-acct">${esc(r.acctName||'')}${r.voided?' ⛔':''}</span>
+       <span class="ci-amt">$${fmtN(r.total||0)}</span>
+     </div>`
+  ).join('');
 }
-function confirmCopyRecord() {
-  if (!_copyFoundId) { searchCopyRecord(); return; }
-  copyFromRecord(_copyFoundId);
+
+/* ② 直接輸入編號複製 */
+function doCopyByNo() {
+  const q   = document.getElementById('copy-no-input').value.trim().toUpperCase();
+  const err = document.getElementById('copy-no-err');
+  err.style.display = 'none';
+  const rec = cachedRecords.find(r => (r.voucherNo||'').toUpperCase() === q);
+  if (!rec) { err.style.display = ''; return; }
+  copyFromRecord(rec.id);
+  closeCopyModal();
 }
 function copyFromRecord(id) {
   const rec = cachedRecords.find(r => r.id === id);
@@ -1276,8 +1335,10 @@ function renderDraftItem(type) {
   document.getElementById('no-history')?.remove();
 }
 
-function clearForm() {
-  if (!confirm('確定清除所有填入資料？')) return;
+async function clearForm() {
+  const ok = await showConfirm('目前填入的資料將全部清除，<br>確定要重新開始嗎？',
+    { title:'確認清除', icon:'🗑️', okClass:'' });
+  if (!ok) return;
   newForm(formType);
 }
 
@@ -1331,6 +1392,19 @@ function showToast(msg) {
 }
 </script>
 
+<!-- ══ 通用確認 Modal ══ -->
+<div id="confirm-modal" style="display:none;">
+  <div class="confirm-box">
+    <div class="confirm-icon" id="confirm-icon">❓</div>
+    <div class="confirm-title" id="confirm-title"></div>
+    <div class="confirm-msg"   id="confirm-msg"></div>
+    <div class="confirm-btns">
+      <button class="confirm-cancel" onclick="_confirmResolve(false)">取消</button>
+      <button class="confirm-ok"     id="confirm-ok-btn" onclick="_confirmResolve(true)">確定</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ 通用提示 Modal ══ -->
 <div id="alert-modal" style="display:none;">
   <div class="alert-box">
@@ -1369,31 +1443,36 @@ function showToast(msg) {
 <div id="copy-modal" style="display:none;">
   <div class="cm-box">
     <h3>📋 複製既有單據</h3>
-    <div style="display:flex; gap:8px; margin-bottom:12px;">
-      <input id="copy-search-input" type="text" placeholder="輸入憑證編號（例：115-0001）"
-             style="flex:1; padding:8px 10px; border:1.5px solid #1565c0; border-radius:6px;
+
+    <!-- ① 關鍵字搜尋 -->
+    <div style="font-size:11px; color:#777; margin-bottom:4px;">🔍 關鍵字搜尋（憑證號、科目、說明…）</div>
+    <div style="display:flex; gap:8px; margin-bottom:8px;">
+      <input id="copy-kw-input" type="text" placeholder="輸入任意關鍵字…"
+             style="flex:1; padding:7px 10px; border:1.5px solid #90a4ae; border-radius:6px;
                     font-size:13px; font-family:inherit; outline:none;"
-             oninput="searchCopyRecord()"
-             onkeydown="if(event.key==='Enter') confirmCopyRecord()">
-      <button onclick="confirmCopyRecord()"
+             oninput="kwSearchCopy()">
+    </div>
+    <div id="copy-kw-results" style="max-height:160px; overflow-y:auto; margin-bottom:10px;"></div>
+
+    <hr style="border:none; border-top:1px solid #e0e0e0; margin:10px 0;">
+
+    <!-- ② 直接輸入編號確定複製 -->
+    <div style="font-size:11px; color:#777; margin-bottom:4px;">✏️ 輸入憑證編號直接複製</div>
+    <div style="display:flex; gap:8px; margin-bottom:10px;">
+      <input id="copy-no-input" type="text" placeholder="例：115-0001"
+             style="flex:1; padding:7px 10px; border:1.5px solid #1565c0; border-radius:6px;
+                    font-size:13px; font-family:inherit; outline:none;"
+             onkeydown="if(event.key==='Enter') doCopyByNo()">
+      <button onclick="doCopyByNo()"
               style="background:#1565c0; color:#fff; border:none; border-radius:6px;
-                     padding:8px 16px; font-size:13px; font-family:inherit; cursor:pointer;">
-        搜尋
+                     padding:7px 14px; font-size:13px; font-family:inherit; cursor:pointer;">
+        複製
       </button>
     </div>
-    <!-- 搜尋結果預覽 -->
-    <div id="copy-preview" style="display:none; background:#f5f9ff; border:1.5px solid #90caf9;
-         border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:12px;">
-      <div id="copy-preview-content"></div>
-      <button onclick="confirmCopyRecord()"
-              style="margin-top:10px; width:100%; background:#1565c0; color:#fff; border:none;
-                     border-radius:6px; padding:8px; font-size:13px; font-family:inherit; cursor:pointer;">
-        ✓ 確定複製此單
-      </button>
-    </div>
-    <div id="copy-not-found" style="display:none; color:#c62828; font-size:12px; margin-bottom:8px;">
+    <div id="copy-no-err" style="display:none; color:#c62828; font-size:12px; margin-bottom:8px;">
       ⚠ 查無此憑證編號，請確認後再試。
     </div>
+
     <button onclick="closeCopyModal()"
             style="width:100%; background:#eceff1; color:#555; border:none; border-radius:6px;
                    padding:8px; font-size:12px; font-family:inherit; cursor:pointer;">✕ 關閉</button>
