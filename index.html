@@ -123,9 +123,15 @@ body {
 .fta { border: none; background: transparent; font-family: inherit;
        font-size: inherit; outline: none; width: 100%; resize: none;
        overflow: hidden; line-height: 1.45; }
-.fsel { border: none; border-bottom: 1px dashed #777; background: transparent;
-        font-family: inherit; font-size: inherit; outline: none;
-        cursor: pointer; max-width: 100%; }
+.fsel {
+  border: 1.5px solid #1565c0; border-radius: 4px;
+  background: #eef4fd; color: #111;
+  font-family: inherit; font-size: 12px; font-weight: bold;
+  padding: 2px 4px; outline: none;
+  cursor: pointer; max-width: 100%;
+}
+.fsel:hover { background: #dce8fb; }
+.fsel:focus { border-color: #0d47a1; box-shadow: 0 0 0 2px rgba(21,101,192,.2); }
 
 /* Type badge（點擊切換） */
 #type-badge {
@@ -151,9 +157,9 @@ body {
 /* Upper table: 憑證編號 | 預算科目 | 金額 | 用途說明 */
 .ut { width: 100%; border-collapse: collapse; }
 .ut td { border: 1px solid #333; vertical-align: top; padding: 1.5mm 2mm; }
-.cell-lbl { font-size: 10px; color: #444; margin-bottom: 1mm; display: block; }
-.bp-row { display: flex; align-items: center; margin: 0.8mm 0; font-size: 11.5px; }
-.bp-row label { min-width: 14mm; font-size: 11px; flex-shrink: 0; }
+.cell-lbl { font-size: 11px; color: #222; font-weight: bold; margin-bottom: 1.5mm; display: block; }
+.bp-row { display: flex; align-items: center; margin: 1.2mm 0; font-size: 11.5px; gap: 2mm; }
+.bp-row label { min-width: 14mm; font-size: 11px; color: #444; flex-shrink: 0; }
 .amount-num { font-size: 20px; font-weight: bold; text-align: center; margin-top: 1.5mm; }
 
 /* Signature grid */
@@ -265,7 +271,11 @@ body {
     display: flex; flex-direction: column;
   }
   .fi   { border-bottom-color: transparent; }
-  .fsel { border-bottom-color: transparent; -webkit-appearance: none; appearance: none; }
+  .fsel {
+    border-color: transparent; background: transparent;
+    -webkit-appearance: none; appearance: none;
+    font-weight: normal; padding: 0; box-shadow: none;
+  }
   .fta  { border-bottom-color: transparent; }
   #apply-date-input { display: none; }
   #roc-date-text    { display: inline !important; }
