@@ -406,7 +406,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.3.5</div>
+    <div id="sb-version">v1.3.6</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -819,7 +819,7 @@ function appendRow(i) {
     <td class="td-spec"><input type="text"   data-r="${i}" data-c="spec"></td>
     <td class="td-r"><input type="text" inputmode="decimal" data-r="${i}" data-c="qty" style="text-align:right;" oninput="validateQty(this,${i})"></td>
     <td style="text-align:center;"><input type="text" data-r="${i}" data-c="unit" style="text-align:center;"></td>
-    <td class="td-r"><input type="number" data-r="${i}" data-c="price" min="0" step="1" oninput="calcRow(${i})"></td>
+    <td class="td-r"><input type="text" inputmode="decimal" data-r="${i}" data-c="price" style="text-align:right;" oninput="validatePrice(this,${i})"></td>
     <td class="td-r" id="sub${i}" style="padding-right:3mm;"></td>`;
   document.getElementById('items-body').appendChild(tr);
 }
@@ -846,6 +846,15 @@ function showAlert(msg, icon='⚠️') {
 }
 function closeAlert() {
   document.getElementById('alert-modal').style.display = 'none';
+}
+
+function validatePrice(el, i) {
+  const raw = el.value.trim();
+  if (raw !== '' && isNaN(Number(raw))) {
+    showAlert('單價請輸入數字\n（例如：100、1500）', '🔢');
+    el.value = '';
+  }
+  calcRow(i);
 }
 
 function validateQty(el, i) {
