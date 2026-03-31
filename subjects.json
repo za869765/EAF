@@ -1,8 +1,7 @@
 {
   "settings": {
     "orgName": "臺南市佳里區衛生所",
-    "exemptThreshold": 10000,
-
+    "exemptThreshold": 10000
   },
   "mainAccounts": [
     {

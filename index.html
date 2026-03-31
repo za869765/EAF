@@ -27,23 +27,33 @@ body {
 #sb-header {
   padding: 13px 14px 10px; border-bottom: 1px solid #2e3f52; flex-shrink: 0;
 }
-#sb-header h2 { font-size: 14px; color: #e8edf2; margin-bottom: 8px; }
-#sb-version { font-size: 10px; color: #4a6278; margin-bottom: 6px; }
-#sb-btns { display: flex; gap: 6px; }
-#new-btn {
-  flex: 1; padding: 8px 0;
-  background: #2e7d32; color: #fff;
+#sb-header h2 { font-size: 15px; color: #e8edf2; margin-bottom: 8px; letter-spacing: 1px; }
+#sb-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+#sb-version { font-size: 10px; color: #4a6278; margin-bottom: 8px; }
+#admin-link {
+  padding: 5px 12px; background: #1565c0; color: #fff;
+  border: none; border-radius: 5px; font-size: 12px;
+  font-family: inherit; cursor: pointer; text-decoration: none;
+  white-space: nowrap;
+}
+#admin-link:hover { background: #1976d2; }
+#sb-btns { display: flex; flex-direction: column; gap: 5px; }
+.new-btn {
+  width: 100%; padding: 7px 0; color: #fff;
   border: none; border-radius: 5px;
   font-size: 13px; font-family: inherit; cursor: pointer; letter-spacing: 1px;
 }
-#new-btn:hover { background: #388e3c; }
+#new-purchase { background: #1565c0; }
+#new-purchase:hover { background: #1976d2; }
+#new-expense  { background: #6a1b9a; }
+#new-expense:hover  { background: #7b1fa2; }
 #export-btn {
-  padding: 8px 10px;
-  background: #1565c0; color: #fff;
+  width: 100%; padding: 6px 0;
+  background: #37474f; color: #cfd8dc;
   border: none; border-radius: 5px;
   font-size: 12px; font-family: inherit; cursor: pointer;
 }
-#export-btn:hover { background: #1976d2; }
+#export-btn:hover { background: #455a64; }
 
 /* sync status */
 #sync-status {
@@ -64,6 +74,8 @@ body {
 }
 .h-item:hover  { background: #2d3f52; }
 .h-item.active { border-left-color: #ffd54f; }
+.h-item.expense { border-left-color: #7b1fa2; }
+.h-item.expense.active { border-left-color: #ce93d8; }
 .h-date   { font-size: 10px; color: #78909c; margin-bottom: 2px; }
 .h-title  { font-size: 12px; font-weight: bold; color: #cfd8dc; margin-bottom: 2px; }
 .h-amount { font-size: 12px; color: #66bb6a; }
@@ -107,7 +119,7 @@ body {
   box-shadow: 0 3px 12px rgba(0,0,0,.25);
   font-family: '標楷體','DFKai-SB','BiauKai','KaiTi',serif;
   font-size: 12px;
-  display: flex; flex-direction: column;
+  position: relative;
 }
 .fi  { border: none; border-bottom: 1px solid #555; background: transparent;
        font-family: inherit; font-size: inherit; outline: none; width: 100%; }
@@ -118,6 +130,15 @@ body {
         font-family: inherit; font-size: inherit; outline: none;
         cursor: pointer; max-width: 100%; }
 
+/* Type badge */
+#type-badge {
+  position: absolute; top: 4mm; right: 5mm;
+  background: #1565c0; color: #fff;
+  font-size: 12px; font-weight: bold; padding: 2px 10px;
+  border-radius: 4px; letter-spacing: 1px;
+}
+#type-badge.expense { background: #6a1b9a; }
+
 /* ── Upper section ── */
 .u-header { display: flex; align-items: flex-start; margin-bottom: 1.5mm; }
 .u-main-acct { font-size: 13px; font-weight: bold; min-width: 18mm; padding-top: 3mm; white-space: nowrap; }
@@ -125,15 +146,7 @@ body {
 .u-org  { font-size: 19px; font-weight: bold; letter-spacing: 3px; }
 .u-sub  { font-size: 12.5px; text-decoration: underline; margin-top: 1mm; }
 
-/* Type selector row */
-#type-row {
-  text-align: right; margin-bottom: 1mm; font-size: 11px;
-}
-#sel-type {
-  border: 1px solid #888; border-radius: 3px; font-size: 12px;
-  font-family: inherit; padding: 1px 4px; cursor: pointer; background: #fffbe6;
-}
-
+/* Upper table: 憑證編號 | 預算科目 | 金額 | 用途說明 */
 .ut { width: 100%; border-collapse: collapse; }
 .ut td { border: 1px solid #333; vertical-align: top; padding: 1.5mm 2mm; }
 .cell-lbl { font-size: 10px; color: #444; margin-bottom: 1mm; display: block; }
@@ -147,27 +160,26 @@ body {
   border: 1px solid #333; text-align: center;
   vertical-align: top; font-size: 11px; padding: 2mm 1mm; height: 18mm;
 }
-.sg td.top-lbl { height: auto; padding: 1.5mm 2mm; vertical-align: top; }
-.slash {
+/* Slash overlay for cells that are N/A */
+.sg td.slash {
   background: linear-gradient(to bottom right,
-    transparent calc(50% - .6px), #555 calc(50% - .6px),
-    #555 calc(50% + .6px), transparent calc(50% + .6px));
+    transparent calc(50% - .6px), #888 calc(50% - .6px),
+    #888 calc(50% + .6px), transparent calc(50% + .6px));
 }
 
 /* Cut line */
 .cut-line {
   text-align: center; font-size: 9.5px; color: #888;
-  margin: 2mm 0; letter-spacing: 4px; user-select: none; flex-shrink: 0;
+  margin: 2mm 0; letter-spacing: 4px; user-select: none;
 }
 
 /* ── Lower section ── */
-#lower-section { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-.lower-wrap { width: 100%; border-collapse: collapse; flex: 1; }
+.lower-wrap { width: 100%; border-collapse: collapse; }
 .lower-wrap > tbody > tr > td { vertical-align: top; }
 .lower-left  { border: 1px solid #333; }
 .lower-right {
   border: 1px solid #333; border-left: none;
-  width: 42mm; padding: 1.5mm 2mm; font-size: 11px; vertical-align: top;
+  width: 38mm; padding: 1.5mm 2mm; font-size: 11px; vertical-align: top;
 }
 .l-top-bar  { display: flex; border-bottom: 1px solid #333; align-items: center; }
 .l-top-title { font-size: 13px; font-weight: bold; padding: 1.5mm 3mm; }
@@ -189,17 +201,36 @@ body {
 .it td.td-r { text-align: right; }
 .it td.td-r input { text-align: right; }
 .it tfoot td { font-weight: bold; background: #f5f5f5; font-size: 12px; vertical-align: middle; }
+.it tfoot td { height: 7mm; }
 
+/* Add row button */
+#add-row-btn {
+  display: block; width: 100%; border: 1px dashed #b0bec5;
+  background: #fafafa; color: #546e7a; font-size: 11px;
+  padding: 3px 0; cursor: pointer; font-family: inherit;
+  border-top: none;
+}
+#add-row-btn:hover { background: #e8f5e9; color: #2e7d32; border-color: #66bb6a; }
+
+/* ── Bottom signatures ── */
 .bs { width: 100%; border-collapse: collapse; border-top: none; }
-.bs td { border: 1px solid #333; text-align: center; font-size: 11px; vertical-align: top; padding: 2mm 1mm; height: 6mm; }
-.bs tr.sig-box td { height: 22mm; }
-.bs tr.exempt-row td { height: 7mm; font-size: 12px; font-weight: bold; border-top: 1px solid #333; vertical-align: middle; }
+.bs td {
+  border: 1px solid #333; text-align: center; font-size: 11px;
+  vertical-align: top; padding: 2mm 1mm;
+}
+.bs tr.label-row td { height: 6mm; vertical-align: middle; }
+.bs tr.sig-box td { height: 22mm; vertical-align: top; }
+.bs tr.exempt-row td {
+  height: 8mm; font-size: 12px; font-weight: bold;
+  vertical-align: middle; border-top: 1px solid #333;
+}
 .hidden-cell { visibility: hidden; }
 .notes-lbl { font-size: 11px; font-weight: bold; margin-bottom: 1.5mm; }
 
-/* Bottom sig wrapper */
-#bs-wrap { }
-#bs-wrap.hidden-bs { display: none; }
+/* purchase-sig: only for 請購單 + >= threshold */
+#purchase-sig { display: none; }
+/* exempt-wrap: 請購<threshold OR 動支>0 */
+#exempt-wrap  { display: none; }
 
 /* ══════════════════════════════════
    PRINT
@@ -208,25 +239,25 @@ body {
   @page { size: A4 portrait; margin: 0; }
   body { background: #fff; }
   #app  { display: block; }
-  #sidebar, #actions, #toast { display: none !important; }
+  #sidebar, #actions, #toast, #add-row-btn { display: none !important; }
   #main { padding: 0; }
   #form-page {
     width: 210mm; height: 297mm; min-height: unset;
     padding: 7mm 7mm 5mm 7mm; box-shadow: none;
+    display: flex; flex-direction: column;
   }
   .fi   { border-bottom-color: transparent; }
   .fsel { border-bottom-color: transparent; -webkit-appearance: none; appearance: none; }
-  #sel-type { border-color: transparent; background: transparent; -webkit-appearance: none; appearance: none; }
   .fta  { border-bottom-color: transparent; }
   #apply-date-input { display: none; }
   #roc-date-text    { display: inline !important; }
-  /* Distribute space in item rows */
-  .it tbody tr { height: 10mm; }
-  .it tfoot tr td { height: 8mm; }
-  .bs tr.sig-box td { height: 24mm; }
-  /* Lower section fills remaining height */
-  #lower-section { flex: 1; }
+  /* Items stretch to fill page */
+  .it tbody tr { height: 9mm; }
+  /* Lower section flex-fills remaining space */
+  #lower-section { flex: 1; display: flex; flex-direction: column; }
+  .lower-wrap { flex: 1; }
   .lower-left { height: 100%; }
+  .bs tr.sig-box td { height: 24mm; }
 }
 </style>
 </head>
@@ -237,14 +268,19 @@ body {
 <!-- ══════════════════════ SIDEBAR ══════════════════════ -->
 <aside id="sidebar">
   <div id="sb-header">
-    <h2>📋 歷史紀錄</h2>
-    <div id="sb-version">v1.1.2 ｜ <a href="admin.html" style="color:#4a8fb5; text-decoration:none;">管理入口</a></div>
+    <div id="sb-top">
+      <h2>⚙ 動支管理系統</h2>
+      <a id="admin-link" href="admin.html">管理入口</a>
+    </div>
+    <div id="sb-version">v1.2.0</div>
     <div id="sb-btns">
-      <button id="new-btn" onclick="newForm()">＋ 新增空白單</button>
-      <button id="export-btn" onclick="exportCSV()" title="匯出CSV">⬇ 匯出</button>
+      <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
+      <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
+      <button id="export-btn" onclick="exportCSV()">⬇ 匯出 CSV</button>
     </div>
   </div>
   <div id="sync-status">● 連線中…</div>
+  <div style="font-size:10px; color:#4a6278; padding:5px 14px 2px; flex-shrink:0;">📋 歷史紀錄</div>
   <div id="history-scroll">
     <div id="no-history">載入中…</div>
   </div>
@@ -262,14 +298,8 @@ body {
   <!-- ══ FORM PAGE ══ -->
   <div id="form-page">
 
-    <!-- ── 類型選擇列 ── -->
-    <div id="type-row">
-      單據類型：
-      <select id="sel-type" onchange="onTypeChange()">
-        <option value="purchase">採購（請購單）</option>
-        <option value="expense">動支（動支單）</option>
-      </select>
-    </div>
+    <!-- 單據類型徽章（右上角） -->
+    <div id="type-badge">請購單</div>
 
     <!-- ── Upper: 憑證用紙 ── -->
     <div class="u-header">
@@ -282,7 +312,10 @@ body {
 
     <table class="ut">
       <colgroup>
-        <col style="width:16mm"><col><col style="width:24mm"><col style="width:46mm">
+        <col style="width:15mm">
+        <col style="width:55mm">
+        <col style="width:20mm">
+        <col><!-- 用途說明 佔剩餘最大空間 -->
       </colgroup>
       <tr>
         <td style="text-align:center; vertical-align:top;">
@@ -292,14 +325,12 @@ body {
         </td>
         <td>
           <span class="cell-lbl">預算科目</span>
-          <!-- 串聯下拉：第1層 主科目 -->
           <div class="bp-row">
             <label>業務計畫：</label>
             <select class="fsel" id="sel-main" onchange="onMainChange()"
-                    style="width:24mm; margin-right:2mm;">
+                    style="width:22mm; margin-right:2mm;">
               <option value="">── 主科目 ──</option>
             </select>
-            <!-- 第2層：主科目選了才顯示 -->
             <select class="fsel" id="sel-bp" onchange="onBpChange()"
                     style="flex:1; display:none;">
             </select>
@@ -308,7 +339,6 @@ body {
             <label>工作計畫：</label>
             <span id="wp-text" style="font-size:11.5px;"></span>
           </div>
-          <!-- 第3層：業務計畫選了且有選項才顯示 -->
           <div class="bp-row" id="row-purpose" style="display:none;">
             <label>用途別　：</label>
             <select class="fsel" id="sel-purpose" style="flex:1;"></select>
@@ -321,12 +351,16 @@ body {
         <td>
           <span class="cell-lbl">用途說明</span>
           <textarea class="fta" id="purpose-desc" rows="4"
-                    style="font-size:11.5px; min-height:16mm;"></textarea>
+                    style="font-size:11.5px; min-height:18mm;"></textarea>
         </td>
       </tr>
     </table>
 
-    <!-- Signature grid（上方憑證用） -->
+    <!-- ── 上方核章格 ── -->
+    <!--
+      請購單：全部空白（每格均需蓋章）
+      動支單：保管(id=sg-custody)、採購(id=sg-purchase)、財物登記(id=sg-financial) 三格加斜線
+    -->
     <table class="sg">
       <colgroup>
         <col style="width:22%"><col style="width:14%"><col style="width:22%">
@@ -334,15 +368,15 @@ body {
       </colgroup>
       <tr>
         <td>經(承)辦單位</td>
-        <td class="top-lbl slash">採購</td>
-        <td class="top-lbl slash" style="font-size:10px;">
+        <td id="sg-purchase">採購</td>
+        <td id="sg-financial" style="font-size:10px;">
           財物或軟體登記<br><span style="font-size:9px;">(備註財物/軟體編)</span>
         </td>
         <td rowspan="2" style="vertical-align:middle;">主(會)計單位</td>
         <td rowspan="2" style="vertical-align:middle;">機關長官</td>
       </tr>
       <tr>
-        <td>保管</td>
+        <td id="sg-custody">保管</td>
         <td>驗收</td>
         <td>出納單位</td>
       </tr>
@@ -372,15 +406,15 @@ body {
           <table class="it">
             <thead>
               <tr>
-                <th rowspan="2" style="width:28%;">採購品名／動支細項</th>
+                <th rowspan="2" style="width:30%;">採購品名／動支細項</th>
                 <th rowspan="2" style="width:20%;">規格（樣式）</th>
-                <th rowspan="2" style="width:9%;">數量</th>
+                <th rowspan="2" style="width:8%;">數量</th>
                 <th rowspan="2" style="width:8%;">單位</th>
                 <th colspan="2">預估金額</th>
               </tr>
               <tr>
                 <th style="width:17%;">單價</th>
-                <th style="width:18%;">總額</th>
+                <th style="width:17%;">總額</th>
               </tr>
             </thead>
             <tbody id="items-body"></tbody>
@@ -392,6 +426,7 @@ body {
               </tr>
             </tfoot>
           </table>
+          <button id="add-row-btn" onclick="addRow()">＋ 新增明細列</button>
         </td>
         <td class="lower-right">
           <div class="notes-lbl">其他說明事項</div>
@@ -400,14 +435,20 @@ body {
         </td>
       </tr></tbody></table>
 
-      <!-- Bottom signatures（請購單 + 金額 >= 10000 才顯示） -->
-      <div id="bs-wrap">
+      <!-- 請購單 + 金額 >= 門檻 才顯示正式簽章列 -->
+      <div id="purchase-sig">
         <table class="bs">
-          <tr>
+          <tr class="label-row">
             <td>請購單位</td><td>採購單位</td><td>主(會)計單位</td><td>機關長官</td>
           </tr>
           <tr class="sig-box"><td></td><td></td><td></td><td></td></tr>
-          <tr class="exempt-row" id="exempt-row">
+        </table>
+      </div>
+
+      <!-- 免核章：請購單 0<金額<門檻，或 動支單 金額>0 -->
+      <div id="exempt-wrap">
+        <table class="bs">
+          <tr class="exempt-row">
             <td id="ex1">免核章</td><td id="ex2">免核章</td>
             <td id="ex3">免核章</td><td id="ex4">免核章</td>
           </tr>
@@ -423,24 +464,24 @@ body {
 <script>
 'use strict';
 
-let CFG = { settings:{ orgName:'臺南市佳里區衛生所', exemptThreshold:10000 }, mainAccounts:[] };
+let CFG       = { settings:{ orgName:'臺南市佳里區衛生所', exemptThreshold:10000 }, mainAccounts:[] };
 let currentId = null;
+let formType  = 'purchase';   /* 'purchase' | 'expense' */
+let rowCount  = 10;
 let cachedRecords = [];
-const ROWS = 7;
-const API  = '/api/records';
+const API = '/api/records';
 
 /* ══════════════════════
    INIT
    ══════════════════════ */
 (async function init() {
-  /* 優先從 API 讀取科目（管理員可即時更新），失敗則讀靜態檔 */
+  /* 優先 API，失敗讀靜態檔 */
   try {
     const r1 = await fetch('/api/subjects');
     if (r1.ok) {
-      const data = await r1.json();
-      if (data && data.mainAccounts) { CFG = data; }
-      else throw new Error('empty');
-    } else throw new Error('not ok');
+      const d = await r1.json();
+      if (d && d.mainAccounts) CFG = d; else throw 0;
+    } else throw 0;
   } catch(_) {
     try {
       const r2 = await fetch('subjects.json');
@@ -448,11 +489,9 @@ const API  = '/api/records';
     } catch(_) {}
   }
 
-  /* 套用組織名稱 */
-  const orgName = CFG.settings?.orgName || '臺南市佳里區衛生所';
-  document.getElementById('org-name').textContent  = orgName;
-  document.getElementById('unit-name').textContent = orgName;
-  document.title = '採購(費用動支)申請單 － ' + orgName;
+  const org = CFG.settings?.orgName || '臺南市佳里區衛生所';
+  document.getElementById('org-name').textContent  = org;
+  document.getElementById('unit-name').textContent = org;
 
   buildMainDropdown();
   generateItemRows();
@@ -462,36 +501,39 @@ const API  = '/api/records';
 })();
 
 /* ══════════════════════
-   TYPE (採購/動支)
+   FORM TYPE
    ══════════════════════ */
-function onTypeChange() {
-  const type = document.getElementById('sel-type').value;
-  if (type === 'purchase') {
-    document.getElementById('form-subtitle').textContent = '採購申請單暨黏貼憑證用紙';
-    document.getElementById('lower-title').textContent  = '採購';
-  } else {
-    document.getElementById('form-subtitle').textContent = '費用動支申請單暨黏貼憑證用紙';
-    document.getElementById('lower-title').textContent  = '動支';
-  }
-  calcTotal(); /* 重新評估下方簽章列顯示 */
+function applyType(type) {
+  formType = type;
+  const isPurchase = type === 'purchase';
+
+  /* 徽章 */
+  const badge = document.getElementById('type-badge');
+  badge.textContent = isPurchase ? '請購單' : '動支單';
+  badge.className   = isPurchase ? '' : 'expense';
+
+  /* 副標題 */
+  document.getElementById('form-subtitle').textContent =
+    isPurchase ? '採購申請單暨黏貼憑證用紙' : '費用動支申請單暨黏貼憑證用紙';
+
+  /* 下方標題 */
+  document.getElementById('lower-title').textContent = isPurchase ? '採購' : '動支';
+
+  /* 上方核章斜線：動支單 → 保管/採購/財物登記 三格加斜線 */
+  ['sg-custody','sg-purchase','sg-financial'].forEach(id => {
+    document.getElementById(id).classList.toggle('slash', !isPurchase);
+  });
+
+  calcTotal();
 }
 
 /* ══════════════════════
    API HELPERS
    ══════════════════════ */
-async function apiGet() {
-  const r = await fetch(API);
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return r.json();
-}
-async function apiPost(data) {
-  const r = await fetch(API, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return r.json();
+async function apiGet()       { const r=await fetch(API); if(!r.ok) throw 0; return r.json(); }
+async function apiPost(data)  {
+  const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  if(!r.ok) throw 0; return r.json();
 }
 
 function setSyncStatus(msg, cls) {
@@ -505,20 +547,20 @@ async function loadHistory() {
     cachedRecords = await apiGet();
     setSyncStatus(`● 已連線　共 ${cachedRecords.length} 筆`, 'ok');
     renderHistory(cachedRecords);
-  } catch(e) {
+  } catch(_) {
     setSyncStatus('● 連線失敗，請確認網路', 'err');
     renderHistory([]);
   }
 }
 
 /* ══════════════════════
-   AUTO VOUCHER NUMBER
+   AUTO VOUCHER
    ══════════════════════ */
 function generateVoucherNo(records) {
   const rocYear = new Date().getFullYear() - 1911;
   const prefix  = String(rocYear) + '-';
   let max = 0;
-  (records || []).forEach(r => {
+  (records||[]).forEach(r => {
     if (r.voucherNo && r.voucherNo.startsWith(prefix)) {
       const n = parseInt(r.voucherNo.slice(prefix.length), 10);
       if (!isNaN(n) && n > max) max = n;
@@ -534,28 +576,20 @@ async function exportCSV() {
   setSyncStatus('⟳ 匯出中…', 'busy');
   try {
     const records = await apiGet();
-    if (!records.length) { showToast('目前無紀錄可匯出'); setSyncStatus(`● 已連線　共 0 筆`, 'ok'); return; }
-
-    const header = ['憑證編號','類型','申請日期','主科目代碼','主科目名稱','業務計畫代碼','業務計畫','用途別代碼','用途說明','合計金額','儲存時間'];
-    const rows = records.map(r => [
-      r.voucherNo||'', r.formType||'', r.applyDateRoc||r.applyDateRaw||'',
-      r.acctCode||'', r.acctName||'', r.bpCode||'', r.bpLabel||'',
-      r.purposeCode||'', r.purposeDesc||'', r.total||0, r.savedAt||''
-    ].map(v => '"'+String(v).replace(/"/g,'""')+'"').join(','));
-
-    const bom = '\uFEFF';
-    const csv = bom + header.join(',') + '\n' + rows.join('\n');
-    const blob = new Blob([csv], { type:'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = '動支申請紀錄_' + new Date().toISOString().slice(0,10) + '.csv';
-    a.click(); URL.revokeObjectURL(url);
-    setSyncStatus(`● 已連線　共 ${records.length} 筆`, 'ok');
+    if (!records.length) { showToast('目前無紀錄可匯出'); setSyncStatus(`● 已連線　共 0 筆`,'ok'); return; }
+    const hdr = ['憑證編號','類型','申請日期','主科目代碼','主科目名稱','業務計畫代碼','業務計畫','用途別代碼','用途說明','金額','儲存時間'];
+    const rows = records.map(r=>[r.voucherNo||'',r.formType==='expense'?'動支單':'請購單',
+      r.applyDateRoc||r.applyDateRaw||'',r.acctCode||'',r.acctName||'',r.bpCode||'',
+      r.bpLabel||'',r.purposeCode||'',r.purposeDesc||'',r.total||0,r.savedAt||'']
+      .map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(','));
+    const csv = '\uFEFF' + hdr.join(',') + '\n' + rows.join('\n');
+    const a = Object.assign(document.createElement('a'),{
+      href:URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
+      download:'動支申請紀錄_'+new Date().toISOString().slice(0,10)+'.csv'});
+    a.click(); URL.revokeObjectURL(a.href);
+    setSyncStatus(`● 已連線　共 ${records.length} 筆`,'ok');
     showToast('✓ 已匯出 CSV');
-  } catch(e) {
-    setSyncStatus('● 連線失敗', 'err');
-    showToast('✗ 匯出失敗');
-  }
+  } catch(_) { setSyncStatus('● 連線失敗','err'); showToast('✗ 匯出失敗'); }
 }
 
 /* ══════════════════════
@@ -570,91 +604,84 @@ function buildMainDropdown() {
 
 function onMainChange() {
   const code = document.getElementById('sel-main').value;
-  const acct = CFG.mainAccounts.find(a => a.code === code);
+  const acct = CFG.mainAccounts.find(a=>a.code===code);
   document.getElementById('main-acct-lbl').textContent = acct ? acct.name : '請選擇';
-
   const bpSel = document.getElementById('sel-bp');
   bpSel.innerHTML = '<option value="">── 選擇業務計畫 ──</option>';
   if (acct) {
-    acct.businessPlans.forEach(bp =>
-      bpSel.appendChild(new Option(bp.code + '　' + bp.name, bp.code)));
+    acct.businessPlans.forEach(bp => bpSel.appendChild(new Option(bp.code+'　'+bp.name, bp.code)));
     bpSel.style.display = '';
-  } else {
-    bpSel.style.display = 'none';
-  }
+  } else { bpSel.style.display = 'none'; }
   document.getElementById('wp-text').textContent = '';
   document.getElementById('sel-purpose').innerHTML = '';
   document.getElementById('row-purpose').style.display = 'none';
 }
 
 function onBpChange() {
-  const acctCode = document.getElementById('sel-main').value;
-  const bpCode   = document.getElementById('sel-bp').value;
-  const acct = CFG.mainAccounts.find(a => a.code === acctCode);
-  const bp   = acct ? acct.businessPlans.find(b => b.code === bpCode) : null;
-
+  const acct = CFG.mainAccounts.find(a=>a.code===document.getElementById('sel-main').value);
+  const bp   = acct ? acct.businessPlans.find(b=>b.code===document.getElementById('sel-bp').value) : null;
   document.getElementById('wp-text').textContent = bp ? bp.workPlan : '';
-
   const pSel = document.getElementById('sel-purpose');
   const pRow = document.getElementById('row-purpose');
   pSel.innerHTML = '<option value="">── 選擇用途別 ──</option>';
   if (bp && bp.purposes.length > 0) {
-    bp.purposes.forEach(p =>
-      pSel.appendChild(new Option(p.code + '　' + p.name, p.code)));
+    bp.purposes.forEach(p => pSel.appendChild(new Option(p.code+'　'+p.name, p.code)));
     pRow.style.display = '';
-  } else {
-    pRow.style.display = 'none';
-  }
+  } else { pRow.style.display = 'none'; }
 }
 
 /* ══════════════════════
    ITEMS TABLE
    ══════════════════════ */
 function generateItemRows() {
-  const tb = document.getElementById('items-body');
-  tb.innerHTML = '';
-  for (let i = 0; i < ROWS; i++) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="td-name"><input type="text"   data-r="${i}" data-c="name"></td>
-      <td class="td-spec"><input type="text"   data-r="${i}" data-c="spec"></td>
-      <td class="td-r">  <input type="number" data-r="${i}" data-c="qty"
-            min="0" step="0.1" oninput="calcRow(${i})"></td>
-      <td style="text-align:center;">
-            <input type="text" data-r="${i}" data-c="unit" style="text-align:center;"></td>
-      <td class="td-r">  <input type="number" data-r="${i}" data-c="price"
-            min="0" step="1" oninput="calcRow(${i})"></td>
-      <td class="td-r" id="sub${i}" style="padding-right:3mm;"></td>`;
-    tb.appendChild(tr);
-  }
+  document.getElementById('items-body').innerHTML = '';
+  for (let i = 0; i < rowCount; i++) appendRow(i);
+}
+
+function appendRow(i) {
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="td-name"><input type="text"   data-r="${i}" data-c="name"></td>
+    <td class="td-spec"><input type="text"   data-r="${i}" data-c="spec"></td>
+    <td class="td-r"><input type="number" data-r="${i}" data-c="qty"   min="0" step="0.1" oninput="calcRow(${i})"></td>
+    <td style="text-align:center;"><input type="text" data-r="${i}" data-c="unit" style="text-align:center;"></td>
+    <td class="td-r"><input type="number" data-r="${i}" data-c="price" min="0" step="1" oninput="calcRow(${i})"></td>
+    <td class="td-r" id="sub${i}" style="padding-right:3mm;"></td>`;
+  document.getElementById('items-body').appendChild(tr);
+}
+
+function addRow() {
+  appendRow(rowCount);
+  rowCount++;
 }
 
 function calcRow(i) {
-  const sub = Math.round((parseFloat(qv(i,'qty'))||0) * (parseFloat(qv(i,'price'))||0));
+  const sub = Math.round((parseFloat(qv(i,'qty'))||0)*(parseFloat(qv(i,'price'))||0));
   document.getElementById('sub'+i).textContent = sub > 0 ? '$'+fmtN(sub) : '';
   calcTotal();
 }
 
 function calcTotal() {
   let total = 0;
-  for (let i = 0; i < ROWS; i++)
+  for (let i = 0; i < rowCount; i++)
     total += Math.round((parseFloat(qv(i,'qty'))||0)*(parseFloat(qv(i,'price'))||0));
   document.getElementById('amount-disp').textContent = '$'+fmtN(total);
   document.getElementById('grand-total').textContent  = '$'+fmtN(total);
 
-  /* 免核章：total > 0 且 < 免核門檻 */
-  const exempt = total > 0 && total < (CFG.settings?.exemptThreshold || 10000);
-  ['ex1','ex2','ex3','ex4'].forEach(id => {
-    const td = document.getElementById(id);
-    td.textContent = '免核章';
-    td.className   = exempt ? '' : 'hidden-cell';
-  });
+  const threshold  = CFG.settings?.exemptThreshold || 10000;
+  const isPurchase = formType === 'purchase';
 
-  /* 下方簽章列：僅「請購單」且金額 >= 10000 才顯示 */
-  const type = document.getElementById('sel-type').value;
-  const threshold = CFG.settings?.exemptThreshold || 10000;
-  const showBs = (type === 'purchase') && (total >= threshold);
-  document.getElementById('bs-wrap').classList.toggle('hidden-bs', !showBs);
+  /* 下方正式簽章列：請購單 + 金額 >= 門檻 */
+  document.getElementById('purchase-sig').style.display =
+    (isPurchase && total >= threshold) ? '' : 'none';
+
+  /* 免核章列：
+     請購單：0 < 金額 < 門檻
+     動支單：金額 > 0（不論金額，動支不需採購核章）*/
+  const showExempt = isPurchase
+    ? (total > 0 && total < threshold)
+    : (total > 0);
+  document.getElementById('exempt-wrap').style.display = showExempt ? '' : 'none';
 }
 
 /* ══════════════════════
@@ -677,9 +704,9 @@ function updateRocDate() {
    ══════════════════════ */
 function getFormData() {
   const items = []; let total = 0;
-  for (let i = 0; i < ROWS; i++) {
+  for (let i = 0; i < rowCount; i++) {
     const qty=qv(i,'qty'), price=qv(i,'price');
-    items.push({ name:qv(i,'name'), spec:qv(i,'spec'), qty, unit:qv(i,'unit'), price });
+    items.push({name:qv(i,'name'),spec:qv(i,'spec'),qty,unit:qv(i,'unit'),price});
     total += Math.round((parseFloat(qty)||0)*(parseFloat(price)||0));
   }
   const acctCode = document.getElementById('sel-main').value;
@@ -688,7 +715,7 @@ function getFormData() {
   const bp   = acct ? acct.businessPlans.find(b=>b.code===bpCode) : null;
   return {
     voucherNo   : document.getElementById('voucher-no').value,
-    formType    : document.getElementById('sel-type').value,
+    formType,
     acctCode, acctName  : acct ? acct.name : '',
     bpCode,   bpLabel   : bp   ? bp.code+'　'+bp.name : '',
     purposeCode : document.getElementById('sel-purpose').value,
@@ -701,27 +728,27 @@ function getFormData() {
 }
 
 function fillForm(rec) {
-  document.getElementById('voucher-no').value    = rec.voucherNo   || '';
-  document.getElementById('purpose-desc').value  = rec.purposeDesc || '';
-  document.getElementById('notes').value         = rec.notes       || '';
-  document.getElementById('apply-date-input').value = rec.applyDateRaw || '';
+  document.getElementById('voucher-no').value         = rec.voucherNo   || '';
+  document.getElementById('purpose-desc').value       = rec.purposeDesc || '';
+  document.getElementById('notes').value              = rec.notes       || '';
+  document.getElementById('apply-date-input').value   = rec.applyDateRaw || '';
   updateRocDate();
-  /* 類型 */
-  if (rec.formType) {
-    document.getElementById('sel-type').value = rec.formType;
-    onTypeChange();
-  }
+  applyType(rec.formType || 'purchase');
   document.getElementById('sel-main').value = rec.acctCode || '';
   onMainChange();
   document.getElementById('sel-bp').value   = rec.bpCode   || '';
   onBpChange();
   document.getElementById('sel-purpose').value = rec.purposeCode || '';
-  (rec.items||[]).forEach((item,i) => {
-    if (i>=ROWS) return;
+  /* 確保行數足夠 */
+  const needed = (rec.items||[]).length;
+  while (rowCount < Math.max(needed, 10)) { appendRow(rowCount); rowCount++; }
+  for (let i=0;i<rowCount;i++) {
+    const item = (rec.items||[])[i] || {};
     qi(i,'name').value=item.name||''; qi(i,'spec').value=item.spec||'';
     qi(i,'qty').value=item.qty||'';   qi(i,'unit').value=item.unit||'';
-    qi(i,'price').value=item.price||''; calcRow(i);
-  });
+    qi(i,'price').value=item.price||'';
+    if (document.getElementById('sub'+i)) calcRow(i);
+  }
   calcTotal();
 }
 
@@ -734,50 +761,46 @@ async function saveRecord() {
   const now  = new Date();
   const ts   = `${now.getFullYear()-1911}/${pad(now.getMonth()+1)}/${pad(now.getDate())} `+
                `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-
   try {
     let records = await apiGet();
     if (currentId) {
       const idx = records.findIndex(r=>r.id===currentId);
-      if (idx>=0) records[idx] = {...data, id:currentId, savedAt:ts};
-      else        records.push({...data, id:currentId, savedAt:ts});
+      if (idx>=0) records[idx]={...data,id:currentId,savedAt:ts};
+      else        records.push({...data,id:currentId,savedAt:ts});
     } else {
-      /* 新紀錄：儲存時才取憑證號 */
       if (!data.voucherNo) {
         data.voucherNo = generateVoucherNo(records);
         document.getElementById('voucher-no').value = data.voucherNo;
       }
       currentId = Date.now().toString();
-      records.push({...data, id:currentId, savedAt:ts});
+      records.push({...data,id:currentId,savedAt:ts});
     }
     await apiPost(records);
     cachedRecords = records;
-    setSyncStatus(`● 已儲存　共 ${records.length} 筆`, 'ok');
+    setSyncStatus(`● 已儲存　共 ${records.length} 筆`,'ok');
     renderHistory(records);
-    showToast('✓ 已儲存 ' + ts);
+    showToast('✓ 已儲存 '+ts);
     showMsg('✓ 已儲存 '+ts);
-  } catch(e) {
-    setSyncStatus('● 儲存失敗', 'err');
+  } catch(_) {
+    setSyncStatus('● 儲存失敗','err');
     showToast('✗ 儲存失敗，請確認網路');
-    showMsg('✗ 儲存失敗，請確認網路');
+    showMsg('✗ 儲存失敗');
   }
 }
 
 async function deleteRecord(id, e) {
   e.stopPropagation();
   if (!confirm('確定刪除此筆紀錄？')) return;
-  setSyncStatus('⟳ 刪除中…', 'busy');
+  setSyncStatus('⟳ 刪除中…','busy');
   try {
     let records = await apiGet();
     records = records.filter(r=>r.id!==id);
     await apiPost(records);
     cachedRecords = records;
     if (currentId===id) currentId=null;
-    setSyncStatus(`● 已刪除　共 ${records.length} 筆`, 'ok');
+    setSyncStatus(`● 已刪除　共 ${records.length} 筆`,'ok');
     renderHistory(records);
-  } catch(_) {
-    setSyncStatus('● 刪除失敗', 'err');
-  }
+  } catch(_) { setSyncStatus('● 刪除失敗','err'); }
 }
 
 async function loadRecord(id) {
@@ -786,8 +809,11 @@ async function loadRecord(id) {
     const rec = records.find(r=>r.id===id);
     if (!rec) return;
     currentId = id;
+    /* 重設行數 */
+    rowCount = 10;
+    generateItemRows();
     fillForm(rec);
-    document.querySelectorAll('.h-item').forEach(el =>
+    document.querySelectorAll('.h-item').forEach(el=>
       el.classList.toggle('active', el.dataset.id===id));
   } catch(_) {}
 }
@@ -799,13 +825,13 @@ function renderHistory(records) {
   }
   wrap.innerHTML='';
   [...records].reverse().forEach(rec => {
+    const isExp = rec.formType==='expense';
     const div = document.createElement('div');
-    div.className = 'h-item'+(rec.id===currentId?' active':'');
+    div.className = 'h-item'+(rec.id===currentId?' active':'')+(isExp?' expense':'');
     div.dataset.id = rec.id;
-    const typeLabel = rec.formType==='expense' ? '[動支]' : '[採購]';
     div.innerHTML = `
       <button class="h-del" onclick="deleteRecord('${rec.id}',event)">✕</button>
-      <div class="h-date">${esc(rec.savedAt||'')} ${esc(typeLabel)}</div>
+      <div class="h-date">${esc(rec.savedAt||'')}　${isExp?'[動支]':'[採購]'}</div>
       <div class="h-title">${esc(rec.voucherNo||'')} ${esc(rec.acctName)} / ${esc(rec.bpLabel)}</div>
       <div class="h-amount">$${fmtN(rec.total)}　${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</div>`;
     div.onclick = () => loadRecord(rec.id);
@@ -813,45 +839,40 @@ function renderHistory(records) {
   });
 }
 
-function newForm() {
+function newForm(type) {
   currentId = null;
-  /* 憑證編號留空，儲存時才取號 */
+  rowCount = 10;
   document.getElementById('voucher-no').value = '';
-  ['purpose-desc','notes'].forEach(id => document.getElementById(id).value='');
-  for (let i=0;i<ROWS;i++) {
-    ['name','spec','qty','unit','price'].forEach(c=>qi(i,c).value='');
-    document.getElementById('sub'+i).textContent='';
-  }
-  document.getElementById('sel-type').value = 'purchase';
-  onTypeChange();
+  ['purpose-desc','notes'].forEach(id=>document.getElementById(id).value='');
+  generateItemRows();
+  applyType(type || 'purchase');
   setTodayDate(); buildMainDropdown(); calcTotal();
   document.getElementById('save-msg').textContent='';
   document.querySelectorAll('.h-item').forEach(el=>el.classList.remove('active'));
-  showToast('📄 已開啟空白申請單，填寫後按「存檔取號」');
+  showToast('📄 已開啟新' + (type==='expense'?'動支單':'請購單') + '，填寫後按「存檔取號」');
 }
 
 function clearForm() {
   if (!confirm('確定清除所有填入資料？')) return;
-  newForm();
+  newForm(formType);
 }
 
 /* ══════════════════════
    UTILS
    ══════════════════════ */
-function qi(r,c){ return document.querySelector(`[data-r="${r}"][data-c="${c}"]`); }
-function qv(r,c){ return qi(r,c)?.value||''; }
-function fmtN(n){ return Number(n).toLocaleString('zh-TW'); }
-function pad(n) { return String(n).padStart(2,'0'); }
-function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function qi(r,c)  { return document.querySelector(`[data-r="${r}"][data-c="${c}"]`); }
+function qv(r,c)  { return qi(r,c)?.value||''; }
+function fmtN(n)  { return Number(n).toLocaleString('zh-TW'); }
+function pad(n)   { return String(n).padStart(2,'0'); }
+function esc(s)   { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function showMsg(t){ const el=document.getElementById('save-msg'); el.textContent=t; setTimeout(()=>el.textContent='',3500); }
 
 let _toastTimer = null;
 function showToast(msg) {
   const el = document.getElementById('toast');
-  el.textContent = msg;
-  el.classList.add('show');
+  el.textContent = msg; el.classList.add('show');
   if (_toastTimer) clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+  _toastTimer = setTimeout(()=>el.classList.remove('show'), 2800);
 }
 </script>
 </body>
