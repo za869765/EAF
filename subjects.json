@@ -1,0 +1,117 @@
+{
+  "settings": {
+    "orgName": "臺南市佳里區衛生所",
+    "exemptThreshold": 10000
+  },
+  "mainAccounts": [
+    {
+      "code": "11010201",
+      "name": "醫療基金專戶",
+      "businessPlans": [
+        {
+          "code": "510601",
+          "name": "門診醫療成本",
+          "workPlan": "門診醫療成本",
+          "purposes": [
+            { "code": "2706", "name": "護理人員訓練費及管理費及薪資暨津貼費" },
+            { "code": "2807", "name": "委託檢驗（定）試驗認證費" },
+            { "code": "3201", "name": "辦公事務用品" },
+            { "code": "2201", "name": "郵費" },
+            { "code": "2202", "name": "電話費" },
+            { "code": "2401", "name": "印刷費" },
+            { "code": "2898", "name": "其他" }
+          ]
+        },
+        {
+          "code": "210205",
+          "name": "應付費用",
+          "workPlan": "應付費用",
+          "purposes": [
+            { "code": "02", "name": "員工獎勵金" },
+            { "code": "03", "name": "員工款" },
+            { "code": "99", "name": "其他" }
+          ]
+        },
+        {
+          "code": "210202",
+          "name": "應付帳款",
+          "workPlan": "應付帳款",
+          "purposes": [
+            { "code": "99", "name": "其他" }
+          ]
+        },
+        {
+          "code": "110404",
+          "name": "醫療用品",
+          "workPlan": "醫療用品",
+          "purposes": []
+        }
+      ]
+    },
+    {
+      "code": "11010202",
+      "name": "保管款專戶",
+      "businessPlans": [
+        {
+          "code": "21020311",
+          "name": "應付代收款-國健科",
+          "workPlan": "應付代收款-國健科",
+          "purposes": [
+            { "code": "01", "name": "菸害防制" },
+            { "code": "07", "name": "社區健康營造" },
+            { "code": "11", "name": "衛生保健" },
+            { "code": "99", "name": "其他" }
+          ]
+        },
+        {
+          "code": "21020312",
+          "name": "應付代收款-疾管科",
+          "workPlan": "應付代收款-疾管科",
+          "purposes": [
+            { "code": "01", "name": "流感防治" },
+            { "code": "06", "name": "COVID-19疫苗接種計畫" },
+            { "code": "99", "name": "其他" }
+          ]
+        },
+        {
+          "code": "21020321",
+          "name": "代收款",
+          "workPlan": "代收款",
+          "purposes": [
+            { "code": "01", "name": "公保費" },
+            { "code": "02", "name": "健保費-公保人員" },
+            { "code": "03", "name": "健保費-勞保人員" },
+            { "code": "04", "name": "勞保費" },
+            { "code": "05", "name": "退撫基金" },
+            { "code": "06", "name": "勞工退休準備金" },
+            { "code": "09", "name": "各項補助費" }
+          ]
+        },
+        {
+          "code": "21020301",
+          "name": "衛生所公務預算經費",
+          "workPlan": "衛生所公務預算經費",
+          "purposes": [
+            { "code": "99", "name": "其他" }
+          ]
+        },
+        {
+          "code": "21020302",
+          "name": "各業務差旅費",
+          "workPlan": "各業務差旅費",
+          "purposes": [
+            { "code": "99", "name": "其他" }
+          ]
+        },
+        {
+          "code": "21020303",
+          "name": "各業務加班費",
+          "workPlan": "各業務加班費",
+          "purposes": [
+            { "code": "99", "name": "其他" }
+          ]
+        }
+      ]
+    }
+  ]
+}
