@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v1.2.4</title>
+<title>管理者入口 — 動支單系統 v1.2.5</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -636,7 +636,7 @@ async function loadRecords() {
           <td>${esc(rec.voucherNo||'—')}</td>
           <td>${rec.formType==='expense'?'動支單':'請購單'}</td>
           <td>${esc(rec.acctName||'')}</td>
-          <td>${esc(rec.bpLabel||'')}</td>
+          <td>${esc(bpLabelName(rec.bpLabel))}</td>
           <td>${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</td>
           <td class="rec-amount td-r-admin">$${Number(rec.total||0).toLocaleString('zh-TW')}</td>
           <td style="text-align:center;">${isVoid
@@ -665,6 +665,28 @@ async function exportCSV() {
   } catch(_) { setMsg('rec-msg', '❌ 匯出失敗', true); }
 }
 
+/* 從已載入的 subjects 資料查詢用途別名稱 */
+function lookupPurposeName(bpCode, purposeCode) {
+  if (!subjects || !bpCode || !purposeCode) return '';
+  for (const acct of (subjects.mainAccounts||[])) {
+    for (const bp of (acct.businessPlans||[])) {
+      if (bp.code === bpCode) {
+        const p = (bp.purposes||[]).find(p => p.code === purposeCode);
+        return p ? p.name : '';
+      }
+    }
+  }
+  return '';
+}
+
+/* bpLabel 舊格式為 "代碼　名稱"，新格式僅名稱；統一取名稱部分 */
+function bpLabelName(label) {
+  if (!label) return '';
+  /* 全形空白分隔時取後半；否則原樣 */
+  const idx = label.indexOf('　');
+  return idx >= 0 ? label.slice(idx + 1) : label;
+}
+
 function downloadCSV(records, filename) {
   const hdr = ['憑證編號','類型','申請日期','主科目代碼','主科目名稱',
                '業務計畫代碼','業務計畫名稱','用途別代碼','用途別名稱','用途說明',
@@ -673,8 +695,10 @@ function downloadCSV(records, filename) {
     r.voucherNo||'', r.formType==='expense'?'動支單':'請購單',
     r.applyDateRoc||r.applyDateRaw||'',
     r.acctCode||'', r.acctName||'',
-    r.bpCode||'',   r.bpLabel||'',
-    r.purposeCode||'', r.purposeName||'', r.purposeDesc||'',
+    r.bpCode||'', bpLabelName(r.bpLabel),
+    r.purposeCode||'',
+    r.purposeName || lookupPurposeName(r.bpCode, r.purposeCode),
+    r.purposeDesc||'',
     r.personnelCode||'', r.personnelName||'',
     r.total||0, r.voided?'作廢':'有效', r.savedAt||''
   ].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(','));
@@ -734,9 +758,9 @@ function renderReports() {
           <td>${r.formType==='expense'?'動支單':'請購單'}</td>
           <td>${esc(r.applyDateRoc||r.applyDateRaw||'')}</td>
           <td>${esc(r.acctName||'')}</td>
-          <td>${esc(r.bpLabel||'')}</td>
+          <td>${esc(bpLabelName(r.bpLabel))}</td>
           <td>${esc(r.purposeCode||'')}</td>
-          <td>${esc(r.purposeName||r.purposeDesc||'')}</td>
+          <td>${esc(r.purposeName || lookupPurposeName(r.bpCode, r.purposeCode))}</td>
           <td class="rec-amount td-r-admin">$${Number(r.total||0).toLocaleString('zh-TW')}</td>
           <td style="text-align:center;">${r.voided
             ? '<span class="void-badge">⛔ 作廢</span>'
@@ -753,9 +777,9 @@ function renderReports() {
           <td>${r.formType==='expense'?'動支單':'請購單'}</td>
           <td>${esc(r.applyDateRoc||r.applyDateRaw||'')}</td>
           <td>${esc(r.acctName||'')}</td>
-          <td>${esc(r.bpLabel||'')}</td>
+          <td>${esc(bpLabelName(r.bpLabel))}</td>
           <td>${esc(r.purposeCode||'')}</td>
-          <td>${esc(r.purposeName||r.purposeDesc||'')}</td>
+          <td>${esc(r.purposeName || lookupPurposeName(r.bpCode, r.purposeCode))}</td>
           <td class="rec-amount td-r-admin">$${Number(r.total||0).toLocaleString('zh-TW')}</td>
           <td>${esc(r.savedAt||'')}</td>
         </tr>`).join('');
