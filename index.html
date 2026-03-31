@@ -427,6 +427,8 @@ body {
   margin-bottom: 6px; cursor: pointer; font-size: 12px;
 }
 .copy-item:hover { background: #e3f2fd; border-color: #1565c0; }
+.copy-item-preview { cursor: default; }
+.copy-item-preview:hover { background: #fff; border-color: #e0e0e0; }
 .ci-no   { font-weight: bold; color: #1565c0; min-width: 90px; }
 .ci-type { color: #6a1b9a; min-width: 46px; }
 .ci-acct { color: #444; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -519,7 +521,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.5.1</div>
+    <div id="sb-version">v1.5.2</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -958,7 +960,11 @@ function onBpChange() {
   if (bp && bp.purposes.length > 0) {
     const isExp = formType === 'expense';
     bp.purposes
-      .filter(p => isExp || !EXPENSE_ONLY_PURPOSES.includes(p.code))
+      .filter(p => {
+        if (!isExp && EXPENSE_ONLY_PURPOSES.includes(p.code))  return false; /* 請購單不含動支專用 */
+        if ( isExp && PURCHASE_ONLY_PURPOSES.includes(p.code)) return false; /* 動支單不含請購專用 */
+        return true;
+      })
       .forEach(p => pSel.appendChild(new Option(p.code+'　'+p.name, p.code)));
     pRow.style.display = '';
   } else { pRow.style.display = 'none'; }
@@ -978,9 +984,12 @@ const PERSONNEL_CODES = ['1301', '1501'];
 /* 僅限動支單的用途別代碼（請購單不得選用） */
 const EXPENSE_ONLY_PURPOSES = [
   '1301','1501','2102','2104','2202','2204',
-  '2301','2305','2401','2607','2706','2707',
+  '2301','2305','2607','2706','2707',
   '2713','2802','7103'
 ];
+
+/* 僅限請購單的用途別代碼（動支單不得選用） */
+const PURCHASE_ONLY_PURPOSES = ['2401','3106','3201','3298'];
 
 /* 講師費顯示業務計畫代碼清單 */
 const LECTURER_BP_CODES = ['21020311','21020312','21020313','21020321'];
@@ -1577,7 +1586,7 @@ function kwSearchCopy() {
     box.innerHTML = '<div style="color:#888;font-size:12px;padding:6px;">查無符合結果</div>'; return;
   }
   box.innerHTML = hits.map(r =>
-    `<div class="copy-item" onclick="copyFromRecord('${r.id}'); closeCopyModal();">
+    `<div class="copy-item copy-item-preview">
        <span class="ci-no">${esc(r.voucherNo||'(未取號)')}</span>
        <span class="ci-type">${r.formType==='expense'?'動支':'採購'}</span>
        <span class="ci-acct">${esc(r.acctName||'')}${r.voided?' ⛔':''}</span>

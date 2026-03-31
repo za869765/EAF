@@ -643,9 +643,11 @@ async function loadRecords() {
             ? '<span class="void-badge">⛔ 作廢</span>'
             : '<span class="ok-badge">✓ 有效</span>'}</td>
           <td>${esc(rec.savedAt||'')}</td>
-          <td>${isVoid ? '<span style="font-size:11px;color:#90a4ae;">已作廢，留存備查</span>'
-            : `<button class="btn btn-red" style="padding:4px 10px; font-size:11px;"
-                onclick="deleteRecord('${rec.id}')">刪除</button>`}</td>`;
+          <td>
+            <button class="btn btn-red" style="padding:4px 10px; font-size:11px;"
+              onclick="deleteRecord('${rec.id}')">刪除</button>
+            ${isVoid ? '' : ''}
+          </td>`;
         tbody.appendChild(tr);
       });
     }
