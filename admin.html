@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v1.2.5</title>
+<title>管理者入口 — 動支單系統 v1.2.6</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -192,6 +192,18 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 }
 .s-row input:focus { border-color: #1976d2; }
 
+/* ── Budget chart ── */
+.budget-section { background: #fff; border-radius: 8px; padding: 20px 24px;
+                  box-shadow: 0 1px 4px rgba(0,0,0,.1); margin-top: 16px; }
+.budget-section h4 { font-size: 14px; font-weight: 600; color: #1e2a38; margin-bottom: 18px; }
+.budget-row { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.budget-label { width: 190px; font-size: 13px; color: #37474f; flex-shrink: 0; }
+.budget-bar-wrap { flex: 1; height: 22px; background: #eceff1; border-radius: 4px; overflow: hidden; position: relative; }
+.budget-bar { height: 100%; border-radius: 4px; transition: width 0.6s ease; min-width: 2px; }
+.budget-info { width: 230px; font-size: 13px; flex-shrink: 0; text-align: right; color: #546e7a; }
+.budget-info strong { font-size: 13px; }
+.budget-no-data { color: #90a4ae; font-size: 13px; padding: 16px 0; }
+
 /* ── Modal ── */
 #modal-bg {
   display: none; position: fixed; inset: 0;
@@ -304,6 +316,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
       <div class="rpt-subtabs">
         <button class="rpt-tab active" id="rpt-tab-all"    onclick="showRptTab('all',this)">📋 詳細報表</button>
         <button class="rpt-tab"        id="rpt-tab-voided" onclick="showRptTab('voided',this)">⛔ 作廢報表</button>
+        <button class="rpt-tab"        id="rpt-tab-budget" onclick="showRptTab('budget',this)">📈 預算執行率</button>
       </div>
       <div class="toolbar" style="margin-top:10px;">
         <button class="btn btn-gray" onclick="loadReports()">🔄 重新載入</button>
@@ -330,6 +343,12 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
           </tr></thead>
           <tbody id="rpt-voided-body"></tbody>
         </table>
+      </div>
+      <div id="rpt-budget-pane" style="display:none; padding-top:12px;">
+        <div class="budget-section">
+          <h4>115年預算執行率</h4>
+          <div id="budget-chart-wrap"><p class="budget-no-data">載入中…</p></div>
+        </div>
       </div>
     </div>
 
@@ -364,6 +383,26 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         <div class="s-row">
           <label>兼職基本工資門檻（元）— 超過此金額代扣繳二代健保 2.11%（專職/員工不適用）</label>
           <input id="set-part50" type="number" min="0">
+        </div>
+
+        <h4 style="font-size:13px; color:#546e7a; margin:20px 0 12px; border-top:1px solid #eceff1; padding-top:14px;">
+          115年預算設定（僅用於報表圖表）
+        </h4>
+        <div class="s-row">
+          <label>1301 延長工時加班費 — 年度預算（元）</label>
+          <input id="set-budget1301" type="number" min="0">
+        </div>
+        <div class="s-row">
+          <label>2807 委託檢驗費 — 公立醫院（元）</label>
+          <input id="set-budget2807-public" type="number" min="0">
+        </div>
+        <div class="s-row">
+          <label>2807 委託檢驗費 — 診所/檢驗所（元）</label>
+          <input id="set-budget2807-clinic" type="number" min="0">
+        </div>
+        <div class="s-row">
+          <label>2807 委託檢驗費 — 開具發票廠商（元）</label>
+          <input id="set-budget2807-invoice" type="number" min="0">
         </div>
 
         <div class="toolbar" style="margin-top:16px;">
@@ -813,6 +852,8 @@ function showRptTab(name, btn) {
   btn.classList.add('active');
   document.getElementById('rpt-all-pane').style.display    = name==='all'    ? '' : 'none';
   document.getElementById('rpt-voided-pane').style.display = name==='voided' ? '' : 'none';
+  document.getElementById('rpt-budget-pane').style.display = name==='budget' ? '' : 'none';
+  if (name === 'budget') renderBudgetChart();
 }
 
 function exportReportCSV() {
@@ -826,6 +867,53 @@ function exportReportCSV() {
   setMsg('rpt-msg', `✓ 已匯出 ${records.length} 筆`, false);
 }
 
+function renderBudgetChart() {
+  const s = subjects?.settings || {};
+  const active = _rptRecords.filter(r => !r.voided);
+  const wrap = document.getElementById('budget-chart-wrap');
+  if (!wrap) return;
+
+  const items = [
+    { label: '1301 延長工時加班費', code: '1301', acctType: null,
+      budget: s.budget1301 ?? 140000 },
+    { label: '2807 公立醫院',       code: '2807', acctType: '公立醫院',
+      budget: s.budget2807_public ?? 60000 },
+    { label: '2807 診所/檢驗所',    code: '2807', acctType: '診所/檢驗所',
+      budget: s.budget2807_clinic ?? 137135 },
+    { label: '2807 開具發票廠商',   code: '2807', acctType: '開具發票廠商',
+      budget: s.budget2807_invoice ?? 2600 },
+  ];
+
+  items.forEach(item => {
+    item.spent = active
+      .filter(r => r.purposeCode === item.code &&
+                   (item.acctType === null || r.acctType === item.acctType))
+      .reduce((sum, r) => sum + (Number(r.total) || 0), 0);
+  });
+
+  wrap.innerHTML = items.map(item => {
+    const pct    = item.budget > 0 ? item.spent / item.budget * 100 : 0;
+    const barPct = Math.min(pct, 100);
+    const color  = pct >= 100 ? '#c62828' : pct >= 80 ? '#e65100' : '#2e7d32';
+    const remain = item.budget - item.spent;
+    const remainTxt = remain >= 0
+      ? `<span style="color:#546e7a;">剩餘 $${fmtN(remain)}</span>`
+      : `<span style="color:#c62828;">超支 $${fmtN(-remain)}</span>`;
+    return `
+      <div class="budget-row">
+        <div class="budget-label">${esc(item.label)}</div>
+        <div class="budget-bar-wrap" title="${pct.toFixed(1)}%">
+          <div class="budget-bar" style="width:${barPct}%; background:${color};"></div>
+        </div>
+        <div class="budget-info">
+          $${fmtN(item.spent)} / $${fmtN(item.budget)}
+          &nbsp;<strong style="color:${color};">${pct.toFixed(1)}%</strong>
+          &nbsp;${remainTxt}
+        </div>
+      </div>`;
+  }).join('');
+}
+
 /* ════════════════════
    SETTINGS
    ════════════════════ */
@@ -836,6 +924,10 @@ function fillSettings() {
   document.getElementById('set-nhi-9a').value    = subjects.settings?.nhiThreshold9A  ?? 20000;
   document.getElementById('set-tax-9a').value    = subjects.settings?.taxThreshold9A  ?? 20010;
   document.getElementById('set-part50').value    = subjects.settings?.part50Threshold ?? 29500;
+  document.getElementById('set-budget1301').value         = subjects.settings?.budget1301         ?? 140000;
+  document.getElementById('set-budget2807-public').value  = subjects.settings?.budget2807_public  ?? 60000;
+  document.getElementById('set-budget2807-clinic').value  = subjects.settings?.budget2807_clinic  ?? 137135;
+  document.getElementById('set-budget2807-invoice').value = subjects.settings?.budget2807_invoice ?? 2600;
 }
 
 async function saveSettings() {
@@ -846,6 +938,10 @@ async function saveSettings() {
   subjects.settings.nhiThreshold9A  = parseInt(document.getElementById('set-nhi-9a').value)    || 20000;
   subjects.settings.taxThreshold9A  = parseInt(document.getElementById('set-tax-9a').value)    || 20010;
   subjects.settings.part50Threshold = parseInt(document.getElementById('set-part50').value)    || 29500;
+  subjects.settings.budget1301         = parseInt(document.getElementById('set-budget1301').value)         || 140000;
+  subjects.settings.budget2807_public  = parseInt(document.getElementById('set-budget2807-public').value)  || 60000;
+  subjects.settings.budget2807_clinic  = parseInt(document.getElementById('set-budget2807-clinic').value)  || 137135;
+  subjects.settings.budget2807_invoice = parseInt(document.getElementById('set-budget2807-invoice').value) || 2600;
   setMsg('set-msg', '⟳ 儲存中…', false);
   try {
     const r = await fetch('/api/subjects', {
@@ -878,6 +974,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal()
    ════════════════════ */
 function v(id)    { return document.getElementById(id)?.value.trim() || ''; }
 function esc(s)   { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function fmtN(n)  { return Number(n).toLocaleString('zh-TW'); }
 function setMsg(id, text, isErr) {
   const el = document.getElementById(id);
   if (!el) return;
