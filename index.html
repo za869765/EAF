@@ -575,7 +575,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.1.9</div>
+    <div id="sb-version">v2.2.0</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2250,12 +2250,40 @@ function renderCopyPage() {
 
 /* ② 直接輸入編號複製 */
 function doCopyByNo() {
-  const q   = document.getElementById('copy-no-input').value.trim().toUpperCase();
+  const raw = document.getElementById('copy-no-input').value.trim();
   const err = document.getElementById('copy-no-err');
   err.style.display = 'none';
-  const rec = cachedRecords.find(r => (r.voucherNo||'').toUpperCase() === q);
-  if (!rec) { err.style.display = ''; return; }
-  /* 類型不符則拒絕 */
+  if (!raw) { err.textContent = '⚠ 請輸入憑證編號或後3～4碼。'; err.style.display = ''; return; }
+
+  const q = raw.toUpperCase();
+
+  /* ① 完整比對 */
+  let rec = cachedRecords.find(r => (r.voucherNo||'').toUpperCase() === q);
+
+  /* ② 後碼比對：輸入純數字 → 比對「當年度」憑證號碼 "-" 後的數字部份 */
+  if (!rec && /^\d+$/.test(raw)) {
+    const inputNum    = parseInt(raw, 10);
+    const curRocYear  = new Date().getFullYear() - 1911;   /* 當前民國年 */
+    const hits = cachedRecords.filter(r => {
+      const parts = (r.voucherNo || '').split('-');
+      if (parts.length < 2) return false;
+      return parseInt(parts[0], 10) === curRocYear        /* 限當年度 */
+          && parseInt(parts[parts.length - 1], 10) === inputNum;
+    });
+    if (hits.length === 1) {
+      rec = hits[0];
+    } else if (hits.length > 1) {
+      showAlert(
+        `「${raw}」符合 <strong>${hits.length} 筆</strong>紀錄，<br>` +
+        `請使用上方<strong>關鍵字搜尋</strong>後再選擇。`, '🔍'
+      );
+      return;
+    }
+  }
+
+  if (!rec) { err.textContent = '⚠ 查無此憑證編號，請確認後再試。'; err.style.display = ''; return; }
+
+  /* ③ 類型不符則拒絕 */
   if (rec.formType !== formType) {
     showAlert(
       `此單為<strong>${rec.formType==='expense'?'動支單':'請購單'}</strong>，<br>` +
