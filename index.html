@@ -560,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.0.2</div>
+    <div id="sb-version">v2.0.3</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1422,7 +1422,7 @@ function calcRow(i) {
   if (formType !== 'expense') {
     const sub = Math.round((parseFloat(qv(i,'qty'))||0)*(parseFloat(qv(i,'price'))||0));
     const cell = document.getElementById('sub'+i);
-    if (cell) cell.textContent = sub > 0 ? '$'+fmtN(sub) : '';
+    if (cell) cell.textContent = sub !== 0 ? '$'+fmtN(sub) : '';
   }
   calcTotal();
 }
@@ -1446,11 +1446,13 @@ function calcTotal() {
     for (let i = 0; i < rowCount; i++)
       total += Math.round(parseFloat(qv(i,'price'))||0);
   }
-  document.getElementById('amount-disp').textContent    = '$'+fmtN(total);
+  const displayTotal = Math.max(0, total);  /* 合計不顯示負值 */
+  document.getElementById('amount-disp').textContent    = '$'+fmtN(displayTotal);
   const gtEl = document.getElementById('grand-total');
   const gzEl = document.getElementById('grand-total-zh');
-  if (gtEl) gtEl.textContent = '$'+fmtN(total);
-  if (gzEl) gzEl.textContent = toChineseAmount(total);
+  if (gtEl) gtEl.textContent = '$'+fmtN(displayTotal);
+  if (gzEl) gzEl.textContent = toChineseAmount(displayTotal);
+  total = displayTotal;   /* 後續門檻判斷 / 儲存均用夾底後的值 */
 
   const threshold = CFG.settings?.exemptThreshold || 10000;
 
