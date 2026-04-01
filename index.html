@@ -463,7 +463,11 @@ body {
   body { background: #fff; }
   #app  { display: block; }
   #sidebar, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns,
-  #row-lecturer, #row-acct-type, #row-income50-type { display: none !important; }
+  #row-lecturer, #row-acct-type, #row-income50-type,
+  #purchase-sig, #exempt-wrap { display: none !important; }
+  /* 隱藏未選擇的佔位文字 */
+  #main-acct-lbl[data-ph="1"] { visibility: hidden; }
+  .fsel[data-ph="1"] { visibility: hidden; }
   #main { padding: 0; }
   #form-page {
     width: 100% !important; max-width: 100% !important;
@@ -554,7 +558,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.16</div>
+    <div id="sb-version">v1.7.17</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -695,7 +699,7 @@ body {
       <table class="lower-wrap"><tbody><tr>
         <td class="lower-left">
           <div class="l-top-bar">
-            <div class="l-top-title" id="lower-title">採購</div>
+            <div class="l-top-title" id="lower-title">採購申請單</div>
           </div>
           <div class="l-unit-row">
             <div class="l-unit-cell">
@@ -812,6 +816,16 @@ const API = '/api/records';
   await loadHistory();
 })();
 
+/* ── 列印前後：隱藏空白下拉佔位文字 ── */
+window.addEventListener('beforeprint', () => {
+  document.querySelectorAll('.fsel').forEach(s => {
+    if (!s.value) s.dataset.ph = '1';
+  });
+});
+window.addEventListener('afterprint', () => {
+  document.querySelectorAll('.fsel').forEach(s => delete s.dataset.ph);
+});
+
 /* ══════════════════════
    FORM TYPE
    ══════════════════════ */
@@ -842,7 +856,7 @@ function applyType(type, { regen = true } = {}) {
     isPurchase ? '採購申請單暨黏貼憑證用紙' : '費用動支申請單暨黏貼憑證用紙';
 
   /* 下方標題 */
-  document.getElementById('lower-title').textContent = isPurchase ? '採購' : '動支';
+  document.getElementById('lower-title').textContent = isPurchase ? '採購申請單' : '費用動支申請單';
 
   /* 上方核章斜線：動支單 → 保管/採購/財物登記 三格加斜線 */
   ['sg-custody','sg-purchase','sg-financial'].forEach(id => {
@@ -865,7 +879,7 @@ function applyType(type, { regen = true } = {}) {
          <th style="width:17%;">總額</th>
        </tr>`
     : `<tr>
-         <th style="width:74%;">動支說明</th>
+         <th colspan="2" style="width:74%;">動支說明</th>
          <th colspan="2">金額</th>
        </tr>`;
 
@@ -878,8 +892,8 @@ function applyType(type, { regen = true } = {}) {
          <td class="td-r" id="grand-total" style="padding-right:3mm;">$0</td>
        </tr>`
     : `<tr>
-         <td style="text-align:center; width:74%;">合計</td>
-         <td style="text-align:center; font-size:11.5px; letter-spacing:1px; width:16%;"
+         <td style="text-align:center; width:20%;">合計</td>
+         <td colspan="2" style="text-align:center; font-size:11.5px; letter-spacing:1px; width:70%;"
              id="grand-total-zh">零元整</td>
          <td class="td-r" id="grand-total" style="padding-right:3mm; width:10%;">$0</td>
        </tr>`;
@@ -1014,7 +1028,9 @@ function buildMainDropdown() {
 function onMainChange() {
   const code = document.getElementById('sel-main').value;
   const acct = CFG.mainAccounts.find(a=>a.code===code);
-  document.getElementById('main-acct-lbl').textContent = acct ? acct.name : '請選擇';
+  const lbl = document.getElementById('main-acct-lbl');
+  lbl.textContent = acct ? acct.name : '請選擇';
+  lbl.dataset.ph = acct ? '' : '1';
   const bpSel = document.getElementById('sel-bp');
   bpSel.innerHTML = '<option value="">── 選擇業務計畫 ──</option>';
   if (acct) {
@@ -1293,7 +1309,7 @@ function appendRow(i) {
   const tr = document.createElement('tr');
   if (formType === 'expense') {
     tr.innerHTML = `
-      <td class="td-name"><textarea data-r="${i}" data-c="name" rows="1" oninput="autoResize(this)"></textarea></td>
+      <td class="td-name" colspan="2"><textarea data-r="${i}" data-c="name" rows="1" oninput="autoResize(this)"></textarea></td>
       <td colspan="2" class="td-r" style="padding-right:2mm;">
         <input type="text" inputmode="decimal" data-r="${i}" data-c="price"
                style="text-align:right; width:100%;"
@@ -1409,9 +1425,8 @@ function calcTotal() {
   document.getElementById('purchase-sig').style.display =
     (isPurchase && total >= threshold) ? 'block' : 'none';
 
-  /* 免核章列：動支單 金額>0 才顯示；請購單不顯示 */
-  const showExempt = !isPurchase && total > 0;
-  document.getElementById('exempt-wrap').style.display = showExempt ? 'block' : 'none';
+  /* 免核章列：目前無內容，永不顯示 */
+  document.getElementById('exempt-wrap').style.display = 'none';
 }
 
 /* ══════════════════════
@@ -1686,7 +1701,7 @@ function unlockForm() {
   _setBtn('clear-btn',  '');
   _setBtn('copy-btn',   cachedRecords.length > 0 ? '' : 'none');
   _setBtn('print-btn',  'none');
-  _setBtn('test-print-btn', '');
+  _setBtn('test-print-btn', 'none');
 }
 function hideAllBtns() {
   ['save-btn','cancel-btn','clear-btn','copy-btn','print-btn','test-print-btn']
