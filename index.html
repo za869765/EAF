@@ -547,7 +547,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.9</div>
+    <div id="sb-version">v1.7.10</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1951,7 +1951,8 @@ function kwSearchCopy() {
   /* 只搜尋同類型的紀錄 */
   const hits = cachedRecords.filter(r =>
     r.formType === formType &&
-    [r.voucherNo, r.acctName, r.bpLabel, r.purposeDesc, r.notes, r.applyDateRoc]
+    [r.voucherNo, r.acctName, r.bpLabel, r.purposeDesc, r.notes, r.applyDateRoc,
+     String(r.total||''), ...(r.items||[]).map(i=>i.name||'')]
     .some(f => (f||'').toLowerCase().includes(q))
   ).slice(0, 20);
   if (!hits.length) {
@@ -2176,7 +2177,7 @@ function showToast(msg) {
     <h3>📋 複製既有單據</h3>
 
     <!-- ① 關鍵字搜尋 -->
-    <div style="font-size:11px; color:#777; margin-bottom:4px;">🔍 關鍵字搜尋（憑證號、科目、說明…）</div>
+    <div style="font-size:11px; color:#777; margin-bottom:4px;">🔍 關鍵字搜尋（憑證號、科目、說明、金額…）</div>
     <div style="display:flex; gap:8px; margin-bottom:8px;">
       <input id="copy-kw-input" type="text" placeholder="輸入任意關鍵字…"
              style="flex:1; padding:7px 10px; border:1.5px solid #90a4ae; border-radius:6px;
