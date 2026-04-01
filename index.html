@@ -599,7 +599,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.2.7</div>
+    <div id="sb-version">v2.2.8</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1304,13 +1304,17 @@ function updateCashierNote() {
     financialEl.classList.remove('slash');
     financialEl.innerHTML = '藥品 / 衛材 登記';
   } else {
-    /* 2807 → 財物登記格加斜線（請購單亦同） */
-    financialEl.classList.toggle('slash', isExp || purposeCode === '2807');
+    /* 2807/2505/2507 → 財物登記格加斜線（請購單亦同） */
+    const needCustodyFinSlash = isExp || purposeCode === '2807'
+                              || purposeCode === '2505' || purposeCode === '2507';
+    financialEl.classList.toggle('slash', needCustodyFinSlash);
     financialEl.innerHTML = '財物或軟體登記<br><span style="font-size:9px;">(備註財物/軟體編)</span>';
   }
-  /* 2807 → 保管格加斜線（請購單亦同） */
+  /* 2807/2505/2507 → 保管格加斜線（請購單亦同） */
+  const needCustodySlash = isExp || purposeCode === '2807'
+                         || purposeCode === '2505' || purposeCode === '2507';
   document.getElementById('sg-custody')
-    .classList.toggle('slash', isExp || purposeCode === '2807');
+    .classList.toggle('slash', needCustodySlash);
 
   /* 2807 + 公立醫院/衛生局 → 請購單採購格加斜線，隱藏廠商查驗附記 */
   const is2807GovAcct = purposeCode === '2807' && (acctType === '公立醫院' || acctType === '衛生局');
