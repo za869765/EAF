@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v1.8.7</title>
+<title>管理者入口 — 動支單系統 v1.8.8</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -172,7 +172,8 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 }
 .rpt-tab:hover { color: #1565c0; }
 .rpt-tab.active { color: #1565c0; border-bottom-color: #1565c0; font-weight: 600; }
-.voided-row td { color: #90a4ae; text-decoration: line-through; }
+.voided-row td { color: #90a4ae; }
+.voided-row td .void-badge { color: #c62828; }
 .void-badge { background: #fce4ec; color: #c62828; border-radius: 4px; padding: 2px 6px; font-size: 11px; }
 .ok-badge   { background: #e8f5e9; color: #2e7d32;  border-radius: 4px; padding: 2px 6px; font-size: 11px; }
 .th-r { text-align: right; }
@@ -243,7 +244,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
                    text-align:left; font-size:11px; font-weight:600; position:sticky; top:0; z-index:1; }
 .export-table td { padding:6px 10px; border-bottom:1px solid #f5f5f5; }
 .export-table tr:hover td { background:#fafafa; }
-.export-table tr.voided-row td { color:#90a4ae; text-decoration:line-through; }
+.export-table tr.voided-row td { color:#90a4ae; }
 .export-table td:first-child { width:32px; text-align:center; }
 .export-table th:first-child { width:32px; text-align:center; }
 /* income stat cards */
@@ -287,7 +288,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v1.8.7</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v1.8.8</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -304,7 +305,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v1.8.7</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v1.8.8</span>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
     <button id="logout-btn" onclick="logout()">登出</button>
   </div>
