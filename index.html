@@ -575,7 +575,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.2.0</div>
+    <div id="sb-version">v2.2.1</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2255,13 +2255,19 @@ function doCopyByNo() {
   err.style.display = 'none';
   if (!raw) { err.textContent = '⚠ 請輸入憑證編號或後3～4碼。'; err.style.display = ''; return; }
 
-  const q = raw.toUpperCase();
+  /* 正規化：去掉所有非數字字元，若長度 ≥ 6 則自動在第3位補 "-"
+     例：1150015 → 115-0015；115 0015 → 115-0015 */
+  const digitsOnly = raw.replace(/\D/g, '');
+  const normalized = digitsOnly.length >= 6
+    ? digitsOnly.slice(0, 3) + '-' + digitsOnly.slice(3)
+    : raw;
+  const q = normalized.toUpperCase();
 
-  /* ① 完整比對 */
+  /* ① 完整比對（含正規化後的結果） */
   let rec = cachedRecords.find(r => (r.voucherNo||'').toUpperCase() === q);
 
-  /* ② 後碼比對：輸入純數字 → 比對「當年度」憑證號碼 "-" 後的數字部份 */
-  if (!rec && /^\d+$/.test(raw)) {
+  /* ② 後碼比對：輸入純數字且長度 ≤ 4 → 比對「當年度」憑證號碼後段 */
+  if (!rec && /^\d+$/.test(raw) && raw.length <= 4) {
     const inputNum    = parseInt(raw, 10);
     const curRocYear  = new Date().getFullYear() - 1911;   /* 當前民國年 */
     const hits = cachedRecords.filter(r => {
