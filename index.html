@@ -560,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.1.1</div>
+    <div id="sb-version">v2.1.2</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1472,6 +1472,45 @@ function validateExpenseAmt(el, i) {
   calcTotal();
 }
 
+/* ── 同品正負合計自動寫入其他說明事項 ── */
+let _autoFoldNote = '';
+
+function computeFoldNote() {
+  const isPurchase = formType === 'purchase';
+  const groups = {};
+  for (let i = 0; i < rowCount; i++) {
+    const name = qv(i,'name').trim();
+    if (!name) continue;
+    const amt = isPurchase
+      ? Math.round((parseFloat(qv(i,'qty'))||0) * (parseFloat(qv(i,'price'))||0))
+      : Math.round(parseFloat(qv(i,'price'))||0);
+    if (!groups[name]) groups[name] = [];
+    groups[name].push(amt);
+  }
+  const parts = [];
+  for (const [name, amts] of Object.entries(groups)) {
+    if (amts.some(a => a > 0) && amts.some(a => a < 0)) {
+      const net = amts.reduce((s, a) => s + a, 0);
+      const netStr = net < 0 ? '-$'+fmtN(-net) : '$'+fmtN(net);
+      parts.push(name + ' ' + netStr);
+    }
+  }
+  return parts.join('；');
+}
+
+function updateFoldedNote() {
+  const notesEl = document.getElementById('notes');
+  if (!notesEl) return;
+  const newNote = computeFoldNote();
+  if (newNote === _autoFoldNote) return;
+  let current = notesEl.value;
+  if (_autoFoldNote) {
+    current = current.replace(_autoFoldNote, '').replace(/^[\n\r]+/, '').trim();
+  }
+  _autoFoldNote = newNote;
+  notesEl.value = newNote ? (current ? newNote + '\n' + current : newNote) : current;
+}
+
 function calcTotal() {
   let total = 0;
   const isPurchase = formType === 'purchase';
@@ -1498,6 +1537,9 @@ function calcTotal() {
 
   /* 免核章列：目前無內容，永不顯示 */
   document.getElementById('exempt-wrap').style.display = 'none';
+
+  /* 同品正負合計自動說明 */
+  updateFoldedNote();
 }
 
 /* ══════════════════════
@@ -1635,6 +1677,9 @@ function fillForm(rec) {
     }
   }
   calcTotal();
+  /* 載入既有紀錄：notes 已含舊版自動說明，同步 _autoFoldNote 避免重複寫入 */
+  document.getElementById('notes').value = rec.notes || '';
+  _autoFoldNote = computeFoldNote();
 }
 
 /* ══════════════════════
@@ -2184,6 +2229,7 @@ function newForm(type) {
   rowCount = 10;
   isLecturer = '';
   income50Type = '';
+  _autoFoldNote = '';
   document.getElementById('voucher-no').value = '';
   ['purpose-desc','notes','delivery-date']
     .forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
