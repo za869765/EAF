@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v1.2.8</title>
+<title>管理者入口 — 動支單系統 v1.2.9</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -230,7 +230,36 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 #modal-ok:hover { background: #1976d2; }
 #modal-cancel { background: #eceff1; color: #37474f; }
 #modal-cancel:hover { background: #cfd8dc; }
+
+/* ── Export tables ── */
+.export-section { background:#fff; border-radius:8px; padding:18px 20px;
+                  box-shadow:0 1px 4px rgba(0,0,0,.1); margin-bottom:16px; }
+.export-section h4 { font-size:14px; font-weight:600; color:#1e2a38; margin-bottom:10px; }
+.export-toolbar { display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+.sel-count { font-size:12px; color:#546e7a; margin-left:4px; }
+.export-table-wrap { overflow-x:auto; max-height:400px; overflow-y:auto; }
+.export-table { width:100%; border-collapse:collapse; font-size:12px; }
+.export-table th { background:#263545; color:#cfd8dc; padding:7px 10px;
+                   text-align:left; font-size:11px; font-weight:600; position:sticky; top:0; z-index:1; }
+.export-table td { padding:6px 10px; border-bottom:1px solid #f5f5f5; }
+.export-table tr:hover td { background:#fafafa; }
+.export-table tr.voided-row td { color:#90a4ae; text-decoration:line-through; }
+.export-table td:first-child { width:32px; text-align:center; }
+.export-table th:first-child { width:32px; text-align:center; }
+/* income stat cards */
+.income-cards { display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+.income-card { background:#fff; border-radius:8px; padding:14px 18px;
+               box-shadow:0 1px 4px rgba(0,0,0,.1); min-width:160px; flex:1; }
+.income-card .ic-label { font-size:11px; color:#546e7a; margin-bottom:4px; }
+.income-card .ic-count { font-size:13px; font-weight:600; color:#1e2a38; }
+.income-card .ic-amt   { font-size:18px; font-weight:700; color:#1565c0; margin-top:2px; }
+/* purpose sub-tabs inside pane */
+.purpose-subtabs { display:flex; gap:2px; border-bottom:2px solid #e0e0e0; margin-bottom:12px; }
+.purpose-tab { padding:7px 18px; border:none; background:transparent; font-size:13px;
+               cursor:pointer; color:#78909c; border-bottom:2px solid transparent; margin-bottom:-2px; }
+.purpose-tab.active { color:#1565c0; border-bottom-color:#1565c0; font-weight:600; }
 </style>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -317,6 +346,8 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         <button class="rpt-tab active" id="rpt-tab-all"    onclick="showRptTab('all',this)">📋 詳細報表</button>
         <button class="rpt-tab"        id="rpt-tab-voided" onclick="showRptTab('voided',this)">⛔ 作廢報表</button>
         <button class="rpt-tab"        id="rpt-tab-budget" onclick="showRptTab('budget',this)">📈 預算執行率</button>
+        <button class="rpt-tab" id="rpt-tab-cashier" onclick="showRptTab('cashier',this)">📑 出納列計</button>
+        <button class="rpt-tab" id="rpt-tab-purpose" onclick="showRptTab('purpose',this)">📋 1301/2807清單</button>
       </div>
       <div class="toolbar" style="margin-top:10px;">
         <button class="btn btn-gray" onclick="loadReports()">🔄 重新載入</button>
@@ -349,6 +380,20 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
           <h4>115年預算執行率</h4>
           <div id="budget-chart-wrap"><p class="budget-no-data">載入中…</p></div>
         </div>
+      </div>
+      <!-- ── 出納列計 pane ── -->
+      <div id="rpt-cashier-pane" style="display:none; padding-top:12px;">
+        <div class="income-cards" id="income-cards"></div>
+        <div id="income-sections"></div>
+      </div>
+      <!-- ── 1301/2807 清單 pane ── -->
+      <div id="rpt-purpose-pane" style="display:none; padding-top:12px;">
+        <div class="purpose-subtabs">
+          <button class="purpose-tab active" id="ptab-1301" onclick="showPurposeTab('1301',this)">1301 延長工時加班費</button>
+          <button class="purpose-tab"        id="ptab-2807" onclick="showPurposeTab('2807',this)">2807 委託檢驗費</button>
+        </div>
+        <div id="purpose-1301-pane"></div>
+        <div id="purpose-2807-pane" style="display:none;"></div>
       </div>
     </div>
 
@@ -865,7 +910,11 @@ function showRptTab(name, btn) {
   document.getElementById('rpt-all-pane').style.display    = name==='all'    ? '' : 'none';
   document.getElementById('rpt-voided-pane').style.display = name==='voided' ? '' : 'none';
   document.getElementById('rpt-budget-pane').style.display = name==='budget' ? '' : 'none';
-  if (name === 'budget') renderBudgetChart();
+  document.getElementById('rpt-cashier-pane').style.display= name==='cashier'? '' : 'none';
+  document.getElementById('rpt-purpose-pane').style.display= name==='purpose'? '' : 'none';
+  if (name === 'budget')  renderBudgetChart();
+  if (name === 'cashier') renderCashierPane();
+  if (name === 'purpose') renderPurposePane();
 }
 
 function exportReportCSV() {
@@ -943,6 +992,184 @@ function renderBudgetChart() {
         </div>
       </div>`;
   }).join('');
+}
+
+/* ════════════════════
+   INCOME TYPE HELPERS
+   ════════════════════ */
+function getIncomeType(r) {
+  const at = r.acctType || '';
+  const pc = r.purposeCode || '';
+  if (at === '財/社團法人') return '列計92所得';
+  if (at === '醫療門診診所/檢驗所' || at === '診所/檢驗所') return '列計9A所得';
+  if (at === '個人' || ['1501','2713','7103'].includes(pc) || r.income50Type) return '列計50所得';
+  return '';
+}
+
+/* ════════════════════
+   CASHIER PANE
+   ════════════════════ */
+let _cashierTab = '50';
+function renderCashierPane() {
+  const active = _rptRecords.filter(r => !r.voided);
+  const groups = { '列計50所得': [], '列計9A所得': [], '列計92所得': [] };
+  active.forEach(r => { const t = getIncomeType(r); if (groups[t]) groups[t].push(r); });
+
+  /* stat cards */
+  const cardColors = { '列計50所得':'#1565c0', '列計9A所得':'#2e7d32', '列計92所得':'#6a1b9a' };
+  document.getElementById('income-cards').innerHTML = Object.entries(groups).map(([lbl, recs]) => {
+    const total = recs.reduce((s,r)=>s+(Number(r.total)||0),0);
+    return `<div class="income-card">
+      <div class="ic-label" style="color:${cardColors[lbl]};">${lbl}</div>
+      <div class="ic-count">${recs.length} 筆</div>
+      <div class="ic-amt" style="color:${cardColors[lbl]};">$${fmtN(total)}</div>
+    </div>`;
+  }).join('');
+
+  /* sections */
+  document.getElementById('income-sections').innerHTML = Object.entries(groups).map(([lbl, recs]) => {
+    const sid = lbl.replace(/[^a-z0-9]/gi,'_');
+    const hdrs = ['憑證編號','類型','申請日期','主科目','業務計畫','用途別','帳戶類別','金額','儲存時間'];
+    const rows = recs.map(r => `
+      <tr data-id="${esc(r.id||'')}">
+        <td><input type="checkbox" onchange="updateSelCount('${sid}')"></td>
+        <td>${esc(r.voucherNo||'—')}</td>
+        <td>${r.formType==='expense'?'動支':'採購'}</td>
+        <td>${esc(r.applyDateRoc||r.applyDateRaw||'')}</td>
+        <td>${esc(r.acctName||'')}</td>
+        <td>${esc(bpLabelName(r.bpLabel))}</td>
+        <td>${esc(r.purposeCode||'')} ${esc(r.purposeName||'')}</td>
+        <td>${esc(r.acctType||'')}</td>
+        <td class="td-r-admin">$${fmtN(r.total||0)}</td>
+        <td>${esc(r.savedAt||'')}</td>
+      </tr>`).join('') || '<tr><td colspan="10" class="no-data">無紀錄</td></tr>';
+    return `<div class="export-section">
+      <h4>${lbl}（${recs.length} 筆）</h4>
+      <div class="export-toolbar">
+        <button class="btn btn-gray" onclick="selAll('${sid}')">全選</button>
+        <button class="btn btn-gray" onclick="invertSel('${sid}')">反選</button>
+        <button class="btn btn-green" onclick="exportSel('${sid}','${lbl}')">⬇ 匯出已選 XLSX</button>
+        <span class="sel-count" id="cnt-${sid}">0 筆已選</span>
+      </div>
+      <div class="export-table-wrap">
+        <table class="export-table" id="${sid}">
+          <thead><tr>
+            <th><input type="checkbox" onchange="selAllChk('${sid}',this)"></th>
+            <th>憑證編號</th><th>類型</th><th>申請日期</th><th>主科目</th>
+            <th>業務計畫</th><th>用途別</th><th>帳戶類別</th>
+            <th style="text-align:right;">金額</th><th>儲存時間</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ════════════════════
+   PURPOSE PANE (1301/2807)
+   ════════════════════ */
+let _purposeTab = '1301';
+function showPurposeTab(code, btn) {
+  _purposeTab = code;
+  document.querySelectorAll('.purpose-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('purpose-1301-pane').style.display = code==='1301' ? '' : 'none';
+  document.getElementById('purpose-2807-pane').style.display = code==='2807' ? '' : 'none';
+}
+
+function renderPurposePane() {
+  renderPurposeTable('1301', '1301 延長工時加班費',
+    ['憑證編號','類型','申請日期','主科目','業務計畫','用途別','帳戶類別','用途說明','金額','儲存時間'],
+    r => [esc(r.voucherNo||'—'), r.formType==='expense'?'動支':'採購',
+          esc(r.applyDateRoc||r.applyDateRaw||''), esc(r.acctName||''),
+          esc(bpLabelName(r.bpLabel)), esc(r.purposeCode+' '+(r.purposeName||'')),
+          esc(r.acctType||''), esc(r.purposeDesc||''),
+          '$'+fmtN(r.total||0), esc(r.savedAt||'')]);
+
+  renderPurposeTable('2807', '2807 委託檢驗費',
+    ['憑證編號','類型','申請日期','主科目','業務計畫','帳戶類別','用途說明','金額','儲存時間'],
+    r => [esc(r.voucherNo||'—'), r.formType==='expense'?'動支':'採購',
+          esc(r.applyDateRoc||r.applyDateRaw||''), esc(r.acctName||''),
+          esc(bpLabelName(r.bpLabel)), esc(r.acctType||''), esc(r.purposeDesc||''),
+          '$'+fmtN(r.total||0), esc(r.savedAt||'')]);
+}
+
+function renderPurposeTable(code, title, hdrs, cellsFn) {
+  const recs = _rptRecords.filter(r => r.purposeCode === code);
+  const sid  = 'ptbl_' + code;
+  const total = recs.filter(r=>!r.voided).reduce((s,r)=>s+(Number(r.total)||0),0);
+  const rows = recs.map(r => {
+    const cells = cellsFn(r);
+    return `<tr data-id="${esc(r.id||'')}" class="${r.voided?'voided-row':''}">
+      <td><input type="checkbox" onchange="updateSelCount('${sid}')"></td>
+      ${cells.map(c=>`<td>${c}</td>`).join('')}
+    </tr>`;
+  }).join('') || `<tr><td colspan="${hdrs.length+1}" class="no-data">無紀錄</td></tr>`;
+
+  document.getElementById(`purpose-${code}-pane`).innerHTML = `
+    <div class="export-section">
+      <h4>${title}　有效合計 $${fmtN(total)}　共 ${recs.length} 筆</h4>
+      <div class="export-toolbar">
+        <button class="btn btn-gray" onclick="selAll('${sid}')">全選</button>
+        <button class="btn btn-gray" onclick="invertSel('${sid}')">反選</button>
+        <button class="btn btn-green" onclick="exportSel('${sid}','${title}')">⬇ 匯出已選 XLSX</button>
+        <span class="sel-count" id="cnt-${sid}">0 筆已選</span>
+      </div>
+      <div class="export-table-wrap">
+        <table class="export-table" id="${sid}">
+          <thead><tr>
+            <th><input type="checkbox" onchange="selAllChk('${sid}',this)"></th>
+            ${hdrs.map(h=>`<th>${h}</th>`).join('')}
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+/* ════════════════════
+   CHECKBOX / EXPORT UTILS
+   ════════════════════ */
+function selAll(sid) {
+  document.querySelectorAll(`#${sid} tbody input[type=checkbox]`).forEach(cb=>cb.checked=true);
+  updateSelCount(sid);
+}
+function invertSel(sid) {
+  document.querySelectorAll(`#${sid} tbody input[type=checkbox]`).forEach(cb=>cb.checked=!cb.checked);
+  updateSelCount(sid);
+}
+function selAllChk(sid, masterCb) {
+  document.querySelectorAll(`#${sid} tbody input[type=checkbox]`).forEach(cb=>cb.checked=masterCb.checked);
+  updateSelCount(sid);
+}
+function updateSelCount(sid) {
+  const n = document.querySelectorAll(`#${sid} tbody input[type=checkbox]:checked`).length;
+  const el = document.getElementById('cnt-'+sid);
+  if (el) el.textContent = n + ' 筆已選';
+}
+
+function exportSel(sid, sheetTitle) {
+  if (typeof XLSX === 'undefined') { alert('SheetJS 尚未載入，請檢查網路連線'); return; }
+  const tbl = document.getElementById(sid);
+  if (!tbl) return;
+  /* header row from <thead> (skip checkbox column) */
+  const hdrs = [...tbl.querySelectorAll('thead th')].slice(1).map(th => th.textContent.trim());
+  /* selected rows */
+  const selectedRows = [...tbl.querySelectorAll('tbody tr')].filter(tr => {
+    const cb = tr.querySelector('input[type=checkbox]');
+    return cb && cb.checked;
+  });
+  if (!selectedRows.length) { alert('請先勾選要匯出的紀錄'); return; }
+  const dataRows = selectedRows.map(tr =>
+    [...tr.querySelectorAll('td')].slice(1).map(td => td.textContent.trim())
+  );
+  const ws = XLSX.utils.aoa_to_sheet([hdrs, ...dataRows]);
+  /* column widths */
+  ws['!cols'] = hdrs.map((h,i) => ({ wch: Math.max(h.length*2, dataRows.reduce((m,r)=>Math.max(m,(r[i]||'').length),0)*1.5, 10) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetTitle.slice(0,31));
+  XLSX.writeFile(wb, sheetTitle + '_' + new Date().toISOString().slice(0,10) + '.xlsx');
 }
 
 /* ════════════════════
