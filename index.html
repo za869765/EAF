@@ -569,7 +569,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.1.6</div>
+    <div id="sb-version">v2.1.7</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2252,10 +2252,13 @@ function copyFromRecord(id) {
   const copy = JSON.parse(JSON.stringify(rec));
   copy.voucherNo    = '';
   copy.applyDateRaw = new Date().toISOString().slice(0,10);
+  copy.notes        = '';   /* 清空其他說明事項，避免舊折讓說明殘留 */
   delete copy.id; delete copy.savedAt;
   rowCount = 10;
   generateItemRows();
   fillForm(copy);
+  _foldNoteApplied = false;
+  _prevNotesBeforeFold = '';
   closeCopyModal();
   showToast('✓ 已複製單據內容，確認後按「存檔取號」');
 }
