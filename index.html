@@ -522,7 +522,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.6.7</div>
+    <div id="sb-version">v1.6.8</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1079,12 +1079,14 @@ function updateCashierNote() {
   document.getElementById('sg-custody')
     .classList.toggle('slash', isExp || purposeCode === '2807');
 
-  /* 出納單位格斜線 */
-  const cashierSlash =
+  /* 出納單位格斜線（1301/21020303 明確排除：只顯示附註，不加斜線） */
+  const noCashierSlash = purposeCode === '1301' || bpCode === '21020303';
+  const cashierSlash = !noCashierSlash && (
     CASHIER_SLASH_BP.includes(bpCode) ||
     (isExp && purposeCode === '1140404') ||
     CASHIER_SLASH_PURPOSE.includes(purposeCode) ||
-    (ACCT_TYPE_CONFIG[purposeCode] && ACCT_SLASH_TYPES.has(acctType));
+    (ACCT_TYPE_CONFIG[purposeCode] && ACCT_SLASH_TYPES.has(acctType))
+  );
   document.getElementById('sg-cashier').classList.toggle('slash', cashierSlash);
 
   let note = '';
