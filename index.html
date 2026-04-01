@@ -216,6 +216,7 @@ body {
 .cut-line {
   text-align: center; font-size: 9.5px; color: #888;
   margin: 2mm 0; letter-spacing: 4px; user-select: none;
+  white-space: nowrap; overflow: hidden;
 }
 
 /* ── Lower section ── */
@@ -521,7 +522,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.5.2</div>
+    <div id="sb-version">v1.6.0</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
