@@ -340,6 +340,27 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
           <label>免核章門檻（元）— 低於此金額自動顯示「免核章」</label>
           <input id="set-threshold" type="number" min="0">
         </div>
+
+        <h4 style="font-size:13px; color:#546e7a; margin:20px 0 12px; border-top:1px solid #eceff1; padding-top:14px;">
+          執行業務所得（9A）扣繳設定
+        </h4>
+        <div class="s-row">
+          <label>代扣繳二代健保門檻（元）— 金額達此值時自動拆出 NHI 2.11%</label>
+          <input id="set-nhi-9a" type="number" min="0">
+        </div>
+        <div class="s-row">
+          <label>代扣繳所得稅門檻（元）— 金額達此值時再拆出所得稅 10%</label>
+          <input id="set-tax-9a" type="number" min="0">
+        </div>
+
+        <h4 style="font-size:13px; color:#546e7a; margin:20px 0 12px; border-top:1px solid #eceff1; padding-top:14px;">
+          列計50所得（兼職）扣繳設定
+        </h4>
+        <div class="s-row">
+          <label>兼職基本工資門檻（元）— 超過此金額代扣繳二代健保 2.11%（專職/員工不適用）</label>
+          <input id="set-part50" type="number" min="0">
+        </div>
+
         <div class="toolbar" style="margin-top:16px;">
           <button class="btn btn-blue" onclick="saveSettings()">💾 儲存設定</button>
           <span id="set-msg" class="toolbar-msg"></span>
@@ -806,14 +827,20 @@ function exportReportCSV() {
 function fillSettings() {
   if (!subjects) return;
   document.getElementById('set-org').value       = subjects.settings?.orgName        || '';
-  document.getElementById('set-threshold').value = subjects.settings?.exemptThreshold || 10000;
+  document.getElementById('set-threshold').value = subjects.settings?.exemptThreshold ?? 10000;
+  document.getElementById('set-nhi-9a').value    = subjects.settings?.nhiThreshold9A  ?? 20000;
+  document.getElementById('set-tax-9a').value    = subjects.settings?.taxThreshold9A  ?? 20010;
+  document.getElementById('set-part50').value    = subjects.settings?.part50Threshold ?? 29500;
 }
 
 async function saveSettings() {
   if (!subjects) return;
   subjects.settings = subjects.settings || {};
-  subjects.settings.orgName        = document.getElementById('set-org').value;
+  subjects.settings.orgName         = document.getElementById('set-org').value;
   subjects.settings.exemptThreshold = parseInt(document.getElementById('set-threshold').value) || 10000;
+  subjects.settings.nhiThreshold9A  = parseInt(document.getElementById('set-nhi-9a').value)    || 20000;
+  subjects.settings.taxThreshold9A  = parseInt(document.getElementById('set-tax-9a').value)    || 20010;
+  subjects.settings.part50Threshold = parseInt(document.getElementById('set-part50').value)    || 29500;
   setMsg('set-msg', '⟳ 儲存中…', false);
   try {
     const r = await fetch('/api/subjects', {

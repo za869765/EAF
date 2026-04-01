@@ -356,6 +356,14 @@ body {
                  padding: 9px 22px; font-size: 14px; font-family: inherit; cursor: pointer; }
 .confirm-cancel:hover { background: #cfd8dc; }
 
+/* ── 扣繳預覽 Modal ── */
+#deduct-review-modal {
+  position: fixed; inset: 0; z-index: 9400;
+  background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  animation: scmFade .18s ease;
+}
+
 /* ── Save Confirm Modal ── */
 #save-confirm-modal {
   position: fixed; inset: 0; z-index: 9500;
@@ -443,7 +451,7 @@ body {
   body { background: #fff; }
   #app  { display: block; }
   #sidebar, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns,
-  #row-lecturer, #row-acct-type { display: none !important; }
+  #row-lecturer, #row-acct-type, #row-income50-type { display: none !important; }
   #main { padding: 0; }
   #form-page {
     width: 100% !important; max-width: 100% !important;
@@ -522,7 +530,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.6.9</div>
+    <div id="sb-version">v1.7.0</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -612,6 +620,10 @@ body {
           <div class="bp-row" id="row-acct-type" style="display:none;">
             <label>帳戶類別：</label>
             <div id="acct-type-btns" style="display:flex; flex-wrap:wrap; gap:2mm;"></div>
+          </div>
+          <div class="bp-row" id="row-income50-type" style="display:none;">
+            <label>人員類別：</label>
+            <div id="income50-type-btns" style="display:flex; flex-wrap:wrap; gap:2mm;"></div>
           </div>
         </td>
         <td style="text-align:center; vertical-align:middle;">
@@ -853,9 +865,10 @@ function applyType(type, { regen = true } = {}) {
     document.getElementById('sel-main').value    = '';
     document.getElementById('sel-bp').value      = '';
     document.getElementById('wp-text').textContent = '';
-    ['row-bp','row-purpose','row-personnel','row-lecturer','row-acct-type']
+    ['row-bp','row-purpose','row-personnel','row-lecturer','row-acct-type','row-income50-type']
       .forEach(id => document.getElementById(id).style.display = 'none');
     acctType = '';
+    income50Type = '';
     updateCashierNote();
   }
   if (regen && changed) {
@@ -1044,6 +1057,11 @@ const ACCT_TYPE_CONFIG = {
 const ACCT_SLASH_TYPES = new Set(['公立醫院','開具發票廠商']);
 const ACCT_NOTE_MAP    = { '財/社團法人':'列計92所得', '診所/檢驗所':'列計9A所得', '個人':'列計50所得' };
 let acctType = '';
+
+/* 50所得人員類別子選單（1501 / 2713 / 7103） */
+const INCOME_50_PURPOSES = ['1501','2713','7103'];
+let income50Type = '';
+
 let _suppressAutoFill = false;   /* 載入已存記錄時抑制自動填入 */
 
 function setLecturer(val) {
@@ -1056,6 +1074,13 @@ function setLecturer(val) {
 function setAcctType(val) {
   acctType = val;
   document.querySelectorAll('#acct-type-btns .lect-btn')
+    .forEach(b => b.classList.toggle('active', b.textContent === val));
+  updateCashierNote();
+}
+
+function setIncome50Type(val) {
+  income50Type = val;
+  document.querySelectorAll('#income50-type-btns .lect-btn')
     .forEach(b => b.classList.toggle('active', b.textContent === val));
   updateCashierNote();
 }
@@ -1125,6 +1150,20 @@ function onPurposeChange() {
   } else {
     acctType = '';
     rowAcct.style.display = 'none';
+  }
+
+  /* 人員類別子選單（1501 / 2713 / 7103） */
+  const rowI50 = document.getElementById('row-income50-type');
+  if (INCOME_50_PURPOSES.includes(code)) {
+    income50Type = '員工';
+    document.getElementById('income50-type-btns').innerHTML =
+      ['員工','兼職'].map(o =>
+        `<button class="lect-btn${o==='員工'?' active':''}" onclick="setIncome50Type('${o}')">${o}</button>`
+      ).join('');
+    rowI50.style.display = '';
+  } else {
+    income50Type = '';
+    rowI50.style.display = 'none';
   }
 
   updateCashierNote();
@@ -1346,6 +1385,7 @@ function getFormData() {
                     ? (document.getElementById('personnel-lbl')?.textContent||'兼任人員') : '',
     lecturerType  : isLecturer ? 'lecturer' : 'non-lecturer',
     acctType,
+    income50Type,
     applyDateRaw: document.getElementById('apply-date-input').value,
     applyDateRoc: document.getElementById('roc-date-text').textContent,
     notes: document.getElementById('notes').value,
@@ -1374,6 +1414,10 @@ function fillForm(rec) {
   /* 還原帳戶類別狀態 */
   if (rec.acctType && ACCT_TYPE_CONFIG[rec.purposeCode]) {
     setAcctType(rec.acctType);
+  }
+  /* 還原50所得人員類別 */
+  if (rec.income50Type && INCOME_50_PURPOSES.includes(rec.purposeCode)) {
+    setIncome50Type(rec.income50Type);
   }
   updateCashierNote();
   _suppressAutoFill = false;
@@ -1624,9 +1668,10 @@ function validateForm() {
 }
 
 /* ── 扣繳自動拆分（9A / 50所得） ── */
-let _prevNotes      = '';
-let _prevRow0Price  = '';
-let _deductRowsAdded = 0;
+let _prevNotes        = '';
+let _prevRow0Price    = '';
+let _deductRowsAdded  = 0;
+let _savedDeductSlots = [];
 
 function getCurrentTotal() {
   const isPurchase = formType === 'purchase';
@@ -1643,27 +1688,35 @@ function getCurrentTotal() {
 
 /* 回傳 { net, deductions:[{name,amount}] } 或 null */
 function calcDeductions(total) {
-  const purposeCode = document.getElementById('sel-purpose').value;
-  const is9A = (purposeCode === '2802' || purposeCode === '2807') && acctType === '診所/檢驗所';
-  const is50 = ['2713','7103','1501'].includes(purposeCode) ||
-               (purposeCode === '2802' && acctType === '個人') ||
-               (purposeCode === '2807' && acctType === '個人');
+  const purposeCode     = document.getElementById('sel-purpose').value;
+  const nhiThreshold9A  = CFG.settings?.nhiThreshold9A  ?? 20000;
+  const taxThreshold9A  = CFG.settings?.taxThreshold9A  ?? 20010;
+  const part50Threshold = CFG.settings?.part50Threshold ?? 29500;
 
-  if (!is9A && !is50) return null;
-  if (total < 20000) return null;
+  const is9A     = (purposeCode === '2802' || purposeCode === '2807') && acctType === '診所/檢驗所';
+  const is50part = INCOME_50_PURPOSES.includes(purposeCode) && income50Type === '兼職';
 
-  const deductions = [];
-  if (total >= 20000) {
+  if (is9A) {
+    if (total < nhiThreshold9A) return null;
+    const deductions = [];
     const nhi = Math.round(total * 0.0211);
     deductions.push({ name: '代扣繳二代健保', amount: nhi });
+    if (total >= taxThreshold9A) {
+      const tax = Math.round(total * 0.1);
+      deductions.push({ name: '代扣繳所得稅', amount: tax });
+    }
+    const net = total - deductions.reduce((s, d) => s + d.amount, 0);
+    return { net, deductions };
   }
-  if (total >= 20010) {
-    const tax = Math.round(total * 0.1);
-    deductions.push({ name: '代扣繳所得稅', amount: tax });
+
+  if (is50part) {
+    if (total <= part50Threshold) return null;
+    const nhi = Math.round(total * 0.0211);
+    const net = total - nhi;
+    return { net, deductions: [{ name: '代扣繳二代健保', amount: nhi }] };
   }
-  if (deductions.length === 0) return null;
-  const net = total - deductions.reduce((s, d) => s + d.amount, 0);
-  return { net, deductions };
+
+  return null;
 }
 
 function openSaveConfirmModal() {
@@ -1697,17 +1750,36 @@ function confirmSave() {
     _prevNotes     = document.getElementById('notes').value;
     _prevRow0Price = qv(0, 'price');
     _deductRowsAdded = 0;
+    _savedDeductSlots = [];
 
     /* 修改第1項金額為淨額 */
     qi(0, 'price').value = String(result.net);
 
-    /* 在最後新增扣繳列 */
+    /* 找最後一筆有資料的列，緊接其後插入扣繳列 */
+    let lastData = 0;
+    for (let i = 0; i < rowCount; i++) {
+      if (qv(i,'name') || qv(i,'price')) lastData = i;
+    }
+    let nextSlot = lastData + 1;
+
     for (const d of result.deductions) {
-      appendRow(rowCount);
-      qi(rowCount, 'name').value  = d.name;
-      qi(rowCount, 'price').value = String(d.amount);
-      rowCount++;
-      _deductRowsAdded++;
+      let slotIdx;
+      if (nextSlot < rowCount) {
+        /* 重用既有空列 */
+        slotIdx = nextSlot;
+        _savedDeductSlots.push({ idx: slotIdx, wasAdded: false,
+          prevName: qv(slotIdx,'name'), prevPrice: qv(slotIdx,'price') });
+      } else {
+        /* 需要新增列 */
+        appendRow(rowCount);
+        slotIdx = rowCount;
+        _savedDeductSlots.push({ idx: slotIdx, wasAdded: true, prevName:'', prevPrice:'' });
+        rowCount++;
+        _deductRowsAdded++;
+      }
+      qi(slotIdx, 'name').value  = d.name;
+      qi(slotIdx, 'price').value = String(d.amount);
+      nextSlot++;
     }
     calcTotal();
 
@@ -1751,13 +1823,20 @@ function confirmSave() {
 function cancelDeductReview() {
   /* 還原第1項金額 */
   qi(0, 'price').value = _prevRow0Price;
-  /* 移除自動新增的扣繳列 */
-  const tb = document.getElementById('items-body');
-  for (let k = 0; k < _deductRowsAdded; k++) {
-    rowCount--;
-    if (tb.lastChild) tb.removeChild(tb.lastChild);
+  /* 還原/清空扣繳列（反序處理，先清後刪） */
+  for (let k = _savedDeductSlots.length - 1; k >= 0; k--) {
+    const s = _savedDeductSlots[k];
+    if (s.wasAdded) {
+      rowCount--;
+      const tb = document.getElementById('items-body');
+      if (tb.lastChild) tb.removeChild(tb.lastChild);
+    } else {
+      qi(s.idx, 'name').value  = s.prevName;
+      qi(s.idx, 'price').value = s.prevPrice;
+    }
   }
-  _deductRowsAdded = 0;
+  _savedDeductSlots = [];
+  _deductRowsAdded  = 0;
   calcTotal();
   /* 還原其他說明事項 */
   document.getElementById('notes').value = _prevNotes;
@@ -1862,6 +1941,7 @@ function newForm(type) {
   currentId = null;
   rowCount = 10;
   isLecturer = false;
+  income50Type = '';
   document.getElementById('voucher-no').value = '';
   ['purpose-desc','notes'].forEach(id=>document.getElementById(id).value='');
   applyType(type || 'purchase', { regen: false });
