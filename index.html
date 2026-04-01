@@ -554,7 +554,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.13</div>
+    <div id="sb-version">v1.7.14</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -896,6 +896,7 @@ function applyType(type, { regen = true } = {}) {
     updateCashierNote();
   }
   if (regen && changed) {
+    buildMainDropdown();   /* 依類型重建主科目下拉（請購單過濾健保款暫存專戶） */
     rowCount = 10;
     generateItemRows();
   }
@@ -1898,10 +1899,9 @@ function confirmSave() {
   openSaveConfirmModal();
 }
 
-function cancelDeductReview() {
-  /* 還原第1項金額 */
+function revertDeductRows() {
+  if (!_savedDeductSlots.length) return;
   qi(0, 'price').value = _prevRow0Price;
-  /* 還原/清空扣繳列（反序處理，先清後刪） */
   for (let k = _savedDeductSlots.length - 1; k >= 0; k--) {
     const s = _savedDeductSlots[k];
     if (s.wasAdded) {
@@ -1916,8 +1916,11 @@ function cancelDeductReview() {
   _savedDeductSlots = [];
   _deductRowsAdded  = 0;
   calcTotal();
-  /* 還原其他說明事項 */
   document.getElementById('notes').value = _prevNotes;
+}
+
+function cancelDeductReview() {
+  revertDeductRows();
   document.getElementById('deduct-review-modal').style.display = 'none';
 }
 
@@ -1928,6 +1931,8 @@ function confirmDeductReview() {
 
 function closeSaveConfirm() {
   document.getElementById('save-confirm-modal').style.display = 'none';
+  /* 若有插入扣繳列尚未真正儲存，一律還原，避免重複執行 */
+  revertDeductRows();
 }
 function doSave() {
   closeSaveConfirm();
