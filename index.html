@@ -560,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.0.7</div>
+    <div id="sb-version">v2.0.8</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1505,8 +1505,21 @@ function calcTotal() {
    DATE
    ══════════════════════ */
 function setTodayDate() {
-  document.getElementById('apply-date-input').value = new Date().toISOString().slice(0,10);
+  const today = new Date();
+  document.getElementById('apply-date-input').value = today.toISOString().slice(0,10);
   updateRocDate();
+  /* 交貨日期預設：今天 + 5 個工作日（跳過六日） */
+  const ddEl = document.getElementById('delivery-date');
+  if (ddEl && !ddEl.value) {
+    let d = new Date(today);
+    let added = 0;
+    while (added < 5) {
+      d.setDate(d.getDate() + 1);
+      if (d.getDay() !== 0 && d.getDay() !== 6) added++;
+    }
+    ddEl.value = d.toISOString().slice(0,10);
+    updateDeliveryDate();
+  }
 }
 function updateRocDate() {
   const v = document.getElementById('apply-date-input').value;
