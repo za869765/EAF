@@ -598,7 +598,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.2.4</div>
+    <div id="sb-version">v2.2.5</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1052,6 +1052,12 @@ async function loadHistory() {
   setSyncStatus('⟳ 載入中…', 'busy');
   try {
     cachedRecords = await apiGet();
+    /* 修正舊資料：110404 僅限請購單，若有誤存為動支單則自動修正 formType */
+    const wrongType = cachedRecords.filter(r => r.bpCode === '110404' && r.formType === 'expense');
+    if (wrongType.length) {
+      await Promise.all(wrongType.map(r => apiPatch(r.id, { formType: 'purchase' })));
+      wrongType.forEach(r => { r.formType = 'purchase'; });
+    }
     setSyncStatus(`● 已連線　共 ${cachedRecords.length} 筆`, 'ok');
     renderHistory(cachedRecords);
   } catch(_) {
@@ -1120,7 +1126,9 @@ function onMainChange() {
   const bpSel = document.getElementById('sel-bp');
   bpSel.innerHTML = '<option value="">── 選擇業務計畫 ──</option>';
   if (acct) {
-    acct.businessPlans.forEach(bp => bpSel.appendChild(new Option(bp.code+'　'+bp.name, bp.code)));
+    acct.businessPlans
+      .filter(bp => !(formType === 'expense' && bp.code === '110404'))  /* 110404 僅限請購單 */
+      .forEach(bp => bpSel.appendChild(new Option(bp.code+'　'+bp.name, bp.code)));
     document.getElementById('row-bp').style.display = '';
   } else { document.getElementById('row-bp').style.display = 'none'; }
   document.getElementById('wp-text').textContent = '';
@@ -1204,7 +1212,7 @@ function updateLecturerRow() {
 }
 
 /* 出納單位格斜線觸發：業務計畫 / 用途別 */
-const CASHIER_SLASH_BP      = ['21020302','21020311','21020312','21020313','21020319','21020301','21020321'];
+const CASHIER_SLASH_BP      = ['21020302','21020311','21020312','21020313','21020319','21020301','21020321','110404'];
 const CASHIER_SLASH_PURPOSE = [
   '2102','2104','2201','2202','2204','2301',
   '2401','2505','2507','2607','2706','2707','2711',
@@ -1330,7 +1338,7 @@ function updateCashierNote() {
 
   /* ── 出納單位格斜線：有所得附記時一律不劃斜線 ── */
   const noCashierSlash = purposeCode === '1301' || bpCode === '21020303' ||
-                         bpCode === '110404' || bpCode === '1140404' || !!note;
+                         bpCode === '1140404' || !!note;
   const cashierSlash = !noCashierSlash && (
     CASHIER_SLASH_BP.includes(bpCode) ||
     (isExp && purposeCode === '1140404') ||
@@ -2519,12 +2527,14 @@ let _cpTimer = null;
 function showCopyPopup(no) {
   const pop = document.getElementById('copy-success-popup');
   document.getElementById('cp-no-text').textContent = no;
-  if (_cpTimer) { clearTimeout(_cpTimer); pop.className = ''; }
-  void pop.offsetWidth;   /* reflow 確保動畫重跑 */
+  if (_cpTimer) clearTimeout(_cpTimer);
+  pop.className    = '';
+  pop.style.display = '';   /* 清除 inline display:none，讓 .in 的 display:block 生效 */
+  void pop.offsetWidth;     /* reflow 確保動畫重跑 */
   pop.classList.add('in');
   _cpTimer = setTimeout(() => {
     pop.classList.replace('in','out');
-    _cpTimer = setTimeout(() => { pop.className = ''; pop.style.display='none'; }, 280);
+    _cpTimer = setTimeout(() => { pop.className = ''; pop.style.display = 'none'; }, 280);
   }, 1500);
 }
 </script>
@@ -2599,41 +2609,41 @@ function showCopyPopup(no) {
 
 <!-- ══ 複製前次單 Modal ══ -->
 <div id="copy-modal" style="display:none;">
-  <div class="cm-box">
-    <h3 style="font-size:17px;">📋 複製前次單</h3>
+  <div class="cm-box" style="position:relative;">
+
+    <!-- 右上角紅色 X 關閉 -->
+    <button onclick="closeCopyModal()"
+            style="position:absolute; top:10px; right:12px; background:none; border:none;
+                   font-size:24px; color:#c62828; cursor:pointer; line-height:1;
+                   font-weight:bold; padding:0 4px;" title="關閉">✕</button>
+
+    <h3 style="font-size:17px; padding-right:36px;">📋 複製前次單</h3>
 
     <!-- ① 關鍵字搜尋 -->
     <div style="font-size:12px; color:#777; margin-bottom:5px;">🔍 關鍵字搜尋（憑證號、科目、說明、金額…）</div>
-    <div style="display:flex; gap:8px; margin-bottom:8px;">
-      <input id="copy-kw-input" type="text" placeholder="輸入任意關鍵字…"
-             style="flex:1; padding:9px 12px; border:1.5px solid #90a4ae; border-radius:6px;
-                    font-size:15px; font-family:inherit; outline:none;"
-             oninput="kwSearchCopy()">
-    </div>
+    <input id="copy-kw-input" type="text" placeholder="輸入任意關鍵字…"
+           style="width:100%; box-sizing:border-box; padding:9px 12px;
+                  border:1.5px solid #90a4ae; border-radius:6px;
+                  font-size:15px; font-family:inherit; outline:none; margin-bottom:8px;"
+           oninput="kwSearchCopy()">
     <div id="copy-kw-results" style="max-height:calc(80vh - 260px); overflow-y:auto; margin-bottom:10px; flex:1;"></div>
 
     <hr style="border:none; border-top:1px solid #e0e0e0; margin:10px 0;">
 
     <!-- ② 直接輸入編號確定複製 -->
     <div style="font-size:12px; color:#777; margin-bottom:5px;">✏️ 輸入憑證編號直接複製</div>
-    <div style="display:flex; gap:8px; margin-bottom:10px;">
-      <input id="copy-no-input" type="text" placeholder="例：115-0001"
-             style="flex:1; padding:9px 12px; border:1.5px solid #1565c0; border-radius:6px;
-                    font-size:15px; font-family:inherit; outline:none;"
-             onkeydown="if(event.key==='Enter') doCopyByNo()">
-      <button onclick="doCopyByNo()"
-              style="background:#1565c0; color:#fff; border:none; border-radius:6px;
-                     padding:10px 22px; font-size:15px; font-family:inherit; cursor:pointer; font-weight:bold;">
-        複製
-      </button>
-    </div>
-    <div id="copy-no-err" style="display:none; color:#c62828; font-size:13px; margin-bottom:8px;">
-      ⚠ 查無此憑證編號，請確認後再試。
-    </div>
+    <input id="copy-no-input" type="text" placeholder="例：115-0001 或後4碼 0001"
+           style="width:100%; box-sizing:border-box; padding:9px 12px;
+                  border:1.5px solid #1565c0; border-radius:6px;
+                  font-size:15px; font-family:inherit; outline:none; margin-bottom:8px;"
+           onkeydown="if(event.key==='Enter') doCopyByNo()">
+    <div id="copy-no-err" style="display:none; color:#c62828; font-size:13px; margin-bottom:8px;"></div>
 
-    <button onclick="closeCopyModal()"
-            style="width:100%; background:#eceff1; color:#555; border:none; border-radius:6px;
-                   padding:11px; font-size:15px; font-family:inherit; cursor:pointer; font-weight:bold;">✕ 關閉</button>
+    <!-- 複製按鈕（取代原 X 關閉） -->
+    <button onclick="doCopyByNo()"
+            style="width:100%; background:#1565c0; color:#fff; border:none; border-radius:6px;
+                   padding:12px; font-size:16px; font-family:inherit;
+                   cursor:pointer; font-weight:bold; letter-spacing:2px;">複製</button>
   </div>
 </div>
 </body>
