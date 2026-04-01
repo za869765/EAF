@@ -7,7 +7,7 @@
  * API：
  *   GET    /api/records           → 讀取所有紀錄（陣列）
  *   POST   /api/records           → 新增或更新單筆紀錄（body: 單筆 JSON）
- *   PATCH  /api/records?id=xxx    → 切換作廢狀態（body: { voided: true/false }）
+ *   PATCH  /api/records?id=xxx    → 部分更新欄位（body: 任意可覆寫欄位；id/savedAt 受保護）
  *   DELETE /api/records?id=xxx    → 永久刪除單筆
  */
 
@@ -73,21 +73,26 @@ export async function onRequest(context) {
     }
   }
 
-  /* ── PATCH：切換作廢狀態 ── */
+  /* ── PATCH：部分更新（作廢旗標 / 管理者編輯內容） ── */
   if (request.method === 'PATCH') {
     if (!id) return json({ ok: false, error: 'missing id' }, 400);
     try {
-      const { voided } = await request.json();
+      const patch = await request.json();
       const row = await DB.prepare(
         'SELECT data FROM records WHERE id = ?'
       ).bind(id).first();
       if (!row) return json({ ok: false, error: 'not found' }, 404);
 
       const rec = JSON.parse(row.data);
-      rec.voided = !!voided;
+      /* 保護不允許被覆寫的欄位 */
+      const PROTECTED = new Set(['id', 'savedAt']);
+      Object.entries(patch).forEach(([k, v]) => {
+        if (!PROTECTED.has(k)) rec[k] = v;
+      });
+      const voidedBit = rec.voided ? 1 : 0;
       await DB.prepare(
         'UPDATE records SET voided = ?, data = ? WHERE id = ?'
-      ).bind(voided ? 1 : 0, JSON.stringify(rec), id).run();
+      ).bind(voidedBit, JSON.stringify(rec), id).run();
 
       return json({ ok: true });
     } catch (e) {
