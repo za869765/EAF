@@ -560,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.0.8</div>
+    <div id="sb-version">v2.0.9</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1436,11 +1436,7 @@ function closeAlert() {
 function validatePrice(el, i) {
   const raw = el.value.trim();
   if (raw !== '' && isNaN(Number(raw))) {
-    showAlert('單價請輸入數字\n（例如：100、1500）', '🔢');
-    el.value = ''; calcRow(i); return;
-  }
-  if (raw !== '' && Number(raw) < 0) {
-    showAlert('單價不可為負值\n折讓請在數量輸入負數', '⚠️');
+    showAlert('單價請輸入數字\n（例如：100、-480、1500）', '🔢');
     el.value = ''; calcRow(i); return;
   }
   calcRow(i);
@@ -1844,11 +1840,11 @@ function validateForm() {
       if (!price) miss.push('單價');
       if (miss.length) errors.push(`第 ${i+1} 列缺少：${miss.join('、')}`);
     }
-    /* 3. 總金額不得為 0 或負數 */
+    /* 3. 合計不得為 0（允許負值單項，但合計夾底後不得為 0） */
     let total = 0;
     for (let i = 0; i < rowCount; i++)
       total += Math.round((parseFloat(qv(i,'qty'))||0)*(parseFloat(qv(i,'price'))||0));
-    if (total <= 0) errors.push('金額不得為 $0 或負數');
+    if (Math.max(0, total) === 0) errors.push('合計金額不得為 $0');
 
   } else {
     /* 2. 動支單：動支說明與金額必須同時有值或同時為空 */
@@ -1858,11 +1854,11 @@ function validateForm() {
       if (name && !price) errors.push(`第 ${i+1} 列有動支說明但缺少金額`);
       if (!name && price) errors.push(`第 ${i+1} 列有金額但缺少動支說明`);
     }
-    /* 3. 總金額不得為 0 或負數 */
+    /* 3. 合計不得為 0（允許負值金額，但合計夾底後不得為 0） */
     let total = 0;
     for (let i = 0; i < rowCount; i++)
       total += Math.round(parseFloat(qv(i,'price'))||0);
-    if (total <= 0) errors.push('金額不得為 $0 或負數');
+    if (Math.max(0, total) === 0) errors.push('合計金額不得為 $0');
   }
 
   return errors;
