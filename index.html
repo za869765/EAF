@@ -558,7 +558,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.22</div>
+    <div id="sb-version">v1.7.23</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1118,11 +1118,11 @@ const CASHIER_SLASH_PURPOSE = [
 
 /* 帳戶類別子選單（2802 / 2807） */
 const ACCT_TYPE_CONFIG = {
-  '2802': { options:['公立醫院','財/社團法人','診所/檢驗所','個人'],              default:'個人'      },
-  '2807': { options:['公立醫院/衛生局','財/社團法人','診所/檢驗所','個人','開具發票廠商'], default:'診所/檢驗所' },
+  '2802': { options:['公立醫院','財/社團法人','診所/檢驗所','個人'],                                               default:'個人'                },
+  '2807': { options:['公立醫院','衛生局','醫療門診診所/檢驗所','財/社團法人','個人','開具發票廠商','HPV'],           default:'醫療門診診所/檢驗所' },
 };
-const ACCT_SLASH_TYPES = new Set(['公立醫院','公立醫院/衛生局','開具發票廠商']);
-const ACCT_NOTE_MAP    = { '財/社團法人':'列計92所得', '診所/檢驗所':'列計9A所得', '個人':'列計50所得' };
+const ACCT_SLASH_TYPES = new Set(['公立醫院','衛生局','開具發票廠商','HPV']);
+const ACCT_NOTE_MAP    = { '財/社團法人':'列計92所得', '診所/檢驗所':'列計9A所得', '醫療門診診所/檢驗所':'列計9A所得', '個人':'列計50所得' };
 let acctType = '';
 
 /* 50所得人員類別子選單（1501 / 2713 / 7103） */
@@ -1796,7 +1796,7 @@ function calcDeductions(total) {
   const taxThreshold9A  = CFG.settings?.taxThreshold9A  ?? 20010;
   const part50Threshold = CFG.settings?.part50Threshold ?? 29500;
 
-  const is9A     = (purposeCode === '2802' || purposeCode === '2807') && acctType === '診所/檢驗所';
+  const is9A     = (purposeCode === '2802' || purposeCode === '2807') && (acctType === '診所/檢驗所' || acctType === '醫療門診診所/檢驗所');
   const is50part = income50Type === '兼職';   /* 所有顯示列計50所得且選兼職的情況 */
 
   if (is9A) {
@@ -2139,9 +2139,12 @@ function updateBudgetInfo() {
     '2807': {
       label: () => '委託檢驗費（' + acctType + '）',
       budgetKey: () => ({
-        '公立醫院/衛生局': s.budget2807_public  ?? 60000,
-        '診所/檢驗所':     s.budget2807_clinic   ?? 137135,
-        '開具發票廠商':    s.budget2807_invoice  ?? 2600,
+        '公立醫院':          s.budget2807_public  ?? 60000,
+        '衛生局':            s.budget2807_health  ?? 210635,
+        '醫療門診診所/檢驗所': s.budget2807_clinic  ?? 137135,
+        '開具發票廠商':      s.budget2807_invoice ?? 2600,
+        'HPV':               s.budget2807_hpv     ?? null,
+        /* 財/社團法人、個人 → null，不顯示（歸為其他） */
       })[acctType] ?? null,
       match: r => r.purposeCode === '2807' && r.acctType === acctType,
     },

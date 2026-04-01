@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v1.2.7</title>
+<title>管理者入口 — 動支單系統 v1.2.8</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -393,16 +393,28 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
           <input id="set-budget1301" type="number" min="0">
         </div>
         <div class="s-row">
-          <label>2807 委託檢驗費 — 公立醫院/衛生局（元）</label>
+          <label>2807 委託檢驗費 — 公立醫院（元）</label>
           <input id="set-budget2807-public" type="number" min="0">
         </div>
         <div class="s-row">
-          <label>2807 委託檢驗費 — 診所/檢驗所（元）</label>
+          <label>2807 委託檢驗費 — 衛生局（元）</label>
+          <input id="set-budget2807-health" type="number" min="0">
+        </div>
+        <div class="s-row">
+          <label>2807 委託檢驗費 — 醫療門診診所/檢驗所（元）</label>
           <input id="set-budget2807-clinic" type="number" min="0">
         </div>
         <div class="s-row">
           <label>2807 委託檢驗費 — 開具發票廠商（元）</label>
           <input id="set-budget2807-invoice" type="number" min="0">
+        </div>
+        <div class="s-row">
+          <label>2807 委託檢驗費 — HPV（元，選填）</label>
+          <input id="set-budget2807-hpv" type="number" min="0" placeholder="0">
+        </div>
+        <div class="s-row">
+          <label>2807 委託檢驗費 — 總額預算（元）</label>
+          <input id="set-budget2807-total" type="number" min="0">
         </div>
 
         <div class="toolbar" style="margin-top:16px;">
@@ -873,18 +885,33 @@ function renderBudgetChart() {
   const wrap = document.getElementById('budget-chart-wrap');
   if (!wrap) return;
 
+  const total2807Budget = s.budget2807_total ?? 410370;
+  const total2807Spent  = active.filter(r => r.purposeCode === '2807')
+                                .reduce((sum, r) => sum + (Number(r.total)||0), 0);
+
   const items = [
-    { label: '1301 延長工時加班費', code: '1301', acctType: null,
+    { label: '1301 延長工時加班費',          code: '1301', acctType: null,
       budget: s.budget1301 ?? 140000 },
-    { label: '2807 公立醫院/衛生局', code: '2807', acctType: '公立醫院/衛生局',
-      budget: s.budget2807_public ?? 60000 },
-    { label: '2807 診所/檢驗所',    code: '2807', acctType: '診所/檢驗所',
-      budget: s.budget2807_clinic ?? 137135 },
-    { label: '2807 開具發票廠商',   code: '2807', acctType: '開具發票廠商',
+    /* ── 2807 總額 ── */
+    { label: '2807 委託檢驗費　【總額】',    code: '_2807total', acctType: null,
+      budget: total2807Budget, spent: total2807Spent, isTotal: true },
+    /* ── 2807 分項 ── */
+    { label: '　↳ 公立醫院',                code: '2807', acctType: '公立醫院',
+      budget: s.budget2807_public  ?? 60000 },
+    { label: '　↳ 衛生局',                  code: '2807', acctType: '衛生局',
+      budget: s.budget2807_health  ?? 210635 },
+    { label: '　↳ 醫療門診診所/檢驗所',     code: '2807', acctType: '醫療門診診所/檢驗所',
+      budget: s.budget2807_clinic  ?? 137135 },
+    { label: '　↳ 開具發票廠商',            code: '2807', acctType: '開具發票廠商',
       budget: s.budget2807_invoice ?? 2600 },
+    ...(s.budget2807_hpv > 0 ? [
+      { label: '　↳ HPV',                   code: '2807', acctType: 'HPV',
+        budget: s.budget2807_hpv }
+    ] : []),
   ];
 
   items.forEach(item => {
+    if (item.isTotal) return;  /* spent 已在外部計算 */
     item.spent = active
       .filter(r => r.purposeCode === item.code &&
                    (item.acctType === null || r.acctType === item.acctType))
@@ -899,9 +926,13 @@ function renderBudgetChart() {
     const remainTxt = remain >= 0
       ? `<span style="color:#546e7a;">剩餘 $${fmtN(remain)}</span>`
       : `<span style="color:#c62828;">超支 $${fmtN(-remain)}</span>`;
+    const rowStyle = item.isTotal
+      ? 'background:#f0f4ff; border-radius:5px; padding:4px 6px; margin-bottom:6px;'
+      : '';
+    const labelStyle = item.isTotal ? 'font-weight:700; color:#1e2a38;' : '';
     return `
-      <div class="budget-row">
-        <div class="budget-label">${esc(item.label)}</div>
+      <div class="budget-row" style="${rowStyle}">
+        <div class="budget-label" style="${labelStyle}">${esc(item.label)}</div>
         <div class="budget-bar-wrap" title="${pct.toFixed(1)}%">
           <div class="budget-bar" style="width:${barPct}%; background:${color};"></div>
         </div>
@@ -924,10 +955,13 @@ function fillSettings() {
   document.getElementById('set-nhi-9a').value    = subjects.settings?.nhiThreshold9A  ?? 20000;
   document.getElementById('set-tax-9a').value    = subjects.settings?.taxThreshold9A  ?? 20010;
   document.getElementById('set-part50').value    = subjects.settings?.part50Threshold ?? 29500;
-  document.getElementById('set-budget1301').value         = subjects.settings?.budget1301         ?? 140000;
-  document.getElementById('set-budget2807-public').value  = subjects.settings?.budget2807_public  ?? 60000;
-  document.getElementById('set-budget2807-clinic').value  = subjects.settings?.budget2807_clinic  ?? 137135;
-  document.getElementById('set-budget2807-invoice').value = subjects.settings?.budget2807_invoice ?? 2600;
+  document.getElementById('set-budget1301').value          = subjects.settings?.budget1301          ?? 140000;
+  document.getElementById('set-budget2807-public').value   = subjects.settings?.budget2807_public   ?? 60000;
+  document.getElementById('set-budget2807-health').value   = subjects.settings?.budget2807_health   ?? 210635;
+  document.getElementById('set-budget2807-clinic').value   = subjects.settings?.budget2807_clinic   ?? 137135;
+  document.getElementById('set-budget2807-invoice').value  = subjects.settings?.budget2807_invoice  ?? 2600;
+  document.getElementById('set-budget2807-hpv').value      = subjects.settings?.budget2807_hpv      ?? 0;
+  document.getElementById('set-budget2807-total').value    = subjects.settings?.budget2807_total    ?? 410370;
 }
 
 async function saveSettings() {
@@ -938,10 +972,13 @@ async function saveSettings() {
   subjects.settings.nhiThreshold9A  = parseInt(document.getElementById('set-nhi-9a').value)    || 20000;
   subjects.settings.taxThreshold9A  = parseInt(document.getElementById('set-tax-9a').value)    || 20010;
   subjects.settings.part50Threshold = parseInt(document.getElementById('set-part50').value)    || 29500;
-  subjects.settings.budget1301         = parseInt(document.getElementById('set-budget1301').value)         || 140000;
-  subjects.settings.budget2807_public  = parseInt(document.getElementById('set-budget2807-public').value)  || 60000;
-  subjects.settings.budget2807_clinic  = parseInt(document.getElementById('set-budget2807-clinic').value)  || 137135;
-  subjects.settings.budget2807_invoice = parseInt(document.getElementById('set-budget2807-invoice').value) || 2600;
+  subjects.settings.budget1301          = parseInt(document.getElementById('set-budget1301').value)          || 140000;
+  subjects.settings.budget2807_public   = parseInt(document.getElementById('set-budget2807-public').value)   || 60000;
+  subjects.settings.budget2807_health   = parseInt(document.getElementById('set-budget2807-health').value)   || 210635;
+  subjects.settings.budget2807_clinic   = parseInt(document.getElementById('set-budget2807-clinic').value)   || 137135;
+  subjects.settings.budget2807_invoice  = parseInt(document.getElementById('set-budget2807-invoice').value)  || 2600;
+  subjects.settings.budget2807_hpv      = parseInt(document.getElementById('set-budget2807-hpv').value)      || 0;
+  subjects.settings.budget2807_total    = parseInt(document.getElementById('set-budget2807-total').value)    || 410370;
   setMsg('set-msg', '⟳ 儲存中…', false);
   try {
     const r = await fetch('/api/subjects', {
