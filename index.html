@@ -558,7 +558,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.18</div>
+    <div id="sb-version">v1.7.19</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1118,9 +1118,9 @@ const CASHIER_SLASH_PURPOSE = [
 /* 帳戶類別子選單（2802 / 2807） */
 const ACCT_TYPE_CONFIG = {
   '2802': { options:['公立醫院','財/社團法人','診所/檢驗所','個人'],              default:'個人'      },
-  '2807': { options:['公立醫院','財/社團法人','診所/檢驗所','個人','開具發票廠商'], default:'診所/檢驗所' },
+  '2807': { options:['公立醫院','衛生局','財/社團法人','診所/檢驗所','個人','開具發票廠商'], default:'診所/檢驗所' },
 };
-const ACCT_SLASH_TYPES = new Set(['公立醫院','開具發票廠商']);
+const ACCT_SLASH_TYPES = new Set(['公立醫院','衛生局','開具發票廠商']);
 const ACCT_NOTE_MAP    = { '財/社團法人':'列計92所得', '診所/檢驗所':'列計9A所得', '個人':'列計50所得' };
 let acctType = '';
 
