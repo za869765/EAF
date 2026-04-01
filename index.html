@@ -466,7 +466,7 @@ body {
   #app  { display: block; }
   #sidebar, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns,
   #row-lecturer, #row-acct-type, #row-income50-type,
-  #row-budget-info, #purchase-sig, #exempt-wrap { display: none !important; }
+  #row-budget-info, #exempt-wrap { display: none !important; }
   /* 隱藏未選擇的佔位文字 */
   #main-acct-lbl[data-ph="1"] { visibility: hidden; }
   .fsel[data-ph="1"] { visibility: hidden; }
@@ -560,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.8.3</div>
+    <div id="sb-version">v1.8.4</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1046,6 +1046,7 @@ function onMainChange() {
   document.getElementById('row-purpose').style.display = 'none';
   /* 切換主科目時清除帳戶/人員類別狀態 */
   acctType = ''; income50Type = '';
+  document.getElementById('row-personnel').style.display = 'none';
   document.getElementById('row-acct-type').style.display = 'none';
   document.getElementById('row-income50-type').style.display = 'none';
 }
