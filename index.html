@@ -560,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.8.8</div>
+    <div id="sb-version">v2.0.0</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -583,9 +583,7 @@ body {
             style="display:none; background:#00695c; color:#fff;">📋 複製前次單</button>
     <button class="btn" id="cancel-btn" onclick="cancelEdit()"
             style="display:none; background:#b71c1c; color:#fff;">✕ 取消</button>
-    <!-- 測試列印（暫時，正式上線刪除） -->
-    <button class="btn" id="test-print-btn" onclick="window.print()"
-            style="display:none; background:#e65100; color:#fff; font-size:11px;">🧪 測試列印</button>
+
     <span id="save-msg"></span>
   </div>
 
@@ -643,7 +641,7 @@ body {
             <span id="personnel-lbl" style="font-size:11.5px; color:#555;">兼任人員</span>
           </div>
           <div class="bp-row" id="row-lecturer" style="display:none;">
-            <label>授課類別：</label>
+            <label>款項用途：</label>
             <button class="lect-btn" id="lect-yes" onclick="setLecturer(true)">講師費</button>
             <button class="lect-btn active" id="lect-no" onclick="setLecturer(false)">非講師費</button>
           </div>
@@ -1078,12 +1076,11 @@ function onBpChange() {
   acctType = ''; income50Type = '';
   document.getElementById('row-acct-type').style.display = 'none';
   document.getElementById('row-income50-type').style.display = 'none';
-  /* 講師費切換：特定業務計畫才顯示，且重設為非講師費 */
-  const showLect = LECTURER_BP_CODES.includes(bpCode);
-  document.getElementById('row-lecturer').style.display = showLect ? '' : 'none';
+  /* 款項用途切換：特定業務計畫才顯示，且重設為非講師費 */
   if (!_suppressAutoFill) { isLecturer = false; }
   document.getElementById('lect-yes').classList.remove('active');
   document.getElementById('lect-no').classList.add('active');
+  updateLecturerRow();
   updateCashierNote();
   /* BP 切換時：510601 + 2706 → 填入匯費無收據；離開時清除 */
   if (!_suppressAutoFill) {
@@ -1113,6 +1110,16 @@ const PURCHASE_ONLY_PURPOSES = ['2401','3106','3201','3298'];
 /* 講師費顯示業務計畫代碼清單 */
 const LECTURER_BP_CODES = ['21020311','21020312','21020313','21020321'];
 let isLecturer = false;
+
+/* 款項用途列顯示邏輯：21020321 需 purposeCode=99 才顯示 */
+function updateLecturerRow() {
+  const bpCode      = document.getElementById('sel-bp').value;
+  const purposeCode = document.getElementById('sel-purpose').value;
+  const showLect = bpCode === '21020321'
+    ? purposeCode === '99'
+    : LECTURER_BP_CODES.includes(bpCode);
+  document.getElementById('row-lecturer').style.display = showLect ? '' : 'none';
+}
 
 /* 出納單位格斜線觸發：業務計畫 / 用途別 */
 const CASHIER_SLASH_BP      = ['21020302','21020311','21020312','21020313','21020319','21020301','21020321'];
@@ -1268,6 +1275,9 @@ function onPurposeChange() {
 
   /* 人員類別子選單（由 updateIncome50Row 統一管理） */
   updateIncome50Row();
+
+  /* 款項用途列：21020321 需同時判斷 purposeCode */
+  updateLecturerRow();
 
   updateCashierNote();
 
@@ -1706,7 +1716,6 @@ function lockForm() {
   _setBtn('clear-btn',  'none');
   _setBtn('copy-btn',   'none');
   _setBtn('print-btn',  '');
-  _setBtn('test-print-btn', '');
 }
 function unlockForm() {
   const page = document.getElementById('form-page');
@@ -1719,10 +1728,9 @@ function unlockForm() {
   _setBtn('clear-btn',  '');
   _setBtn('copy-btn',   cachedRecords.length > 0 ? '' : 'none');
   _setBtn('print-btn',  'none');
-  _setBtn('test-print-btn', '');
 }
 function hideAllBtns() {
-  ['save-btn','cancel-btn','clear-btn','copy-btn','print-btn','test-print-btn']
+  ['save-btn','cancel-btn','clear-btn','copy-btn','print-btn']
     .forEach(id => _setBtn(id,'none'));
 }
 function _setBtn(id, disp) {
