@@ -548,7 +548,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.11</div>
+    <div id="sb-version">v1.7.12</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1944,22 +1944,36 @@ function closeCopyModal() {
   document.getElementById('copy-modal').style.display = 'none';
 }
 
-/* ① 關鍵字搜尋 */
+/* ① 關鍵字搜尋（含分頁） */
+const COPY_PAGE_SIZE = 20;
+let _copyHits = [], _copyPage = 0;
+
 function kwSearchCopy() {
-  const q   = document.getElementById('copy-kw-input').value.trim().toLowerCase();
+  const q = document.getElementById('copy-kw-input').value.trim().toLowerCase();
   const box = document.getElementById('copy-kw-results');
   if (!q) { box.innerHTML = ''; return; }
-  /* 只搜尋同類型的紀錄 */
-  const hits = cachedRecords.filter(r =>
+  _copyHits = cachedRecords.filter(r =>
     r.formType === formType &&
     [r.voucherNo, r.acctName, r.bpLabel, r.purposeDesc, r.notes, r.applyDateRoc,
      String(r.total||''), ...(r.items||[]).map(i=>i.name||'')]
     .some(f => (f||'').toLowerCase().includes(q))
-  ).slice(0, 20);
-  if (!hits.length) {
+  );
+  _copyPage = 0;
+  renderCopyPage();
+}
+
+function renderCopyPage() {
+  const box   = document.getElementById('copy-kw-results');
+  const total = _copyHits.length;
+  if (!total) {
     box.innerHTML = '<div style="color:#888;font-size:12px;padding:6px;">查無符合結果</div>'; return;
   }
-  box.innerHTML = hits.map(r =>
+  const pages   = Math.ceil(total / COPY_PAGE_SIZE);
+  const start   = _copyPage * COPY_PAGE_SIZE;
+  const end     = Math.min(start + COPY_PAGE_SIZE, total);
+  const pageRec = _copyHits.slice(start, end);
+
+  const rows = pageRec.map(r =>
     `<div class="copy-item copy-item-preview">
        <span class="ci-no">${esc(r.voucherNo||'(未取號)')}</span>
        <span class="ci-type">${r.formType==='expense'?'動支':'採購'}</span>
@@ -1967,6 +1981,16 @@ function kwSearchCopy() {
        <span class="ci-amt">$${fmtN(r.total||0)}</span>
      </div>`
   ).join('');
+
+  const info = `<div style="font-size:11px;color:#666;padding:4px 2px;display:flex;align-items:center;justify-content:space-between;">
+    <span>第 ${start+1}–${end} 筆，共 ${pages} 頁，總筆數 ${total} 筆</span>
+    <span>
+      <button onclick="_copyPage--;renderCopyPage()" ${_copyPage===0?'disabled':''} style="margin-right:4px;padding:2px 8px;font-size:11px;cursor:pointer;border:1px solid #90a4ae;border-radius:4px;background:#f5f5f5;">◀ 上頁</button>
+      <button onclick="_copyPage++;renderCopyPage()" ${_copyPage>=pages-1?'disabled':''} style="padding:2px 8px;font-size:11px;cursor:pointer;border:1px solid #90a4ae;border-radius:4px;background:#f5f5f5;">下頁 ▶</button>
+    </span>
+  </div>`;
+
+  box.innerHTML = rows + info;
 }
 
 /* ② 直接輸入編號複製 */
