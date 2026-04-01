@@ -431,8 +431,9 @@ body {
 }
 .cm-box {
   background: #fff; border-radius: 10px; padding: 22px 26px;
-  min-width: 380px; max-width: 92vw; max-height: 70vh;
+  width: 80vw; max-width: 80vw; max-height: 80vh;
   overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,.3);
+  display: flex; flex-direction: column;
 }
 .cm-box h3 { font-size: 14px; margin-bottom: 12px; color: #1a237e; }
 .copy-item {
@@ -547,7 +548,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.10</div>
+    <div id="sb-version">v1.7.11</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -567,7 +568,7 @@ body {
     <button class="btn btn-print" onclick="window.print()" id="print-btn"      style="display:none;">🖨️ 列印</button>
     <button class="btn btn-clear" onclick="clearForm()"    id="clear-btn"      style="display:none;">🗑️ 清除</button>
     <button class="btn" id="copy-btn" onclick="showCopyModal()"
-            style="display:none; background:#00695c; color:#fff;">📋 複製既有單</button>
+            style="display:none; background:#00695c; color:#fff;">📋 複製前次單</button>
     <button class="btn" id="cancel-btn" onclick="cancelEdit()"
             style="display:none; background:#b71c1c; color:#fff;">✕ 取消</button>
     <!-- 測試列印（暫時，正式上線刪除） -->
@@ -2171,10 +2172,10 @@ function showToast(msg) {
   </div>
 </div>
 
-<!-- ══ 複製既有單 Modal ══ -->
+<!-- ══ 複製前次單 Modal ══ -->
 <div id="copy-modal" style="display:none;">
   <div class="cm-box">
-    <h3>📋 複製既有單據</h3>
+    <h3>📋 複製前次單</h3>
 
     <!-- ① 關鍵字搜尋 -->
     <div style="font-size:11px; color:#777; margin-bottom:4px;">🔍 關鍵字搜尋（憑證號、科目、說明、金額…）</div>
@@ -2184,7 +2185,7 @@ function showToast(msg) {
                     font-size:13px; font-family:inherit; outline:none;"
              oninput="kwSearchCopy()">
     </div>
-    <div id="copy-kw-results" style="max-height:160px; overflow-y:auto; margin-bottom:10px;"></div>
+    <div id="copy-kw-results" style="max-height:calc(80vh - 240px); overflow-y:auto; margin-bottom:10px; flex:1;"></div>
 
     <hr style="border:none; border-top:1px solid #e0e0e0; margin:10px 0;">
 
