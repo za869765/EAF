@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v1.8.0</title>
+<title>管理者入口 — 動支單系統 v1.8.1</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -258,6 +258,25 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 .purpose-tab { padding:7px 18px; border:none; background:transparent; font-size:13px;
                cursor:pointer; color:#78909c; border-bottom:2px solid transparent; margin-bottom:-2px; }
 .purpose-tab.active { color:#1565c0; border-bottom-color:#1565c0; font-weight:600; }
+
+/* ── Budget year accordion ── */
+.byr-block { border:1px solid #dde3ef; border-radius:8px; margin-bottom:8px; overflow:hidden; }
+.byr-header {
+  display:flex; align-items:center; gap:10px; padding:11px 16px;
+  background:#263545; color:#fff; cursor:pointer; user-select:none;
+}
+.byr-header:hover { background:#2e4057; }
+.byr-title { font-size:14px; font-weight:600; flex:1; }
+.byr-summary { font-size:11px; color:#90a4ae; }
+.byr-arrow { font-size:11px; transition:transform .2s; }
+.byr-header.open .byr-arrow { transform:rotate(180deg); }
+.byr-body { display:none; padding:16px; background:#fff; }
+.byr-body.open { display:block; }
+.byr-add {
+  width:100%; padding:10px; background:#fff; border:2px dashed #b0bec5;
+  border-radius:8px; font-size:13px; color:#546e7a; cursor:pointer; margin-top:4px;
+}
+.byr-add:hover { background:#e8f5e9; border-color:#388e3c; color:#2e7d32; }
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 </head>
@@ -284,7 +303,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v1.8.0</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v1.8.1</span>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
     <button id="logout-btn" onclick="logout()">登出</button>
   </div>
@@ -377,7 +396,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
       </div>
       <div id="rpt-budget-pane" style="display:none; padding-top:12px;">
         <div class="budget-section">
-          <h4>115年預算執行率</h4>
+          <h4 id="budget-chart-title">預算執行率</h4>
           <div id="budget-chart-wrap"><p class="budget-no-data">載入中…</p></div>
         </div>
       </div>
@@ -431,36 +450,10 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         </div>
 
         <h4 style="font-size:13px; color:#546e7a; margin:20px 0 12px; border-top:1px solid #eceff1; padding-top:14px;">
-          115年預算設定（僅用於報表圖表）
+          年度預算設定（僅用於報表圖表）
         </h4>
-        <div class="s-row">
-          <label>1301 延長工時加班費 — 年度預算（元）</label>
-          <input id="set-budget1301" type="number" min="0">
-        </div>
-        <div class="s-row">
-          <label>2807 委託檢驗費 — 公立醫院（元）</label>
-          <input id="set-budget2807-public" type="number" min="0">
-        </div>
-        <div class="s-row">
-          <label>2807 委託檢驗費 — 衛生局（元）</label>
-          <input id="set-budget2807-health" type="number" min="0">
-        </div>
-        <div class="s-row">
-          <label>2807 委託檢驗費 — 醫療門診診所/檢驗所（元）</label>
-          <input id="set-budget2807-clinic" type="number" min="0">
-        </div>
-        <div class="s-row">
-          <label>2807 委託檢驗費 — 開具發票廠商（元）</label>
-          <input id="set-budget2807-invoice" type="number" min="0">
-        </div>
-        <div class="s-row">
-          <label>2807 委託檢驗費 — HPV（元，選填）</label>
-          <input id="set-budget2807-hpv" type="number" min="0" placeholder="0">
-        </div>
-        <div class="s-row">
-          <label>2807 委託檢驗費 — 總額預算（元）</label>
-          <input id="set-budget2807-total" type="number" min="0">
-        </div>
+        <div id="budget-years-wrap"></div>
+        <button class="byr-add" onclick="addBudgetYear()">＋ 新增年度預算</button>
 
         <div class="toolbar" style="margin-top:16px;">
           <button class="btn btn-blue" onclick="saveSettings()">💾 儲存設定</button>
@@ -493,6 +486,16 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 let PASS    = '';
 let subjects = null;  /* current subjects object */
 let modalCb  = null;  /* modal callback */
+
+const BUDGET_YEAR_FIELDS = [
+  { key:'b1301',        label:'1301 延長工時加班費',              def:140000 },
+  { key:'b2807_public', label:'2807 委託檢驗費 — 公立醫院',       def:60000  },
+  { key:'b2807_health', label:'2807 委託檢驗費 — 衛生局',         def:210635 },
+  { key:'b2807_clinic', label:'2807 委託檢驗費 — 醫療門診診所/檢驗所', def:137135 },
+  { key:'b2807_invoice',label:'2807 委託檢驗費 — 開具發票廠商',   def:2600   },
+  { key:'b2807_hpv',   label:'2807 委託檢驗費 — HPV（選填）',     def:0      },
+  { key:'b2807_total', label:'2807 委託檢驗費 — 總額預算',        def:410370 },
+];
 
 /* ════════════════════
    LOGIN / LOGOUT
@@ -930,33 +933,43 @@ function exportReportCSV() {
 }
 
 function renderBudgetChart() {
-  const s = subjects?.settings || {};
+  const s   = subjects?.settings || {};
+  const rocYear = String(new Date().getFullYear() - 1911);
+  const yr  = s.budgets?.[rocYear] || s.budgets?.['115'] || {};
+  /* fall back to old flat keys for backward compat */
+  const b1301        = yr.b1301        ?? s.budget1301          ?? 140000;
+  const b2807_public = yr.b2807_public ?? s.budget2807_public   ?? 60000;
+  const b2807_health = yr.b2807_health ?? s.budget2807_health   ?? 210635;
+  const b2807_clinic = yr.b2807_clinic ?? s.budget2807_clinic   ?? 137135;
+  const b2807_invoice= yr.b2807_invoice?? s.budget2807_invoice  ?? 2600;
+  const b2807_hpv    = yr.b2807_hpv    ?? s.budget2807_hpv      ?? 0;
+  const total2807Budget = yr.b2807_total ?? s.budget2807_total ?? 410370;
   const active = _rptRecords.filter(r => !r.voided);
-  const wrap = document.getElementById('budget-chart-wrap');
-  if (!wrap) return;
-
-  const total2807Budget = s.budget2807_total ?? 410370;
   const total2807Spent  = active.filter(r => r.purposeCode === '2807')
                                 .reduce((sum, r) => sum + (Number(r.total)||0), 0);
 
+  const titleEl = document.getElementById('budget-chart-title');
+  if (titleEl) titleEl.textContent = rocYear + '年預算執行率';
+
+  const wrap = document.getElementById('budget-chart-wrap');
+  if (!wrap) return;
+
   const items = [
     { label: '1301 延長工時加班費',          code: '1301', acctType: null,
-      budget: s.budget1301 ?? 140000 },
-    /* ── 2807 總額 ── */
+      budget: b1301 },
     { label: '2807 委託檢驗費　【總額】',    code: '_2807total', acctType: null,
       budget: total2807Budget, spent: total2807Spent, isTotal: true },
-    /* ── 2807 分項 ── */
     { label: '　↳ 公立醫院',                code: '2807', acctType: '公立醫院',
-      budget: s.budget2807_public  ?? 60000 },
+      budget: b2807_public },
     { label: '　↳ 衛生局',                  code: '2807', acctType: '衛生局',
-      budget: s.budget2807_health  ?? 210635 },
+      budget: b2807_health },
     { label: '　↳ 醫療門診診所/檢驗所',     code: '2807', acctType: '醫療門診診所/檢驗所',
-      budget: s.budget2807_clinic  ?? 137135 },
+      budget: b2807_clinic },
     { label: '　↳ 開具發票廠商',            code: '2807', acctType: '開具發票廠商',
-      budget: s.budget2807_invoice ?? 2600 },
-    ...(s.budget2807_hpv > 0 ? [
+      budget: b2807_invoice },
+    ...(b2807_hpv > 0 ? [
       { label: '　↳ HPV',                   code: '2807', acctType: 'HPV',
-        budget: s.budget2807_hpv }
+        budget: b2807_hpv }
     ] : []),
   ];
 
@@ -1174,6 +1187,87 @@ function exportSel(sid, sheetTitle) {
 }
 
 /* ════════════════════
+   BUDGET YEAR ACCORDION
+   ════════════════════ */
+function renderBudgetYears() {
+  const wrap = document.getElementById('budget-years-wrap');
+  if (!wrap || !subjects) return;
+  if (!subjects.settings.budgets) subjects.settings.budgets = {};
+  const budgets = subjects.settings.budgets;
+  const years = Object.keys(budgets).sort((a,b) => Number(b)-Number(a));
+  wrap.innerHTML = years.map(yr => {
+    const yd = budgets[yr];
+    const tot = yd.b2807_total || 0;
+    return `<div class="byr-block" id="byr-${yr}">
+      <div class="byr-header" id="byr-hdr-${yr}" onclick="toggleBudgetYear('${yr}')">
+        <span class="byr-title">${yr}年 預算設定</span>
+        <span class="byr-summary">2807總額 $${fmtN(tot)}</span>
+        <span class="byr-arrow">▼</span>
+      </div>
+      <div class="byr-body" id="byr-body-${yr}">
+        ${BUDGET_YEAR_FIELDS.map(f => `
+          <div class="s-row">
+            <label>${esc(f.label)}（元）</label>
+            <input type="number" min="0" id="byr-${yr}-${f.key}"
+                   value="${yd[f.key] ?? f.def}"
+                   oninput="onByrInput('${yr}','${f.key}',this.value)">
+          </div>`).join('')}
+        <div style="margin-top:12px; text-align:right;">
+          <button class="btn btn-red" style="font-size:12px; padding:5px 12px;"
+            onclick="removeBudgetYear('${yr}')">✕ 刪除此年度</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleBudgetYear(yr) {
+  const hdr  = document.getElementById('byr-hdr-'  + yr);
+  const body = document.getElementById('byr-body-' + yr);
+  if (!hdr || !body) return;
+  const open = body.classList.toggle('open');
+  hdr.classList.toggle('open', open);
+}
+
+function addBudgetYear() {
+  const yr = prompt('請輸入年度（民國年，例如 116）');
+  if (!yr) return;
+  if (!/^\d{3}$/.test(yr.trim())) { alert('請輸入3位數民國年（例如 116）'); return; }
+  const y = yr.trim();
+  if (!subjects.settings.budgets) subjects.settings.budgets = {};
+  if (subjects.settings.budgets[y]) { alert(`${y}年已存在，請直接展開編輯`); return; }
+  const def = {};
+  BUDGET_YEAR_FIELDS.forEach(f => def[f.key] = f.def);
+  subjects.settings.budgets[y] = def;
+  renderBudgetYears();
+  setTimeout(() => toggleBudgetYear(y), 30);
+  setMsg('set-msg', `已新增 ${y}年，請記得儲存設定`, false);
+}
+
+function removeBudgetYear(yr) {
+  if (!confirm(`確定刪除 ${yr}年 預算設定？`)) return;
+  delete subjects.settings.budgets[yr];
+  renderBudgetYears();
+  setMsg('set-msg', `已刪除 ${yr}年，請記得儲存設定`, false);
+}
+
+function onByrInput(yr, key, val) {
+  if (!subjects.settings.budgets?.[yr]) return;
+  subjects.settings.budgets[yr][key] = parseInt(val) || 0;
+}
+
+function syncBudgetYearInputs() {
+  /* 強制同步 DOM → subjects（防止 oninput 漏更新的情況） */
+  const budgets = subjects.settings.budgets || {};
+  Object.keys(budgets).forEach(yr => {
+    BUDGET_YEAR_FIELDS.forEach(f => {
+      const el = document.getElementById(`byr-${yr}-${f.key}`);
+      if (el) budgets[yr][f.key] = parseInt(el.value) || 0;
+    });
+  });
+}
+
+/* ════════════════════
    SETTINGS
    ════════════════════ */
 function fillSettings() {
@@ -1183,13 +1277,29 @@ function fillSettings() {
   document.getElementById('set-nhi-9a').value    = subjects.settings?.nhiThreshold9A  ?? 20000;
   document.getElementById('set-tax-9a').value    = subjects.settings?.taxThreshold9A  ?? 20010;
   document.getElementById('set-part50').value    = subjects.settings?.part50Threshold ?? 29500;
-  document.getElementById('set-budget1301').value          = subjects.settings?.budget1301          ?? 140000;
-  document.getElementById('set-budget2807-public').value   = subjects.settings?.budget2807_public   ?? 60000;
-  document.getElementById('set-budget2807-health').value   = subjects.settings?.budget2807_health   ?? 210635;
-  document.getElementById('set-budget2807-clinic').value   = subjects.settings?.budget2807_clinic   ?? 137135;
-  document.getElementById('set-budget2807-invoice').value  = subjects.settings?.budget2807_invoice  ?? 2600;
-  document.getElementById('set-budget2807-hpv').value      = subjects.settings?.budget2807_hpv      ?? 0;
-  document.getElementById('set-budget2807-total').value    = subjects.settings?.budget2807_total    ?? 410370;
+
+  /* ── 年度預算：若舊版扁平鍵存在，遷移至 budgets['115'] ── */
+  const s = subjects.settings || {};
+  if (!s.budgets) {
+    s.budgets = {};
+    subjects.settings.budgets = s.budgets;
+  }
+  if (!s.budgets['115'] && (s.budget1301 !== undefined || s.budget2807_total !== undefined)) {
+    s.budgets['115'] = {
+      b1301:        s.budget1301          ?? 140000,
+      b2807_public: s.budget2807_public   ?? 60000,
+      b2807_health: s.budget2807_health   ?? 210635,
+      b2807_clinic: s.budget2807_clinic   ?? 137135,
+      b2807_invoice:s.budget2807_invoice  ?? 2600,
+      b2807_hpv:    s.budget2807_hpv      ?? 0,
+      b2807_total:  s.budget2807_total    ?? 410370,
+    };
+  }
+  if (!s.budgets['115']) {
+    s.budgets['115'] = {};
+    BUDGET_YEAR_FIELDS.forEach(f => { s.budgets['115'][f.key] = f.def; });
+  }
+  renderBudgetYears();
 }
 
 async function saveSettings() {
@@ -1200,13 +1310,19 @@ async function saveSettings() {
   subjects.settings.nhiThreshold9A  = parseInt(document.getElementById('set-nhi-9a').value)    || 20000;
   subjects.settings.taxThreshold9A  = parseInt(document.getElementById('set-tax-9a').value)    || 20010;
   subjects.settings.part50Threshold = parseInt(document.getElementById('set-part50').value)    || 29500;
-  subjects.settings.budget1301          = parseInt(document.getElementById('set-budget1301').value)          || 140000;
-  subjects.settings.budget2807_public   = parseInt(document.getElementById('set-budget2807-public').value)   || 60000;
-  subjects.settings.budget2807_health   = parseInt(document.getElementById('set-budget2807-health').value)   || 210635;
-  subjects.settings.budget2807_clinic   = parseInt(document.getElementById('set-budget2807-clinic').value)   || 137135;
-  subjects.settings.budget2807_invoice  = parseInt(document.getElementById('set-budget2807-invoice').value)  || 2600;
-  subjects.settings.budget2807_hpv      = parseInt(document.getElementById('set-budget2807-hpv').value)      || 0;
-  subjects.settings.budget2807_total    = parseInt(document.getElementById('set-budget2807-total').value)    || 410370;
+  /* 同步所有年度欄位至 subjects.settings.budgets */
+  syncBudgetYearInputs();
+  /* backward-compat: 寫回 115年扁平鍵供舊版 index.html 讀取 */
+  const y115 = subjects.settings.budgets?.['115'];
+  if (y115) {
+    subjects.settings.budget1301          = y115.b1301        ?? 140000;
+    subjects.settings.budget2807_public   = y115.b2807_public ?? 60000;
+    subjects.settings.budget2807_health   = y115.b2807_health ?? 210635;
+    subjects.settings.budget2807_clinic   = y115.b2807_clinic ?? 137135;
+    subjects.settings.budget2807_invoice  = y115.b2807_invoice?? 2600;
+    subjects.settings.budget2807_hpv      = y115.b2807_hpv    ?? 0;
+    subjects.settings.budget2807_total    = y115.b2807_total  ?? 410370;
+  }
   setMsg('set-msg', '⟳ 儲存中…', false);
   try {
     const r = await fetch('/api/subjects', {

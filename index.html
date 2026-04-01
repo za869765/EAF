@@ -558,7 +558,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.8.0</div>
+    <div id="sb-version">v1.8.1</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2132,19 +2132,23 @@ function updateBudgetInfo() {
   const row = document.getElementById('row-budget-info');
   if (!row) return;
 
-  const s = CFG.settings || {};
+  const s   = CFG.settings || {};
+  const rocYear = String(new Date().getFullYear() - 1911);
+  const yr  = s.budgets?.[rocYear] || s.budgets?.['115'] || {};
+  /* values: new year-based structure → fallback to old flat keys → hardcoded defaults */
+  const _b = (yKey, flatKey, def) => yr[yKey] ?? s[flatKey] ?? def;
   const BUDGET_CFG = {
-    '1301': { label:'延長工時加班費', budgetKey: () => s.budget1301 ?? 140000,
-              match: r => r.purposeCode === '1301' },
+    '1301': { label:'延長工時加班費',
+      budgetKey: () => _b('b1301','budget1301',140000),
+      match: r => r.purposeCode === '1301' },
     '2807': {
       label: () => '委託檢驗費（' + acctType + '）',
       budgetKey: () => ({
-        '公立醫院':          s.budget2807_public  ?? 60000,
-        '衛生局':            s.budget2807_health  ?? 210635,
-        '醫療門診診所/檢驗所': s.budget2807_clinic  ?? 137135,
-        '開具發票廠商':      s.budget2807_invoice ?? 2600,
-        'HPV':               s.budget2807_hpv     ?? null,
-        /* 財/社團法人、個人 → null，不顯示（歸為其他） */
+        '公立醫院':           _b('b2807_public', 'budget2807_public',  60000),
+        '衛生局':             _b('b2807_health', 'budget2807_health',  210635),
+        '醫療門診診所/檢驗所': _b('b2807_clinic', 'budget2807_clinic',  137135),
+        '開具發票廠商':       _b('b2807_invoice','budget2807_invoice', 2600),
+        'HPV':                _b('b2807_hpv',    'budget2807_hpv',     null),
       })[acctType] ?? null,
       match: r => r.purposeCode === '2807' && r.acctType === acctType,
     },
@@ -2171,7 +2175,7 @@ function updateBudgetInfo() {
     <div style="background:#eef3ff; border:1px solid #c5d5f5; border-radius:5px;
                 padding:4px 8px; font-size:11px; color:#333; width:100%;">
       <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
-        <span style="font-weight:600;">115年預算　${label}</span>
+        <span style="font-weight:600;">${rocYear}年預算　${label}</span>
         <span style="color:${color}; font-weight:700;">${rawPct.toFixed(1)}%</span>
       </div>
       <div style="background:#d0d8ee; border-radius:3px; height:6px; margin-bottom:4px; overflow:hidden;">
