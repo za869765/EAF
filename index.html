@@ -599,7 +599,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.3.0</div>
+    <div id="sb-version">v2.3.1</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2435,8 +2435,13 @@ function updateBudgetInfo() {
   if (!row) return;
 
   const s   = CFG.settings || {};
-  const rocYear = String(new Date().getFullYear() - 1911);
-  const yr  = s.budgets?.[rocYear] || s.budgets?.['115'] || {};
+  const sysRocYear  = String(new Date().getFullYear() - 1911);
+  /* derive budget year from apply date; fall back to current system year */
+  const applyDateVal = document.getElementById('apply-date-input').value;
+  const budgetYear   = applyDateVal
+    ? String(new Date(applyDateVal + 'T00:00:00').getFullYear() - 1911)
+    : sysRocYear;
+  const yr  = s.budgets?.[budgetYear] || s.budgets?.[sysRocYear] || s.budgets?.['115'] || {};
   /* values: new year-based structure → fallback to old flat keys → hardcoded defaults */
   const _b = (yKey, flatKey, def) => yr[yKey] ?? s[flatKey] ?? def;
   const BUDGET_CFG = {
@@ -2463,8 +2468,11 @@ function updateBudgetInfo() {
   const label  = typeof cfg.label     === 'function' ? cfg.label()    : cfg.label;
   if (budget === null || budget === undefined) { row.style.display = 'none'; return; }
 
+  /* only count records whose apply date falls in the same ROC year */
+  const adGregorian = String(Number(budgetYear) + 1911);
   const spent = cachedRecords
-    .filter(r => !r.voided && cfg.match(r))
+    .filter(r => !r.voided && cfg.match(r) &&
+                 (r.applyDateRaw || '').startsWith(adGregorian + '-'))
     .reduce((sum, r) => sum + (Number(r.total) || 0), 0);
 
   const rawPct  = budget > 0 ? spent / budget * 100 : 0;
@@ -2477,7 +2485,7 @@ function updateBudgetInfo() {
     <div style="background:#eef3ff; border:1px solid #c5d5f5; border-radius:5px;
                 padding:4px 8px; font-size:11px; color:#333; width:100%;">
       <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
-        <span style="font-weight:600;">${rocYear}年預算　${label}</span>
+        <span style="font-weight:600;">${budgetYear}年預算　${label}</span>
         <span style="color:${color}; font-weight:700;">${rawPct.toFixed(1)}%</span>
       </div>
       <div style="background:#d0d8ee; border-radius:3px; height:6px; margin-bottom:4px; overflow:hidden;">
