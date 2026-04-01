@@ -539,7 +539,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.7</div>
+    <div id="sb-version">v1.7.8</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1031,6 +1031,16 @@ function onBpChange() {
   document.getElementById('lect-yes').classList.remove('active');
   document.getElementById('lect-no').classList.add('active');
   updateCashierNote();
+  /* BP 切換時：510601 + 2706 → 填入匯費無收據；離開時清除 */
+  if (!_suppressAutoFill) {
+    const purposeCode = document.getElementById('sel-purpose').value;
+    const notesEl = document.getElementById('notes');
+    if (bpCode === '510601' && purposeCode === '2706') {
+      if (!notesEl.value.trim()) notesEl.value = '匯費無收據';
+    } else if (bpCode !== '510601' && notesEl.value.trim() === '匯費無收據') {
+      notesEl.value = '';
+    }
+  }
 }
 
 /* 人員類別：用途別 1301/1501 → 固定顯示「兼任人員」 */
@@ -1212,6 +1222,11 @@ function onPurposeChange() {
       calcRow(0);
     }
     calcTotal();
+    /* BP 510601 + 2706：其他說明事項自動填入「匯費無收據」 */
+    if (document.getElementById('sel-bp').value === '510601') {
+      const notesEl = document.getElementById('notes');
+      if (!notesEl.value.trim()) notesEl.value = '匯費無收據';
+    }
   }
 
   /* 離開 2706：若第一列仍是自動帶入的預設值則清除（使用者已修改過的不影響） */
@@ -1222,6 +1237,9 @@ function onPurposeChange() {
     const priceMatch = priceEl && priceEl.value.trim() === '30';
     if (nameMatch)  nameEl.value  = '';
     if (priceMatch) priceEl.value = '';
+    /* 同步清除自動填入的「匯費無收據」 */
+    const notesEl = document.getElementById('notes');
+    if (notesEl.value.trim() === '匯費無收據') notesEl.value = '';
     if (formType === 'purchase') {
       const qtyEl  = qi(0, 'qty');
       const unitEl = qi(0, 'unit');
