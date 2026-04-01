@@ -560,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.1.2</div>
+    <div id="sb-version">v2.1.3</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1472,10 +1472,13 @@ function validateExpenseAmt(el, i) {
   calcTotal();
 }
 
-/* ── 同品正負合計自動寫入其他說明事項 ── */
-let _autoFoldNote = '';
+/* ── 同品正負合計，存檔時寫入其他說明事項（可還原） ── */
+let _foldNoteApplied = false;
+let _prevNotesBeforeFold = '';
 
-function computeFoldNote() {
+function applyFoldNoteOnSave() {
+  const notesEl = document.getElementById('notes');
+  if (!notesEl || _foldNoteApplied) return;   /* 已套用則不重複 */
   const isPurchase = formType === 'purchase';
   const groups = {};
   for (let i = 0; i < rowCount; i++) {
@@ -1495,20 +1498,18 @@ function computeFoldNote() {
       parts.push(name + ' ' + netStr);
     }
   }
-  return parts.join('；');
+  if (!parts.length) return;
+  _prevNotesBeforeFold = notesEl.value;
+  _foldNoteApplied = true;
+  const foldNote = parts.join('；');
+  const cur = notesEl.value.trim();
+  notesEl.value = cur ? cur + '\n' + foldNote : foldNote;
 }
 
-function updateFoldedNote() {
-  const notesEl = document.getElementById('notes');
-  if (!notesEl) return;
-  const newNote = computeFoldNote();
-  if (newNote === _autoFoldNote) return;
-  let current = notesEl.value;
-  if (_autoFoldNote) {
-    current = current.replace(_autoFoldNote, '').replace(/^[\n\r]+/, '').trim();
-  }
-  _autoFoldNote = newNote;
-  notesEl.value = newNote ? (current ? newNote + '\n' + current : newNote) : current;
+function revertFoldNote() {
+  if (!_foldNoteApplied) return;
+  document.getElementById('notes').value = _prevNotesBeforeFold;
+  _foldNoteApplied = false;
 }
 
 function calcTotal() {
@@ -1537,9 +1538,6 @@ function calcTotal() {
 
   /* 免核章列：目前無內容，永不顯示 */
   document.getElementById('exempt-wrap').style.display = 'none';
-
-  /* 同品正負合計自動說明 */
-  updateFoldedNote();
 }
 
 /* ══════════════════════
@@ -1677,9 +1675,9 @@ function fillForm(rec) {
     }
   }
   calcTotal();
-  /* 載入既有紀錄：notes 已含舊版自動說明，同步 _autoFoldNote 避免重複寫入 */
+  /* 載入既有紀錄：還原 notes（calcTotal 不再即時修改 notes） */
   document.getElementById('notes').value = rec.notes || '';
-  _autoFoldNote = computeFoldNote();
+  _foldNoteApplied = false;
 }
 
 /* ══════════════════════
@@ -2068,6 +2066,8 @@ function confirmSave() {
     return;
   }
 
+  /* 無扣繳情況：套用同品折讓說明再開存檔確認 */
+  applyFoldNoteOnSave();
   openSaveConfirmModal();
 }
 
@@ -2092,19 +2092,25 @@ function revertDeductRows() {
 }
 
 function cancelDeductReview() {
-  revertDeductRows();
+  revertDeductRows();        /* 還原扣繳列與 notes */
+  _foldNoteApplied = false;  /* 此時 fold note 尚未套用，重設旗標 */
   document.getElementById('deduct-review-modal').style.display = 'none';
 }
 
 function confirmDeductReview() {
   document.getElementById('deduct-review-modal').style.display = 'none';
+  applyFoldNoteOnSave();   /* 扣繳確認後再套用同品折讓說明 */
   openSaveConfirmModal();
 }
 
 function closeSaveConfirm() {
   document.getElementById('save-confirm-modal').style.display = 'none';
-  /* 若有插入扣繳列尚未真正儲存，一律還原，避免重複執行 */
-  revertDeductRows();
+  if (_savedDeductSlots.length) {
+    revertDeductRows();    /* 還原扣繳列與 notes（原始值），同時撤銷 fold note */
+    _foldNoteApplied = false;
+  } else {
+    revertFoldNote();      /* 無扣繳：單獨還原 fold note */
+  }
 }
 function doSave() {
   closeSaveConfirm();
@@ -2229,7 +2235,7 @@ function newForm(type) {
   rowCount = 10;
   isLecturer = '';
   income50Type = '';
-  _autoFoldNote = '';
+  _foldNoteApplied = false;
   document.getElementById('voucher-no').value = '';
   ['purpose-desc','notes','delivery-date']
     .forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
