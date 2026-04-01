@@ -569,7 +569,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.1.7</div>
+    <div id="sb-version">v2.1.8</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1578,6 +1578,21 @@ function updateRocDate() {
   if (!v) { el.textContent = ''; return; }
   const d = new Date(v+'T00:00:00');
   el.textContent = (d.getFullYear()-1911)+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
+  /* 使用者手動選擇時：距今超過 6 個月則彈窗提醒（不阻擋） */
+  if (!_suppressAutoFill) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const limit = new Date(today);
+    limit.setMonth(limit.getMonth() - 6);   /* 六個月前 */
+    const limitF = new Date(today);
+    limitF.setMonth(limitF.getMonth() + 6); /* 六個月後 */
+    if (d < limit || d > limitF) {
+      const rocY = d.getFullYear()-1911, rocM = d.getMonth()+1, rocD = d.getDate();
+      showAlert(
+        `所選申請日期（${rocY}年${rocM}月${rocD}日）<br>距今超過 <strong>6 個月</strong>，請再次確認是否正確。`,
+        '⚠️'
+      );
+    }
+  }
   /* 請購單且未鎖定：申請日期改變時自動更新交貨日期（+5個工作日） */
   if (formType === 'purchase' &&
       !document.getElementById('form-page').classList.contains('locked')) {
