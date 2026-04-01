@@ -530,7 +530,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.3</div>
+    <div id="sb-version">v1.7.4</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1717,7 +1717,7 @@ function calcDeductions(total) {
   const part50Threshold = CFG.settings?.part50Threshold ?? 29500;
 
   const is9A     = (purposeCode === '2802' || purposeCode === '2807') && acctType === '診所/檢驗所';
-  const is50part = INCOME_50_PURPOSES.includes(purposeCode) && income50Type === '兼職';
+  const is50part = income50Type === '兼職';   /* 所有顯示列計50所得且選兼職的情況 */
 
   if (is9A) {
     if (total < nhiThreshold9A) return null;
