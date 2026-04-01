@@ -135,6 +135,23 @@ body {
 }
 #toast.show { opacity: 1; }
 
+/* ── 複製成功動畫彈窗 ── */
+@keyframes cpPopIn  { 0%{opacity:0;transform:translate(-50%,-50%) scale(.6)} 60%{transform:translate(-50%,-50%) scale(1.08)} 100%{opacity:1;transform:translate(-50%,-50%) scale(1)} }
+@keyframes cpPopOut { 0%{opacity:1;transform:translate(-50%,-50%) scale(1)} 100%{opacity:0;transform:translate(-50%,-50%) scale(.8)} }
+#copy-success-popup {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  background: #fff; border-radius: 18px;
+  padding: 32px 48px; text-align: center;
+  box-shadow: 0 16px 56px rgba(0,0,0,.28);
+  z-index: 10000; pointer-events: none; display: none;
+}
+#copy-success-popup.in  { display:block; animation: cpPopIn  .3s ease forwards; }
+#copy-success-popup.out { display:block; animation: cpPopOut .25s ease forwards; }
+#copy-success-popup .cp-icon  { font-size: 48px; line-height: 1; margin-bottom: 10px; }
+#copy-success-popup .cp-label { font-size: 13px; color: #777; margin-bottom: 6px; }
+#copy-success-popup .cp-no    { font-size: 26px; font-weight: bold; color: #1565c0; letter-spacing: 2px; }
+
 /* ══════════════════════════════════
    FORM PAGE  (A4)
    ══════════════════════════════════ */
@@ -478,7 +495,8 @@ body {
   #app  { display: block; }
   #sidebar, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns,
   #row-lecturer, #row-acct-type, #row-income50-type,
-  #row-budget-info, #exempt-wrap, #copy-no-btn { display: none !important; }
+  #row-budget-info, #exempt-wrap, #copy-no-btn,
+  .date-picker-btn { display: none !important; }
   /* 隱藏未選擇的佔位文字 */
   #main-acct-lbl[data-ph="1"] { visibility: hidden; }
   .fsel[data-ph="1"] { visibility: hidden; }
@@ -566,6 +584,11 @@ body {
 </head>
 <body>
 <div id="toast"></div>
+<div id="copy-success-popup">
+  <div class="cp-icon">✅</div>
+  <div class="cp-label">憑證編號已複製</div>
+  <div class="cp-no"  id="cp-no-text"></div>
+</div>
 <div id="app">
 
 <!-- ══════════════════════ SIDEBAR ══════════════════════ -->
@@ -575,7 +598,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.2.3</div>
+    <div id="sb-version">v2.2.4</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -631,7 +654,7 @@ body {
           <input class="fi" id="voucher-no" type="text"
                  style="text-align:center; font-size:13px; font-weight:bold; margin-top:1.5mm;">
           <button id="copy-no-btn"
-                  onclick="const v=document.getElementById('voucher-no').value; navigator.clipboard?.writeText(v).then(()=>showToast('✓ 已複製：'+v)).catch(()=>{document.getElementById('voucher-no').select();showToast('請按 Ctrl+C 複製');})"
+                  onclick="const v=document.getElementById('voucher-no').value; navigator.clipboard?.writeText(v).then(()=>showCopyPopup(v)).catch(()=>{document.getElementById('voucher-no').select();showToast('請按 Ctrl+C 複製');})"
                   title="複製憑證編號"
                   style="display:none; margin-top:3px; padding:1px 7px; font-size:11px;
                          cursor:pointer; border:1px solid #aaa; border-radius:4px;
@@ -694,7 +717,7 @@ body {
                 <span class="cell-lbl" style="display:block; margin-bottom:1mm;">交貨日期</span>
                 <div style="display:flex; align-items:center; gap:2px;">
                   <span id="delivery-date-text" style="font-size:11.5px;"></span>
-                  <button type="button" onclick="document.getElementById('delivery-date').showPicker?document.getElementById('delivery-date').showPicker():document.getElementById('delivery-date').click()"
+                  <button type="button" class="date-picker-btn" onclick="document.getElementById('delivery-date').showPicker?document.getElementById('delivery-date').showPicker():document.getElementById('delivery-date').click()"
                           style="font-size:10px; padding:1px 4px; cursor:pointer; border:1px solid #aaa; border-radius:3px; background:#f5f5f5;">📅</button>
                   <input type="date" id="delivery-date"
                          style="width:0; height:0; opacity:0; position:absolute; pointer-events:none;"
@@ -757,7 +780,7 @@ body {
               <span>申請日期</span>
               <div style="display:flex; align-items:center; gap:2px;">
                 <span id="roc-date-text" style="font-size:11.5px;"></span>
-                <button type="button" onclick="document.getElementById('apply-date-input').showPicker?document.getElementById('apply-date-input').showPicker():document.getElementById('apply-date-input').click()"
+                <button type="button" class="date-picker-btn" onclick="document.getElementById('apply-date-input').showPicker?document.getElementById('apply-date-input').showPicker():document.getElementById('apply-date-input').click()"
                         style="font-size:10px; padding:1px 4px; cursor:pointer; border:1px solid #aaa; border-radius:3px; background:#f5f5f5;">📅</button>
                 <input type="date" id="apply-date-input" class="fi"
                        style="width:0; height:0; opacity:0; position:absolute; pointer-events:none;"
@@ -2491,6 +2514,18 @@ function showToast(msg) {
   el.textContent = msg; el.classList.add('show');
   if (_toastTimer) clearTimeout(_toastTimer);
   _toastTimer = setTimeout(()=>el.classList.remove('show'), 2800);
+}
+let _cpTimer = null;
+function showCopyPopup(no) {
+  const pop = document.getElementById('copy-success-popup');
+  document.getElementById('cp-no-text').textContent = no;
+  if (_cpTimer) { clearTimeout(_cpTimer); pop.className = ''; }
+  void pop.offsetWidth;   /* reflow 確保動畫重跑 */
+  pop.classList.add('in');
+  _cpTimer = setTimeout(() => {
+    pop.classList.replace('in','out');
+    _cpTimer = setTimeout(() => { pop.className = ''; pop.style.display='none'; }, 280);
+  }, 1500);
 }
 </script>
 
