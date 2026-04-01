@@ -530,7 +530,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.0</div>
+    <div id="sb-version">v1.7.1</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1104,16 +1104,7 @@ function updateCashierNote() {
   document.getElementById('sg-custody')
     .classList.toggle('slash', isExp || purposeCode === '2807');
 
-  /* 出納單位格斜線（1301/21020303 明確排除：只顯示附註，不加斜線） */
-  const noCashierSlash = purposeCode === '1301' || bpCode === '21020303';
-  const cashierSlash = !noCashierSlash && (
-    CASHIER_SLASH_BP.includes(bpCode) ||
-    (isExp && purposeCode === '1140404') ||
-    CASHIER_SLASH_PURPOSE.includes(purposeCode) ||
-    (ACCT_TYPE_CONFIG[purposeCode] && ACCT_SLASH_TYPES.has(acctType))
-  );
-  document.getElementById('sg-cashier').classList.toggle('slash', cashierSlash);
-
+  /* ── 先計算附記文字（note 決定後才套用斜線，有附記一律不劃斜線） ── */
   let note = '';
   if (ACCT_TYPE_CONFIG[purposeCode] && acctType) {
     note = ACCT_SLASH_TYPES.has(acctType) ? '' : (ACCT_NOTE_MAP[acctType] || '');
@@ -1121,13 +1112,23 @@ function updateCashierNote() {
     note = '列計50所得+個人補充保費';
   } else if (purposeCode === '2305') {
     note = '列計92所得';
-  } else if (['2713','7103'].includes(purposeCode)) {
+  } else if (INCOME_50_PURPOSES.includes(purposeCode)) {
     note = '列計50所得';
   } else if (LECTURER_BP_CODES.includes(bpCode) && isLecturer) {
     note = '列入薪資所得';
   } else if (purposeCode === '1301' || bpCode === '21020303') {
     note = '當月未逾46小時得免列計所得';
   }
+
+  /* ── 出納單位格斜線：有所得附記時一律不劃斜線 ── */
+  const noCashierSlash = purposeCode === '1301' || bpCode === '21020303' || !!note;
+  const cashierSlash = !noCashierSlash && (
+    CASHIER_SLASH_BP.includes(bpCode) ||
+    (isExp && purposeCode === '1140404') ||
+    CASHIER_SLASH_PURPOSE.includes(purposeCode) ||
+    (ACCT_TYPE_CONFIG[purposeCode] && ACCT_SLASH_TYPES.has(acctType))
+  );
+  document.getElementById('sg-cashier').classList.toggle('slash', cashierSlash);
   const el = document.getElementById('cashier-note');
   el.textContent   = note;
   el.style.display = note ? 'block' : 'none';
