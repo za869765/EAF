@@ -560,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.1.0</div>
+    <div id="sb-version">v2.1.1</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1848,6 +1848,12 @@ function validateForm() {
     for (let i = 0; i < rowCount; i++)
       total += Math.round((parseFloat(qv(i,'qty'))||0)*(parseFloat(qv(i,'price'))||0));
     if (Math.max(0, total) === 0) errors.push('合計金額不得為 $0');
+
+    /* 4. 交貨日期不可早於申請日期（請購單專屬） */
+    const applyRaw    = document.getElementById('apply-date-input').value;
+    const deliveryRaw = document.getElementById('delivery-date').value;
+    if (applyRaw && deliveryRaw && deliveryRaw < applyRaw)
+      errors.push('交貨日期不可早於申請日期');
 
   } else {
     /* 2. 動支單：動支說明與金額必須同時有值或同時為空 */
