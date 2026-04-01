@@ -560,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.0.0</div>
+    <div id="sb-version">v2.0.1</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -642,8 +642,9 @@ body {
           </div>
           <div class="bp-row" id="row-lecturer" style="display:none;">
             <label>款項用途：</label>
-            <button class="lect-btn" id="lect-yes" onclick="setLecturer(true)">講師費</button>
-            <button class="lect-btn active" id="lect-no" onclick="setLecturer(false)">非講師費</button>
+            <button class="lect-btn" id="lect-yes"   onclick="setLecturer('lecturer')">講師費</button>
+            <button class="lect-btn active" id="lect-no" onclick="setLecturer('')">非講師費</button>
+            <button class="lect-btn" id="lect-bonus" onclick="setLecturer('bonus')">獎勵金</button>
           </div>
           <div class="bp-row" id="row-acct-type" style="display:none;">
             <label>帳戶類別：</label>
@@ -1077,9 +1078,10 @@ function onBpChange() {
   document.getElementById('row-acct-type').style.display = 'none';
   document.getElementById('row-income50-type').style.display = 'none';
   /* 款項用途切換：特定業務計畫才顯示，且重設為非講師費 */
-  if (!_suppressAutoFill) { isLecturer = false; }
+  if (!_suppressAutoFill) { isLecturer = ''; }
   document.getElementById('lect-yes').classList.remove('active');
   document.getElementById('lect-no').classList.add('active');
+  document.getElementById('lect-bonus').classList.remove('active');
   updateLecturerRow();
   updateCashierNote();
   /* BP 切換時：510601 + 2706 → 填入匯費無收據；離開時清除 */
@@ -1109,7 +1111,7 @@ const PURCHASE_ONLY_PURPOSES = ['2401','3106','3201','3298'];
 
 /* 講師費顯示業務計畫代碼清單 */
 const LECTURER_BP_CODES = ['21020311','21020312','21020313','21020321'];
-let isLecturer = false;
+let isLecturer = '';   /* '' = 非講師費, 'lecturer' = 講師費, 'bonus' = 獎勵金 */
 
 /* 款項用途列顯示邏輯：21020321 需 purposeCode=99 才顯示 */
 function updateLecturerRow() {
@@ -1146,8 +1148,9 @@ let _suppressAutoFill = false;   /* 載入已存記錄時抑制自動填入 */
 
 function setLecturer(val) {
   isLecturer = val;
-  document.getElementById('lect-yes').classList.toggle('active',  val);
-  document.getElementById('lect-no').classList.toggle('active',  !val);
+  document.getElementById('lect-yes').classList.toggle('active',   val === 'lecturer');
+  document.getElementById('lect-no').classList.toggle('active',    val === '');
+  document.getElementById('lect-bonus').classList.toggle('active', val === 'bonus');
   updateIncome50Row();
   updateCashierNote();
 }
@@ -1160,7 +1163,7 @@ function updateIncome50Row() {
   const purposeCode = document.getElementById('sel-purpose').value;
   const bpCode      = document.getElementById('sel-bp').value;
   const show = INCOME_50_PURPOSES.includes(purposeCode) ||
-               (LECTURER_BP_CODES.includes(bpCode) && isLecturer) ||
+               (LECTURER_BP_CODES.includes(bpCode) && isLecturer === 'lecturer') ||
                (ACCT_TYPE_CONFIG[purposeCode] && acctType === '個人');
   const rowI50 = document.getElementById('row-income50-type');
   if (show) {
@@ -1233,8 +1236,10 @@ function updateCashierNote() {
     note = '列計92所得';
   } else if (INCOME_50_PURPOSES.includes(purposeCode)) {
     note = '列計50所得';
-  } else if (LECTURER_BP_CODES.includes(bpCode) && isLecturer) {
+  } else if (LECTURER_BP_CODES.includes(bpCode) && isLecturer === 'lecturer') {
     note = '列計50所得';
+  } else if (LECTURER_BP_CODES.includes(bpCode) && isLecturer === 'bonus') {
+    note = '列計50所得+個人補充保費';
   } else if (purposeCode === '1301' || bpCode === '21020303') {
     note = '當月未逾46小時得免列計所得';
   }
@@ -1507,7 +1512,7 @@ function getFormData() {
     personnelCode : PERSONNEL_CODES.includes(document.getElementById('sel-purpose').value) ? '4' : '',
     personnelName : PERSONNEL_CODES.includes(document.getElementById('sel-purpose').value)
                     ? (document.getElementById('personnel-lbl')?.textContent||'兼任人員') : '',
-    lecturerType  : isLecturer ? 'lecturer' : 'non-lecturer',
+    lecturerType  : isLecturer || 'non-lecturer',
     acctType,
     income50Type,
     applyDateRaw: document.getElementById('apply-date-input').value,
@@ -1531,10 +1536,12 @@ function fillForm(rec) {
   onBpChange();
   document.getElementById('sel-purpose').value = rec.purposeCode || '';
   onPurposeChange();
-  /* 還原講師費狀態 */
-  isLecturer = rec.lecturerType === 'lecturer';
-  document.getElementById('lect-yes').classList.toggle('active',  isLecturer);
-  document.getElementById('lect-no').classList.toggle('active',  !isLecturer);
+  /* 還原款項用途狀態 */
+  isLecturer = (rec.lecturerType === 'lecturer' || rec.lecturerType === 'bonus')
+               ? rec.lecturerType : '';
+  document.getElementById('lect-yes').classList.toggle('active',   isLecturer === 'lecturer');
+  document.getElementById('lect-no').classList.toggle('active',    isLecturer === '');
+  document.getElementById('lect-bonus').classList.toggle('active', isLecturer === 'bonus');
   /* 還原帳戶類別狀態 */
   if (rec.acctType && ACCT_TYPE_CONFIG[rec.purposeCode]) {
     setAcctType(rec.acctType);   /* setAcctType 已呼叫 updateIncome50Row */
@@ -2100,7 +2107,7 @@ function copyFromRecord(id) {
 function newForm(type) {
   currentId = null;
   rowCount = 10;
-  isLecturer = false;
+  isLecturer = '';
   income50Type = '';
   document.getElementById('voucher-no').value = '';
   ['purpose-desc','notes'].forEach(id=>document.getElementById(id).value='');
