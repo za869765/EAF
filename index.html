@@ -141,16 +141,17 @@ body {
 #copy-success-popup {
   position: fixed; top: 50%; left: 50%;
   transform: translate(-50%,-50%);
-  background: #fff; border-radius: 18px;
-  padding: 32px 48px; text-align: center;
-  box-shadow: 0 16px 56px rgba(0,0,0,.28);
+  background: #fff; border-radius: 22px;
+  padding: 44px 64px; text-align: center;
+  box-shadow: 0 20px 72px rgba(0,0,0,.32);
   z-index: 10000; pointer-events: none; display: none;
+  min-width: 280px;
 }
-#copy-success-popup.in  { display:block; animation: cpPopIn  .3s ease forwards; }
-#copy-success-popup.out { display:block; animation: cpPopOut .25s ease forwards; }
-#copy-success-popup .cp-icon  { font-size: 48px; line-height: 1; margin-bottom: 10px; }
-#copy-success-popup .cp-label { font-size: 13px; color: #777; margin-bottom: 6px; }
-#copy-success-popup .cp-no    { font-size: 26px; font-weight: bold; color: #1565c0; letter-spacing: 2px; }
+#copy-success-popup.in  { display:block; animation: cpPopIn  .35s cubic-bezier(.175,.885,.32,1.275) forwards; }
+#copy-success-popup.out { display:block; animation: cpPopOut .28s ease forwards; }
+#copy-success-popup .cp-icon  { font-size: 64px; line-height: 1; margin-bottom: 14px; }
+#copy-success-popup .cp-label { font-size: 15px; color: #555; margin-bottom: 10px; letter-spacing: 1px; }
+#copy-success-popup .cp-no    { font-size: 32px; font-weight: bold; color: #1565c0; letter-spacing: 3px; }
 
 /* ══════════════════════════════════
    FORM PAGE  (A4)
@@ -585,9 +586,9 @@ body {
 <body>
 <div id="toast"></div>
 <div id="copy-success-popup">
-  <div class="cp-icon">✅</div>
-  <div class="cp-label">憑證編號已複製</div>
-  <div class="cp-no"  id="cp-no-text"></div>
+  <div class="cp-icon"  id="cp-icon-el">✅</div>
+  <div class="cp-label" id="cp-label-el">憑證編號已複製</div>
+  <div class="cp-no"    id="cp-no-text"></div>
 </div>
 <div id="app">
 
@@ -598,7 +599,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.2.6</div>
+    <div id="sb-version">v2.2.7</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2364,7 +2365,8 @@ function copyFromRecord(id) {
   _foldNoteApplied = false;
   _prevNotesBeforeFold = '';
   closeCopyModal();
-  showToast('✓ 已複製單據內容，確認後按「存檔取號」');
+  showCopyPopup(rec.voucherNo || '（未取號）',
+    { icon: '📋', label: '已複製單據內容', duration: 2500 });
 }
 
 function newForm(type) {
@@ -2530,18 +2532,21 @@ function showToast(msg) {
   _toastTimer = setTimeout(()=>el.classList.remove('show'), 2800);
 }
 let _cpTimer = null;
-function showCopyPopup(no) {
+function showCopyPopup(no, opts = {}) {
   const pop = document.getElementById('copy-success-popup');
-  document.getElementById('cp-no-text').textContent = no;
+  document.getElementById('cp-icon-el').textContent  = opts.icon  || '✅';
+  document.getElementById('cp-label-el').textContent = opts.label || '憑證編號已複製';
+  document.getElementById('cp-no-text').textContent  = no;
+  const duration = opts.duration || 1500;
   if (_cpTimer) clearTimeout(_cpTimer);
-  pop.className    = '';
-  pop.style.display = '';   /* 清除 inline display:none，讓 .in 的 display:block 生效 */
+  pop.className     = '';
+  pop.style.display = '';   /* 清除 inline display:none */
   void pop.offsetWidth;     /* reflow 確保動畫重跑 */
   pop.classList.add('in');
   _cpTimer = setTimeout(() => {
     pop.classList.replace('in','out');
     _cpTimer = setTimeout(() => { pop.className = ''; pop.style.display = 'none'; }, 280);
-  }, 1500);
+  }, duration);
 }
 </script>
 
