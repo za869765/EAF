@@ -560,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.0.9</div>
+    <div id="sb-version">v2.1.0</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1435,6 +1435,7 @@ function closeAlert() {
 
 function validatePrice(el, i) {
   const raw = el.value.trim();
+  if (raw === '-') return;   /* 允許輸入中的負號前綴 */
   if (raw !== '' && isNaN(Number(raw))) {
     showAlert('單價請輸入數字\n（例如：100、-480、1500）', '🔢');
     el.value = ''; calcRow(i); return;
@@ -1444,8 +1445,9 @@ function validatePrice(el, i) {
 
 function validateQty(el, i) {
   const raw = el.value.trim();
+  if (raw === '-') return;   /* 允許輸入中的負號前綴 */
   if (raw !== '' && isNaN(Number(raw))) {
-    showAlert('數量請輸入數字\n（例如：1、2.5）', '🔢');
+    showAlert('數量請輸入數字\n（例如：1、-1、2.5）', '🔢');
     el.value = '';
   }
   calcRow(i);
@@ -1462,8 +1464,9 @@ function calcRow(i) {
 
 function validateExpenseAmt(el, i) {
   const raw = el.value.trim();
+  if (raw === '-') return;   /* 允許輸入中的負號前綴 */
   if (raw !== '' && isNaN(Number(raw))) {
-    showAlert('金額請輸入數字\n（例如：500、1200）', '🔢');
+    showAlert('金額請輸入數字\n（例如：500、-200、1200）', '🔢');
     el.value = '';
   }
   calcTotal();
