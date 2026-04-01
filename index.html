@@ -569,7 +569,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.1.4</div>
+    <div id="sb-version">v2.1.5</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1578,6 +1578,20 @@ function updateRocDate() {
   if (!v) { el.textContent = ''; return; }
   const d = new Date(v+'T00:00:00');
   el.textContent = (d.getFullYear()-1911)+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
+  /* 請購單且未鎖定：申請日期改變時自動更新交貨日期（+5個工作日） */
+  if (formType === 'purchase' &&
+      !document.getElementById('form-page').classList.contains('locked')) {
+    const ddEl = document.getElementById('delivery-date');
+    if (ddEl) {
+      let nd = new Date(v+'T00:00:00'), added = 0;
+      while (added < 5) {
+        nd.setDate(nd.getDate() + 1);
+        if (nd.getDay() !== 0 && nd.getDay() !== 6) added++;
+      }
+      ddEl.value = nd.toISOString().slice(0,10);
+      updateDeliveryDate();
+    }
+  }
 }
 function updateDeliveryDate() {
   const v = document.getElementById('delivery-date').value;
