@@ -522,7 +522,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.6.8</div>
+    <div id="sb-version">v1.6.9</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1032,7 +1032,7 @@ let isLecturer = false;
 const CASHIER_SLASH_BP      = ['21020302','21020319','21020301','21020321'];
 const CASHIER_SLASH_PURPOSE = [
   '2102','2104','2201','2202','2204','2301',
-  '2505','2507','2607','2706','2707','2711',
+  '2401','2505','2507','2607','2706','2707','2711',
   '2810','2901','3106','4302','4501'
 ];
 
@@ -1623,6 +1623,57 @@ function validateForm() {
   return errors;
 }
 
+/* ── 扣繳自動拆分（9A / 50所得） ── */
+let _prevNotes      = '';
+let _prevRow0Price  = '';
+let _deductRowsAdded = 0;
+
+function getCurrentTotal() {
+  const isPurchase = formType === 'purchase';
+  let total = 0;
+  if (isPurchase) {
+    for (let i = 0; i < rowCount; i++)
+      total += Math.round((parseFloat(qv(i,'qty'))||0)*(parseFloat(qv(i,'price'))||0));
+  } else {
+    for (let i = 0; i < rowCount; i++)
+      total += Math.round(parseFloat(qv(i,'price'))||0);
+  }
+  return total;
+}
+
+/* 回傳 { net, deductions:[{name,amount}] } 或 null */
+function calcDeductions(total) {
+  const purposeCode = document.getElementById('sel-purpose').value;
+  const is9A = (purposeCode === '2802' || purposeCode === '2807') && acctType === '診所/檢驗所';
+  const is50 = ['2713','7103','1501'].includes(purposeCode) ||
+               (purposeCode === '2802' && acctType === '個人') ||
+               (purposeCode === '2807' && acctType === '個人');
+
+  if (!is9A && !is50) return null;
+  if (total < 20000) return null;
+
+  const deductions = [];
+  if (total >= 20000) {
+    const nhi = Math.round(total * 0.0211);
+    deductions.push({ name: '代扣繳二代健保', amount: nhi });
+  }
+  if (total >= 20010) {
+    const tax = Math.round(total * 0.1);
+    deductions.push({ name: '代扣繳所得稅', amount: tax });
+  }
+  if (deductions.length === 0) return null;
+  const net = total - deductions.reduce((s, d) => s + d.amount, 0);
+  return { net, deductions };
+}
+
+function openSaveConfirmModal() {
+  const raw  = document.getElementById('apply-date-input').value;
+  const roc  = document.getElementById('roc-date-text').textContent;
+  const disp = roc || raw || '（未填）';
+  document.getElementById('scm-date-val').textContent = disp;
+  document.getElementById('save-confirm-modal').style.display = '';
+}
+
 function confirmSave() {
   /* 先驗證表單 */
   const errors = validateForm();
@@ -1637,13 +1688,87 @@ function confirmSave() {
     );
     return;
   }
-  /* 將申請日期顯示於確認框供使用者核對 */
-  const raw  = document.getElementById('apply-date-input').value;
-  const roc  = document.getElementById('roc-date-text').textContent;
-  const disp = roc || raw || '（未填）';
-  document.getElementById('scm-date-val').textContent = disp;
-  document.getElementById('save-confirm-modal').style.display = '';
+
+  /* 扣繳拆分攔截 */
+  const total  = getCurrentTotal();
+  const result = calcDeductions(total);
+  if (result) {
+    /* 儲存還原狀態 */
+    _prevNotes     = document.getElementById('notes').value;
+    _prevRow0Price = qv(0, 'price');
+    _deductRowsAdded = 0;
+
+    /* 修改第1項金額為淨額 */
+    qi(0, 'price').value = String(result.net);
+
+    /* 在最後新增扣繳列 */
+    for (const d of result.deductions) {
+      appendRow(rowCount);
+      qi(rowCount, 'name').value  = d.name;
+      qi(rowCount, 'price').value = String(d.amount);
+      rowCount++;
+      _deductRowsAdded++;
+    }
+    calcTotal();
+
+    /* 在其他說明事項補充文字 */
+    const noteText = result.deductions
+      .map(d => `${d.name} $${fmtN(d.amount)}`)
+      .join('、');
+    document.getElementById('notes').value =
+      _prevNotes ? _prevNotes + '\n' + noteText : noteText;
+
+    /* 組裝預覽表格 */
+    const row0Name = (qv(0,'name') || '（第1項）')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    let html = `<table style="width:100%;font-size:12px;border-collapse:collapse;">
+      <tr style="background:#bbdefb;">
+        <th style="padding:4px 8px;text-align:left;">動支說明</th>
+        <th style="padding:4px 8px;text-align:right;">金額</th>
+      </tr>
+      <tr>
+        <td style="padding:3px 8px;">${row0Name}</td>
+        <td style="padding:3px 8px;text-align:right;">$${fmtN(result.net)}</td>
+      </tr>`;
+    for (const d of result.deductions) {
+      html += `<tr style="background:#fff9c4;">
+        <td style="padding:3px 8px;">${d.name}</td>
+        <td style="padding:3px 8px;text-align:right;color:#c62828;">$${fmtN(d.amount)}</td>
+      </tr>`;
+    }
+    html += `<tr style="font-weight:bold;border-top:1px solid #90a4ae;">
+        <td style="padding:3px 8px;">合計</td>
+        <td style="padding:3px 8px;text-align:right;">$${fmtN(total)}</td>
+      </tr></table>`;
+    document.getElementById('drm-preview').innerHTML = html;
+    document.getElementById('deduct-review-modal').style.display = '';
+    return;
+  }
+
+  openSaveConfirmModal();
 }
+
+function cancelDeductReview() {
+  /* 還原第1項金額 */
+  qi(0, 'price').value = _prevRow0Price;
+  /* 移除自動新增的扣繳列 */
+  const tb = document.getElementById('items-body');
+  for (let k = 0; k < _deductRowsAdded; k++) {
+    rowCount--;
+    if (tb.lastChild) tb.removeChild(tb.lastChild);
+  }
+  _deductRowsAdded = 0;
+  calcTotal();
+  /* 還原其他說明事項 */
+  document.getElementById('notes').value = _prevNotes;
+  document.getElementById('deduct-review-modal').style.display = 'none';
+}
+
+function confirmDeductReview() {
+  document.getElementById('deduct-review-modal').style.display = 'none';
+  openSaveConfirmModal();
+}
+
 function closeSaveConfirm() {
   document.getElementById('save-confirm-modal').style.display = 'none';
 }
@@ -1856,6 +1981,24 @@ function showToast(msg) {
     <div class="saved-no" id="saved-no-display">—</div>
     <br>
     <button class="saved-ok" onclick="document.getElementById('saved-modal').style.display='none'">確認</button>
+  </div>
+</div>
+
+<!-- ══ 9A 扣繳預覽 Modal ══ -->
+<div id="deduct-review-modal" style="display:none;">
+  <div class="scm-box" style="min-width:340px; max-width:92vw;">
+    <div class="scm-icon">⚠️</div>
+    <div class="scm-title">自動填入扣繳說明 — 請確認</div>
+    <div class="scm-msg" style="text-align:left;">
+      系統已依金額自動在<strong>其他說明事項</strong>填入以下文字，請確認後再存檔：<br><br>
+      <div id="drm-preview"
+           style="background:#e3f2fd; border-radius:6px; padding:10px 14px;
+                  font-size:13px; color:#0d47a1;"></div>
+    </div>
+    <div class="scm-btns">
+      <button class="scm-cancel" onclick="cancelDeductReview()">✕ 取消修改</button>
+      <button class="scm-ok"     onclick="confirmDeductReview()">✓ 確認並繼續存檔</button>
+    </div>
   </div>
 </div>
 
