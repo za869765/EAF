@@ -560,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.0.1</div>
+    <div id="sb-version">v2.0.2</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1687,7 +1687,11 @@ function renderHistory(records) {
     wrap.innerHTML='<div id="no-history">尚無紀錄</div>'; return;
   }
   wrap.innerHTML='';
-  [...records].reverse().forEach(rec => {
+  [...records].sort((a, b) => {
+    const numA = parseInt((a.voucherNo || '').replace(/\D/g, '')) || 0;
+    const numB = parseInt((b.voucherNo || '').replace(/\D/g, '')) || 0;
+    return numB - numA;   /* 大→小 */
+  }).forEach(rec => {
     const isExp   = rec.formType==='expense';
     const isVoid  = !!rec.voided;
     const div = document.createElement('div');
