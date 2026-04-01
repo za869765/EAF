@@ -716,13 +716,7 @@ async function deleteRecord(id) {
   if (!confirm('確定刪除此筆紀錄？')) return;
   setMsg('rec-msg', '⟳ 刪除中…', false);
   try {
-    let records = await (await fetch('/api/records')).json();
-    records = records.filter(r => r.id !== id);
-    const r = await fetch('/api/records', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(records),
-    });
+    const r = await fetch(`/api/records?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
     if ((await r.json()).ok) { setMsg('rec-msg', '✓ 已刪除', false); loadRecords(); }
     else setMsg('rec-msg', '❌ 刪除失敗', true);
   } catch (_) { setMsg('rec-msg', '❌ 連線失敗', true); }

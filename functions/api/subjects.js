@@ -3,10 +3,9 @@
  * POST /api/subjects          → 更新科目設定（需管理密碼）
  *   Header: X-Admin-Pass: yourpassword
  *
- * 科目設定儲存於 Gist 的 subjects.json 檔案中
+ * 科目設定儲存於 D1 的 settings 資料表（key = 'subjects'）
  */
 
-const GIST_FILE = 'subjects.json';
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -16,27 +15,17 @@ const CORS = {
 export async function onRequest({ request, env }) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
 
-  const gistId = env.GIST_ID;
-  const token  = env.GIST_TOKEN;
-  if (!gistId || !token) return json({ error: '尚未設定環境變數' }, 500);
-
-  const ghHeaders = {
-    'Authorization': `Bearer ${token}`,
-    'Accept': 'application/vnd.github+json',
-    'Content-Type': 'application/json',
-    'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'EAF-Worker/1.0',
-  };
+  const DB = env.DB;
+  if (!DB) return json(null, 404); /* D1 未設定時讓前端 fallback 到靜態 subjects.json */
 
   /* ── GET ── */
   if (request.method === 'GET') {
     try {
-      const res  = await fetch(`https://api.github.com/gists/${gistId}`, { headers: ghHeaders });
-      if (!res.ok) return json(null, 404);
-      const data    = await res.json();
-      const content = data.files?.[GIST_FILE]?.content;
-      if (!content) return json(null, 404);  /* 告知前端改用靜態檔 */
-      return json(JSON.parse(content), 200);
+      const row = await DB.prepare(
+        "SELECT value FROM settings WHERE key = 'subjects'"
+      ).first();
+      if (!row) return json(null, 404);
+      return json(JSON.parse(row.value));
     } catch (_) {
       return json(null, 404);
     }
@@ -50,14 +39,11 @@ export async function onRequest({ request, env }) {
     }
     try {
       const subjects = await request.json();
-      const res = await fetch(`https://api.github.com/gists/${gistId}`, {
-        method: 'PATCH',
-        headers: ghHeaders,
-        body: JSON.stringify({
-          files: { [GIST_FILE]: { content: JSON.stringify(subjects, null, 2) } }
-        }),
-      });
-      return json({ ok: res.ok }, res.ok ? 200 : 502);
+      await DB.prepare(`
+        INSERT INTO settings (key, value) VALUES ('subjects', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+      `).bind(JSON.stringify(subjects)).run();
+      return json({ ok: true });
     } catch (e) {
       return json({ ok: false, error: e.message }, 500);
     }

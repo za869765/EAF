@@ -1,0 +1,8 @@
+name                  = "eaf"
+compatibility_date    = "2024-09-23"
+pages_build_output_dir = "."
+
+[[d1_databases]]
+binding       = "DB"
+database_name = "eaf-records"
+database_id   = "98784adc-02a9-464a-a678-9ebe21a2a5c7"

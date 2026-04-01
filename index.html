@@ -446,7 +446,7 @@ body {
   #main { padding: 0; }
   #form-page {
     width: 100% !important; max-width: 100% !important;
-    height: auto; min-height: unset;
+    height: calc(297mm - 12mm); min-height: unset;
     padding: 0; box-shadow: none;
     display: flex; flex-direction: column;
   }
@@ -862,10 +862,36 @@ function applyType(type, { regen = true } = {}) {
 /* ══════════════════════
    API HELPERS
    ══════════════════════ */
-async function apiGet()       { const r=await fetch(API); if(!r.ok) throw 0; return r.json(); }
-async function apiPost(data)  {
-  const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
-  if(!r.ok) throw 0; return r.json();
+async function apiGet() {
+  const r = await fetch(API);
+  if (!r.ok) throw 0;
+  return r.json();
+}
+/* POST 單筆紀錄（create / update） */
+async function apiPost(record) {
+  const r = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(record),
+  });
+  if (!r.ok) throw 0;
+  return r.json();
+}
+/* PATCH 作廢旗標 */
+async function apiPatch(id, patch) {
+  const r = await fetch(`${API}?id=${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!r.ok) throw 0;
+  return r.json();
+}
+/* DELETE 永久刪除 */
+async function apiDelete(id) {
+  const r = await fetch(`${API}?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (!r.ok) throw 0;
+  return r.json();
 }
 
 function setSyncStatus(msg, cls) {
@@ -1300,22 +1326,19 @@ async function saveRecord() {
   const ts   = `${now.getFullYear()-1911}/${pad(now.getMonth()+1)}/${pad(now.getDate())} `+
                `${pad(now.getHours())}:${pad(now.getMinutes())}`;
   try {
-    let records = await apiGet();
-    if (currentId) {
-      const idx = records.findIndex(r=>r.id===currentId);
-      if (idx>=0) records[idx]={...data,id:currentId,savedAt:ts};
-      else        records.push({...data,id:currentId,savedAt:ts});
-    } else {
+    if (!currentId) {
       if (!data.voucherNo) {
-        data.voucherNo = generateVoucherNo(records);
+        data.voucherNo = generateVoucherNo(cachedRecords);
         document.getElementById('voucher-no').value = data.voucherNo;
       }
       currentId = Date.now().toString();
-      records.push({...data,id:currentId,savedAt:ts});
     }
-    await apiPost(records);
-    cachedRecords = records;
-    setSyncStatus(`● 已儲存　共 ${records.length} 筆`,'ok');
+    const record = { ...data, id: currentId, savedAt: ts };
+    await apiPost(record);
+    const idx = cachedRecords.findIndex(r => r.id === currentId);
+    if (idx >= 0) cachedRecords[idx] = record;
+    else cachedRecords.unshift(record);
+    setSyncStatus(`● 已儲存　共 ${cachedRecords.length} 筆`, 'ok');
     document.getElementById('draft-item')?.remove();
     renderHistory(records);
     showToast('✓ 已儲存 '+ts);
@@ -1342,13 +1365,11 @@ async function voidRecord(id, e) {
   if (!ok) return;
   setSyncStatus('⟳ 更新中…','busy');
   try {
-    let records = await apiGet();
-    const idx = records.findIndex(r=>r.id===id);
-    if (idx>=0) records[idx].voided = true;
-    await apiPost(records);
-    cachedRecords = records;
+    await apiPatch(id, { voided: true });
+    const idx = cachedRecords.findIndex(r => r.id === id);
+    if (idx >= 0) cachedRecords[idx].voided = true;
     setSyncStatus('● 已作廢，留存備查', 'ok');
-    renderHistory(records);
+    renderHistory(cachedRecords);
     if (currentId === id) loadRecord(id);
     showToast('⛔ 已作廢，留存備查');
   } catch(_) { setSyncStatus('● 更新失敗','err'); }
@@ -1361,20 +1382,17 @@ async function deleteRecord(id, e) {
   if (!ok) return;
   setSyncStatus('⟳ 刪除中…','busy');
   try {
-    let records = await apiGet();
-    records = records.filter(r=>r.id!==id);
-    await apiPost(records);
-    cachedRecords = records;
-    if (currentId===id) currentId=null;
-    setSyncStatus(`● 已刪除　共 ${records.length} 筆`,'ok');
-    renderHistory(records);
+    await apiDelete(id);
+    cachedRecords = cachedRecords.filter(r => r.id !== id);
+    if (currentId === id) currentId = null;
+    setSyncStatus(`● 已刪除　共 ${cachedRecords.length} 筆`, 'ok');
+    renderHistory(cachedRecords);
   } catch(_) { setSyncStatus('● 刪除失敗','err'); }
 }
 
 async function loadRecord(id) {
   try {
-    const records = await apiGet();
-    const rec = records.find(r=>r.id===id);
+    const rec = cachedRecords.find(r => r.id === id);
     if (!rec) return;
     currentId = id;
     rowCount = 10;
