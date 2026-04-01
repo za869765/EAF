@@ -19,7 +19,7 @@ body {
 
 /* ── Sidebar ── */
 #sidebar {
-  width: 260px; min-width: 260px;
+  width: 260px; min-width: 160px;
   background: #1e2a38; color: #dde3ea;
   display: flex; flex-direction: column;
   height: 100vh; position: sticky; top: 0; overflow: hidden;
@@ -111,8 +111,29 @@ body {
   #void-stamp span { color: rgba(0,0,0,.18); border-color: rgba(0,0,0,.18); }
 }
 
+/* ── Sidebar resizer ── */
+#sidebar-resizer {
+  width: 5px; flex-shrink: 0; cursor: col-resize;
+  background: transparent; position: relative; z-index: 50;
+  transition: background .15s;
+  user-select: none; -webkit-user-select: none;
+}
+#sidebar-resizer::after {
+  content: ''; position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px; height: 40px; border-radius: 2px;
+  background: rgba(255,255,255,.18);
+  transition: background .15s, height .15s;
+}
+#sidebar-resizer:hover::after,
+#sidebar-resizer.dragging::after {
+  background: #4da6ff; height: 64px;
+}
+body.sb-resizing { cursor: col-resize !important; user-select: none; -webkit-user-select: none; }
+body.sb-resizing * { pointer-events: none !important; }
+
 /* ── Main ── */
-#main { flex: 1; padding: 16px 22px; overflow-x: auto; }
+#main { flex: 1; min-width: 480px; padding: 16px 22px; overflow-x: auto; }
 #actions { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
 .btn {
   padding: 7px 18px; border: none; border-radius: 5px;
@@ -494,7 +515,7 @@ body {
   @page { size: A4 portrait; margin: 6mm 8mm; }
   body { background: #fff; }
   #app  { display: block; }
-  #sidebar, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns,
+  #sidebar, #sidebar-resizer, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns,
   #row-lecturer, #row-acct-type, #row-income50-type,
   #row-budget-info, #exempt-wrap, #copy-no-btn,
   .date-picker-btn { display: none !important; }
@@ -599,7 +620,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.3.1</div>
+    <div id="sb-version">v2.3.2</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -611,6 +632,9 @@ body {
     <div id="no-history">載入中…</div>
   </div>
 </aside>
+
+<!-- ══════════ SIDEBAR RESIZE HANDLE ══════════ -->
+<div id="sidebar-resizer" title="拖曳調整寬度"></div>
 
 <!-- ══════════════════════ MAIN ══════════════════════ -->
 <div id="main">
@@ -859,6 +883,54 @@ body {
 <!-- ══════════════════════ JAVASCRIPT ══════════════════════ -->
 <script>
 'use strict';
+
+/* ── Sidebar drag-to-resize ── */
+(function () {
+  const STORAGE_KEY = 'eaf_sidebar_width';
+  const SB_MIN = 160, SB_MAX = 480, MAIN_MIN = 480;
+
+  function setSidebarWidth(w) {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+    const maxW = window.innerWidth - MAIN_MIN - 5;
+    w = Math.max(SB_MIN, Math.min(w, SB_MAX, maxW));
+    sidebar.style.width    = w + 'px';
+    sidebar.style.minWidth = w + 'px';
+    localStorage.setItem(STORAGE_KEY, w);
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    /* restore saved width */
+    const saved = parseInt(localStorage.getItem(STORAGE_KEY), 10);
+    if (saved && saved >= SB_MIN) setSidebarWidth(saved);
+
+    const handle = document.getElementById('sidebar-resizer');
+    if (!handle) return;
+
+    let dragging = false, startX = 0, startW = 0;
+
+    handle.addEventListener('mousedown', function (e) {
+      e.preventDefault();
+      dragging = true;
+      startX   = e.clientX;
+      startW   = parseInt(getComputedStyle(document.getElementById('sidebar')).width, 10);
+      handle.classList.add('dragging');
+      document.body.classList.add('sb-resizing');
+    });
+
+    document.addEventListener('mousemove', function (e) {
+      if (!dragging) return;
+      setSidebarWidth(startW + (e.clientX - startX));
+    });
+
+    document.addEventListener('mouseup', function () {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      document.body.classList.remove('sb-resizing');
+    });
+  });
+})();
 
 let CFG       = { settings:{ orgName:'臺南市佳里區衛生所', exemptThreshold:10000 }, mainAccounts:[] };
 let currentId = null;
