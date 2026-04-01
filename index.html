@@ -238,13 +238,18 @@ body {
 .it { width: 100%; border-collapse: collapse; }
 .it th, .it td { border: 1px solid #333; padding: 1mm 1.5mm; font-size: 11px; text-align: center; vertical-align: middle; }
 .it th { background: #f5f5f5; font-size: 10.5px; vertical-align: middle; }
-.it tbody tr { height: 11mm; }
-.it td.td-name, .it td.td-spec { text-align: left; }
-.it td input {
+.it tbody tr { min-height: 11mm; height: auto; }
+.it td.td-name, .it td.td-spec { text-align: left; vertical-align: middle; }
+.it td input, .it td textarea {
   width: 100%; border: none; background: transparent;
   font-family: inherit; font-size: 12px; outline: none;
 }
-.it td.td-name input, .it td.td-spec input { text-align: left; }
+.it td.td-name textarea, .it td.td-spec textarea {
+  text-align: left; resize: none; overflow: hidden;
+  padding: 0; margin: 0; display: block;
+  line-height: 1.4; min-height: 1.4em;
+  overflow-wrap: break-word; word-break: break-word;
+}
 .it td.td-r { text-align: right; }
 .it td.td-r input { text-align: right; width:100%; }
 .it tfoot td { font-weight: bold; background: #f5f5f5; font-size: 12px; vertical-align: middle; }
@@ -519,7 +524,10 @@ body {
   #apply-date-input { display: none; }
   #roc-date-text    { display: inline !important; }
   /* Items stretch to fill page */
-  .it tbody tr { height: 10mm; }
+  .it tbody tr { min-height: 10mm; height: auto; }
+  .it td.td-name textarea, .it td.td-spec textarea {
+    overflow: visible !important; height: auto !important;
+  }
   /* Lower section flex-fills remaining space */
   #lower-section { flex: 1; display: flex; flex-direction: column; }
   .lower-wrap { flex: 1; }
@@ -539,7 +547,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.8</div>
+    <div id="sb-version">v1.7.9</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -985,7 +993,9 @@ async function exportCSV() {
 function buildMainDropdown() {
   const sel = document.getElementById('sel-main');
   sel.innerHTML = '<option value="">── 選擇主科目 ──</option>';
-  CFG.mainAccounts.forEach(a => sel.appendChild(new Option(a.name, a.code)));
+  CFG.mainAccounts
+    .filter(a => !(formType === 'purchase' && a.name.includes('健保款暫存專戶')))
+    .forEach(a => sel.appendChild(new Option(a.name, a.code)));
   onMainChange();
 }
 
@@ -1002,6 +1012,10 @@ function onMainChange() {
   document.getElementById('wp-text').textContent = '';
   document.getElementById('sel-purpose').innerHTML = '';
   document.getElementById('row-purpose').style.display = 'none';
+  /* 切換主科目時清除帳戶/人員類別狀態 */
+  acctType = ''; income50Type = '';
+  document.getElementById('row-acct-type').style.display = 'none';
+  document.getElementById('row-income50-type').style.display = 'none';
 }
 
 function onBpChange() {
@@ -1024,6 +1038,10 @@ function onBpChange() {
     pRow.style.display = '';
   } else { pRow.style.display = 'none'; }
   document.getElementById('row-personnel').style.display = 'none';
+  /* 切換業務計畫時清除帳戶/人員類別狀態（用途別尚未選擇） */
+  acctType = ''; income50Type = '';
+  document.getElementById('row-acct-type').style.display = 'none';
+  document.getElementById('row-income50-type').style.display = 'none';
   /* 講師費切換：特定業務計畫才顯示，且重設為非講師費 */
   const showLect = LECTURER_BP_CODES.includes(bpCode);
   document.getElementById('row-lecturer').style.display = showLect ? '' : 'none';
@@ -1263,15 +1281,15 @@ function appendRow(i) {
   const tr = document.createElement('tr');
   if (formType === 'expense') {
     tr.innerHTML = `
-      <td class="td-name"><input type="text" data-r="${i}" data-c="name"></td>
+      <td class="td-name"><textarea data-r="${i}" data-c="name" rows="1" oninput="autoResize(this)"></textarea></td>
       <td colspan="2" class="td-r" style="padding-right:2mm;">
         <input type="text" inputmode="decimal" data-r="${i}" data-c="price"
                style="text-align:right; width:100%;"
                oninput="validateExpenseAmt(this,${i})"></td>`;
   } else {
     tr.innerHTML = `
-      <td class="td-name"><input type="text"   data-r="${i}" data-c="name"></td>
-      <td class="td-spec"><input type="text"   data-r="${i}" data-c="spec"></td>
+      <td class="td-name"><textarea data-r="${i}" data-c="name" rows="1" oninput="autoResize(this)"></textarea></td>
+      <td class="td-spec"><textarea data-r="${i}" data-c="spec" rows="1" oninput="autoResize(this)"></textarea></td>
       <td class="td-r"><input type="text" inputmode="decimal" data-r="${i}" data-c="qty" style="text-align:right;" oninput="validateQty(this,${i})"></td>
       <td style="text-align:center;"><input type="text" data-r="${i}" data-c="unit" style="text-align:center;"></td>
       <td class="td-r"><input type="text" inputmode="decimal" data-r="${i}" data-c="price" style="text-align:right;" oninput="validatePrice(this,${i})"></td>
@@ -1408,11 +1426,14 @@ function getFormData() {
   for (let i = 0; i < rowCount; i++) {
     const price = qv(i,'price');
     if (isExp) {
-      items.push({ name: qv(i,'name'), price });
+      const name = qv(i,'name');
+      if (!name && !price) continue;
+      items.push({ name, price });
       total += Math.round(parseFloat(price)||0);
     } else {
-      const qty = qv(i,'qty');
-      items.push({name:qv(i,'name'),spec:qv(i,'spec'),qty,unit:qv(i,'unit'),price});
+      const name = qv(i,'name'), spec = qv(i,'spec'), qty = qv(i,'qty'), unit = qv(i,'unit');
+      if (!name && !price && !spec && !qty) continue;
+      items.push({name,spec,qty,unit,price});
       total += Math.round((parseFloat(qty)||0)*(parseFloat(price)||0));
     }
   }
@@ -1477,10 +1498,10 @@ function fillForm(rec) {
   const isExp = (rec.formType || 'purchase') === 'expense';
   for (let i=0;i<rowCount;i++) {
     const item = (rec.items||[])[i] || {};
-    const nameEl = qi(i,'name');  if (nameEl)  nameEl.value  = item.name  || '';
+    const nameEl = qi(i,'name');  if (nameEl)  { nameEl.value  = item.name  || ''; autoResize(nameEl); }
     const priceEl= qi(i,'price'); if (priceEl) priceEl.value = item.price || '';
     if (!isExp) {
-      const specEl = qi(i,'spec'); if (specEl) specEl.value = item.spec || '';
+      const specEl = qi(i,'spec'); if (specEl) { specEl.value = item.spec || ''; autoResize(specEl); }
       const qtyEl  = qi(i,'qty');  if (qtyEl)  qtyEl.value  = item.qty  || '';
       const unitEl = qi(i,'unit'); if (unitEl) unitEl.value = item.unit || '';
       calcRow(i);
@@ -2035,6 +2056,7 @@ async function clearForm() {
    ══════════════════════ */
 function qi(r,c)  { return document.querySelector(`[data-r="${r}"][data-c="${c}"]`); }
 function qv(r,c)  { return qi(r,c)?.value||''; }
+function autoResize(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
 function fmtN(n)  { return Number(n).toLocaleString('zh-TW'); }
 
 /* 金額大寫（繁體會計字） */
