@@ -560,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.0.4</div>
+    <div id="sb-version">v2.0.5</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -660,10 +660,27 @@ body {
           <span class="cell-lbl">金額</span>
           <div class="amount-num" id="amount-disp">$0</div>
         </td>
-        <td>
-          <span class="cell-lbl">用途說明</span>
-          <textarea class="fta" id="purpose-desc" rows="4"
-                    style="font-size:12.5px; min-height:18mm;"></textarea>
+        <td style="padding:0;">
+          <div style="display:flex; height:100%;">
+            <div style="flex:1; padding:2mm 2mm 2mm 2mm; border-right:1px solid #ccc;">
+              <span class="cell-lbl">用途說明</span>
+              <textarea class="fta" id="purpose-desc" rows="4"
+                        style="font-size:12.5px; min-height:18mm; width:100%;"></textarea>
+            </div>
+            <!-- 請購單專屬：交貨日期 / 交貨地點 -->
+            <div id="delivery-fields" style="width:38mm; padding:2mm; display:flex; flex-direction:column; gap:2mm; justify-content:center;">
+              <div>
+                <span class="cell-lbl" style="display:block; margin-bottom:1mm;">交貨日期</span>
+                <input class="fi" id="delivery-date" type="text" placeholder="例：115/5/1"
+                       style="font-size:11.5px; width:100%;">
+              </div>
+              <div>
+                <span class="cell-lbl" style="display:block; margin-bottom:1mm;">交貨地點</span>
+                <input class="fi" id="delivery-place" type="text" placeholder="例：本所藥局"
+                       style="font-size:11.5px; width:100%;">
+              </div>
+            </div>
+          </div>
         </td>
       </tr>
     </table>
@@ -855,6 +872,10 @@ function applyType(type, { regen = true } = {}) {
   const badge = document.getElementById('type-badge');
   badge.textContent = isPurchase ? '請購單' : '動支單';
   badge.className   = isPurchase ? '' : 'expense';
+
+  /* 交貨欄位：請購單才顯示 */
+  const delivEl = document.getElementById('delivery-fields');
+  if (delivEl) delivEl.style.display = isPurchase ? '' : 'none';
 
   /* 副標題 */
   document.getElementById('form-subtitle').textContent =
@@ -1524,6 +1545,8 @@ function getFormData() {
     applyDateRaw: document.getElementById('apply-date-input').value,
     applyDateRoc: document.getElementById('roc-date-text').textContent,
     notes: document.getElementById('notes').value,
+    deliveryDate  : document.getElementById('delivery-date')?.value  || '',
+    deliveryPlace : document.getElementById('delivery-place')?.value || '',
     items, total
   };
 }
@@ -1534,6 +1557,10 @@ function fillForm(rec) {
   document.getElementById('purpose-desc').value       = rec.purposeDesc || '';
   document.getElementById('notes').value              = rec.notes       || '';
   document.getElementById('apply-date-input').value   = rec.applyDateRaw || '';
+  const ddEl = document.getElementById('delivery-date');
+  const dpEl = document.getElementById('delivery-place');
+  if (ddEl) ddEl.value = rec.deliveryDate  || '';
+  if (dpEl) dpEl.value = rec.deliveryPlace || '';
   updateRocDate();
   applyType(rec.formType || 'purchase');
   document.getElementById('sel-main').value = rec.acctCode || '';
@@ -2120,7 +2147,8 @@ function newForm(type) {
   isLecturer = '';
   income50Type = '';
   document.getElementById('voucher-no').value = '';
-  ['purpose-desc','notes'].forEach(id=>document.getElementById(id).value='');
+  ['purpose-desc','notes','delivery-date','delivery-place']
+    .forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   applyType(type || 'purchase', { regen: false });
   generateItemRows();
   setTodayDate(); buildMainDropdown(); calcTotal();
