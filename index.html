@@ -177,8 +177,8 @@ body {
 .u-header { display: flex; align-items: flex-start; margin-bottom: 1.5mm; }
 .u-main-acct { font-size: 13px; font-weight: bold; min-width: 18mm; padding-top: 3mm; white-space: nowrap; }
 .u-title-wrap { flex: 1; text-align: center; }
-.u-org  { font-size: 19px; font-weight: bold; letter-spacing: 3px; }
-.u-sub  { font-size: 12.5px; text-decoration: underline; margin-top: 1mm; }
+.u-org  { font-size: 22px; font-weight: bold; letter-spacing: 3px; }
+.u-sub  { font-size: 14px; text-decoration: underline; margin-top: 1mm; }
 
 /* Upper table: 憑證編號 | 預算科目 | 金額 | 用途說明 */
 .ut { width: 100%; border-collapse: collapse; }
@@ -522,7 +522,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.6.0</div>
+    <div id="sb-version">v1.6.1</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -823,8 +823,8 @@ function applyType(type, { regen = true } = {}) {
          <th style="width:17%;">總額</th>
        </tr>`
     : `<tr>
-         <th style="width:76%;">動支說明</th>
-         <th style="width:24%;">金額</th>
+         <th style="width:55%;">動支說明</th>
+         <th colspan="2">金額</th>
        </tr>`;
 
   /* 明細表 tfoot（colspan 按欄數調整） */
@@ -836,11 +836,10 @@ function applyType(type, { regen = true } = {}) {
          <td class="td-r" id="grand-total" style="padding-right:3mm;">$0</td>
        </tr>`
     : `<tr>
-         <td style="text-align:center;">合計</td>
-         <td style="text-align:right; padding-right:3mm; line-height:1.5;">
-           <div style="font-size:11px; letter-spacing:1px;" id="grand-total-zh">零元整</div>
-           <div style="font-weight:bold;" id="grand-total">$0</div>
-         </td>
+         <td style="text-align:center; width:55%;">合計</td>
+         <td style="text-align:center; font-size:11.5px; letter-spacing:1px; width:27%;"
+             id="grand-total-zh">零元整</td>
+         <td class="td-r" id="grand-total" style="padding-right:3mm; width:18%;">$0</td>
        </tr>`;
 
   /* 類型切換時：清除預算科目、重新產生明細列 */
@@ -1033,10 +1032,21 @@ function setLecturer(val) {
 function updateCashierNote() {
   const purposeCode = document.getElementById('sel-purpose').value;
   const bpCode      = document.getElementById('sel-bp').value;
+  const isExp       = formType === 'expense';
 
-  /* 21020302 各業務差旅費 → 出納單位格加斜線 */
+  /* 1140404 醫療用品（動支單）→ 財物登記格取消斜線、改標籤文字 */
+  const financialEl = document.getElementById('sg-financial');
+  if (isExp && purposeCode === '1140404') {
+    financialEl.classList.remove('slash');
+    financialEl.innerHTML = '藥品 / 衛材 登記';
+  } else {
+    financialEl.classList.toggle('slash', isExp);
+    financialEl.innerHTML = '財物或軟體登記<br><span style="font-size:9px;">(備註財物/軟體編)</span>';
+  }
+
+  /* 出納單位格斜線：21020302 差旅費 或 1140404 醫療用品（動支單） */
   document.getElementById('sg-cashier')
-    .classList.toggle('slash', bpCode === '21020302');
+    .classList.toggle('slash', bpCode === '21020302' || (isExp && purposeCode === '1140404'));
 
   let note = '';
   if (purposeCode === '1501') {
@@ -1104,7 +1114,7 @@ function appendRow(i) {
   if (formType === 'expense') {
     tr.innerHTML = `
       <td class="td-name"><input type="text" data-r="${i}" data-c="name"></td>
-      <td class="td-r" style="padding-right:2mm;">
+      <td colspan="2" class="td-r" style="padding-right:2mm;">
         <input type="text" inputmode="decimal" data-r="${i}" data-c="price"
                style="text-align:right; width:100%;"
                oninput="validateExpenseAmt(this,${i})"></td>`;
