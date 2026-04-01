@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v2.3.0</title>
+<title>管理者入口 — 動支單系統 v2.3.5</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -260,6 +260,52 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
                cursor:pointer; color:#78909c; border-bottom:2px solid transparent; margin-bottom:-2px; }
 .purpose-tab.active { color:#1565c0; border-bottom-color:#1565c0; font-weight:600; }
 
+/* ── Record edit modal ── */
+#rec-edit-modal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.52); z-index: 1000;
+  align-items: flex-start; justify-content: center;
+  overflow-y: auto; padding: 24px 12px;
+}
+#rec-edit-modal.open { display: flex; }
+#rec-edit-box {
+  background: #fff; border-radius: 10px; padding: 28px 32px;
+  width: 100%; max-width: 780px; box-shadow: 0 8px 40px rgba(0,0,0,.3);
+  margin: auto;
+}
+#rec-edit-box h3 { font-size: 16px; margin-bottom: 20px; color: #1e2a38; }
+.re-row { margin-bottom: 14px; }
+.re-row label { display: block; font-size: 12px; color: #546e7a; margin-bottom: 4px; font-weight: 600; }
+.re-row input, .re-row textarea {
+  width: 100%; padding: 8px 12px; border: 1px solid #cfd8dc;
+  border-radius: 5px; font-size: 13px; outline: none; font-family: inherit;
+}
+.re-row input:focus, .re-row textarea:focus { border-color: #1976d2; }
+.re-row textarea { resize: vertical; min-height: 60px; }
+.re-items-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.re-items-table th {
+  background: #263545; color: #cfd8dc; padding: 7px 8px;
+  text-align: left; font-size: 11px;
+}
+.re-items-table td { padding: 3px 3px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+.re-items-table td input {
+  width: 100%; padding: 5px 7px; border: 1px solid #cfd8dc;
+  border-radius: 4px; font-size: 12px; outline: none; font-family: inherit;
+}
+.re-items-table td input:focus { border-color: #1976d2; }
+.re-del-row { background: none; border: none; color: #e53935; cursor: pointer; font-size: 16px; padding: 2px 5px; line-height: 1; }
+.re-del-row:hover { color: #c62828; }
+.re-total-row { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; }
+.re-total-val { font-weight: 700; font-size: 20px; color: #1565c0; }
+.re-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px;
+           border-top: 1px solid #eceff1; padding-top: 16px; align-items: center; }
+.re-btns button { padding: 9px 24px; border: none; border-radius: 5px; font-size: 13px; cursor: pointer; }
+#re-save   { background: #1565c0; color: #fff; }
+#re-save:hover { background: #1976d2; }
+#re-cancel { background: #eceff1; color: #37474f; }
+#re-cancel:hover { background: #cfd8dc; }
+#re-msg { font-size: 12px; color: #e53935; flex: 1; }
+
 /* ── Budget year accordion ── */
 .byr-block { border:1px solid #dde3ef; border-radius:8px; margin-bottom:8px; overflow:hidden; }
 .byr-header {
@@ -288,7 +334,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.3.0</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.3.5</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -305,7 +351,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.3.0</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.3.5</span>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
     <button id="logout-btn" onclick="logout()">登出</button>
   </div>
@@ -464,6 +510,47 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- ═══ RECORD EDIT MODAL ═══ -->
+<div id="rec-edit-modal">
+  <div id="rec-edit-box">
+    <h3 id="re-title">✏️ 編輯紀錄</h3>
+    <div style="display:flex; gap:16px; flex-wrap:wrap;">
+      <div class="re-row" style="flex:1; min-width:150px;">
+        <label>申請日期</label>
+        <input type="date" id="re-apply-date">
+      </div>
+      <div class="re-row" style="flex:3; min-width:220px;">
+        <label>用途說明</label>
+        <input type="text" id="re-purpose-desc" placeholder="用途說明">
+      </div>
+    </div>
+    <div class="re-row">
+      <label>其他說明事項</label>
+      <textarea id="re-notes" rows="3"></textarea>
+    </div>
+    <div class="re-row">
+      <label>明細</label>
+      <table class="re-items-table">
+        <thead id="re-items-head"></thead>
+        <tbody id="re-items-body"></tbody>
+      </table>
+      <button onclick="addEditRow()"
+        style="margin-top:6px; padding:4px 14px; background:#e8f5e9;
+               border:1px dashed #388e3c; border-radius:4px;
+               font-size:12px; color:#2e7d32; cursor:pointer;">＋ 新增列</button>
+    </div>
+    <div class="re-total-row">
+      <span style="color:#546e7a;">合計金額：</span>
+      <span class="re-total-val" id="re-total-display">$0</span>
+    </div>
+    <div class="re-btns">
+      <span id="re-msg"></span>
+      <button id="re-cancel" onclick="closeEditModal()">取消</button>
+      <button id="re-save"   onclick="saveEditRecord()">💾 儲存</button>
+    </div>
   </div>
 </div>
 
@@ -775,10 +862,11 @@ async function loadRecords() {
             ? '<span class="void-badge">⛔ 作廢</span>'
             : '<span class="ok-badge">✓ 有效</span>'}</td>
           <td>${esc(rec.savedAt||'')}</td>
-          <td>
+          <td style="white-space:nowrap;">
+            <button class="btn" style="padding:4px 10px; font-size:11px; background:#e3f2fd; color:#1565c0; margin-right:4px;"
+              onclick="editRecord('${rec.id}')">✏️ 編輯</button>
             <button class="btn btn-red" style="padding:4px 10px; font-size:11px;"
               onclick="deleteRecord('${rec.id}')">刪除</button>
-            ${isVoid ? '' : ''}
           </td>`;
         tbody.appendChild(tr);
       });
@@ -843,6 +931,140 @@ function downloadCSV(records, filename) {
   });
   a.click(); URL.revokeObjectURL(a.href);
 }
+
+/* ════════════════════
+   RECORD EDIT MODAL
+   ════════════════════ */
+let _editId = null;
+let _editFormType = 'expense';
+
+async function editRecord(id) {
+  setMsg('rec-msg', '⟳ 載入…', false);
+  try {
+    const records = await (await fetch('/api/records')).json();
+    const rec = records.find(r => r.id === id);
+    if (!rec) { setMsg('rec-msg', '❌ 找不到紀錄', true); return; }
+    _editId = id;
+    _editFormType = rec.formType || 'expense';
+    document.getElementById('re-title').textContent =
+      `✏️ 編輯紀錄 — ${rec.voucherNo || id}`;
+    document.getElementById('re-apply-date').value  = rec.applyDateRaw  || '';
+    document.getElementById('re-purpose-desc').value = rec.purposeDesc || '';
+    document.getElementById('re-notes').value        = rec.notes        || '';
+    /* build items header */
+    const isExp = _editFormType === 'expense';
+    document.getElementById('re-items-head').innerHTML = isExp
+      ? `<tr><th>動支說明</th><th style="width:120px;">金額</th><th style="width:32px;"></th></tr>`
+      : `<tr><th>品名</th><th>規格</th><th style="width:60px;">數量</th><th style="width:60px;">單位</th><th style="width:90px;">單價</th><th style="width:32px;"></th></tr>`;
+    /* render rows */
+    document.getElementById('re-items-body').innerHTML = '';
+    const items = (rec.items && rec.items.length) ? rec.items : [{}];
+    items.forEach(item => renderEditItemRow(item));
+    calcEditTotal();
+    document.getElementById('re-msg').textContent = '';
+    document.getElementById('rec-edit-modal').classList.add('open');
+    setMsg('rec-msg', '', false);
+  } catch (_) { setMsg('rec-msg', '❌ 載入失敗', true); }
+}
+
+function renderEditItemRow(item) {
+  const isExp = _editFormType === 'expense';
+  const tr = document.createElement('tr');
+  if (isExp) {
+    tr.innerHTML = `
+      <td><input type="text"   class="re-name"  value="${esc(item.name||'')}"  oninput="calcEditTotal()"></td>
+      <td><input type="number" class="re-price" value="${esc(String(item.price||''))}" oninput="calcEditTotal()" style="text-align:right;"></td>
+      <td><button class="re-del-row" onclick="removeEditRow(this)">✕</button></td>`;
+  } else {
+    tr.innerHTML = `
+      <td><input type="text"   class="re-name"  value="${esc(item.name||'')}"></td>
+      <td><input type="text"   class="re-spec"  value="${esc(item.spec||'')}"></td>
+      <td><input type="number" class="re-qty"   value="${esc(String(item.qty||''))}"  oninput="calcEditTotal()" style="text-align:right;"></td>
+      <td><input type="text"   class="re-unit"  value="${esc(item.unit||'')}"></td>
+      <td><input type="number" class="re-price" value="${esc(String(item.price||''))}" oninput="calcEditTotal()" style="text-align:right;"></td>
+      <td><button class="re-del-row" onclick="removeEditRow(this)">✕</button></td>`;
+  }
+  document.getElementById('re-items-body').appendChild(tr);
+}
+
+function addEditRow()           { renderEditItemRow({}); }
+function removeEditRow(btn)     { btn.closest('tr').remove(); calcEditTotal(); }
+
+function calcEditTotal() {
+  const isExp = _editFormType === 'expense';
+  let total = 0;
+  document.querySelectorAll('#re-items-body tr').forEach(tr => {
+    const price = parseFloat(tr.querySelector('.re-price')?.value) || 0;
+    if (isExp) {
+      total += Math.round(price);
+    } else {
+      const qty = parseFloat(tr.querySelector('.re-qty')?.value) || 0;
+      total += Math.round(qty * price);
+    }
+  });
+  document.getElementById('re-total-display').textContent =
+    '$' + total.toLocaleString('zh-TW');
+  return total;
+}
+
+function closeEditModal() {
+  document.getElementById('rec-edit-modal').classList.remove('open');
+  _editId = null;
+}
+
+async function saveEditRecord() {
+  if (!_editId) return;
+  const isExp = _editFormType === 'expense';
+  const items = [];
+  document.querySelectorAll('#re-items-body tr').forEach(tr => {
+    const name  = tr.querySelector('.re-name')?.value.trim()  || '';
+    const price = tr.querySelector('.re-price')?.value.trim() || '';
+    if (!name && !price) return;
+    if (isExp) {
+      items.push({ name, price });
+    } else {
+      items.push({
+        name,
+        spec : tr.querySelector('.re-spec')?.value.trim()  || '',
+        qty  : tr.querySelector('.re-qty')?.value.trim()   || '',
+        unit : tr.querySelector('.re-unit')?.value.trim()  || '',
+        price,
+      });
+    }
+  });
+  const applyDateRaw = document.getElementById('re-apply-date').value;
+  let applyDateRoc = '';
+  if (applyDateRaw) {
+    const d = new Date(applyDateRaw + 'T00:00:00');
+    applyDateRoc = `${d.getFullYear()-1911}年${d.getMonth()+1}月${d.getDate()}日`;
+  }
+  const patch = {
+    applyDateRaw, applyDateRoc,
+    purposeDesc : document.getElementById('re-purpose-desc').value.trim(),
+    notes       : document.getElementById('re-notes').value,
+    items, total: calcEditTotal(),
+  };
+  document.getElementById('re-msg').textContent = '⟳ 儲存中…';
+  try {
+    const r = await fetch(`/api/records?id=${encodeURIComponent(_editId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    if ((await r.json()).ok) {
+      closeEditModal();
+      setMsg('rec-msg', '✓ 已儲存', false);
+      loadRecords();
+    } else {
+      document.getElementById('re-msg').textContent = '❌ 儲存失敗';
+    }
+  } catch (_) { document.getElementById('re-msg').textContent = '❌ 連線失敗'; }
+}
+
+/* 點擊 modal 背景關閉 */
+document.addEventListener('click', e => {
+  if (e.target === document.getElementById('rec-edit-modal')) closeEditModal();
+});
 
 async function deleteRecord(id) {
   if (!confirm('確定刪除此筆紀錄？')) return;
