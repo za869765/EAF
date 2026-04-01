@@ -554,7 +554,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.14</div>
+    <div id="sb-version">v1.7.15</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -865,7 +865,7 @@ function applyType(type, { regen = true } = {}) {
          <th style="width:17%;">總額</th>
        </tr>`
     : `<tr>
-         <th style="width:55%;">動支說明</th>
+         <th style="width:68%;">動支說明</th>
          <th colspan="2">金額</th>
        </tr>`;
 
@@ -878,11 +878,15 @@ function applyType(type, { regen = true } = {}) {
          <td class="td-r" id="grand-total" style="padding-right:3mm;">$0</td>
        </tr>`
     : `<tr>
-         <td style="text-align:center; width:55%;">合計</td>
-         <td style="text-align:center; font-size:11.5px; letter-spacing:1px; width:27%;"
+         <td style="text-align:center; width:68%;">合計</td>
+         <td style="text-align:center; font-size:11.5px; letter-spacing:1px; width:20%;"
              id="grand-total-zh">零元整</td>
-         <td class="td-r" id="grand-total" style="padding-right:3mm; width:18%;">$0</td>
+         <td class="td-r" id="grand-total" style="padding-right:3mm; width:12%;">$0</td>
        </tr>`;
+
+  /* 其他說明事項欄寬：動支單較寬，請購單維持預設 */
+  const lowerRight = document.querySelector('.lower-right');
+  if (lowerRight) lowerRight.style.width = isPurchase ? '28mm' : '40mm';
 
   /* 類型切換時：清除預算科目、重新產生明細列 */
   if (regen && changed && !_suppressAutoFill) {
