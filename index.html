@@ -464,7 +464,7 @@ body {
   #app  { display: block; }
   #sidebar, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns,
   #row-lecturer, #row-acct-type, #row-income50-type,
-  #purchase-sig, #exempt-wrap { display: none !important; }
+  #row-budget-info, #purchase-sig, #exempt-wrap { display: none !important; }
   /* 隱藏未選擇的佔位文字 */
   #main-acct-lbl[data-ph="1"] { visibility: hidden; }
   .fsel[data-ph="1"] { visibility: hidden; }
@@ -558,7 +558,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.20</div>
+    <div id="sb-version">v1.7.21</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -653,6 +653,7 @@ body {
             <label>人員類別：</label>
             <div id="income50-type-btns" style="display:flex; flex-wrap:wrap; gap:2mm;"></div>
           </div>
+          <div id="row-budget-info" style="display:none; margin:1.5mm 0;"></div>
         </td>
         <td style="text-align:center; vertical-align:middle;">
           <span class="cell-lbl">金額</span>
@@ -907,7 +908,7 @@ function applyType(type, { regen = true } = {}) {
     document.getElementById('sel-main').value    = '';
     document.getElementById('sel-bp').value      = '';
     document.getElementById('wp-text').textContent = '';
-    ['row-bp','row-purpose','row-personnel','row-lecturer','row-acct-type','row-income50-type']
+    ['row-bp','row-purpose','row-personnel','row-lecturer','row-acct-type','row-income50-type','row-budget-info']
       .forEach(id => document.getElementById(id).style.display = 'none');
     acctType = '';
     income50Type = '';
@@ -1173,6 +1174,7 @@ function setAcctType(val) {
     .forEach(b => b.classList.toggle('active', b.textContent === val));
   updateIncome50Row();
   updateCashierNote();
+  updateBudgetInfo();
 }
 
 function setIncome50Type(val) {
@@ -1297,6 +1299,7 @@ function onPurposeChange() {
     }
     if (nameMatch || priceMatch) calcTotal();
   }
+  updateBudgetInfo();
 }
 
 /* ══════════════════════
@@ -2123,6 +2126,64 @@ function qi(r,c)  { return document.querySelector(`[data-r="${r}"][data-c="${c}"
 function qv(r,c)  { return qi(r,c)?.value||''; }
 function autoResize(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
 function fmtN(n)  { return Number(n).toLocaleString('zh-TW'); }
+
+function updateBudgetInfo() {
+  const purposeCode = document.getElementById('sel-purpose').value;
+  const row = document.getElementById('row-budget-info');
+  if (!row) return;
+
+  const s = CFG.settings || {};
+  const BUDGET_CFG = {
+    '1301': { label:'延長工時加班費', budgetKey: () => s.budget1301 ?? 0,
+              match: r => r.purposeCode === '1301' },
+    '2807': {
+      label: () => '委託檢驗費（' + acctType + '）',
+      budgetKey: () => ({
+        '公立醫院/衛生局': s.budget2807_public  ?? 0,
+        '診所/檢驗所':     s.budget2807_clinic   ?? 0,
+        '開具發票廠商':    s.budget2807_invoice  ?? 0,
+      })[acctType] || 0,
+      match: r => r.purposeCode === '2807' && r.acctType === acctType,
+    },
+  };
+
+  const cfg = BUDGET_CFG[purposeCode];
+  if (!cfg) { row.style.display = 'none'; return; }
+
+  const budget = typeof cfg.budgetKey === 'function' ? cfg.budgetKey() : cfg.budgetKey;
+  const label  = typeof cfg.label     === 'function' ? cfg.label()    : cfg.label;
+  if (!budget) { row.style.display = 'none'; return; }
+
+  const spent = cachedRecords
+    .filter(r => !r.voided && cfg.match(r))
+    .reduce((sum, r) => sum + (Number(r.total) || 0), 0);
+
+  const rawPct  = budget > 0 ? spent / budget * 100 : 0;
+  const barPct  = Math.min(rawPct, 100);
+  const remain  = budget - spent;
+  const color   = rawPct >= 100 ? '#c62828' : rawPct >= 80 ? '#e65100' : '#1565c0';
+  const remainColor = remain >= 0 ? '#2e7d32' : '#c62828';
+
+  row.innerHTML = `
+    <div style="background:#eef3ff; border:1px solid #c5d5f5; border-radius:5px;
+                padding:4px 8px; font-size:11px; color:#333; width:100%;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:3px;">
+        <span style="font-weight:600;">115年預算　${label}</span>
+        <span style="color:${color}; font-weight:700;">${rawPct.toFixed(1)}%</span>
+      </div>
+      <div style="background:#d0d8ee; border-radius:3px; height:6px; margin-bottom:4px; overflow:hidden;">
+        <div style="width:${barPct}%; height:100%; background:${color}; border-radius:3px;"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between;">
+        <span>已動支 <b>$${fmtN(spent)}</b></span>
+        <span>年度預算 $${fmtN(budget)}</span>
+        <span style="color:${remainColor}; font-weight:600;">
+          ${remain >= 0 ? '剩餘' : '超支'} $${fmtN(Math.abs(remain))}
+        </span>
+      </div>
+    </div>`;
+  row.style.display = '';
+}
 
 /* 金額大寫（繁體會計字） */
 function toChineseAmount(n) {
