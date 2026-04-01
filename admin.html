@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v1.2.6</title>
+<title>管理者入口 — 動支單系統 v1.2.7</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -393,7 +393,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
           <input id="set-budget1301" type="number" min="0">
         </div>
         <div class="s-row">
-          <label>2807 委託檢驗費 — 公立醫院（元）</label>
+          <label>2807 委託檢驗費 — 公立醫院/衛生局（元）</label>
           <input id="set-budget2807-public" type="number" min="0">
         </div>
         <div class="s-row">
@@ -876,7 +876,7 @@ function renderBudgetChart() {
   const items = [
     { label: '1301 延長工時加班費', code: '1301', acctType: null,
       budget: s.budget1301 ?? 140000 },
-    { label: '2807 公立醫院',       code: '2807', acctType: '公立醫院',
+    { label: '2807 公立醫院/衛生局', code: '2807', acctType: '公立醫院/衛生局',
       budget: s.budget2807_public ?? 60000 },
     { label: '2807 診所/檢驗所',    code: '2807', acctType: '診所/檢驗所',
       budget: s.budget2807_clinic ?? 137135 },
