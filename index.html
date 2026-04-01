@@ -312,6 +312,12 @@ body {
   box-shadow: none !important;
 }
 #form-page.locked #type-badge { pointer-events: none; }
+/* 鎖定後款項用途／人員類別按鈕不可點選 */
+#form-page.locked .lect-btn {
+  pointer-events: none;
+  cursor: default;
+  opacity: 0.65;
+}
 
 /* ── 通用提示 Modal (showAlert) ── */
 #alert-modal {
@@ -477,9 +483,10 @@ body {
     padding: 0; box-shadow: none;
     display: flex; flex-direction: column;
   }
-  /* ── 黑白列印：所有文字強制黑色、背景透明 ── */
+  /* ── 黑白列印：所有文字強制黑色、背景透明、字重加粗 ── */
   * { color: #000 !important; background: transparent !important;
-      -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      font-weight: bold !important; }
 
   /* 斜線格：覆蓋上方 transparent，強制印出漸層斜線 */
   .sg td.slash {
@@ -493,7 +500,7 @@ body {
   /* 框線全黑加深 */
   .ut td, .sg td, .it th, .it td, .bs td,
   .lower-left, .lower-right,
-  .l-top-bar, .l-unit-row { border-color: #000 !important; }
+  .l-top-bar, .l-unit-row { border-color: #000 !important; border-width: 1px !important; }
 
   /* 類型徽章：移除彩色背景，改為黑框黑字 */
   #type-badge {
@@ -524,8 +531,8 @@ body {
   .it th { background: #fff !important; font-weight: bold !important; }
   .it tfoot td { background: #fff !important; font-weight: bold !important; }
 
-  /* 人員類別、工作計畫等靜態文字 */
-  span, label, div { color: #000 !important; }
+  /* 核章格標籤、備註文字 */
+  .sg td, .sg td * { font-size: 11px !important; }
 
   /* 機構名、副標 */
   .u-org { color: #000 !important; font-weight: bold !important; }
@@ -546,6 +553,8 @@ body {
   .lower-wrap { flex: 1; }
   .lower-left { height: 100%; }
   .bs tr.sig-box td { height: 32mm; }
+  /* 頁尾留白：列印時顯示，供手寫備註用 */
+  #print-footer { display: block !important; height: 16mm; flex-shrink: 0; }
 }
 </style>
 </head>
@@ -560,7 +569,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.1.3</div>
+    <div id="sb-version">v2.1.4</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -803,6 +812,9 @@ body {
         </table>
       </div>
     </div><!-- /#lower-section -->
+
+    <!-- 頁尾留白（僅列印顯示）：供手寫備註 -->
+    <div id="print-footer"></div>
 
   </div><!-- /#form-page -->
 </div><!-- /#main -->
