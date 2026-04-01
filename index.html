@@ -522,7 +522,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.6.5</div>
+    <div id="sb-version">v1.6.6</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1065,9 +1065,9 @@ function updateCashierNote() {
   const bpCode      = document.getElementById('sel-bp').value;
   const isExp       = formType === 'expense';
 
-  /* 1140404 醫療用品（動支單）→ 財物登記格取消斜線、改標籤文字 */
+  /* 醫療用品業務計畫 → 財物登記格取消斜線、改標籤文字（請購單/動支單均套用） */
   const financialEl = document.getElementById('sg-financial');
-  if (isExp && purposeCode === '1140404') {
+  if (bpCode === '1140404' || bpCode === '110404') {
     financialEl.classList.remove('slash');
     financialEl.innerHTML = '藥品 / 衛材 登記';
   } else {
