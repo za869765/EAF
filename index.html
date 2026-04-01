@@ -620,7 +620,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.3.2</div>
+    <div id="sb-version">v2.3.3</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1333,11 +1333,13 @@ function updateIncome50Row() {
     if (rowI50.style.display === 'none' || rowI50.style.display === '') {
       /* 僅在尚未顯示時重建按鈕並重設預設值 */
       if (rowI50.style.display === 'none') {
-        /* 講師費／獎勵金預設兼職，其餘預設員工 */
-        const defVal = isLecturerOrBonus ? '兼職' : '員工';
+        /* 7103 職業團體會費 → 僅員工；講師費／獎勵金預設兼職；其餘預設員工 */
+        const onlyEmployee = purposeCode === '7103';
+        const defVal = onlyEmployee ? '員工' : (isLecturerOrBonus ? '兼職' : '員工');
         income50Type = defVal;
+        const opts = onlyEmployee ? ['員工'] : ['員工','兼職'];
         document.getElementById('income50-type-btns').innerHTML =
-          ['員工','兼職'].map(o =>
+          opts.map(o =>
             `<button class="lect-btn${o===defVal?' active':''}" onclick="setIncome50Type('${o}')">${o}</button>`
           ).join('');
       }
