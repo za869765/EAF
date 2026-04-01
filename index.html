@@ -560,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.8.5</div>
+    <div id="sb-version">v1.8.6</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1208,6 +1208,13 @@ function updateCashierNote() {
   /* 2807 → 保管格加斜線（請購單亦同） */
   document.getElementById('sg-custody')
     .classList.toggle('slash', isExp || purposeCode === '2807');
+
+  /* 2807 + 公立醫院/衛生局 → 請購單採購格加斜線，隱藏廠商查驗附記 */
+  const is2807GovAcct = purposeCode === '2807' && (acctType === '公立醫院' || acctType === '衛生局');
+  if (!isExp) {
+    document.getElementById('sg-purchase').classList.toggle('slash', is2807GovAcct);
+    document.getElementById('purchase-note').style.display = is2807GovAcct ? 'none' : '';
+  }
 
   /* ── 先計算附記文字（note 決定後才套用斜線，有附記一律不劃斜線） ── */
   let note = '';
