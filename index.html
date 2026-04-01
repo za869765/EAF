@@ -558,7 +558,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.21</div>
+    <div id="sb-version">v1.7.22</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2134,15 +2134,15 @@ function updateBudgetInfo() {
 
   const s = CFG.settings || {};
   const BUDGET_CFG = {
-    '1301': { label:'延長工時加班費', budgetKey: () => s.budget1301 ?? 0,
+    '1301': { label:'延長工時加班費', budgetKey: () => s.budget1301 ?? 140000,
               match: r => r.purposeCode === '1301' },
     '2807': {
       label: () => '委託檢驗費（' + acctType + '）',
       budgetKey: () => ({
-        '公立醫院/衛生局': s.budget2807_public  ?? 0,
-        '診所/檢驗所':     s.budget2807_clinic   ?? 0,
-        '開具發票廠商':    s.budget2807_invoice  ?? 0,
-      })[acctType] || 0,
+        '公立醫院/衛生局': s.budget2807_public  ?? 60000,
+        '診所/檢驗所':     s.budget2807_clinic   ?? 137135,
+        '開具發票廠商':    s.budget2807_invoice  ?? 2600,
+      })[acctType] ?? null,
       match: r => r.purposeCode === '2807' && r.acctType === acctType,
     },
   };
@@ -2152,7 +2152,7 @@ function updateBudgetInfo() {
 
   const budget = typeof cfg.budgetKey === 'function' ? cfg.budgetKey() : cfg.budgetKey;
   const label  = typeof cfg.label     === 'function' ? cfg.label()    : cfg.label;
-  if (!budget) { row.style.display = 'none'; return; }
+  if (budget === null || budget === undefined) { row.style.display = 'none'; return; }
 
   const spent = cachedRecords
     .filter(r => !r.voided && cfg.match(r))
