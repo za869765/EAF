@@ -530,7 +530,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.2</div>
+    <div id="sb-version">v1.7.3</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1068,13 +1068,44 @@ function setLecturer(val) {
   isLecturer = val;
   document.getElementById('lect-yes').classList.toggle('active',  val);
   document.getElementById('lect-no').classList.toggle('active',  !val);
+  updateIncome50Row();
   updateCashierNote();
+}
+
+/* 員工/兼職 子選單的顯示條件：
+   ① 用途別屬 INCOME_50_PURPOSES（1501/2713/7103）
+   ② 講師費業務計畫 + 選了「講師費」
+   ③ 2802/2807 帳戶類別選「個人」（ACCT_NOTE_MAP → 列計50所得） */
+function updateIncome50Row() {
+  const purposeCode = document.getElementById('sel-purpose').value;
+  const bpCode      = document.getElementById('sel-bp').value;
+  const show = INCOME_50_PURPOSES.includes(purposeCode) ||
+               (LECTURER_BP_CODES.includes(bpCode) && isLecturer) ||
+               (ACCT_TYPE_CONFIG[purposeCode] && acctType === '個人');
+  const rowI50 = document.getElementById('row-income50-type');
+  if (show) {
+    if (rowI50.style.display === 'none' || rowI50.style.display === '') {
+      /* 僅在尚未顯示時重建按鈕並重設預設值 */
+      if (rowI50.style.display === 'none') {
+        income50Type = '員工';
+        document.getElementById('income50-type-btns').innerHTML =
+          ['員工','兼職'].map(o =>
+            `<button class="lect-btn${o==='員工'?' active':''}" onclick="setIncome50Type('${o}')">${o}</button>`
+          ).join('');
+      }
+    }
+    rowI50.style.display = '';
+  } else {
+    income50Type = '';
+    rowI50.style.display = 'none';
+  }
 }
 
 function setAcctType(val) {
   acctType = val;
   document.querySelectorAll('#acct-type-btns .lect-btn')
     .forEach(b => b.classList.toggle('active', b.textContent === val));
+  updateIncome50Row();
   updateCashierNote();
 }
 
@@ -1153,19 +1184,8 @@ function onPurposeChange() {
     rowAcct.style.display = 'none';
   }
 
-  /* 人員類別子選單（1501 / 2713 / 7103） */
-  const rowI50 = document.getElementById('row-income50-type');
-  if (INCOME_50_PURPOSES.includes(code)) {
-    income50Type = '員工';
-    document.getElementById('income50-type-btns').innerHTML =
-      ['員工','兼職'].map(o =>
-        `<button class="lect-btn${o==='員工'?' active':''}" onclick="setIncome50Type('${o}')">${o}</button>`
-      ).join('');
-    rowI50.style.display = '';
-  } else {
-    income50Type = '';
-    rowI50.style.display = 'none';
-  }
+  /* 人員類別子選單（由 updateIncome50Row 統一管理） */
+  updateIncome50Row();
 
   updateCashierNote();
 
@@ -1414,10 +1434,12 @@ function fillForm(rec) {
   document.getElementById('lect-no').classList.toggle('active',  !isLecturer);
   /* 還原帳戶類別狀態 */
   if (rec.acctType && ACCT_TYPE_CONFIG[rec.purposeCode]) {
-    setAcctType(rec.acctType);
+    setAcctType(rec.acctType);   /* setAcctType 已呼叫 updateIncome50Row */
   }
-  /* 還原50所得人員類別 */
-  if (rec.income50Type && INCOME_50_PURPOSES.includes(rec.purposeCode)) {
+  /* 確保講師費/個人 路徑的員工兼職列也正確顯示 */
+  updateIncome50Row();
+  /* 還原50所得人員類別（覆蓋 updateIncome50Row 設定的預設值） */
+  if (rec.income50Type) {
     setIncome50Type(rec.income50Type);
   }
   updateCashierNote();
