@@ -620,7 +620,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.3.3</div>
+    <div id="sb-version">v2.3.4</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2138,6 +2138,17 @@ function calcDeductions(total) {
 
   if (is50part) {
     if (total <= part50Threshold) return null;
+    /* 多人付款：逐列檢查單人金額。若每筆均未超過門檻，各人分別不達代扣標準，免代扣。
+       （補充保費以「單次給付同一人」為單位，非以總額計算） */
+    const rowTotals = [];
+    for (let i = 0; i < rowCount; i++) {
+      const name  = qv(i, 'name');
+      const price = Number(qv(i, 'price'));
+      if (!name || !price) continue;
+      const qty = Number(qv(i, 'qty')) || 1;   /* 請購單有qty；動支單qty為空，預設1 */
+      rowTotals.push(Math.abs(qty * price));
+    }
+    if (rowTotals.length > 1 && Math.max(...rowTotals) <= part50Threshold) return null;
     const nhi = Math.round(total * 0.0211);
     const net = total - nhi;
     return { net, deductions: [{ name: '代扣繳二代健保', amount: nhi }] };
