@@ -177,8 +177,8 @@ body {
 .u-header { display: flex; align-items: flex-start; margin-bottom: 1.5mm; }
 .u-main-acct { font-size: 13px; font-weight: bold; min-width: 18mm; padding-top: 3mm; white-space: nowrap; }
 .u-title-wrap { flex: 1; text-align: center; }
-.u-org  { font-size: 22px; font-weight: bold; letter-spacing: 3px; }
-.u-sub  { font-size: 14px; text-decoration: underline; margin-top: 1mm; }
+.u-org  { font-size: 28px; font-weight: bold; letter-spacing: 3px; }
+.u-sub  { font-size: 16px; text-decoration: underline; margin-top: 1mm; }
 
 /* Upper table: 憑證編號 | 預算科目 | 金額 | 用途說明 */
 .ut { width: 100%; border-collapse: collapse; }
@@ -437,17 +437,23 @@ body {
 }
 .cm-box h3 { font-size: 14px; margin-bottom: 12px; color: #1a237e; }
 .copy-item {
-  display: flex; gap: 8px; align-items: center;
-  padding: 8px 10px; border: 1px solid #e0e0e0; border-radius: 5px;
-  margin-bottom: 6px; cursor: pointer; font-size: 12px;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 9px 12px; border: 1px solid #e0e0e0; border-radius: 6px;
+  margin-bottom: 7px; cursor: pointer; font-size: 13px;
 }
 .copy-item:hover { background: #e3f2fd; border-color: #1565c0; }
 .copy-item-preview { cursor: default; }
 .copy-item-preview:hover { background: #fff; border-color: #e0e0e0; }
-.ci-no   { font-weight: bold; color: #1565c0; min-width: 90px; }
-.ci-type { color: #6a1b9a; min-width: 46px; }
-.ci-acct { color: #444; flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.ci-amt  { color: #2e7d32; min-width: 58px; text-align: right; }
+.ci-row1 { display: flex; gap: 8px; align-items: center; }
+.ci-row2 { display: flex; gap: 8px; align-items: center; font-size: 12px; color: #555; }
+.ci-row3 { font-size: 11.5px; color: #777; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ci-no   { font-weight: bold; color: #1565c0; min-width: 90px; font-size: 14px; }
+.ci-type { color: #6a1b9a; min-width: 40px; font-size: 12px; }
+.ci-acct { color: #444; flex: 1; }
+.ci-amt  { color: #2e7d32; font-size: 16px; font-weight: bold; text-align: right; margin-left: auto; }
+.ci-bp   { color: #0277bd; }
+.ci-wp   { color: #558b2f; }
+.ci-pur  { color: #6d4c41; }
 
 /* ══════════════════════════════════
    PRINT
@@ -548,7 +554,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.12</div>
+    <div id="sb-version">v1.7.13</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1398,8 +1404,8 @@ function calcTotal() {
   document.getElementById('purchase-sig').style.display =
     (isPurchase && total >= threshold) ? 'block' : 'none';
 
-  /* 免核章列：請購單且 0 < 金額 < 門檻；動支單不顯示 */
-  const showExempt = isPurchase && total > 0 && total < threshold;
+  /* 免核章列：動支單 金額>0 才顯示；請購單不顯示 */
+  const showExempt = !isPurchase && total > 0;
   document.getElementById('exempt-wrap').style.display = showExempt ? 'block' : 'none';
 }
 
@@ -1973,14 +1979,21 @@ function renderCopyPage() {
   const end     = Math.min(start + COPY_PAGE_SIZE, total);
   const pageRec = _copyHits.slice(start, end);
 
-  const rows = pageRec.map(r =>
-    `<div class="copy-item copy-item-preview">
-       <span class="ci-no">${esc(r.voucherNo||'(未取號)')}</span>
-       <span class="ci-type">${r.formType==='expense'?'動支':'採購'}</span>
-       <span class="ci-acct">${esc(r.acctName||'')}${r.voided?' ⛔':''}</span>
-       <span class="ci-amt">$${fmtN(r.total||0)}</span>
-     </div>`
-  ).join('');
+  const rows = pageRec.map(r => {
+    const firstItem = (r.items||[]).find(i=>i.name);
+    const itemText  = firstItem ? esc(firstItem.name) : '';
+    const desc      = r.purposeDesc ? esc(r.purposeDesc) : '';
+    const row3parts = [r.bpLabel&&`業務：${esc(r.bpLabel)}`, r.purposeName&&`用途：${esc(r.purposeName)}`, desc&&`說明：${desc}`, itemText&&`品名：${itemText}`].filter(Boolean);
+    return `<div class="copy-item copy-item-preview">
+      <div class="ci-row1">
+        <span class="ci-no">${esc(r.voucherNo||'(未取號)')}</span>
+        <span class="ci-type">${r.formType==='expense'?'動支':'採購'}</span>
+        <span class="ci-acct">${esc(r.acctName||'')}${r.voided?' ⛔':''}</span>
+        <span class="ci-amt">$${fmtN(r.total||0)}</span>
+      </div>
+      ${row3parts.length ? `<div class="ci-row3">${row3parts.join('　')}</div>` : ''}
+    </div>`;
+  }).join('');
 
   const info = `<div style="font-size:11px;color:#666;padding:4px 2px;display:flex;align-items:center;justify-content:space-between;">
     <span>第 ${start+1}–${end} 筆，共 ${pages} 頁，總筆數 ${total} 筆</span>
@@ -2199,40 +2212,40 @@ function showToast(msg) {
 <!-- ══ 複製前次單 Modal ══ -->
 <div id="copy-modal" style="display:none;">
   <div class="cm-box">
-    <h3>📋 複製前次單</h3>
+    <h3 style="font-size:17px;">📋 複製前次單</h3>
 
     <!-- ① 關鍵字搜尋 -->
-    <div style="font-size:11px; color:#777; margin-bottom:4px;">🔍 關鍵字搜尋（憑證號、科目、說明、金額…）</div>
+    <div style="font-size:12px; color:#777; margin-bottom:5px;">🔍 關鍵字搜尋（憑證號、科目、說明、金額…）</div>
     <div style="display:flex; gap:8px; margin-bottom:8px;">
       <input id="copy-kw-input" type="text" placeholder="輸入任意關鍵字…"
-             style="flex:1; padding:7px 10px; border:1.5px solid #90a4ae; border-radius:6px;
-                    font-size:13px; font-family:inherit; outline:none;"
+             style="flex:1; padding:9px 12px; border:1.5px solid #90a4ae; border-radius:6px;
+                    font-size:15px; font-family:inherit; outline:none;"
              oninput="kwSearchCopy()">
     </div>
-    <div id="copy-kw-results" style="max-height:calc(80vh - 240px); overflow-y:auto; margin-bottom:10px; flex:1;"></div>
+    <div id="copy-kw-results" style="max-height:calc(80vh - 260px); overflow-y:auto; margin-bottom:10px; flex:1;"></div>
 
     <hr style="border:none; border-top:1px solid #e0e0e0; margin:10px 0;">
 
     <!-- ② 直接輸入編號確定複製 -->
-    <div style="font-size:11px; color:#777; margin-bottom:4px;">✏️ 輸入憑證編號直接複製</div>
+    <div style="font-size:12px; color:#777; margin-bottom:5px;">✏️ 輸入憑證編號直接複製</div>
     <div style="display:flex; gap:8px; margin-bottom:10px;">
       <input id="copy-no-input" type="text" placeholder="例：115-0001"
-             style="flex:1; padding:7px 10px; border:1.5px solid #1565c0; border-radius:6px;
-                    font-size:13px; font-family:inherit; outline:none;"
+             style="flex:1; padding:9px 12px; border:1.5px solid #1565c0; border-radius:6px;
+                    font-size:15px; font-family:inherit; outline:none;"
              onkeydown="if(event.key==='Enter') doCopyByNo()">
       <button onclick="doCopyByNo()"
               style="background:#1565c0; color:#fff; border:none; border-radius:6px;
-                     padding:7px 14px; font-size:13px; font-family:inherit; cursor:pointer;">
+                     padding:10px 22px; font-size:15px; font-family:inherit; cursor:pointer; font-weight:bold;">
         複製
       </button>
     </div>
-    <div id="copy-no-err" style="display:none; color:#c62828; font-size:12px; margin-bottom:8px;">
+    <div id="copy-no-err" style="display:none; color:#c62828; font-size:13px; margin-bottom:8px;">
       ⚠ 查無此憑證編號，請確認後再試。
     </div>
 
     <button onclick="closeCopyModal()"
             style="width:100%; background:#eceff1; color:#555; border:none; border-radius:6px;
-                   padding:8px; font-size:12px; font-family:inherit; cursor:pointer;">✕ 關閉</button>
+                   padding:11px; font-size:15px; font-family:inherit; cursor:pointer; font-weight:bold;">✕ 關閉</button>
   </div>
 </div>
 </body>
