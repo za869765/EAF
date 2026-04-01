@@ -534,10 +534,8 @@ body {
   /* 金額數字加粗 */
   .amount-num { color: #000 !important; font-weight: bold !important; }
 
-  #apply-date-input  { display: none; }
-  #roc-date-text     { display: inline !important; }
-  #delivery-date     { display: none; }
-  #delivery-date-text{ display: inline !important; }
+  #apply-date-input  { display: none !important; }
+  #delivery-date     { display: none !important; }
   /* Items stretch to fill page */
   .it tbody tr { min-height: 10mm; height: auto; }
   .it td.td-name textarea, .it td.td-spec textarea {
@@ -562,7 +560,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.0.6</div>
+    <div id="sb-version">v2.0.7</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -673,9 +671,14 @@ body {
             <div id="delivery-fields" style="width:38mm; padding:2mm; display:flex; flex-direction:column; gap:2mm; justify-content:center;">
               <div>
                 <span class="cell-lbl" style="display:block; margin-bottom:1mm;">交貨日期</span>
-                <input type="date" class="fi" id="delivery-date"
-                       style="font-size:11px; width:100%;" onchange="updateDeliveryDate()">
-                <span id="delivery-date-text" style="font-size:11.5px; display:none;"></span>
+                <div style="display:flex; align-items:center; gap:2px;">
+                  <span id="delivery-date-text" style="font-size:11.5px;"></span>
+                  <button type="button" onclick="document.getElementById('delivery-date').showPicker?document.getElementById('delivery-date').showPicker():document.getElementById('delivery-date').click()"
+                          style="font-size:10px; padding:1px 4px; cursor:pointer; border:1px solid #aaa; border-radius:3px; background:#f5f5f5;">📅</button>
+                  <input type="date" id="delivery-date"
+                         style="width:0; height:0; opacity:0; position:absolute; pointer-events:none;"
+                         onchange="updateDeliveryDate()">
+                </div>
               </div>
               <div>
                 <span class="cell-lbl" style="display:block; margin-bottom:1mm;">交貨地點</span>
@@ -731,9 +734,14 @@ body {
             </div>
             <div class="l-date-cell">
               <span>申請日期</span>
-              <input type="date" id="apply-date-input" class="fi"
-                     style="width:30mm; font-size:11px;" onchange="updateRocDate()">
-              <span id="roc-date-text" style="font-size:11.5px; display:none;"></span>
+              <div style="display:flex; align-items:center; gap:2px;">
+                <span id="roc-date-text" style="font-size:11.5px;"></span>
+                <button type="button" onclick="document.getElementById('apply-date-input').showPicker?document.getElementById('apply-date-input').showPicker():document.getElementById('apply-date-input').click()"
+                        style="font-size:10px; padding:1px 4px; cursor:pointer; border:1px solid #aaa; border-radius:3px; background:#f5f5f5;">📅</button>
+                <input type="date" id="apply-date-input" class="fi"
+                       style="width:0; height:0; opacity:0; position:absolute; pointer-events:none;"
+                       onchange="updateRocDate()">
+              </div>
             </div>
           </div>
           <table class="it">
@@ -1502,10 +1510,10 @@ function setTodayDate() {
 }
 function updateRocDate() {
   const v = document.getElementById('apply-date-input').value;
-  if (!v) return;
+  const el = document.getElementById('roc-date-text');
+  if (!v) { el.textContent = ''; return; }
   const d = new Date(v+'T00:00:00');
-  document.getElementById('roc-date-text').textContent =
-    (d.getFullYear()-1911)+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
+  el.textContent = (d.getFullYear()-1911)+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
 }
 function updateDeliveryDate() {
   const v = document.getElementById('delivery-date').value;
