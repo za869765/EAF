@@ -459,9 +459,18 @@ body {
     padding: 0; box-shadow: none;
     display: flex; flex-direction: column;
   }
-  /* ── 黑白列印：所有文字強制黑色、背景白色 ── */
+  /* ── 黑白列印：所有文字強制黑色、背景透明 ── */
   * { color: #000 !important; background: transparent !important;
-      -webkit-print-color-adjust: exact; }
+      -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* 斜線格：覆蓋上方 transparent，強制印出漸層斜線 */
+  .sg td.slash {
+    background: linear-gradient(to bottom right,
+      transparent calc(50% - .6px), #000 calc(50% - .6px),
+      #000 calc(50% + .6px), transparent calc(50% + .6px)) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 
   /* 框線全黑加深 */
   .ut td, .sg td, .it th, .it td, .bs td,
@@ -530,7 +539,7 @@ body {
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v1.7.5</div>
+    <div id="sb-version">v1.7.6</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
