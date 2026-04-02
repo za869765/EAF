@@ -433,6 +433,37 @@ body.sb-resizing * { pointer-events: none !important; }
   animation: scmFade .18s ease;
 }
 @keyframes scmFade { from { opacity:0; } to { opacity:1; } }
+
+/* ── 尚未存檔警示 Modal ── */
+#unsaved-modal {
+  position: fixed; inset: 0; z-index: 9900;
+  background: rgba(0,0,0,.55);
+  display: flex; align-items: center; justify-content: center;
+  animation: scmFade .15s ease;
+}
+.unsaved-box {
+  background: #fff; border-radius: 14px;
+  padding: 32px 40px; min-width: 300px; max-width: 88vw;
+  box-shadow: 0 12px 48px rgba(0,0,0,.38);
+  text-align: center;
+  animation: unsavedShake .45s ease;
+}
+@keyframes unsavedShake {
+  0%   { transform: translateY(16px) rotate(0deg); opacity:0; }
+  30%  { transform: translateY(0) rotate(-2deg); opacity:1; }
+  55%  { transform: rotate(2deg); }
+  75%  { transform: rotate(-1.2deg); }
+  90%  { transform: rotate(.6deg); }
+  100% { transform: none; }
+}
+.unsaved-icon  { font-size: 42px; margin-bottom: 10px; }
+.unsaved-title { font-size: 16px; font-weight: bold; color: #b71c1c; margin-bottom: 8px; }
+.unsaved-msg   { font-size: 13px; color: #555; line-height: 1.75; margin-bottom: 24px;
+                 font-family: 'Microsoft JhengHei','微軟正黑體',sans-serif; }
+.unsaved-ok    { background: #1565c0; color: #fff; border: none; border-radius: 7px;
+                 padding: 10px 40px; font-size: 14px; font-family: inherit;
+                 cursor: pointer; transition: background .15s; }
+.unsaved-ok:hover { background: #1976d2; }
 .scm-box {
   background: #fff; border-radius: 12px; padding: 30px 36px;
   box-shadow: 0 10px 48px rgba(0,0,0,.35);
@@ -623,7 +654,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.29</div>
+    <div id="sb-version">v2.4.30</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -952,6 +983,7 @@ function getAutoText(key, fallback) {
 }
 let currentId = null;
 let formType  = 'purchase';   /* 'purchase' | 'expense' */
+let _editingSaved = false;    /* 是否正在修改已存檔紀錄（未確定存檔前攔截切換） */
 let rowCount  = 10;
 let cachedRecords = [];
 const API = '/api/records';
@@ -2068,6 +2100,18 @@ async function loadRecord(id) {
   } catch(_) {}
 }
 
+function showUnsavedWarning() {
+  const m = document.getElementById('unsaved-modal');
+  m.style.display = '';
+  const box = m.querySelector('.unsaved-box');
+  box.style.animation = 'none';
+  box.offsetHeight;   /* reflow 重觸發動畫 */
+  box.style.animation = '';
+}
+function closeUnsavedModal() {
+  document.getElementById('unsaved-modal').style.display = 'none';
+}
+
 function cancelEdit() {
   if (currentId) {
     loadRecord(currentId);
@@ -2113,7 +2157,10 @@ function renderHistory(records) {
       <div class="h-date">${esc(rec.savedAt||'')}　${isExp?'[動支]':'[採購]'}${isVoid?' ⛔':''}</div>
       <div class="h-title">${esc(rec.voucherNo||'')} ${esc(rec.acctName)} / ${esc(rec.bpLabel)}</div>
       <div class="h-amount">$${fmtN(rec.total)}　${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</div>`;
-    div.onclick = () => loadRecord(rec.id);
+    div.onclick = () => {
+      if (_editingSaved) { showUnsavedWarning(); return; }
+      loadRecord(rec.id);
+    };
     wrap.appendChild(div);
   });
 }
@@ -2122,6 +2169,9 @@ function renderHistory(records) {
    LOCK / UNLOCK
    ══════════════════════ */
 function lockForm() {
+  _editingSaved = false;
+  document.getElementById('save-btn').innerHTML   = '💾 存檔取號';
+  document.getElementById('cancel-btn').innerHTML = '✕ 取消';
   const page = document.getElementById('form-page');
   page.classList.remove('inactive');
   page.classList.add('locked');
@@ -2163,6 +2213,9 @@ function editSaved() {
   _setBtn('print-btn',   'none');
   _setBtn('copy-no-btn', 'none');
   _setBtn('edit-btn',    'none');
+  _editingSaved = true;
+  document.getElementById('save-btn').innerHTML   = '💾 確定存檔';
+  document.getElementById('cancel-btn').innerHTML = '✕ 放棄修改';
 }
 function hideAllBtns() {
   ['save-btn','cancel-btn','clear-btn','copy-btn','print-btn','copy-no-btn','edit-btn']
@@ -3035,6 +3088,16 @@ function showCopyPopup(no, opts = {}) {
   });
 })();
 </script>
+
+<!-- ══ 尚未存檔警示 Modal ══ -->
+<div id="unsaved-modal" style="display:none;">
+  <div class="unsaved-box">
+    <div class="unsaved-icon">⚠️</div>
+    <div class="unsaved-title">目前修改的尚未存檔</div>
+    <div class="unsaved-msg">請先按「確定存檔」儲存，<br>或按「放棄修改」離開編輯模式。</div>
+    <button class="unsaved-ok" onclick="closeUnsavedModal()">確定</button>
+  </div>
+</div>
 
 <!-- ══ 通用確認 Modal ══ -->
 <div id="confirm-modal" style="display:none;">
