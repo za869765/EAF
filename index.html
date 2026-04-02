@@ -654,7 +654,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;}">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.31</div>
+    <div id="sb-version">v2.4.32</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1055,15 +1055,71 @@ async function handlePrint() {
 /* ══════════════════════
    FORM TYPE
    ══════════════════════ */
-function toggleType() {
-  /* 切換類型，保留表單資料 */
-  applyType(formType === 'purchase' ? 'expense' : 'purchase');
-  /* 更新草稿列（如有）的類型標示 */
+function checkHasValidRows() {
+  const isExp = formType === 'expense';
+  for (let i = 0; i < rowCount; i++) {
+    const name  = (qv(i,'name')  || '').trim();
+    const price = parseFloat(qv(i,'price')) || 0;
+    if (isExp) {
+      if (name && price !== 0) return true;
+    } else {
+      const qty = parseFloat(qv(i,'qty')) || 0;
+      if (name && qty !== 0 && price !== 0) return true;
+    }
+  }
+  return false;
+}
+
+async function toggleType() {
+  const targetType  = formType === 'purchase' ? 'expense' : 'purchase';
+  const targetLabel = targetType === 'purchase' ? '請購單' : '動支單';
+
+  /* 切換前記錄目前選擇的業務計畫 / 用途別 */
+  const bpSel   = document.getElementById('sel-bp');
+  const purSel  = document.getElementById('sel-purpose');
+  const curBpCode  = bpSel.value;
+  const curBpName  = curBpCode ? (bpSel.options[bpSel.selectedIndex]?.text || curBpCode).replace(/^\S+\s+/,'').trim() : '';
+  const curPurCode = purSel.value;
+  const curPurName = curPurCode ? (purSel.options[purSel.selectedIndex]?.text || curPurCode).replace(/^\S+\s+/,'').trim() : '';
+
+  /* ① 已有有效資料 → 詢問是否確定清空 */
+  if (checkHasValidRows()) {
+    const ok = await showConfirm(
+      `切換至<strong>${targetLabel}</strong>後，下方表格資料將變為空白。<br>是否確定切換？`,
+      { title:`切換至 ${targetLabel}`, icon:'⚠️',
+        okText:`確定切換${targetLabel}`, cancelText:'取消', okClass:'blue' }
+    );
+    if (!ok) return;
+  }
+
+  /* 執行切換 */
+  applyType(targetType);
+
+  /* 更新草稿列標示 */
   const draft = document.getElementById('draft-item');
   if (draft) {
     draft.className = 'h-item active' + (formType==='expense'?' expense':'');
     draft.querySelector('.h-date').textContent =
       (formType==='expense'?'[動支]':'[採購]') + '　編輯中';
+  }
+
+  /* ② 業務計畫在新類型下不存在 → 提示 */
+  if (curBpCode) {
+    const bpLost = (targetType === 'expense'  && curBpCode === '110404') ||
+                   (targetType === 'purchase' && curBpCode === '330101');
+    if (bpLost) {
+      showAlert(`${targetLabel} 沒有「${curBpName}」業務計畫，請重新選擇。`, '⚠️');
+      return;
+    }
+  }
+
+  /* ③ 用途別在新類型下不存在 → 提示 */
+  if (curPurCode) {
+    const purLost = (targetType === 'purchase' && EXPENSE_ONLY_PURPOSES.includes(curPurCode)) ||
+                    (targetType === 'expense'  && PURCHASE_ONLY_PURPOSES.includes(curPurCode));
+    if (purLost) {
+      showAlert(`${targetLabel} 沒有「${curPurName}」用途別，請重新選擇。`, '⚠️');
+    }
   }
 }
 
@@ -1703,7 +1759,7 @@ function delRow() {
 
 /* ── 通用確認 Modal（Promise-based，await 使用） ── */
 let _confirmResolve = () => {};
-function showConfirm(msg, { title='請確認', icon='❓', okClass='' } = {}) {
+function showConfirm(msg, { title='請確認', icon='❓', okClass='', okText='確定', cancelText='取消' } = {}) {
   return new Promise(resolve => {
     _confirmResolve = (val) => {
       document.getElementById('confirm-modal').style.display = 'none';
@@ -1713,7 +1769,9 @@ function showConfirm(msg, { title='請確認', icon='❓', okClass='' } = {}) {
     document.getElementById('confirm-title').textContent = title;
     document.getElementById('confirm-msg').innerHTML     = msg;
     const okBtn = document.getElementById('confirm-ok-btn');
-    okBtn.className = 'confirm-ok' + (okClass ? ' '+okClass : '');
+    okBtn.className   = 'confirm-ok' + (okClass ? ' '+okClass : '');
+    okBtn.textContent = okText;
+    document.getElementById('confirm-cancel-btn').textContent = cancelText;
     document.getElementById('confirm-modal').style.display = '';
   });
 }
@@ -3108,8 +3166,8 @@ function showCopyPopup(no, opts = {}) {
     <div class="confirm-title" id="confirm-title"></div>
     <div class="confirm-msg"   id="confirm-msg"></div>
     <div class="confirm-btns">
-      <button class="confirm-cancel" onclick="_confirmResolve(false)">取消</button>
-      <button class="confirm-ok"     id="confirm-ok-btn" onclick="_confirmResolve(true)">確定</button>
+      <button class="confirm-cancel" id="confirm-cancel-btn" onclick="_confirmResolve(false)">取消</button>
+      <button class="confirm-ok"     id="confirm-ok-btn"     onclick="_confirmResolve(true)">確定</button>
     </div>
   </div>
 </div>
