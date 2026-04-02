@@ -623,7 +623,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.20</div>
+    <div id="sb-version">v2.4.26</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1227,7 +1227,8 @@ function onMainChange() {
   bpSel.innerHTML = '<option value="">── 選擇業務計畫 ──</option>';
   if (acct) {
     acct.businessPlans
-      .filter(bp => !(formType === 'expense' && bp.code === '110404'))  /* 110404 僅限請購單 */
+      .filter(bp => !(formType === 'expense'  && bp.code === '110404'))  /* 110404 僅限請購單 */
+      .filter(bp => !(formType === 'purchase' && bp.code === '330101'))  /* 330101 僅限動支單 */
       .forEach(bp => bpSel.appendChild(new Option(bp.code+'　'+bp.name, bp.code)));
     document.getElementById('row-bp').style.display = '';
   } else { document.getElementById('row-bp').style.display = 'none'; }
