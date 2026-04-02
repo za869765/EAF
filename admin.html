@@ -1689,7 +1689,7 @@ function renderRptDashboard(active) {
 
   /* 累積賸餘已內嵌至主科目分布面板底部 */
 
-  /* ── 醫療用品（含月份柱狀圖，只顯示有資料的月） ── */
+  /* ── 醫療用品（大圖趨勢，僅顯示有資料的月） ── */
   const medRecs = active.filter(r => (r.bpLabel||'').includes('醫療用品'));
   const medPanel = medRecs.length ? (() => {
     const total = medRecs.reduce((s,r)=>s+(Number(r.total)||0),0);
@@ -1698,24 +1698,23 @@ function renderRptDashboard(active) {
       const m = parseInt((r.applyDateRoc||'').replace(/.*?(\d+)月.*/, '$1')) || 0;
       if (m) monthly[m] = (monthly[m]||0) + (Number(r.total)||0);
     });
-    const months = Object.entries(monthly).sort((a,b)=>a[0]-b[0]);
+    const months = Object.entries(monthly).sort((a,b)=>+a[0]-+b[0]);
     const maxM = Math.max(...months.map(([,v])=>v), 1);
-    return `<div class="rpt-dash-panel" style="min-width:150px; max-width:220px;">
-      <div class="rpt-dash-title" style="font-size:12px;">💊 醫療用品</div>
-      <div style="text-align:center;margin:4px 0;">
-        <div style="font-size:18px;font-weight:700;color:#00838f;">$${fmtN(total)}</div>
-        <div style="font-size:10px;color:#78909c;">${medRecs.length} 筆</div>
-      </div>
-      ${months.length ? `<div style="display:flex;align-items:flex-end;gap:3px;height:55px;margin-top:4px;">
-        ${months.map(([m,amt])=>{
-          const h = Math.round(amt/maxM*100);
-          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;" title="${m}月 $${fmtN(amt)}">
-            <div style="font-size:7px;color:#546e7a;margin-bottom:1px;">$${fmtN(amt)}</div>
-            <div style="width:100%;max-width:24px;height:${h}%;min-height:3px;background:#00838f;border-radius:2px 2px 0 0;opacity:.75;"></div>
-            <div style="font-size:8px;color:#90a4ae;margin-top:2px;">${m}月</div>
+    const medClrs = ['#00838f','#00796b','#006064','#00897b','#00acc1','#0097a7','#00838f','#00695c','#004d40','#006064','#00838f','#0097a7'];
+    return `<div class="rpt-dash-panel" style="min-width:240px;">
+      <div class="rpt-dash-title">💊 醫療用品　<span style="font-size:12px;color:#00838f;font-weight:700;">$${fmtN(total)}</span>　<span style="font-size:11px;color:#90a4ae;font-weight:400;">${medRecs.length} 筆</span></div>
+      <div style="display:flex; align-items:flex-end; height:100px; gap:6px; padding: 4px 0 0;">
+        ${months.map(([m,amt],i)=>{
+          const pct = Math.round(amt/maxM*100);
+          return `<div class="cbar-col" title="${m}月 $${fmtN(amt)}">
+            <div class="cbar-amt-lbl" style="color:#00838f;">$${fmtN(amt)}</div>
+            <div class="cbar-bar-inner" style="height:${pct}%;background:linear-gradient(to top,${medClrs[i%medClrs.length]},#b2ebf2);"></div>
           </div>`;
         }).join('')}
-      </div>` : ''}
+      </div>
+      <div style="display:flex; gap:6px; margin-top:4px;">
+        ${months.map(([m])=>`<div style="flex:1;text-align:center;"><span class="cbar-month-lbl">${m}月</span></div>`).join('')}
+      </div>
     </div>`;
   })() : '';
   dash.innerHTML = `<div class="rpt-dash-grid">${barChart}${acctPanel}${purpPanel}${typePanel}${medPanel}</div>`;
