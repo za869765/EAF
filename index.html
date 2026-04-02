@@ -623,7 +623,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.18</div>
+    <div id="sb-version">v2.4.19</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2875,6 +2875,92 @@ function showCopyPopup(no, opts = {}) {
     _cpTimer = setTimeout(() => { pop.className = ''; pop.style.display = 'none'; }, 280);
   }, duration);
 }
+
+/* ══════════════════════════════════════════════════
+   表格方向鍵導航
+   上/下：同欄跨列移動（textarea 在首/末行才觸發）
+   左/右：欄間移動（input 在首/末位才觸發，textarea 同理）
+   e.isComposing：輸入法選字中不觸發
+   ══════════════════════════════════════════════════ */
+(function initTableArrowNav() {
+  const COLS = {
+    expense:  ['name', 'price'],
+    purchase: ['name', 'spec', 'qty', 'unit', 'price'],
+  };
+
+  document.addEventListener('keydown', function (e) {
+    if (e.isComposing) return;           /* 輸入法選字中不攔截 */
+    const dir = e.key;
+    if (!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(dir)) return;
+
+    const el = e.target;
+    const r  = parseInt(el.dataset.r);
+    const c  = el.dataset.c;
+    if (isNaN(r) || !c) return;          /* 不在表格欄位 */
+
+    const cols    = COLS[formType] || [];
+    const colIdx  = cols.indexOf(c);
+    if (colIdx === -1) return;
+
+    const isTA    = el.tagName === 'TEXTAREA';
+    const val     = el.value;
+    const pos     = isTA ? el.selectionStart : null;
+
+    /* ── 上/下：只在 textarea 首/末行（或 input）時觸發 ── */
+    if (dir === 'ArrowUp' || dir === 'ArrowDown') {
+      if (isTA) {
+        const before = val.substring(0, pos);
+        const after  = val.substring(pos);
+        if (dir === 'ArrowUp'   && before.includes('\n')) return;
+        if (dir === 'ArrowDown' && after.includes('\n'))  return;
+      }
+      const targetR = dir === 'ArrowUp' ? r - 1 : r + 1;
+      const target  = document.querySelector(`[data-r="${targetR}"][data-c="${c}"]`);
+      if (!target) return;
+      e.preventDefault();
+      target.focus();
+      if (target.tagName === 'TEXTAREA') {
+        const tLen = target.value.length;
+        const tPos = dir === 'ArrowUp' ? tLen : 0;
+        target.setSelectionRange(tPos, tPos);
+      } else {
+        target.select();
+      }
+      return;
+    }
+
+    /* ── 左/右：在首/末位時跨欄 ── */
+    if (dir === 'ArrowLeft') {
+      if (isTA && pos > 0) return;
+      if (!isTA && el.selectionStart > 0) return;
+      let tR = r, tColIdx = colIdx - 1;
+      if (tColIdx < 0) { tR--; tColIdx = cols.length - 1; }
+      if (tR < 0) return;
+      e.preventDefault();
+      const target = document.querySelector(`[data-r="${tR}"][data-c="${cols[tColIdx]}"]`);
+      if (!target) return;
+      target.focus();
+      const tLen = target.value.length;
+      if (target.tagName === 'TEXTAREA') target.setSelectionRange(tLen, tLen);
+      else target.setSelectionRange(tLen, tLen);
+      return;
+    }
+
+    if (dir === 'ArrowRight') {
+      const atEnd = isTA ? pos === val.length : el.selectionEnd === val.length;
+      if (!atEnd) return;
+      let tR = r, tColIdx = colIdx + 1;
+      if (tColIdx >= cols.length) { tR++; tColIdx = 0; }
+      if (tR >= rowCount) return;
+      e.preventDefault();
+      const target = document.querySelector(`[data-r="${tR}"][data-c="${cols[tColIdx]}"]`);
+      if (!target) return;
+      target.focus();
+      if (target.tagName === 'TEXTAREA') target.setSelectionRange(0, 0);
+      else target.setSelectionRange(0, 0);
+    }
+  });
+})();
 </script>
 
 <!-- ══ 通用確認 Modal ══ -->
