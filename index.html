@@ -622,7 +622,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.11</div>
+    <div id="sb-version">v2.4.12</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2197,33 +2197,63 @@ function calcDeductions(total) {
   return null;
 }
 
-/* ── 餐費時間區間檢查 ──
-   若用途說明含「餐費」，且 用途說明＋其他說明事項 均未出現橫跨 6:00/12:00/18:00 的時間區間，
-   回傳提醒文字；否則回傳 null。 ── */
+/* ── 餐費綜合提醒（時間區間 + 日期一致性）──
+   若用途說明含「餐費」，同時檢查：
+   ① 用途說明＋其他說明事項 是否含橫跨 6:00/12:00/18:00 的時間區間
+   ② 用途說明中的日期 是否與交貨日期（請購）或申請日期（動支）相符
+   有問題時回傳提醒文字；全部通過回傳 null。 ── */
 function checkMealTimeRange() {
   const desc  = (document.getElementById('purpose-desc')?.value || '');
   const notes = (document.getElementById('notes')?.value || '');
   if (!desc.includes('餐費')) return null;   /* 無「餐費」→ 不需檢查 */
 
-  const combined = desc + ' ' + notes;
-  const TARGETS  = [6 * 60, 12 * 60, 18 * 60];   /* 6:00 / 12:00 / 18:00（分鐘） */
+  const warnings = [];
 
-  /* 匹配 HH:MM(-/~/～/到/至)HH:MM，支援全形冒號與常見分隔符 */
+  /* ── ① 時間區間檢查 ── */
+  const combined = desc + ' ' + notes;
+  const TARGETS  = [6 * 60, 12 * 60, 18 * 60];
   const RE = /(\d{1,2})[：:](\d{2})\s*[-~～→至到]\s*(\d{1,2})[：:](\d{2})/g;
-  let m;
+  let m, hasValidTime = false;
   while ((m = RE.exec(combined)) !== null) {
-    const s = parseInt(m[1]) * 60 + parseInt(m[2]);  /* 開始分鐘 */
-    const e = parseInt(m[3]) * 60 + parseInt(m[4]);  /* 結束分鐘 */
+    const s = parseInt(m[1]) * 60 + parseInt(m[2]);
+    const e = parseInt(m[3]) * 60 + parseInt(m[4]);
     for (const t of TARGETS) {
-      /* 正常區間（s ≤ e）：目標落在 [s, e] */
-      if (s <= e) { if (s <= t && t <= e) return null; }
-      /* 跨午夜區間（s > e）：目標落在 [s,∞) 或 [0, e] */
-      else { if (t >= s || t <= e) return null; }
+      if (s <= e) { if (s <= t && t <= e) { hasValidTime = true; break; } }
+      else        { if (t >= s || t <= e) { hasValidTime = true; break; } }
+    }
+    if (hasValidTime) break;
+  }
+  if (!hasValidTime) {
+    warnings.push('「用途說明」或「其他說明事項」中未偵測到橫跨 6:00、12:00 或 18:00 的用餐時間區間，' +
+                  '建議補充如 <strong>11:30-13:00</strong> 的用餐時段。');
+  }
+
+  /* ── ② 日期一致性檢查 ── */
+  const rocM = desc.match(/(\d{2,3})年(\d{1,2})月(\d{1,2})日/);
+  if (rocM) {
+    const descYear  = parseInt(rocM[1]) + 1911;
+    const descMonth = parseInt(rocM[2]);
+    const descDay   = parseInt(rocM[3]);
+    /* 請購單用交貨日期，動支單用申請日期 */
+    const isPurchase  = formType === 'purchase';
+    const dateElId    = isPurchase ? 'delivery-date' : 'apply-date-input';
+    const dateLbl     = isPurchase ? '交貨日期' : '申請日期';
+    const dateVal     = document.getElementById(dateElId)?.value;
+    if (dateVal) {
+      const fd = new Date(dateVal + 'T00:00:00');
+      const fy = fd.getFullYear(), fm = fd.getMonth()+1, fd2 = fd.getDate();
+      if (fy !== descYear || fm !== descMonth || fd2 !== descDay) {
+        const descStr = `${rocM[1]}年${descMonth}月${descDay}日`;
+        const formStr = `${fy-1911}年${fm}月${fd2}日`;
+        warnings.push(`用途說明日期（<strong>${descStr}</strong>）與${dateLbl}（<strong>${formStr}</strong>）不符，請確認是否正確。`);
+      }
     }
   }
-  /* 找不到符合的時間區間 → 回傳提醒 */
-  return '⚠️ 餐費提醒：「用途說明」或「其他說明事項」中未偵測到橫跨 6:00、12:00 或 18:00 的用餐時間區間。' +
-         '<br>建議補充如 <strong>11:30-13:00</strong> 的用餐時段（可直接按「確定存檔」繼續）。';
+
+  if (!warnings.length) return null;
+  return '⚠️ 餐費提醒：<br>' +
+         warnings.map(w => `・${w}`).join('<br>') +
+         '<br><span style="color:#78909c;">（可直接按「確定存檔」繼續）</span>';
 }
 
 function openSaveConfirmModal() {
