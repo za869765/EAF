@@ -91,6 +91,16 @@ body {
 /* 已作廢的歷史列 */
 .h-item.voided { opacity: .65; border-left-color: #555 !important; }
 .h-item.voided .h-title { text-decoration: line-through; color: #b0bec5; }
+/* 科目別卡片底色（微色調，不影響文字可讀性） */
+.h-item.acct-medical   { background: #1f3145; border-left-color: #42a5f5; }
+.h-item.acct-custody   { background: #1e3228; border-left-color: #66bb6a; }
+.h-item.acct-insurance { background: #2d2a1c; border-left-color: #ffb74d; }
+.h-item.acct-medical:hover   { background: #273d52; }
+.h-item.acct-custody:hover   { background: #253b30; }
+.h-item.acct-insurance:hover { background: #373220; }
+.h-item.acct-medical.active   { border-left-color: #90caf9 !important; }
+.h-item.acct-custody.active   { border-left-color: #a5d6a7 !important; }
+.h-item.acct-insurance.active { border-left-color: #ffe082 !important; }
 /* 作廢浮水印（表單鎖定時） */
 #void-stamp {
   position: absolute; inset: 0; z-index: 50;
@@ -654,7 +664,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;}">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.34</div>
+    <div id="sb-version">v2.4.35</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2203,10 +2213,19 @@ function renderHistory(records) {
     const isExp   = rec.formType==='expense';
     const isVoid  = !!rec.voided;
     const div = document.createElement('div');
+    const acctClass = (rec.acctName||'').includes('醫療基金') ? 'acct-medical' :
+                      (rec.acctName||'').includes('保管款')   ? 'acct-custody' :
+                      (rec.acctName||'').includes('健保款')   ? 'acct-insurance' : '';
+    const tot = Number(rec.total)||0;
+    const amtStyle = tot >= 100000 ? 'font-size:14px;font-weight:bold;color:#ffca28;' :
+                     tot >= 10000  ? 'font-size:13px;font-weight:600;color:#a5d6a7;' :
+                     tot >= 1000   ? 'font-size:12px;color:#66bb6a;' :
+                                     'font-size:11.5px;color:#78909c;';
     div.className = 'h-item'
       +(rec.id===currentId?' active':'')
       +(isExp?' expense':'')
-      +(isVoid?' voided':'');
+      +(isVoid?' voided':'')
+      +(acctClass?' '+acctClass:'');
     div.dataset.id = rec.id;
     div.innerHTML = `
       ${isVoid
@@ -2215,7 +2234,7 @@ function renderHistory(records) {
       }
       <div class="h-date">${esc(rec.savedAt||'')}　${isExp?'[動支]':'[採購]'}${isVoid?' ⛔':''}</div>
       <div class="h-title">${esc(rec.voucherNo||'')} ${esc(rec.acctName)} / ${esc(rec.bpLabel)}</div>
-      <div class="h-amount">$${fmtN(rec.total)}　${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</div>`;
+      <div class="h-amount" style="${amtStyle}">$${fmtN(rec.total)}　${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</div>`;
     div.onclick = () => {
       if (_editingSaved) { showUnsavedWarning(); return; }
       loadRecord(rec.id);
@@ -2616,12 +2635,16 @@ function checkSuspicious() {
   const total = getCurrentTotal();
   if (total > 999999)
     warns.push(`金額合計 $${fmtN(total)} 超過 $999,999，請確認是否正確`);
-  else if (total > 0 && total < 99)
-    warns.push(`金額合計 $${fmtN(total)} 低於 $99，金額是否有誤？`);
+  else if (total > 0 && total < 30)
+    warns.push(`金額合計 $${fmtN(total)} 低於 $30，金額是否有誤？`);
 
-  /* 9. 機關名稱「台」字 */
-  if (/台南/.test(allText))
-    warns.push('內容中出現「台南」，正式全銜應為「臺南市佳里區衛生所」（臺字），請確認');
+  /* 9. 機關名稱「台」字（僅比對完整九字） */
+  if (/台南市佳里區衛生所/.test(allText))
+    warns.push('內容中出現「台南市佳里區衛生所」，正式全銜第一字應為「臺」（臺南市佳里區衛生所），請確認');
+
+  /* 10. 家裡 → 佳里 疑似錯字 */
+  if (/家裡/.test(allText))
+    warns.push('內容中出現「家裡」，是否為「佳里」之誤？請再確認');
 
   return warns;
 }
