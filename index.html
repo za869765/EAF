@@ -652,9 +652,9 @@ body.sb-resizing * { pointer-events: none !important; }
   <div id="sb-header">
     <div id="sb-top">
       <h2>⚙ 動支管理系統</h2>
-      <a id="admin-link" href="admin.html">管理入口</a>
+      <a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;}">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.30</div>
+    <div id="sb-version">v2.4.31</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2061,6 +2061,7 @@ async function saveRecord() {
 
 async function voidRecord(id, e) {
   e.stopPropagation();
+  if (_editingSaved) { showUnsavedWarning(); return; }
   const rec = cachedRecords.find(r=>r.id===id);
   if (!rec || rec.voided) return; /* 已作廢者不可再操作 */
   const ok = await showConfirm(
@@ -2815,6 +2816,7 @@ function copyFromRecord(id) {
 }
 
 function newForm(type) {
+  if (_editingSaved) { showUnsavedWarning(); return; }
   currentId = null;
   rowCount = 10;
   isLecturer = '';
