@@ -623,7 +623,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.17</div>
+    <div id="sb-version">v2.4.18</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1544,6 +1544,16 @@ function generateItemRows() {
   for (let i = 0; i < rowCount; i++) appendRow(i);
 }
 
+/* ── 數量欄 Tab → 同列單位欄（讓 lang="zh-TW" 提示 IME 切中文） ── */
+function qtyTabToUnit(e, rowIdx) {
+  if (e.key !== 'Tab' || e.shiftKey) return;
+  const unit = document.querySelector(`[data-r="${rowIdx}"][data-c="unit"]`);
+  if (!unit) return;
+  e.preventDefault();
+  unit.focus();
+  unit.select();
+}
+
 /* ── 金額欄 Tab → 下一列動支說明／採購品名，並以程式化 focus 帶動輸入法切換提示 ── */
 function priceTabToNextName(e, rowIdx) {
   if (e.key !== 'Tab' || e.shiftKey) return;
@@ -1569,8 +1579,8 @@ function appendRow(i) {
     tr.innerHTML = `
       <td class="td-name"><textarea data-r="${i}" data-c="name" rows="1" lang="zh-TW" oninput="autoResize(this)"></textarea></td>
       <td class="td-spec"><textarea data-r="${i}" data-c="spec" rows="1" oninput="autoResize(this)"></textarea></td>
-      <td class="td-r"><input type="text" inputmode="decimal" data-r="${i}" data-c="qty" style="text-align:right;" oninput="validateQty(this,${i})"></td>
-      <td style="text-align:center;"><input type="text" data-r="${i}" data-c="unit" style="text-align:center;"></td>
+      <td class="td-r"><input type="text" inputmode="decimal" data-r="${i}" data-c="qty" style="text-align:right;" oninput="validateQty(this,${i})" onkeydown="qtyTabToUnit(event,${i})"></td>
+      <td style="text-align:center;"><input type="text" data-r="${i}" data-c="unit" lang="zh-TW" style="text-align:center; ime-mode:active;"></td>
       <td class="td-r"><input type="text" inputmode="decimal" data-r="${i}" data-c="price" style="text-align:right;"
                oninput="validatePrice(this,${i})"
                onkeydown="priceTabToNextName(event,${i})"></td>
