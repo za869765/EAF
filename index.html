@@ -665,7 +665,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v2.4.43</div>
+      <div id="sb-version">v2.4.44</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1055,7 +1055,7 @@ window.addEventListener('afterprint', () => {
 /* 列印攔截：首次列印前顯示鎖定警告 */
 async function handlePrint() {
   const rec = currentId ? cachedRecords.find(r => r.id === currentId) : null;
-  if (rec && !rec.printed) {
+  if (rec && !rec.printed && !rec.locked) {
     const ok = await showConfirm(
       '列印後，此表單將<strong>永久鎖定</strong>，不可再修改。<br><br>確定要列印嗎？',
       { title: '確認列印', icon: '🖨️' }
