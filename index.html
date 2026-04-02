@@ -665,7 +665,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v2.4.41</div>
+      <div id="sb-version">v2.4.42</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -710,7 +710,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <div class="u-main-acct" id="main-acct-lbl">請選擇</div>
       <div class="u-title-wrap">
         <div class="u-org" id="org-name">臺南市佳里區衛生所</div>
-        <div class="u-sub" id="form-subtitle">採購申請單暨黏貼憑證用紙</div>
+        <div class="u-sub" id="form-subtitle">臺南市佳里區衛生所財物請(修)購單暨黏貼憑證用紙</div>
       </div>
     </div>
 
@@ -850,7 +850,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <table class="lower-wrap"><tbody><tr>
         <td class="lower-left">
           <div class="l-top-bar">
-            <div class="l-top-title" id="lower-title">採購申請單</div>
+            <div class="l-top-title" id="lower-title">臺南市佳里區衛生所財物請(修)購單</div>
           </div>
           <div class="l-unit-row">
             <div class="l-unit-cell">
@@ -1113,7 +1113,7 @@ async function toggleType() {
   if (draft) {
     draft.className = 'h-item active' + (formType==='expense'?' expense':'');
     draft.querySelector('.h-date').textContent =
-      (formType==='expense'?'[動支]':'[採購]') + '　編輯中';
+      (formType==='expense'?'[動支單]':'[請購單]') + '　編輯中';
   }
 
   /* ② 業務計畫在新類型下不存在 → 提示 */
@@ -1152,10 +1152,10 @@ function applyType(type, { regen = true } = {}) {
 
   /* 副標題 */
   document.getElementById('form-subtitle').textContent =
-    isPurchase ? '採購申請單暨黏貼憑證用紙' : '費用動支申請單暨黏貼憑證用紙';
+    isPurchase ? '臺南市佳里區衛生所財物請(修)購單暨黏貼憑證用紙' : '臺南市佳里區衛生所費用動支請示單暨黏貼憑證用紙';
 
   /* 下方標題 */
-  document.getElementById('lower-title').textContent = isPurchase ? '採購申請單' : '費用動支申請單';
+  document.getElementById('lower-title').textContent = isPurchase ? '臺南市佳里區衛生所財物請(修)購單' : '臺南市佳里區衛生所費用動支請示單';
 
   /* 上方核章斜線：動支單 → 保管/採購/財物登記 三格加斜線 */
   ['sg-custody','sg-purchase','sg-financial'].forEach(id => {
@@ -2235,7 +2235,7 @@ function renderHistory(records) {
         ? '<span class="h-void-stamp" title="已作廢，留存備查">⛔</span>'
         : `<button class="h-void" onclick="voidRecord('${rec.id}',event)" title="點擊作廢此筆">✕</button>`
       }
-      <div class="h-date">${esc(rec.savedAt||'')}　${isExp?'[動支]':'[採購]'}${isVoid?' ⛔':''}</div>
+      <div class="h-date">${esc(rec.savedAt||'')}　${isExp?'[動支單]':'[請購單]'}${isVoid?' ⛔':''}</div>
       <div class="h-title">${esc(rec.voucherNo||'')} ${esc(rec.acctName)} / ${esc(rec.bpLabel)}</div>
       <div class="h-amount" style="${amtStyle}">$${fmtN(rec.total)}　${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</div>`;
     div.onclick = () => {
@@ -2648,6 +2648,10 @@ function checkSuspicious() {
   /* 10. 家裡 → 佳里 疑似錯字 */
   if (/家裡/.test(allText))
     warns.push('內容中出現「家裡」，是否為「佳里」之誤？請再確認');
+
+  /* 11. 合適/合式 → 核示 疑似錯字 */
+  if (/合適|合式/.test(allText))
+    warns.push('內容中出現「合適」或「合式」，是否為「核示」之誤？請再確認');
 
   return warns;
 }
