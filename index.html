@@ -654,7 +654,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;}">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.33</div>
+    <div id="sb-version">v2.4.34</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2555,8 +2555,79 @@ function openSaveConfirmModal() {
   document.getElementById('save-confirm-modal').style.display = '';
 }
 
-function confirmSave() {
-  /* 先驗證表單 */
+function checkSuspicious() {
+  const warns = [];
+  const isPurchase = formType === 'purchase';
+  const curRocYear = new Date().getFullYear() - 1911;
+  const oldThreshold = curRocYear - 4;  /* e.g. 115-4=111 */
+
+  /* 收集所有文字欄位 */
+  const allParts = [
+    document.getElementById('purpose-desc').value,
+    document.getElementById('notes').value,
+    isPurchase ? (document.getElementById('delivery-place')?.value||'') : '',
+  ];
+  for (let i = 0; i < rowCount; i++) {
+    allParts.push(qv(i,'name'), qv(i,'spec')||'');
+  }
+  const allText = allParts.join(' ');
+  const esc2 = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+  /* 1. 申請日期過舊 */
+  const applyRaw = document.getElementById('apply-date-input').value;
+  if (applyRaw) {
+    const iso = parseInt(applyRaw.slice(0,4));
+    if (iso < new Date().getFullYear() - 4) {
+      warns.push(`申請日期「${iso - 1911}年」距今超過4年，請確認是否正確`);
+    }
+  }
+
+  /* 2. 文字中出現舊民國年份 */
+  const seenYears = new Set();
+  for (const m of allText.matchAll(/\b(\d{2,3})年/g)) {
+    const y = parseInt(m[1]);
+    if (y >= 70 && y <= oldThreshold && !seenYears.has(y)) {
+      warns.push(`內容中出現「${y}年」，距今超過4年，請確認是否為舊資料`);
+      seenYears.add(y);
+    }
+  }
+
+  /* 3. 不存在的月份（>12月） */
+  if (/1[3-9]月|[2-9]\d月/.test(allText))
+    warns.push('內容中出現不存在的月份（月份超過12），請再確認');
+
+  /* 4. 不存在的日期（>31日）*/
+  if (/3[2-9]日|[4-9]\d日/.test(allText))
+    warns.push('內容中出現不存在的日期（超過31日），請再確認');
+
+  /* 5. 2月不存在的日期 */
+  if (/2月(30|31)日/.test(allText))
+    warns.push('內容中出現不存在的日期（2月無30或31日），請再確認');
+
+  /* 6. 不合理的時間－小時 */
+  if (/\b(2[4-9]|[3-9]\d):\d{2}/.test(allText))
+    warns.push('內容中出現不合理的時間（小時超過23），請再確認');
+
+  /* 7. 不合理的時間－分鐘 */
+  if (/\b\d{1,2}:([6-9]\d)/.test(allText))
+    warns.push('內容中出現不合理的時間（分鐘超過59），請再確認');
+
+  /* 8. 金額異常 */
+  const total = getCurrentTotal();
+  if (total > 999999)
+    warns.push(`金額合計 $${fmtN(total)} 超過 $999,999，請確認是否正確`);
+  else if (total > 0 && total < 99)
+    warns.push(`金額合計 $${fmtN(total)} 低於 $99，金額是否有誤？`);
+
+  /* 9. 機關名稱「台」字 */
+  if (/台南/.test(allText))
+    warns.push('內容中出現「台南」，正式全銜應為「臺南市佳里區衛生所」（臺字），請確認');
+
+  return warns;
+}
+
+async function confirmSave() {
+  /* 先驗證表單（阻擋性） */
   const errors = validateForm();
   if (errors.length > 0) {
     const listHtml = errors.map(e =>
@@ -2568,6 +2639,21 @@ function confirmSave() {
       '❌'
     );
     return;
+  }
+
+  /* 非強制善意提醒（不阻止存檔） */
+  const suspWarn = checkSuspicious();
+  if (suspWarn.length > 0) {
+    const warnHtml = suspWarn.map(w =>
+      `<div style="text-align:left; padding:3px 0 3px 4px; border-left:3px solid #ff8f00; margin:5px 0; font-size:12.5px;">
+         ⚠ ${w.replace(/&/g,'&amp;').replace(/</g,'&lt;')}
+       </div>`).join('');
+    const go = await showConfirm(
+      `<div style="font-size:13px; font-weight:bold; margin-bottom:10px; color:#e65100;">發現以下可能有誤的內容，請再確認：<br>
+       <span style="font-size:11.5px; font-weight:normal; color:#777;">（仍可強制存檔）</span></div>` + warnHtml,
+      { title:'善意提醒 🔍', icon:'🔍', okText:'仍要存檔', cancelText:'返回修改' }
+    );
+    if (!go) return;
   }
 
   /* 扣繳拆分攔截 */
