@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v2.4.23</title>
+<title>管理者入口 — 動支單系統 v2.4.24</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -375,7 +375,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.23</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.24</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -392,7 +392,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.23</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.24</span>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
     <button id="logout-btn" onclick="logout()">登出</button>
   </div>
@@ -2092,7 +2092,108 @@ function renderCashierPane() {
   </div>`;
   html += renderCashierSection('列計9A所得', inc9a, yr, '#2e7d32');
   html += renderCashierSection('列計92所得', inc92, yr, '#6a1b9a');
+  html += renderNhiSection(yr);
   document.getElementById('income-sections').innerHTML = html;
+}
+
+/* ── 個人補充保費統計 ── */
+function isNhiRecord(r) {
+  if (r.purposeCode === '1501' && r.income50Type !== '費用') return true;
+  if (r.lecturerType === 'bonus') return true;
+  return false;
+}
+
+function renderNhiSection(yr) {
+  const NHI_RATE = 0.0211;
+  const recs = _rptRecords.filter(r =>
+    !r.voided && isNhiRecord(r) && (r.applyDateRoc||'').startsWith(yr + '年')
+  );
+
+  /* 依 items[].name（動支說明）加總 */
+  const map = {};
+  recs.forEach(r => {
+    (r.items||[]).forEach(it => {
+      const name  = (it.name||'').trim();
+      const price = parseFloat(it.price) || 0;
+      if (!name || !price) return;
+      map[name] = (map[name]||0) + price;
+    });
+  });
+  const entries    = Object.entries(map).sort((a,b) => b[1]-a[1]);
+  const grandTotal = entries.reduce((s,[,v]) => s+v, 0);
+  const nhiTotal   = Math.round(grandTotal * NHI_RATE);
+
+  /* 儲存給 CSV 用 */
+  window._nhiExportData = { yr, entries, NHI_RATE };
+
+  if (!entries.length) return `
+    <div class="export-section" style="margin-bottom:14px; border-left:4px solid #e65100;">
+      <h4 style="color:#e65100;">個人補充保費統計（${yr}年）</h4>
+      <p style="color:#888; font-size:13px; padding:8px 0;">此年度無符合資料（1501績效獎金員工/兼職 或 獎勵金）</p>
+    </div>`;
+
+  const tblRows = entries.map(([name, total]) => {
+    const nhi = Math.round(total * NHI_RATE);
+    return `<tr>
+      <td>${esc(name)}</td>
+      <td class="td-r-admin">$${fmtN(total)}</td>
+      <td class="td-r-admin" style="color:#b71c1c;">$${fmtN(nhi)}</td>
+    </tr>`;
+  }).join('');
+
+  const textLines = entries.map(([name, total]) => {
+    const nhi = Math.round(total * NHI_RATE);
+    return `${name}\t$${fmtN(total)} × 2.11% = $${fmtN(nhi)}`;
+  });
+  textLines.push(`合計\t$${fmtN(grandTotal)} × 2.11% = $${fmtN(nhiTotal)}`);
+
+  return `
+    <div class="export-section" style="margin-bottom:14px; border-left:4px solid #e65100;">
+      <h4 style="color:#e65100;">個人補充保費統計（${yr}年）　補充保費合計 $${fmtN(nhiTotal)}</h4>
+      <div class="export-toolbar">
+        <button class="btn btn-green" onclick="exportNhiCSV()">⬇ 匯出 CSV</button>
+      </div>
+      <div class="export-table-wrap">
+        <table class="export-table">
+          <thead><tr>
+            <th>動支說明（人名）</th>
+            <th style="text-align:right;">金額合計</th>
+            <th style="text-align:right;">補充保費（×2.11%）</th>
+          </tr></thead>
+          <tbody>
+            ${tblRows}
+            <tr style="font-weight:700; border-top:2px solid #555; background:#f5f5f5;">
+              <td>合計</td>
+              <td class="td-r-admin">$${fmtN(grandTotal)}</td>
+              <td class="td-r-admin" style="color:#b71c1c;">$${fmtN(nhiTotal)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:12px;">
+        <div style="font-size:12px; color:#555; margin-bottom:4px;">文字摘要（可複製）：</div>
+        <textarea readonly rows="${entries.length+2}" style="width:100%;font-family:monospace;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:4px;resize:vertical;background:#fafafa;">${textLines.join('\n')}</textarea>
+      </div>
+    </div>`;
+}
+
+function exportNhiCSV() {
+  const d = window._nhiExportData;
+  if (!d || !d.entries.length) return;
+  const ec  = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const hdr = ['動支說明（人名）','金額合計','補充保費率','補充保費金額'];
+  const rows = d.entries.map(([name, total]) => {
+    const nhi = Math.round(total * d.NHI_RATE);
+    return [name, total, '2.11%', nhi].map(ec).join(',');
+  });
+  const grandTotal = d.entries.reduce((s,[,v])=>s+v, 0);
+  rows.push(['合計', grandTotal, '2.11%', Math.round(grandTotal * d.NHI_RATE)].map(ec).join(','));
+  const csv = '\uFEFF' + hdr.join(',') + '\n' + rows.join('\n');
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
+    download: `個人補充保費統計_${d.yr}年.csv`
+  });
+  a.click(); URL.revokeObjectURL(a.href);
 }
 
 /* ════════════════════
