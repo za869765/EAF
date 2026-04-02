@@ -623,7 +623,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.19</div>
+    <div id="sb-version">v2.4.20</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1364,7 +1364,8 @@ function updateIncome50Row() {
         const onlyEmployee = purposeCode === '7103';
         const defVal = onlyEmployee ? '員工' : (isLecturerOrBonus ? '兼職' : '員工');
         income50Type = defVal;
-        const opts = onlyEmployee ? ['員工'] : ['員工','兼職'];
+        const opts = onlyEmployee ? ['員工'] :
+                     purposeCode === '1501' ? ['員工','兼職','費用'] : ['員工','兼職'];
         document.getElementById('income50-type-btns').innerHTML =
           opts.map(o =>
             `<button class="lect-btn${o===defVal?' active':''}" onclick="setIncome50Type('${o}')">${o}</button>`
@@ -1435,7 +1436,7 @@ function updateCashierNote() {
   if (ACCT_TYPE_CONFIG[purposeCode] && acctType) {
     note = ACCT_SLASH_TYPES.has(acctType) ? '' : (_acctNM[acctType] || '');
   } else if (purposeCode === '1501') {
-    note = _t50nhi;
+    note = income50Type === '費用' ? '' : _t50nhi;
   } else if (purposeCode === '2305') {
     note = _t92;
   } else if (INCOME_50_PURPOSES.includes(purposeCode)) {
@@ -1457,7 +1458,8 @@ function updateCashierNote() {
     CASHIER_SLASH_PURPOSE.includes(purposeCode) ||
     (ACCT_TYPE_CONFIG[purposeCode] && ACCT_SLASH_TYPES.has(acctType))
   );
-  document.getElementById('sg-cashier').classList.toggle('slash', cashierSlash);
+  const forceSlash = purposeCode === '1501' && income50Type === '費用';
+  document.getElementById('sg-cashier').classList.toggle('slash', cashierSlash || forceSlash);
   const el = document.getElementById('cashier-note');
   el.textContent   = note;
   el.style.display = note ? 'block' : 'none';
