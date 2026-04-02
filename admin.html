@@ -833,7 +833,7 @@ function updateMaintBtn() {
   const btn = document.getElementById('maint-btn');
   const on = !!subjects?.settings?.maintenance;
   btn.textContent = on ? '🟢 恢復使用' : '🔴 維護停用';
-  btn.style.background = on ? '#c62828' : '#2e7d32';
+  btn.style.background = on ? '#2e7d32' : '#e65100';
   btn.style.color = '#fff';
 }
 async function toggleMaintenance() {
