@@ -30,9 +30,9 @@ body {
 #sb-header h2 { font-size: 15px; color: #e8edf2; margin-bottom: 8px; letter-spacing: 1px; }
 #sb-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 #sb-version {
-  font-size: 12px; color: #90a4ae; margin-bottom: 8px;
+  font-size: 14px; color: #b0bec5; margin-bottom: 8px;
   background: #162230; border-radius: 4px;
-  padding: 2px 7px; display: inline-block; letter-spacing: 1px;
+  padding: 3px 10px; display: inline-block; letter-spacing: 1.5px; font-weight: bold;
 }
 #admin-link {
   font-size: 22px; color: #78909c; text-decoration: none;
@@ -664,14 +664,17 @@ body.sb-resizing * { pointer-events: none !important; }
     <div id="sb-top">
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區動支管理系統</h2>
     </div>
-    <div id="sb-version">v2.4.38</div>
+    <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
+      <div id="sb-version">v2.4.39</div>
+      <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
+    </div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')"><span style="font-size:20px;">🛒</span>新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')"><span style="font-size:20px;">🧾</span>新增動支單</button>
     </div>
   </div>
   <div id="sync-status">● 連線中…</div>
-  <div style="font-size:10px; color:#4a6278; padding:5px 14px 2px; flex-shrink:0;">📋 歷史紀錄</div>
+  <div style="font-size:10px; color:#4a6278; padding:5px 14px 2px; flex-shrink:0;">📋 動支單申請紀錄</div>
   <div id="history-scroll">
     <div id="no-history">載入中…</div>
   </div>
