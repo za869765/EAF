@@ -1530,8 +1530,9 @@ function renderRptDashboard(active) {
   /* ── 用途別 TOP 5 ── */
   const purpMap={};
   active.forEach(r=>{
-    const k=(r.purposeCode||'?')+' '+(r.purposeName||lookupPurposeName(r.bpCode,r.purposeCode)||'');
-    purpMap[k]=(purpMap[k]||0)+(Number(r.total)||0);
+    if (!r.purposeCode) return;   /* 略過未選用途別的紀錄 */
+    const label=(r.purposeName||lookupPurposeName(r.bpCode,r.purposeCode)||r.purposeCode);
+    purpMap[label]=(purpMap[label]||0)+(Number(r.total)||0);
   });
   const top5=Object.entries(purpMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const maxP=Math.max(...top5.map(([,v])=>v),1);
