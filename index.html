@@ -622,7 +622,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.0</div>
+    <div id="sb-version">v2.4.1</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -993,7 +993,6 @@ window.addEventListener('afterprint', () => {
       rec.printed = true;
       apiPatch(currentId, { printed: true }).catch(() => {});
       _setBtn('edit-btn', 'none');
-      showToast('🖨️ 已列印，表單已鎖定，不可再修改');
     }
   }
 });
@@ -1003,7 +1002,7 @@ async function handlePrint() {
   const rec = currentId ? cachedRecords.find(r => r.id === currentId) : null;
   if (rec && !rec.printed) {
     const ok = await showConfirm(
-      '列印後，此表單將<strong>永久鎖定</strong>，不可再修改。<br>如需修改，須請管理者解鎖。<br><br>確定要列印嗎？',
+      '確定要列印嗎？',
       { title: '確認列印', icon: '🖨️' }
     );
     if (!ok) return;
