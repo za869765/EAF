@@ -1703,17 +1703,19 @@ function renderRptDashboard(active) {
     const medClrs = ['#00838f','#00796b','#006064','#00897b','#00acc1','#0097a7','#00838f','#00695c','#004d40','#006064','#00838f','#0097a7'];
     return `<div class="rpt-dash-panel" style="min-width:240px;">
       <div class="rpt-dash-title">💊 醫療用品　<span style="font-size:12px;color:#00838f;font-weight:700;">$${fmtN(total)}</span>　<span style="font-size:11px;color:#90a4ae;font-weight:400;">${medRecs.length} 筆</span></div>
-      <div style="display:flex; align-items:flex-end; height:100px; gap:6px; padding: 4px 0 0;">
-        ${months.map(([m,amt],i)=>{
-          const pct = Math.round(amt/maxM*100);
-          return `<div class="cbar-col" title="${m}月 $${fmtN(amt)}">
-            <div class="cbar-amt-lbl" style="color:#00838f;">$${fmtN(amt)}</div>
-            <div class="cbar-bar-inner" style="height:${pct}%;background:linear-gradient(to top,${medClrs[i%medClrs.length]},#b2ebf2);"></div>
-          </div>`;
-        }).join('')}
-      </div>
-      <div style="display:flex; gap:6px; margin-top:4px;">
-        ${months.map(([m])=>`<div style="flex:1;text-align:center;"><span class="cbar-month-lbl">${m}月</span></div>`).join('')}
+      <div style="overflow-x:auto; padding-bottom:2px;">
+        <div style="display:flex; align-items:flex-end; height:100px; gap:4px; padding:4px 0 0; min-width:${months.length*44}px;">
+          ${months.map(([m,amt],i)=>{
+            const pct = Math.round(amt/maxM*100);
+            return `<div style="width:40px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;" title="${m}月 $${fmtN(amt)}">
+              <div class="cbar-amt-lbl" style="color:#00838f;">$${fmtN(amt)}</div>
+              <div style="width:32px;height:${pct}%;min-height:3px;background:linear-gradient(to top,${medClrs[i%medClrs.length]},#b2ebf2);border-radius:2px 2px 0 0;"></div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex; gap:4px; min-width:${months.length*44}px; margin-top:4px;">
+          ${months.map(([m])=>`<div style="width:40px;flex-shrink:0;text-align:center;"><span class="cbar-month-lbl">${m}月</span></div>`).join('')}
+        </div>
       </div>
     </div>`;
   })() : '';
