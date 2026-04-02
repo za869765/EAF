@@ -694,7 +694,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v2.5.0</div>
+      <div id="sb-version">v2.5.1</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -710,7 +710,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <button id="sf-clear" onclick="clearHistoryFilter()" title="清除篩選">✕</button>
     </div>
     <div class="sf-row">
-      <select class="sf-select" id="sf-acct" onchange="applyHistoryFilter()"><option value="">全部科目</option></select>
+      <select class="sf-select" id="sf-acct" onchange="applyHistoryFilter()"><option value="">全部帳戶</option></select>
       <select class="sf-select" id="sf-amount" onchange="applyHistoryFilter()">
         <option value="">全部金額</option>
         <option value="0-999">$0–999</option>
@@ -1035,6 +1035,7 @@ body.sb-resizing * { pointer-events: none !important; }
 })();
 
 let CFG       = { settings:{ orgName:'臺南市佳里區衛生所', exemptThreshold:10000 }, mainAccounts:[] };
+let _maintenance = false;  /* 維護模式旗標 */
 
 function getAutoText(key, fallback) {
   const val = CFG.settings?.autoText?.[key];
@@ -1064,6 +1065,9 @@ const API = '/api/records';
       if (r2.ok) CFG = await r2.json();
     } catch(_) {}
   }
+
+  _maintenance = !!CFG.settings?.maintenance;
+  if (_maintenance) setSyncStatus('● 維修中，暫停存檔功能', 'err');
 
   const org = CFG.settings?.orgName || '臺南市佳里區衛生所';
   document.getElementById('org-name').textContent  = org;
@@ -1273,6 +1277,14 @@ function applyType(type, { regen = true } = {}) {
 /* ══════════════════════
    API HELPERS
    ══════════════════════ */
+function checkMaintenance() {
+  if (_maintenance) {
+    showAlert('⚠️ 系統維護中，暫停存檔/作廢等操作。<br>您仍可繼續填寫，待維護結束後再存檔。', '🔧');
+    return true;
+  }
+  return false;
+}
+
 async function apiGet() {
   const r = await fetch(API);
   if (!r.ok) throw 0;
@@ -1345,6 +1357,12 @@ async function heartbeat() {
     const d = await r.json();
     const el = document.getElementById('online-count');
     if (el && d.online != null) el.textContent = '　👤 ' + d.online + ' 人在線';
+    /* 同步維護模式旗標 */
+    if (d.maintenance !== undefined && d.maintenance !== _maintenance) {
+      _maintenance = d.maintenance;
+      if (_maintenance) setSyncStatus('● 維修中，暫停存檔功能', 'err');
+      else setSyncStatus('● 已連線', 'ok');
+    }
   } catch(_) {}
 }
 heartbeat();
@@ -1361,11 +1379,11 @@ function buildFilterDropdowns() {
   const purpSet = new Map();
   cachedRecords.forEach(r => {
     if (r.acctName) acctSet.set(r.acctName, (acctSet.get(r.acctName)||0)+1);
-    if (r.purposeName) purpSet.set(r.purposeName, (purpSet.get(r.purposeName)||0)+1);
+    if (r.purposeName && !r.purposeName.includes('選擇用途別')) purpSet.set(r.purposeName, (purpSet.get(r.purposeName)||0)+1);
   });
   const acctSel = document.getElementById('sf-acct');
   const curAcct = acctSel.value;
-  acctSel.innerHTML = '<option value="">全部科目</option>';
+  acctSel.innerHTML = '<option value="">全部帳戶</option>';
   [...acctSet.entries()].sort((a,b)=>b[1]-a[1]).forEach(([n,c]) =>
     acctSel.appendChild(new Option(n+' ('+c+')', n)));
   acctSel.value = curAcct;
@@ -2161,7 +2179,7 @@ function getFormData() {
     acctCode, acctName  : acct ? acct.name : '',
     bpCode,   bpLabel : bp ? bp.name : '',
     purposeCode : document.getElementById('sel-purpose').value,
-    purposeName : (()=>{ const s=document.getElementById('sel-purpose'); return s.options[s.selectedIndex]?.text||''; })(),
+    purposeName : (()=>{ const s=document.getElementById('sel-purpose'); const v=s.value; return v ? (s.options[s.selectedIndex]?.text||'') : ''; })(),
     purposeDesc : document.getElementById('purpose-desc').value,
     personnelCode : PERSONNEL_CODES.includes(document.getElementById('sel-purpose').value) ? '4' : '',
     personnelName : PERSONNEL_CODES.includes(document.getElementById('sel-purpose').value)
@@ -2286,6 +2304,7 @@ async function saveRecord() {
 
 async function voidRecord(id, e) {
   e.stopPropagation();
+  if (checkMaintenance()) return;
   if (_editingSaved) { showUnsavedWarning(); return; }
   const rec = cachedRecords.find(r=>r.id===id);
   if (!rec || rec.voided) return; /* 已作廢者不可再操作 */
@@ -2818,6 +2837,7 @@ function checkSuspicious() {
 }
 
 async function confirmSave() {
+  if (checkMaintenance()) return;
   /* 先驗證表單（阻擋性） */
   const errors = validateForm();
   if (errors.length > 0) {

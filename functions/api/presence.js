@@ -60,7 +60,17 @@ export async function onRequest(context) {
         'SELECT COUNT(*) as cnt FROM presence WHERE last_seen >= ?'
       ).bind(cutoff).all();
 
-      return json({ ok: true, online: results[0].cnt });
+      /* 讀取維護模式旗標 */
+      let maintenance = false;
+      try {
+        const sRow = await DB.prepare("SELECT data FROM subjects WHERE id = 'main' LIMIT 1").first();
+        if (sRow) {
+          const sData = JSON.parse(sRow.data);
+          maintenance = !!sData?.settings?.maintenance;
+        }
+      } catch (_) {}
+
+      return json({ ok: true, online: results[0].cnt, maintenance });
     } catch (e) {
       return json({ error: e.message }, 500);
     }
