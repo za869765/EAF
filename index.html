@@ -622,7 +622,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.13</div>
+    <div id="sb-version">v2.4.14</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2271,7 +2271,7 @@ function openSaveConfirmModal() {
     if (total > 0 && purposeDesc && !hasAmt) {
       warnEl.innerHTML =
         `⚠️ 提醒：用途說明中未出現金額 <strong>$${fmtN(total)}</strong>，` +
-        `請確認說明是否已更新。<br>（可直接按「確定存檔」繼續）`;
+        `請確認說明是否已更新。<br>（可直接按「確定存檔」強制存檔）`;
       warnEl.style.display = '';
     } else {
       warnEl.style.display = 'none';
