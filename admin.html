@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v2.4.24</title>
+<title>管理者入口 — 動支單系統 v2.4.25</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -160,11 +160,25 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   display: flex; gap: 12px; margin-bottom: 18px; flex-wrap: wrap;
 }
 .stat-card {
-  background: #fff; border-radius: 8px; padding: 16px 22px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.1); min-width: 130px; text-align: center;
+  background: #fff; border-radius: 10px; padding: 16px 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08); min-width: 120px; text-align: center; flex: 1;
+  border-top: 4px solid #e0e0e0; transition: box-shadow .2s;
 }
+.stat-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.13); }
 .stat-num   { font-size: 26px; font-weight: 700; line-height: 1.2; }
-.stat-label { font-size: 12px; color: #78909c; margin-top: 2px; }
+.stat-label { font-size: 11px; color: #78909c; margin-top: 4px; letter-spacing:.3px; }
+.stat-sub   { font-size: 11px; color: #aaa; margin-top: 2px; }
+/* Dashboard panels */
+.rpt-dash-grid { display:flex; gap:14px; margin:6px 0 16px; flex-wrap:wrap; }
+.rpt-dash-panel {
+  background:#fff; border-radius:10px; padding:18px 20px;
+  box-shadow:0 2px 8px rgba(0,0,0,.08); flex:1; min-width:220px;
+}
+.rpt-dash-title { font-size:13px; font-weight:600; color:#37474f; margin-bottom:14px; }
+.rpt-hbar-row { margin-bottom:9px; }
+.rpt-hbar-label { font-size:11px; color:#546e7a; display:flex; justify-content:space-between; margin-bottom:3px; }
+.rpt-hbar-track { background:#eceff1; border-radius:4px; height:9px; overflow:hidden; }
+.rpt-hbar-fill  { height:100%; border-radius:4px; transition:width .5s ease; }
 .rpt-subtabs { display: flex; gap: 2px; border-bottom: 2px solid #e0e0e0; margin-bottom: 0; flex-wrap: wrap; }
 .rpt-tab {
   padding: 9px 20px; border: none; background: transparent; font-size: 13px;
@@ -375,7 +389,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.24</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.25</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -392,7 +406,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.24</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.25</span>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
     <button id="logout-btn" onclick="logout()">登出</button>
   </div>
@@ -480,19 +494,34 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
     <!-- ── Tab: reports ── -->
     <div id="tab-reports" class="tab-pane">
       <div class="stats-row">
-        <div class="stat-card">
+        <div class="stat-card" style="border-top-color:#546e7a;">
           <div class="stat-num" id="rpt-total">—</div>
           <div class="stat-label">全部紀錄</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" style="border-top-color:#2e7d32;">
           <div class="stat-num" id="rpt-active" style="color:#2e7d32;">—</div>
           <div class="stat-label">有效紀錄</div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" style="border-top-color:#b71c1c;">
           <div class="stat-num" id="rpt-voided" style="color:#b71c1c;">—</div>
           <div class="stat-label">作廢紀錄</div>
         </div>
+        <div class="stat-card" style="border-top-color:#1565c0;">
+          <div class="stat-num" id="rpt-total-amt" style="color:#1565c0; font-size:20px;">—</div>
+          <div class="stat-label">有效總金額</div>
+        </div>
+        <div class="stat-card" style="border-top-color:#37474f;">
+          <div class="stat-num" id="rpt-expense-cnt" style="color:#37474f; font-size:20px;">—</div>
+          <div class="stat-label">動支單</div>
+          <div class="stat-sub" id="rpt-expense-amt"></div>
+        </div>
+        <div class="stat-card" style="border-top-color:#00838f;">
+          <div class="stat-num" id="rpt-purchase-cnt" style="color:#00838f; font-size:20px;">—</div>
+          <div class="stat-label">請購單</div>
+          <div class="stat-sub" id="rpt-purchase-amt"></div>
+        </div>
       </div>
+      <div id="rpt-dashboard"></div>
       <div class="rpt-subtabs">
         <button class="rpt-tab active" id="rpt-tab-all"    onclick="showRptTab('all',this)">📋 動支單報表</button>
         <button class="rpt-tab"        id="rpt-tab-voided" onclick="showRptTab('voided',this)">⛔ 作廢報表</button>
@@ -1385,12 +1414,23 @@ async function loadReports() {
 }
 
 function renderReports() {
-  const all    = _rptRecords;
-  const active = all.filter(r => !r.voided);
-  const voided = all.filter(r =>  r.voided);
-  document.getElementById('rpt-total').textContent  = all.length;
-  document.getElementById('rpt-active').textContent = active.length;
-  document.getElementById('rpt-voided').textContent = voided.length;
+  const all      = _rptRecords;
+  const active   = all.filter(r => !r.voided);
+  const voided   = all.filter(r =>  r.voided);
+  const expense  = active.filter(r => r.formType === 'expense');
+  const purchase = active.filter(r => r.formType === 'purchase');
+  const totalAmt    = active.reduce((s,r) => s+(Number(r.total)||0), 0);
+  const expenseAmt  = expense.reduce((s,r) => s+(Number(r.total)||0), 0);
+  const purchaseAmt = purchase.reduce((s,r) => s+(Number(r.total)||0), 0);
+  document.getElementById('rpt-total').textContent       = all.length;
+  document.getElementById('rpt-active').textContent      = active.length;
+  document.getElementById('rpt-voided').textContent      = voided.length;
+  document.getElementById('rpt-total-amt').textContent   = '$' + fmtN(totalAmt);
+  document.getElementById('rpt-expense-cnt').textContent = expense.length + ' 筆';
+  document.getElementById('rpt-expense-amt').textContent = '$' + fmtN(expenseAmt);
+  document.getElementById('rpt-purchase-cnt').textContent= purchase.length + ' 筆';
+  document.getElementById('rpt-purchase-amt').textContent= '$' + fmtN(purchaseAmt);
+  renderRptDashboard(active);
 
   /* 動支單報表（僅有效） */
   document.getElementById('rpt-all-body').innerHTML = active.length === 0
@@ -1423,6 +1463,124 @@ function renderReports() {
           <td class="rec-amount td-r-admin">$${Number(r.total||0).toLocaleString('zh-TW')}</td>
           <td>${esc(r.savedAt||'')}</td>
         </tr>`).join('');
+}
+
+function renderRptDashboard(active) {
+  const dash = document.getElementById('rpt-dashboard');
+  if (!active.length) { dash.innerHTML = ''; return; }
+
+  /* ── 目前最新年度 ── */
+  const allYears = new Set();
+  active.forEach(r => { const m=(r.applyDateRoc||'').match(/^(\d{2,3})年/); if(m) allYears.add(+m[1]); });
+  const curYear = allYears.size ? Math.max(...allYears) : 115;
+
+  /* ── 各月金額（當年） ── */
+  const monthTotals = Object.fromEntries([...Array(12)].map((_,i)=>[i+1,0]));
+  const monthCounts = Object.fromEntries([...Array(12)].map((_,i)=>[i+1,0]));
+  active.forEach(r => {
+    const m=(r.applyDateRoc||'').match(/^(\d{2,3})年(\d+)月/);
+    if(m && +m[1]===curYear){ monthTotals[+m[2]]+=(Number(r.total)||0); monthCounts[+m[2]]++; }
+  });
+  const maxMo = Math.max(...Object.values(monthTotals),1);
+  const monthColors = ['#1976d2','#1e88e5','#42a5f5','#64b5f6','#1976d2','#1e88e5',
+                       '#42a5f5','#64b5f6','#1976d2','#1e88e5','#42a5f5','#64b5f6'];
+  const barChart = `
+    <div class="rpt-dash-panel" style="flex:2; min-width:300px;">
+      <div class="rpt-dash-title">📅 ${curYear}年 各月申請金額</div>
+      <div class="cashier-chart" style="margin:0;background:transparent;padding:8px 0 0;">
+        <div class="cashier-bars-wrap">
+          ${[...Array(12)].map((_,i)=>{
+            const mo=i+1, amt=monthTotals[mo], cnt=monthCounts[mo];
+            const pct=amt?Math.max(Math.round(amt/maxMo*100),3):0;
+            return `<div class="cbar-col" title="${mo}月 ${cnt}筆 $${fmtN(amt)}">
+              <div class="cbar-amt-lbl">${amt?'$'+fmtN(amt):''}</div>
+              <div class="cbar-bar-inner" style="height:${pct}%;background:linear-gradient(to top,${monthColors[i]},#bbdefb);"></div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;gap:4px;margin-top:4px;">
+          ${[...Array(12)].map((_,i)=>`<div style="flex:1;text-align:center;"><span class="cbar-month-lbl">${i+1}月</span></div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  /* ── 主科目分布 ── */
+  const acctMap={};
+  active.forEach(r=>{ const k=r.acctName||'其他'; acctMap[k]=(acctMap[k]||0)+(Number(r.total)||0); });
+  const acctList=Object.entries(acctMap).sort((a,b)=>b[1]-a[1]);
+  const maxAcct=Math.max(...acctList.map(([,v])=>v),1);
+  const acctTotal=acctList.reduce((s,[,v])=>s+v,0);
+  const acctClrs=['#1565c0','#2e7d32','#6a1b9a','#e65100','#00838f'];
+  const acctPanel=`
+    <div class="rpt-dash-panel" style="min-width:200px;">
+      <div class="rpt-dash-title">🏦 主科目分布</div>
+      ${acctList.map(([name,amt],i)=>{
+        const pct=Math.round(amt/acctTotal*100);
+        const c=acctClrs[i%acctClrs.length];
+        return `<div class="rpt-hbar-row">
+          <div class="rpt-hbar-label">
+            <span style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(name)}">${esc(name)}</span>
+            <span style="color:${c};font-weight:600;white-space:nowrap;">$${fmtN(amt)} <span style="color:#aaa;font-weight:400;">(${pct}%)</span></span>
+          </div>
+          <div class="rpt-hbar-track"><div class="rpt-hbar-fill" style="width:${Math.round(amt/maxAcct*100)}%;background:${c};"></div></div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  /* ── 用途別 TOP 5 ── */
+  const purpMap={};
+  active.forEach(r=>{
+    const k=(r.purposeCode||'?')+' '+(r.purposeName||lookupPurposeName(r.bpCode,r.purposeCode)||'');
+    purpMap[k]=(purpMap[k]||0)+(Number(r.total)||0);
+  });
+  const top5=Object.entries(purpMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const maxP=Math.max(...top5.map(([,v])=>v),1);
+  const purpClrs=['#e65100','#f57c00','#ffa726','#ff8f00','#ef6c00'];
+  const purpPanel=`
+    <div class="rpt-dash-panel" style="min-width:200px;">
+      <div class="rpt-dash-title">📊 用途別 TOP 5</div>
+      ${top5.map(([name,amt],i)=>{
+        const c=purpClrs[i];
+        return `<div class="rpt-hbar-row">
+          <div class="rpt-hbar-label">
+            <span style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(name)}">${esc(name)}</span>
+            <span style="color:${c};font-weight:600;white-space:nowrap;">$${fmtN(amt)}</span>
+          </div>
+          <div class="rpt-hbar-track"><div class="rpt-hbar-fill" style="width:${Math.round(amt/maxP*100)}%;background:${c};"></div></div>
+        </div>`;
+      }).join('')}
+    </div>`;
+
+  /* ── 動支 vs 請購 圓餅（純CSS） ── */
+  const expAmt  = active.filter(r=>r.formType==='expense').reduce((s,r)=>s+(Number(r.total)||0),0);
+  const purAmt  = active.filter(r=>r.formType==='purchase').reduce((s,r)=>s+(Number(r.total)||0),0);
+  const gt2     = expAmt+purAmt||1;
+  const expPct  = Math.round(expAmt/gt2*100);
+  const purPct  = 100-expPct;
+  const typePanel=`
+    <div class="rpt-dash-panel" style="min-width:160px; max-width:200px;">
+      <div class="rpt-dash-title">📝 類型比例</div>
+      <div style="margin-bottom:14px;">
+        <div style="display:flex;height:18px;border-radius:9px;overflow:hidden;margin-bottom:8px;">
+          <div style="width:${expPct}%;background:#37474f;" title="動支單 ${expPct}%"></div>
+          <div style="width:${purPct}%;background:#00838f;" title="請購單 ${purPct}%"></div>
+        </div>
+        <div style="font-size:11px;color:#546e7a;display:flex;gap:8px;flex-wrap:wrap;">
+          <span><span style="display:inline-block;width:10px;height:10px;background:#37474f;border-radius:2px;margin-right:3px;"></span>動支單 ${expPct}%</span>
+          <span><span style="display:inline-block;width:10px;height:10px;background:#00838f;border-radius:2px;margin-right:3px;"></span>請購單 ${purPct}%</span>
+        </div>
+      </div>
+      <div class="rpt-hbar-row">
+        <div class="rpt-hbar-label"><span>動支單</span><span style="color:#37474f;font-weight:600;">$${fmtN(expAmt)}</span></div>
+        <div class="rpt-hbar-track"><div class="rpt-hbar-fill" style="width:${expPct}%;background:#37474f;"></div></div>
+      </div>
+      <div class="rpt-hbar-row">
+        <div class="rpt-hbar-label"><span>請購單</span><span style="color:#00838f;font-weight:600;">$${fmtN(purAmt)}</span></div>
+        <div class="rpt-hbar-track"><div class="rpt-hbar-fill" style="width:${purPct}%;background:#00838f;"></div></div>
+      </div>
+    </div>`;
+
+  dash.innerHTML = `<div class="rpt-dash-grid">${barChart}${acctPanel}${purpPanel}${typePanel}</div>`;
 }
 
 function showRptTab(name, btn) {
