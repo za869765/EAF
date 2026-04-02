@@ -622,7 +622,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.10</div>
+    <div id="sb-version">v2.4.11</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2197,6 +2197,35 @@ function calcDeductions(total) {
   return null;
 }
 
+/* ── 餐費時間區間檢查 ──
+   若用途說明含「餐費」，且 用途說明＋其他說明事項 均未出現橫跨 6:00/12:00/18:00 的時間區間，
+   回傳提醒文字；否則回傳 null。 ── */
+function checkMealTimeRange() {
+  const desc  = (document.getElementById('purpose-desc')?.value || '');
+  const notes = (document.getElementById('notes')?.value || '');
+  if (!desc.includes('餐費')) return null;   /* 無「餐費」→ 不需檢查 */
+
+  const combined = desc + ' ' + notes;
+  const TARGETS  = [6 * 60, 12 * 60, 18 * 60];   /* 6:00 / 12:00 / 18:00（分鐘） */
+
+  /* 匹配 HH:MM(-/~/～/到/至)HH:MM，支援全形冒號與常見分隔符 */
+  const RE = /(\d{1,2})[：:](\d{2})\s*[-~～→至到]\s*(\d{1,2})[：:](\d{2})/g;
+  let m;
+  while ((m = RE.exec(combined)) !== null) {
+    const s = parseInt(m[1]) * 60 + parseInt(m[2]);  /* 開始分鐘 */
+    const e = parseInt(m[3]) * 60 + parseInt(m[4]);  /* 結束分鐘 */
+    for (const t of TARGETS) {
+      /* 正常區間（s ≤ e）：目標落在 [s, e] */
+      if (s <= e) { if (s <= t && t <= e) return null; }
+      /* 跨午夜區間（s > e）：目標落在 [s,∞) 或 [0, e] */
+      else { if (t >= s || t <= e) return null; }
+    }
+  }
+  /* 找不到符合的時間區間 → 回傳提醒 */
+  return '⚠️ 餐費提醒：「用途說明」或「其他說明事項」中未偵測到橫跨 6:00、12:00 或 18:00 的用餐時間區間。' +
+         '<br>建議補充如 <strong>11:30-13:00</strong> 的用餐時段（可直接按「確定存檔」繼續）。';
+}
+
 function openSaveConfirmModal() {
   const raw  = document.getElementById('apply-date-input').value;
   const roc  = document.getElementById('roc-date-text').textContent;
@@ -2217,6 +2246,18 @@ function openSaveConfirmModal() {
       warnEl.style.display = '';
     } else {
       warnEl.style.display = 'none';
+    }
+  }
+
+  /* 善意提醒：餐費時間區間 */
+  const mealWarnEl = document.getElementById('scm-meal-warn');
+  if (mealWarnEl) {
+    const mealMsg = checkMealTimeRange();
+    if (mealMsg) {
+      mealWarnEl.innerHTML = mealMsg;
+      mealWarnEl.style.display = '';
+    } else {
+      mealWarnEl.style.display = 'none';
     }
   }
 
@@ -2793,6 +2834,10 @@ function showCopyPopup(no, opts = {}) {
     <div id="scm-amount-warn" style="display:none; margin:10px 16px 0;
          background:#fff8e1; border-left:3px solid #f9a825; border-radius:4px;
          padding:8px 12px; font-size:12px; color:#5d4037; text-align:left; line-height:1.6;">
+    </div>
+    <div id="scm-meal-warn" style="display:none; margin:10px 16px 0;
+         background:#fce4ec; border-left:3px solid #e91e63; border-radius:4px;
+         padding:8px 12px; font-size:12px; color:#880e4f; text-align:left; line-height:1.6;">
     </div>
     <div class="scm-btns">
       <button class="scm-cancel" onclick="closeSaveConfirm()">✕ 取消</button>
