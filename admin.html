@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v2.4.22</title>
+<title>管理者入口 — 動支單系統 v2.4.23</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -375,7 +375,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.22</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.23</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -392,7 +392,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.22</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.23</span>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
     <button id="logout-btn" onclick="logout()">登出</button>
   </div>
@@ -573,6 +573,18 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         <div class="purpose-subtabs">
           <button class="purpose-tab active" id="ptab-1301" onclick="showPurposeTab('1301',this)">1301 延長工時加班費</button>
           <button class="purpose-tab"        id="ptab-2807" onclick="showPurposeTab('2807',this)">2807 委託檢驗費</button>
+        </div>
+        <div id="purpose-filters" style="display:flex; align-items:center; gap:10px; margin:10px 0 4px;">
+          <label style="font-size:13px; color:#555;">年度：</label>
+          <select id="purpose-year-sel" style="font-size:13px; padding:3px 6px; border-radius:4px; border:1px solid #bbb;" onchange="renderPurposePane()"></select>
+          <label style="font-size:13px; color:#555;">月份：</label>
+          <select id="purpose-month-sel" style="font-size:13px; padding:3px 6px; border-radius:4px; border:1px solid #bbb;" onchange="renderPurposePane()">
+            <option value="">全年</option>
+            <option value="1">1月</option><option value="2">2月</option><option value="3">3月</option>
+            <option value="4">4月</option><option value="5">5月</option><option value="6">6月</option>
+            <option value="7">7月</option><option value="8">8月</option><option value="9">9月</option>
+            <option value="10">10月</option><option value="11">11月</option><option value="12">12月</option>
+          </select>
         </div>
         <div id="purpose-1301-pane"></div>
         <div id="purpose-2807-pane" style="display:none;"></div>
@@ -2096,41 +2108,61 @@ function showPurposeTab(code, btn) {
 }
 
 function renderPurposePane() {
-  renderPurposeTable('1301', '1301 延長工時加班費',
-    ['憑證編號','類型','申請日期','主科目','業務計畫','用途別','帳戶類別','用途說明','金額','儲存時間'],
-    r => [esc(r.voucherNo||'—'), r.formType==='expense'?'動支':'採購',
-          esc(r.applyDateRoc||r.applyDateRaw||''), esc(r.acctName||''),
-          esc(bpLabelName(r.bpLabel)), esc(r.purposeCode+' '+(r.purposeName||'')),
-          esc(r.acctType||''), esc(r.purposeDesc||''),
-          '$'+fmtN(r.total||0), esc(r.savedAt||'')]);
+  /* ── 建立年度選項 ── */
+  const yearSel = document.getElementById('purpose-year-sel');
+  const allRecs = _rptRecords.filter(r => r.purposeCode === '1301' || r.purposeCode === '2807');
+  const yearSet = new Set();
+  allRecs.forEach(r => {
+    const m = (r.applyDateRoc||'').match(/^(\d{2,3})年/);
+    if (m) yearSet.add(m[1]);
+  });
+  const years = [...yearSet].sort((a,b) => Number(b)-Number(a));
+  const prevYr = yearSel.value;
+  yearSel.innerHTML = years.length
+    ? years.map(y => `<option value="${y}"${y===prevYr?' selected':''}>${y}年</option>`).join('')
+    : '<option value="">（無資料）</option>';
+  const yr    = yearSel.value;
+  const month = document.getElementById('purpose-month-sel').value;  /* '' = 全年 */
 
-  renderPurposeTable('2807', '2807 委託檢驗費',
-    ['憑證編號','類型','申請日期','主科目','業務計畫','帳戶類別','用途說明','金額','儲存時間'],
-    r => [esc(r.voucherNo||'—'), r.formType==='expense'?'動支':'採購',
-          esc(r.applyDateRoc||r.applyDateRaw||''), esc(r.acctName||''),
-          esc(bpLabelName(r.bpLabel)), esc(r.acctType||''), esc(r.purposeDesc||''),
-          '$'+fmtN(r.total||0), esc(r.savedAt||'')]);
+  renderPurposeTable('1301', '1301 延長工時加班費', yr, month);
+  renderPurposeTable('2807', '2807 委託檢驗費',     yr, month);
 }
 
-function renderPurposeTable(code, title, hdrs, cellsFn) {
-  const recs = _rptRecords.filter(r => r.purposeCode === code);
-  const sid  = 'ptbl_' + code;
-  const total = recs.filter(r=>!r.voided).reduce((s,r)=>s+(Number(r.total)||0),0);
-  const rows = recs.map(r => {
-    const cells = cellsFn(r);
-    return `<tr data-id="${esc(r.id||'')}" class="${r.voided?'voided-row':''}">
-      <td><input type="checkbox" onchange="updateSelCount('${sid}')"></td>
-      ${cells.map(c=>`<td>${c}</td>`).join('')}
-    </tr>`;
-  }).join('') || `<tr><td colspan="${hdrs.length+1}" class="no-data">無紀錄</td></tr>`;
+function renderPurposeTable(code, title, yr, month) {
+  /* 依年/月篩選 */
+  let recs = _rptRecords.filter(r => r.purposeCode === code);
+  if (yr) recs = recs.filter(r => (r.applyDateRoc||'').startsWith(yr + '年'));
+  if (month) recs = recs.filter(r => {
+    const m = (r.applyDateRoc||'').match(/^\d+年(\d+)月/);
+    return m && String(parseInt(m[1])) === month;
+  });
 
+  const sid   = 'ptbl_' + code;
+  const valid = recs.filter(r => !r.voided);
+  const total = valid.reduce((s,r) => s+(Number(r.total)||0), 0);
+  const hdrs  = ['憑證編號','類型','申請日期','主科目','業務計畫','帳戶類別','用途說明','金額','儲存時間'];
+  const rows  = recs.map(r => `
+    <tr data-id="${esc(r.id||'')}" class="${r.voided?'voided-row':''}">
+      <td><input type="checkbox" onchange="updateSelCount('${sid}')"></td>
+      <td>${esc(r.voucherNo||'—')}</td>
+      <td>${r.formType==='expense'?'動支':'採購'}</td>
+      <td>${esc(r.applyDateRoc||r.applyDateRaw||'')}</td>
+      <td>${esc(r.acctName||'')}</td>
+      <td>${esc(bpLabelName(r.bpLabel))}</td>
+      <td>${esc(r.acctType||'')}</td>
+      <td>${esc(r.purposeDesc||'')}</td>
+      <td class="td-r-admin">$${fmtN(r.total||0)}</td>
+      <td>${esc(r.savedAt||'')}</td>
+    </tr>`).join('') || `<tr><td colspan="${hdrs.length+1}" class="no-data">無紀錄</td></tr>`;
+
+  const filterLabel = yr ? (month ? `${yr}年${month}月` : `${yr}年`) : '全部';
   document.getElementById(`purpose-${code}-pane`).innerHTML = `
     <div class="export-section">
-      <h4>${title}　有效合計 $${fmtN(total)}　共 ${recs.length} 筆</h4>
+      <h4>${title}　${filterLabel}　有效合計 $${fmtN(total)}　共 ${valid.length} 筆</h4>
       <div class="export-toolbar">
         <button class="btn btn-gray" onclick="selAll('${sid}')">全選</button>
         <button class="btn btn-gray" onclick="invertSel('${sid}')">反選</button>
-        <button class="btn btn-green" onclick="exportCashierCSV('${sid}','${title}')">⬇ 匯出 CSV</button>
+        <button class="btn btn-green" onclick="exportCashierCSV('${sid}','${title}_${filterLabel}')">⬇ 匯出 CSV</button>
         <span class="sel-count" id="cnt-${sid}">0 筆已選</span>
       </div>
       <div class="export-table-wrap">
