@@ -665,7 +665,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v2.4.39</div>
+      <div id="sb-version">v2.4.40</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1269,7 +1269,7 @@ async function loadHistory() {
       await Promise.all(wrongType.map(r => apiPatch(r.id, { formType: 'purchase' })));
       wrongType.forEach(r => { r.formType = 'purchase'; });
     }
-    setSyncStatus(`● 已連線　共 ${cachedRecords.length} 筆`, 'ok');
+    setSyncStatus('● 已連線', 'ok');
     renderHistory(cachedRecords);
   } catch(_) {
     setSyncStatus('● 連線失敗，請確認網路', 'err');
@@ -1300,7 +1300,7 @@ async function exportCSV() {
   setSyncStatus('⟳ 匯出中…', 'busy');
   try {
     const records = await apiGet();
-    if (!records.length) { showToast('目前無紀錄可匯出'); setSyncStatus(`● 已連線　共 0 筆`,'ok'); return; }
+    if (!records.length) { showToast('目前無紀錄可匯出'); setSyncStatus('● 已連線','ok'); return; }
     const hdr = ['憑證編號','類型','申請日期','主科目代碼','主科目名稱','業務計畫代碼','業務計畫','用途別代碼','用途說明','金額','儲存時間'];
     const rows = records.map(r=>[r.voucherNo||'',r.formType==='expense'?'動支單':'請購單',
       r.applyDateRoc||r.applyDateRaw||'',r.acctCode||'',r.acctName||'',r.bpCode||'',
@@ -1311,7 +1311,7 @@ async function exportCSV() {
       href:URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
       download:'動支申請紀錄_'+new Date().toISOString().slice(0,10)+'.csv'});
     a.click(); URL.revokeObjectURL(a.href);
-    setSyncStatus(`● 已連線　共 ${records.length} 筆`,'ok');
+    setSyncStatus('● 已連線','ok');
     showToast('✓ 已匯出 CSV');
   } catch(_) { setSyncStatus('● 連線失敗','err'); showToast('✗ 匯出失敗'); }
 }
@@ -2110,7 +2110,7 @@ async function saveRecord() {
     const idx = cachedRecords.findIndex(r => r.id === currentId);
     if (idx >= 0) cachedRecords[idx] = record;
     else cachedRecords.unshift(record);
-    setSyncStatus(`● 已儲存　共 ${cachedRecords.length} 筆`, 'ok');
+    setSyncStatus('● 已儲存', 'ok');
     document.getElementById('draft-item')?.remove();
     renderHistory(cachedRecords);
     showToast('✓ 已儲存 '+ts);
