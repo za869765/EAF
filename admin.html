@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v2.4.21</title>
+<title>管理者入口 — 動支單系統 v2.4.22</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -375,7 +375,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.21</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.22</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -392,7 +392,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.21</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.22</span>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
     <button id="logout-btn" onclick="logout()">登出</button>
   </div>
@@ -1857,23 +1857,61 @@ async function setPayMonth(id, ym) {
   renderCashierPane();
 }
 
-/* ── exportCashierCSV：匯出已選列為 CSV ── */
+/* ── exportCashierCSV：匯出已選列為 CSV（一筆細項一列） ── */
 function exportCashierCSV(sid, filename) {
   const tbl = document.getElementById(sid);
   if (!tbl) return;
-  const hdrs = [...tbl.querySelectorAll('thead th')].slice(1).map(th => th.textContent.trim());
   const selected = [...tbl.querySelectorAll('tbody tr')].filter(tr => tr.querySelector('input[type=checkbox]')?.checked);
   if (!selected.length) { showAdminAlert('請先勾選要匯出的紀錄'); return; }
-  const dataRows = selected.map(tr =>
-    [...tr.querySelectorAll('td')].slice(1).map(td => {
-      const sel = td.querySelector('select');
-      return sel ? (sel.options[sel.selectedIndex]?.text || '') : td.textContent.trim();
-    })
-  );
-  const csv = [hdrs, ...dataRows]
-    .map(row => row.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))
-    .join('\r\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+  const hdr = ['憑證編號','申請日期','主科目代碼','主科目名稱',
+               '業務計畫代碼','業務計畫名稱','用途別代碼','用途別名稱','用途說明',
+               '人員類別','帳戶類別',
+               '細項序號','品名／動支說明','規格','數量','單位','單價','小計',
+               '合計金額','實付月'];
+  const rows = [];
+  for (const tr of selected) {
+    const id = tr.dataset.id;
+    const r  = _rptRecords.find(x => String(x.id) === String(id));
+    if (!r) continue;
+    const isExp = r.formType === 'expense';
+    /* 實付月：從該列的 select 取（50所得有；9A/92無） */
+    const sel = tr.querySelector('select');
+    const payMonth = sel ? (sel.options[sel.selectedIndex]?.text || '') : '';
+    const base = [
+      r.voucherNo||'',
+      r.applyDateRoc||r.applyDateRaw||'',
+      r.acctCode||'', r.acctName||'',
+      r.bpCode||'', bpLabelName(r.bpLabel),
+      r.purposeCode||'',
+      r.purposeName || lookupPurposeName(r.bpCode, r.purposeCode),
+      r.purposeDesc||'',
+      r.personnelName||'', r.acctType||'',
+    ];
+    const tail = [r.total||0, payMonth];
+    const items = (r.items||[]).filter(it => (it.name||'').trim() || (it.price||'').toString().trim());
+    if (!items.length) {
+      rows.push([...base, '', '', '', '', '', '', '', ...tail].map(esc).join(','));
+    } else {
+      items.forEach((it, idx) => {
+        const price = parseFloat(it.price) || 0;
+        const sub   = isExp ? price : Math.round((parseFloat(it.qty)||0) * price);
+        rows.push([
+          ...base,
+          idx + 1,
+          it.name  || '',
+          isExp ? '' : (it.spec || ''),
+          isExp ? '' : (it.qty  || ''),
+          isExp ? '' : (it.unit || ''),
+          it.price || '',
+          sub,
+          ...tail
+        ].map(esc).join(','));
+      });
+    }
+  }
+  const csv = '\uFEFF' + hdr.join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename.replace(/[\\/:"*?<>|]/g,'_') + '.csv';
@@ -2018,7 +2056,7 @@ function renderCashierPane() {
       <div class="export-toolbar">
         <button class="btn btn-gray" onclick="selAll('${sid}')">全選</button>
         <button class="btn btn-gray" onclick="invertSel('${sid}')">反選</button>
-        <button class="btn btn-green" onclick="exportCashierCSV('${sid}','列計50_${moLabel}')">⬇ 匯出 CSV（本月）</button>
+        <button class="btn btn-green" onclick="exportCashierCSV('${sid}','列計50_${moLabel}')">⬇ 匯出 CSV</button>
         <span class="sel-count" id="cnt-${sid}">0 筆已選</span>
       </div>
       <div class="export-table-wrap">
