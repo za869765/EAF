@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v2.4.8</title>
+<title>管理者入口 — 動支單系統 v2.4.9</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -179,7 +179,8 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 .lock-badge    { background: #eceff1; color: #37474f;  border-radius: 4px; padding: 2px 6px; font-size: 11px; }
 .archive-badge { background: #e3f2fd; color: #1565c0;  border-radius: 4px; padding: 2px 6px; font-size: 11px; }
 .archived-row td { opacity: 0.55; }
-.autotext-input:disabled { background: #f5f5f5; color: #9e9e9e; cursor: not-allowed; }
+.autotext-input:disabled,
+.settings-basic-input:disabled { background: #f5f5f5; color: #546e7a; cursor: not-allowed; }
 
 /* ── Admin CSS 動畫彈窗 ── */
 .adm-modal-bg {
@@ -281,6 +282,19 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 .income-card .ic-label { font-size:11px; color:#546e7a; margin-bottom:4px; }
 .income-card .ic-count { font-size:13px; font-weight:600; color:#1e2a38; }
 .income-card .ic-amt   { font-size:18px; font-weight:700; color:#1565c0; margin-top:2px; }
+
+/* ── Cashier bar chart ── */
+.cashier-year-bar { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+.cashier-year-bar label { font-size:13px; font-weight:600; color:#37474f; }
+.cashier-year-bar select { padding:4px 8px; border:1px solid #b0bec5; border-radius:5px; font-size:13px; }
+.cashier-chart { margin:0 0 16px; background:#f8f9fa; border-radius:8px; padding:16px 20px; }
+.cashier-chart-title { font-size:13px; font-weight:600; color:#37474f; margin-bottom:14px; }
+.cashier-bars-wrap { display:flex; align-items:flex-end; height:130px; gap:4px; border-bottom:2px solid #cfd8dc; }
+.cbar-col { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+.cbar-amt-lbl { font-size:9px; color:#1565c0; white-space:nowrap; text-align:center; min-height:11px; margin-bottom:2px; writing-mode:initial; }
+.cbar-bar-inner { width:80%; background:linear-gradient(to top,#1565c0,#64b5f6); border-radius:2px 2px 0 0; }
+.cbar-month-lbl { font-size:10px; color:#78909c; margin-top:5px; white-space:nowrap; }
+.pm-sel { font-size:12px; padding:2px 4px; border:1px solid #cfd8dc; border-radius:4px; cursor:pointer; }
 /* purpose sub-tabs inside pane */
 .purpose-subtabs { display:flex; gap:2px; border-bottom:2px solid #e0e0e0; margin-bottom:12px; }
 .purpose-tab { padding:7px 18px; border:none; background:transparent; font-size:13px;
@@ -361,7 +375,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.8</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.9</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -378,7 +392,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.8</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.9</span>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
     <button id="logout-btn" onclick="logout()">登出</button>
   </div>
@@ -483,9 +497,9 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         <button class="rpt-tab active" id="rpt-tab-all"    onclick="showRptTab('all',this)">📋 動支單報表</button>
         <button class="rpt-tab"        id="rpt-tab-voided" onclick="showRptTab('voided',this)">⛔ 作廢報表</button>
         <button class="rpt-tab"        id="rpt-tab-budget" onclick="showRptTab('budget',this)">📈 預算執行率</button>
-        <button class="rpt-tab" id="rpt-tab-cashier" onclick="showRptTab('cashier',this)">📑 出納列計</button>
         <button class="rpt-tab" id="rpt-tab-purpose" onclick="showRptTab('purpose',this)">📋 1301/2807清單</button>
         <button class="rpt-tab" id="rpt-tab-sysstat" onclick="showRptTab('sysstat',this)">📊 系統狀態</button>
+        <button class="rpt-tab" id="rpt-tab-cashier" onclick="showRptTab('cashier',this)">📑 出納列計</button>
       </div>
       <div class="toolbar" style="margin-top:10px;">
         <button class="btn btn-gray" onclick="loadReports()">🔄 重新載入</button>
@@ -542,6 +556,11 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
       </div>
       <!-- ── 出納列計 pane ── -->
       <div id="rpt-cashier-pane" style="display:none; padding-top:12px;">
+        <div class="cashier-year-bar">
+          <label>年度：</label>
+          <select id="cashier-year-sel" onchange="renderCashierPane()"></select>
+          <span style="font-size:12px; color:#78909c;">（列計50依實付月分類；9A/92依申請日年度）</span>
+        </div>
         <div class="income-cards" id="income-cards"></div>
         <div id="income-sections"></div>
       </div>
@@ -563,38 +582,56 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
     <!-- ── Tab: settings ── -->
     <div id="tab-settings" class="tab-pane">
       <div class="setting-card">
-        <h3>系統設定</h3>
-        <div class="s-row">
-          <label>機關名稱</label>
-          <input id="set-org" type="text">
-        </div>
-        <div class="s-row">
-          <label>免核章門檻（元）— 低於此金額自動顯示「免核章」</label>
-          <input id="set-threshold" type="number" min="0">
-        </div>
-        <div class="s-row">
-          <label>封存提醒門檻（筆數）— 有效紀錄達到此數量時顯示封存提醒橫幅</label>
-          <input id="set-archive-threshold" type="number" min="50" max="5000" placeholder="500">
+        <h3 style="display:flex; align-items:center; gap:8px;">
+          系統設定
+          <span id="basic-settings-lock-icon" style="font-size:13px; color:#78909c;">🔒</span>
+        </h3>
+
+        <div id="settings-basic-section">
+          <div class="s-row">
+            <label>機關名稱</label>
+            <input id="set-org" class="settings-basic-input" type="text" disabled>
+          </div>
+          <div class="s-row">
+            <label>免核章門檻（元）— 低於此金額自動顯示「免核章」</label>
+            <input id="set-threshold" class="settings-basic-input" type="number" min="0" disabled>
+          </div>
+          <div class="s-row">
+            <label>封存提醒門檻（筆數）— 有效紀錄達到此數量時顯示封存提醒橫幅</label>
+            <input id="set-archive-threshold" class="settings-basic-input" type="number" min="50" max="5000" disabled>
+          </div>
+
+          <h4 style="font-size:13px; color:#546e7a; margin:20px 0 12px; border-top:1px solid #eceff1; padding-top:14px;">
+            執行業務所得（9A）扣繳設定
+          </h4>
+          <div class="s-row">
+            <label>代扣繳二代健保門檻（元）— 金額達此值時自動拆出 NHI 2.11%</label>
+            <input id="set-nhi-9a" class="settings-basic-input" type="number" min="0" disabled>
+          </div>
+          <div class="s-row">
+            <label>代扣繳所得稅門檻（元）— 金額達此值時再拆出所得稅 10%</label>
+            <input id="set-tax-9a" class="settings-basic-input" type="number" min="0" disabled>
+          </div>
+
+          <h4 style="font-size:13px; color:#546e7a; margin:20px 0 12px; border-top:1px solid #eceff1; padding-top:14px;">
+            列計50所得（兼職）扣繳設定
+          </h4>
+          <div class="s-row">
+            <label>兼職基本工資門檻（元）— 超過此金額代扣繳二代健保 2.11%（專職/員工不適用）</label>
+            <input id="set-part50" class="settings-basic-input" type="number" min="0" disabled>
+          </div>
         </div>
 
-        <h4 style="font-size:13px; color:#546e7a; margin:20px 0 12px; border-top:1px solid #eceff1; padding-top:14px;">
-          執行業務所得（9A）扣繳設定
-        </h4>
-        <div class="s-row">
-          <label>代扣繳二代健保門檻（元）— 金額達此值時自動拆出 NHI 2.11%</label>
-          <input id="set-nhi-9a" type="number" min="0">
-        </div>
-        <div class="s-row">
-          <label>代扣繳所得稅門檻（元）— 金額達此值時再拆出所得稅 10%</label>
-          <input id="set-tax-9a" type="number" min="0">
-        </div>
-
-        <h4 style="font-size:13px; color:#546e7a; margin:20px 0 12px; border-top:1px solid #eceff1; padding-top:14px;">
-          列計50所得（兼職）扣繳設定
-        </h4>
-        <div class="s-row">
-          <label>兼職基本工資門檻（元）— 超過此金額代扣繳二代健保 2.11%（專職/員工不適用）</label>
-          <input id="set-part50" type="number" min="0">
+        <!-- 基本設定 鎖定/編輯 工具列 -->
+        <div class="toolbar" style="margin:12px 0 4px;">
+          <div id="basic-settings-lock-bar">
+            <button class="btn" style="background:#546e7a;color:#fff;" onclick="unlockBasicSettings()">🔓 解鎖編輯</button>
+          </div>
+          <div id="basic-settings-edit-bar" style="display:none;">
+            <button class="btn btn-blue" onclick="saveBasicSettings()">💾 存檔</button>
+            <button class="btn" style="background:#b71c1c;color:#fff;" onclick="cancelBasicSettings()">✕ 取消</button>
+          </div>
+          <span id="set-basic-msg" class="toolbar-msg"></span>
         </div>
 
         <h4 style="font-size:13px; color:#546e7a; margin:20px 0 12px; border-top:1px solid #eceff1; padding-top:14px;">
@@ -1196,27 +1233,34 @@ function selectByRange(uncheck = false) {
   setMsg('rec-msg', uncheck ? `✕ 已取消 ${cnt} 筆勾選` : `✓ 已勾選 ${cnt} 筆`, false);
 }
 
-/* 紀錄列 hover 預覽卡片 */
+/* 紀錄列 hover 預覽卡片（懶初始化，避免 body 尚未就緒） */
 let _previewTimer = null;
-const _previewEl = (() => {
-  const el = document.createElement('div');
-  el.id = 'rec-preview-card';
-  el.style.cssText = `position:fixed; z-index:9999; background:#fff; border:1px solid #b0bec5;
-    border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.18); padding:14px 16px; min-width:300px;
-    max-width:420px; font-size:12px; line-height:1.7; pointer-events:none; display:none;`;
-  document.body.appendChild(el);
-  return el;
-})();
+let _previewEl    = null;
+let _previewCX    = 0, _previewCY = 0;   /* 即時滑鼠座標 */
+
+function _getPreviewEl() {
+  if (!_previewEl) {
+    _previewEl = document.createElement('div');
+    _previewEl.id = 'rec-preview-card';
+    _previewEl.style.cssText = `position:fixed; z-index:9999; background:#fff; border:1px solid #b0bec5;
+      border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,.18); padding:14px 16px; min-width:300px;
+      max-width:420px; font-size:12px; line-height:1.7; pointer-events:none; display:none;`;
+    document.body.appendChild(_previewEl);
+  }
+  return _previewEl;
+}
 
 function showRecPreview(evt, rec) {
   clearTimeout(_previewTimer);
+  _previewCX = evt.clientX; _previewCY = evt.clientY;   /* 提前捕捉，避免事件對象回收 */
   _previewTimer = setTimeout(() => {
+    const el = _getPreviewEl();
     const items = (rec.items || []).filter(i => i.name || i.price);
     const itemRows = items.map(i =>
       `<tr><td style="padding:1px 8px 1px 0; color:#37474f;">${esc(i.name||'')}</td>
            <td style="text-align:right; color:#1565c0; white-space:nowrap;">$${fmtN(i.price||0)}</td></tr>`
     ).join('');
-    _previewEl.innerHTML = `
+    el.innerHTML = `
       <div style="font-weight:700; font-size:13px; color:#1e2a38; margin-bottom:6px; border-bottom:1px solid #e0e0e0; padding-bottom:5px;">
         ${esc(rec.voucherNo||'—')} <span style="font-weight:400; color:#78909c; font-size:11px;">${rec.formType==='expense'?'動支單':'請購單'}</span>
       </div>
@@ -1227,7 +1271,7 @@ function showRecPreview(evt, rec) {
         ${rec.purposeName ? `<tr><td style="color:#78909c;">用途別</td><td>${esc(rec.purposeName)}</td></tr>` : ''}
         ${rec.purposeDesc ? `<tr><td style="color:#78909c;">用途說明</td><td style="color:#333;">${esc(rec.purposeDesc)}</td></tr>` : ''}
       </table>
-      ${items.length ? `<table style="width:100%; border-collapse:collapse; border-top:1px solid #eceff1; padding-top:4px; margin-top:4px;">
+      ${items.length ? `<table style="width:100%; border-collapse:collapse; border-top:1px solid #eceff1; margin-top:4px;">
         <tr><th style="text-align:left; color:#78909c; font-weight:400; padding-bottom:2px;">品項</th>
             <th style="text-align:right; color:#78909c; font-weight:400;">金額</th></tr>
         ${itemRows}
@@ -1236,19 +1280,26 @@ function showRecPreview(evt, rec) {
         合計 $${fmtN(rec.total||0)}
       </div>
       ${rec.notes ? `<div style="margin-top:4px; color:#546e7a; font-size:11px; border-top:1px solid #eceff1; padding-top:4px;">備註：${esc(rec.notes)}</div>` : ''}`;
-    positionPreview(evt);
-    _previewEl.style.display = 'block';
-  }, 400);
+    _placePreview(_previewCX, _previewCY);
+    el.style.display = 'block';
+  }, 350);
+}
+
+function _placePreview(cx, cy) {
+  const el = _getPreviewEl();
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const w = 430, h = el.offsetHeight || 300;
+  let x = cx + 18, y = cy + 12;
+  if (x + w > vw - 8) x = cx - w - 8;
+  if (y + h > vh - 8) y = cy - h - 8;
+  if (y < 8) y = 8;
+  el.style.left = x + 'px';
+  el.style.top  = y + 'px';
 }
 
 function positionPreview(evt) {
-  const vw = window.innerWidth, vh = window.innerHeight;
-  const w = 420, h = 280;
-  let x = evt.clientX + 16, y = evt.clientY + 10;
-  if (x + w > vw - 10) x = evt.clientX - w - 10;
-  if (y + h > vh - 10) y = evt.clientY - h - 10;
-  _previewEl.style.left = x + 'px';
-  _previewEl.style.top  = y + 'px';
+  _previewCX = evt.clientX; _previewCY = evt.clientY;
+  if (_previewEl && _previewEl.style.display !== 'none') _placePreview(evt.clientX, evt.clientY);
 }
 
 function hideRecPreview() {
@@ -1740,16 +1791,138 @@ function getIncomeType(r) {
 /* ════════════════════
    CASHIER PANE
    ════════════════════ */
+/* ── getPayMonth：取得實付月，格式 "115/01"，預設從申請日推算 ── */
+function getPayMonth(r) {
+  if (r.payMonth) return r.payMonth;
+  const m = (r.applyDateRoc||'').match(/^(\d{2,3})年(\d{1,2})月/);
+  if (m) return `${m[1]}/${m[2].padStart(2,'0')}`;
+  return '';
+}
+
+/* ── buildPayMonthOptions：產生實付月 <option> 列表 ── */
+function buildPayMonthOptions(currentYM, baseYr) {
+  const base = Number(baseYr) || Number((currentYM||'').split('/')[0]) || 115;
+  const opts = [];
+  for (let y = base - 1; y <= base + 1; y++) {
+    for (let mo = 1; mo <= 12; mo++) {
+      const val = `${y}/${String(mo).padStart(2,'0')}`;
+      opts.push(`<option value="${val}"${val===currentYM?' selected':''}>${y}年${mo}月</option>`);
+    }
+  }
+  if (currentYM && !opts.some(o => o.includes(`value="${currentYM}"`))) {
+    const [cy, cm] = currentYM.split('/');
+    opts.unshift(`<option value="${currentYM}" selected>${cy}年${parseInt(cm)}月</option>`);
+  }
+  return opts.join('');
+}
+
+/* ── setPayMonth：更新單筆實付月並重繪 ── */
+async function setPayMonth(id, ym) {
+  const rec = _rptRecords.find(r => r.id === id);
+  if (!rec) return;
+  rec.payMonth = ym;
+  try {
+    await fetch(`/api/records?id=${encodeURIComponent(id)}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payMonth: ym }),
+    });
+  } catch (_) { /* 靜默失敗 */ }
+  renderCashierPane();
+}
+
+/* ── exportCashierCSV：匯出已選列為 CSV ── */
+function exportCashierCSV(sid, filename) {
+  const tbl = document.getElementById(sid);
+  if (!tbl) return;
+  const hdrs = [...tbl.querySelectorAll('thead th')].slice(1).map(th => th.textContent.trim());
+  const selected = [...tbl.querySelectorAll('tbody tr')].filter(tr => tr.querySelector('input[type=checkbox]')?.checked);
+  if (!selected.length) { showAdminAlert('請先勾選要匯出的紀錄'); return; }
+  const dataRows = selected.map(tr =>
+    [...tr.querySelectorAll('td')].slice(1).map(td => {
+      const sel = td.querySelector('select');
+      return sel ? (sel.options[sel.selectedIndex]?.text || '') : td.textContent.trim();
+    })
+  );
+  const csv = [hdrs, ...dataRows]
+    .map(row => row.map(c => `"${String(c).replace(/"/g,'""')}"`).join(','))
+    .join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename.replace(/[\\/:"*?<>|]/g,'_') + '.csv';
+  a.click();
+}
+
+/* ── renderCashierSection：繪製 9A / 92 年度區塊 ── */
+function renderCashierSection(label, recs, yr, color) {
+  const sid = 'csh_' + label.replace(/[^a-z0-9]/gi,'_');
+  const total = recs.reduce((s,r) => s + (Number(r.total)||0), 0);
+  const rows = recs.map(r => `
+    <tr data-id="${esc(r.id||'')}">
+      <td><input type="checkbox" onchange="updateSelCount('${sid}')"></td>
+      <td>${esc(r.voucherNo||'—')}</td>
+      <td>${esc(r.applyDateRoc||r.applyDateRaw||'')}</td>
+      <td>${esc(r.acctName||'')}</td>
+      <td>${esc(r.purposeCode||'')} ${esc(r.purposeName||'')}</td>
+      <td>${esc(r.acctType||'')}</td>
+      <td class="td-r-admin">$${fmtN(r.total||0)}</td>
+    </tr>`).join('') || `<tr><td colspan="7" class="no-data">無紀錄</td></tr>`;
+  return `<div class="export-section" style="margin-bottom:14px;">
+    <h4 style="color:${color};">${label}（${recs.length} 筆）　合計 $${fmtN(total)}</h4>
+    <div class="export-toolbar">
+      <button class="btn btn-gray" onclick="selAll('${sid}')">全選</button>
+      <button class="btn btn-gray" onclick="invertSel('${sid}')">反選</button>
+      <button class="btn btn-green" onclick="exportCashierCSV('${sid}','${label}_${yr}年')">⬇ 匯出 CSV</button>
+      <span class="sel-count" id="cnt-${sid}">0 筆已選</span>
+    </div>
+    <div class="export-table-wrap">
+      <table class="export-table" id="${sid}">
+        <thead><tr>
+          <th><input type="checkbox" onchange="selAllChk('${sid}',this)"></th>
+          <th>憑證編號</th><th>申請日期</th><th>主科目</th><th>用途別</th>
+          <th>帳戶類別</th><th style="text-align:right;">金額</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+}
+
 let _cashierTab = '50';
 function renderCashierPane() {
   const active = _rptRecords.filter(r => !r.voided);
   const groups = { '列計50所得': [], '列計9A所得': [], '列計92所得': [] };
   active.forEach(r => { const t = getIncomeType(r); if (groups[t]) groups[t].push(r); });
 
-  /* stat cards */
+  /* ── 年度選擇器 ── */
+  const selEl = document.getElementById('cashier-year-sel');
+  const allIncomeRecs = [...groups['列計50所得'], ...groups['列計9A所得'], ...groups['列計92所得']];
+  const yearSet = new Set();
+  allIncomeRecs.forEach(r => {
+    const pm = getPayMonth(r);
+    if (pm) yearSet.add(pm.split('/')[0]);
+    const m2 = (r.applyDateRoc||'').match(/^(\d{2,3})年/);
+    if (m2) yearSet.add(m2[1]);
+  });
+  const years = [...yearSet].sort((a,b) => Number(b)-Number(a));
+  const prevSel = selEl ? selEl.value : '';
+  if (selEl) {
+    selEl.innerHTML = years.length
+      ? years.map(y => `<option value="${y}"${y===prevSel?' selected':''}>${y}年</option>`).join('')
+      : '<option value="">（無資料）</option>';
+  }
+  const yr = selEl ? selEl.value : (years[0]||'');
+
+  /* ── 依年度篩選各類別 ── */
+  const inc50 = groups['列計50所得'].filter(r => getPayMonth(r).startsWith(yr + '/'));
+  const inc9a = groups['列計9A所得'].filter(r => (r.applyDateRoc||'').startsWith(yr + '年'));
+  const inc92 = groups['列計92所得'].filter(r => (r.applyDateRoc||'').startsWith(yr + '年'));
+
+  /* ── 統計卡片（依選定年度） ── */
   const cardColors = { '列計50所得':'#1565c0', '列計9A所得':'#2e7d32', '列計92所得':'#6a1b9a' };
-  document.getElementById('income-cards').innerHTML = Object.entries(groups).map(([lbl, recs]) => {
-    const total = recs.reduce((s,r)=>s+(Number(r.total)||0),0);
+  const filtered = { '列計50所得': inc50, '列計9A所得': inc9a, '列計92所得': inc92 };
+  document.getElementById('income-cards').innerHTML = Object.entries(filtered).map(([lbl, recs]) => {
+    const total = recs.reduce((s,r) => s+(Number(r.total)||0), 0);
     return `<div class="income-card">
       <div class="ic-label" style="color:${cardColors[lbl]};">${lbl}</div>
       <div class="ic-count">${recs.length} 筆</div>
@@ -1757,44 +1930,92 @@ function renderCashierPane() {
     </div>`;
   }).join('');
 
-  /* sections */
-  document.getElementById('income-sections').innerHTML = Object.entries(groups).map(([lbl, recs]) => {
-    const sid = lbl.replace(/[^a-z0-9]/gi,'_');
-    const hdrs = ['憑證編號','類型','申請日期','主科目','業務計畫','用途別','帳戶類別','金額','儲存時間'];
-    const rows = recs.map(r => `
-      <tr data-id="${esc(r.id||'')}">
+  /* ── 列計50所得：依實付月分組 ── */
+  const monthMap = {};
+  inc50.forEach(r => {
+    const ym = getPayMonth(r);
+    if (!monthMap[ym]) monthMap[ym] = [];
+    monthMap[ym].push(r);
+  });
+
+  /* 月份條形圖 */
+  const totByMonth = {};
+  for (let mo = 1; mo <= 12; mo++) {
+    const key = `${yr}/${String(mo).padStart(2,'0')}`;
+    totByMonth[key] = (monthMap[key]||[]).reduce((s,r) => s+(Number(r.total)||0), 0);
+  }
+  const maxAmt = Math.max(...Object.values(totByMonth), 1);
+  const barChartHtml = `
+    <div class="cashier-chart">
+      <div class="cashier-chart-title">${yr}年 列計50所得 — 各月合計</div>
+      <div class="cashier-bars-wrap">
+        ${[...Array(12)].map((_,i) => {
+          const mo = i + 1;
+          const key = `${yr}/${String(mo).padStart(2,'0')}`;
+          const amt = totByMonth[key];
+          const pct = amt ? Math.max(Math.round((amt/maxAmt)*100), 3) : 0;
+          return `<div class="cbar-col">
+            <div class="cbar-amt-lbl">${amt ? '$'+fmtN(amt) : ''}</div>
+            <div class="cbar-bar-inner" style="height:${pct}%;"></div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex; gap:4px; margin-top:4px;">
+        ${[...Array(12)].map((_,i) => `<div style="flex:1; text-align:center;"><span class="cbar-month-lbl">${i+1}月</span></div>`).join('')}
+      </div>
+    </div>`;
+
+  /* 各月子區塊 */
+  const months50 = Object.keys(monthMap).sort();
+  const monthSections = months50.length ? months50.map(ym => {
+    const [y, mo] = ym.split('/');
+    const moLabel = `${y}年${parseInt(mo)}月`;
+    const recs = monthMap[ym];
+    const sid = `csh50_${ym.replace('/','_')}`;
+    const total = recs.reduce((s,r) => s+(Number(r.total)||0), 0);
+    const rows = recs.map(r => {
+      const pmOpts = buildPayMonthOptions(getPayMonth(r), yr);
+      return `<tr data-id="${esc(r.id||'')}">
         <td><input type="checkbox" onchange="updateSelCount('${sid}')"></td>
         <td>${esc(r.voucherNo||'—')}</td>
-        <td>${r.formType==='expense'?'動支':'採購'}</td>
         <td>${esc(r.applyDateRoc||r.applyDateRaw||'')}</td>
         <td>${esc(r.acctName||'')}</td>
-        <td>${esc(bpLabelName(r.bpLabel))}</td>
         <td>${esc(r.purposeCode||'')} ${esc(r.purposeName||'')}</td>
         <td>${esc(r.acctType||'')}</td>
         <td class="td-r-admin">$${fmtN(r.total||0)}</td>
-        <td>${esc(r.savedAt||'')}</td>
-      </tr>`).join('') || '<tr><td colspan="10" class="no-data">無紀錄</td></tr>';
-    return `<div class="export-section">
-      <h4>${lbl}（${recs.length} 筆）</h4>
+        <td><select class="pm-sel" onchange="setPayMonth('${esc(r.id||'')}', this.value)">${pmOpts}</select></td>
+      </tr>`;
+    }).join('');
+    return `<div class="export-section" style="margin-bottom:10px;">
+      <h4 style="color:#1565c0;">${moLabel}　合計 $${fmtN(total)}　${recs.length} 筆</h4>
       <div class="export-toolbar">
         <button class="btn btn-gray" onclick="selAll('${sid}')">全選</button>
         <button class="btn btn-gray" onclick="invertSel('${sid}')">反選</button>
-        <button class="btn btn-green" onclick="exportSel('${sid}','${lbl}')">⬇ 匯出已選 XLSX</button>
+        <button class="btn btn-green" onclick="exportCashierCSV('${sid}','列計50_${moLabel}')">⬇ 匯出 CSV（本月）</button>
         <span class="sel-count" id="cnt-${sid}">0 筆已選</span>
       </div>
       <div class="export-table-wrap">
         <table class="export-table" id="${sid}">
           <thead><tr>
             <th><input type="checkbox" onchange="selAllChk('${sid}',this)"></th>
-            <th>憑證編號</th><th>類型</th><th>申請日期</th><th>主科目</th>
-            <th>業務計畫</th><th>用途別</th><th>帳戶類別</th>
-            <th style="text-align:right;">金額</th><th>儲存時間</th>
+            <th>憑證編號</th><th>申請日期</th><th>主科目</th><th>用途別</th>
+            <th>帳戶類別</th><th style="text-align:right;">金額</th><th>實付月</th>
           </tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
     </div>`;
-  }).join('');
+  }).join('') : `<p style="color:#888; padding:12px 0; font-size:13px;">此年度無列計50所得紀錄</p>`;
+
+  /* ── 組合輸出 ── */
+  let html = `<div class="export-section" style="margin-bottom:14px;">
+    <h4 style="color:#1565c0;">列計50所得（${inc50.length} 筆）</h4>
+    ${barChartHtml}
+    ${monthSections}
+  </div>`;
+  html += renderCashierSection('列計9A所得', inc9a, yr, '#2e7d32');
+  html += renderCashierSection('列計92所得', inc92, yr, '#6a1b9a');
+  document.getElementById('income-sections').innerHTML = html;
 }
 
 /* ════════════════════
@@ -1995,6 +2216,7 @@ function fillSettings() {
   document.getElementById('set-nhi-9a').value    = subjects.settings?.nhiThreshold9A  ?? 20000;
   document.getElementById('set-tax-9a').value    = subjects.settings?.taxThreshold9A  ?? 20010;
   document.getElementById('set-part50').value    = subjects.settings?.part50Threshold ?? 29500;
+  lockBasicSettings();
   /* 自動填入文字 */
   const at = subjects.settings?.autoText || {};
   document.getElementById('set-text-2706name').value    = at.item2706Name  || '';
@@ -2029,6 +2251,35 @@ function fillSettings() {
     BUDGET_YEAR_FIELDS.forEach(f => { s.budgets['115'][f.key] = f.def; });
   }
   renderBudgetYears();
+}
+
+function unlockBasicSettings() {
+  document.querySelectorAll('.settings-basic-input').forEach(el => el.disabled = false);
+  document.getElementById('basic-settings-lock-bar').style.display = 'none';
+  document.getElementById('basic-settings-edit-bar').style.display = '';
+  document.getElementById('basic-settings-lock-icon').textContent  = '🔓';
+}
+function lockBasicSettings() {
+  document.querySelectorAll('.settings-basic-input').forEach(el => el.disabled = true);
+  document.getElementById('basic-settings-lock-bar').style.display = '';
+  document.getElementById('basic-settings-edit-bar').style.display = 'none';
+  document.getElementById('basic-settings-lock-icon').textContent  = '🔒';
+}
+function cancelBasicSettings() {
+  const s = subjects?.settings || {};
+  document.getElementById('set-org').value               = s.orgName           || '';
+  document.getElementById('set-threshold').value         = s.exemptThreshold   ?? 10000;
+  document.getElementById('set-archive-threshold').value = s.archiveThreshold  ?? 500;
+  document.getElementById('set-nhi-9a').value            = s.nhiThreshold9A    ?? 20000;
+  document.getElementById('set-tax-9a').value            = s.taxThreshold9A    ?? 20010;
+  document.getElementById('set-part50').value            = s.part50Threshold   ?? 29500;
+  lockBasicSettings();
+  setMsg('set-basic-msg', '已取消，未儲存', false);
+  setTimeout(() => setMsg('set-basic-msg', '', false), 2000);
+}
+async function saveBasicSettings() {
+  await saveSettings();
+  lockBasicSettings();
 }
 
 function unlockAutoText() {
