@@ -622,7 +622,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.14</div>
+    <div id="sb-version">v2.4.15</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2197,6 +2197,49 @@ function calcDeductions(total) {
   return null;
 }
 
+/* ── 差旅/交通費科目提醒 ──
+   只要動支說明、用途說明或其他說明事項含「交通」或「差旅」，
+   且不符合以下合法組合，即顯示提醒：
+     ① 保管款專戶 + 業務計劃 21020302
+     ② 醫療基金專戶 + 用途別 2301 / 2305 / 2711 / 2898
+   ── */
+function checkTravelKeywords() {
+  const KEYWORDS   = ['交通', '差旅'];
+  const VALID_PC   = ['2301', '2305', '2711', '2898'];
+
+  /* 蒐集所有文字來源 */
+  const desc  = document.getElementById('purpose-desc')?.value || '';
+  const notes = document.getElementById('notes')?.value        || '';
+  let   itemText = '';
+  for (let i = 0; i < rowCount; i++) itemText += ' ' + (qv(i, 'name') || '');
+  const combined = desc + ' ' + notes + ' ' + itemText;
+
+  /* 無關鍵字 → 不需提醒 */
+  if (!KEYWORDS.some(kw => combined.includes(kw))) return null;
+
+  /* 讀取目前主科目 / 業務計劃 / 用途別 */
+  const mainSel = document.getElementById('sel-main');
+  const acctName = mainSel?.options[mainSel.selectedIndex]?.text || '';
+  const bpCode   = document.getElementById('sel-bp')?.value      || '';
+  const pcCode   = document.getElementById('sel-purpose')?.value || '';
+
+  const isCustody = acctName.includes('保管款');
+  const isMedical = acctName.includes('醫療基金');
+
+  /* 例外①：保管款專戶 + 業務計劃 21020302 */
+  if (isCustody && bpCode.startsWith('21020302')) return null;
+  /* 例外②：醫療基金專戶 + 合法用途別 */
+  if (isMedical && VALID_PC.includes(pcCode)) return null;
+
+  /* 其餘情況 → 提醒 */
+  const found = KEYWORDS.filter(kw => combined.includes(kw));
+  return `🚨 差旅／交通費提醒：說明欄含「${found.join('、')}」，` +
+         `但目前科目設定不符合差旅費的標準組合。<br>` +
+         `・差旅費通常應使用：<strong>保管款專戶 ＋ 業務計劃 21020302</strong><br>` +
+         `・或：<strong>醫療基金專戶 ＋ 用途別 2301 / 2305 / 2711 / 2898</strong><br>` +
+         `<span style="color:#78909c; font-size:12px;">（可直接按「確定存檔」強制存檔）</span>`;
+}
+
 /* ── 餐費綜合提醒（時間區間 + 日期一致性）──
    若用途說明含「餐費」，同時檢查：
    ① 用途說明＋其他說明事項 是否含橫跨 6:00/12:00/18:00 的時間區間
@@ -2287,6 +2330,18 @@ function openSaveConfirmModal() {
       mealWarnEl.style.display = '';
     } else {
       mealWarnEl.style.display = 'none';
+    }
+  }
+
+  /* 善意提醒：差旅／交通費科目 */
+  const travelWarnEl = document.getElementById('scm-travel-warn');
+  if (travelWarnEl) {
+    const travelMsg = checkTravelKeywords();
+    if (travelMsg) {
+      travelWarnEl.innerHTML = travelMsg;
+      travelWarnEl.style.display = '';
+    } else {
+      travelWarnEl.style.display = 'none';
     }
   }
 
@@ -2867,6 +2922,10 @@ function showCopyPopup(no, opts = {}) {
     <div id="scm-meal-warn" style="display:none; margin:10px 16px 0;
          background:#fce4ec; border-left:3px solid #e91e63; border-radius:4px;
          padding:8px 12px; font-size:12px; color:#880e4f; text-align:left; line-height:1.6;">
+    </div>
+    <div id="scm-travel-warn" style="display:none; margin:10px 16px 0;
+         background:#fff3e0; border-left:4px solid #e65100; border-radius:4px;
+         padding:10px 14px; font-size:13px; font-weight:500; color:#bf360c; text-align:left; line-height:1.7;">
     </div>
     <div class="scm-btns">
       <button class="scm-cancel" onclick="closeSaveConfirm()">✕ 取消</button>
