@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v2.4.7</title>
+<title>管理者入口 — 動支單系統 v2.4.8</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -361,7 +361,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.7</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.8</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -378,7 +378,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.7</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.8</span>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
     <button id="logout-btn" onclick="logout()">登出</button>
   </div>
@@ -485,6 +485,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         <button class="rpt-tab"        id="rpt-tab-budget" onclick="showRptTab('budget',this)">📈 預算執行率</button>
         <button class="rpt-tab" id="rpt-tab-cashier" onclick="showRptTab('cashier',this)">📑 出納列計</button>
         <button class="rpt-tab" id="rpt-tab-purpose" onclick="showRptTab('purpose',this)">📋 1301/2807清單</button>
+        <button class="rpt-tab" id="rpt-tab-sysstat" onclick="showRptTab('sysstat',this)">📊 系統狀態</button>
       </div>
       <div class="toolbar" style="margin-top:10px;">
         <button class="btn btn-gray" onclick="loadReports()">🔄 重新載入</button>
@@ -544,6 +545,10 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         <div class="income-cards" id="income-cards"></div>
         <div id="income-sections"></div>
       </div>
+      <!-- ── 系統狀態 pane ── -->
+      <div id="rpt-sysstat-pane" style="display:none; padding-top:12px;">
+        <div id="sysstat-content"><p style="color:#888; font-size:13px;">載入中…</p></div>
+      </div>
       <!-- ── 1301/2807 清單 pane ── -->
       <div id="rpt-purpose-pane" style="display:none; padding-top:12px;">
         <div class="purpose-subtabs">
@@ -566,6 +571,10 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         <div class="s-row">
           <label>免核章門檻（元）— 低於此金額自動顯示「免核章」</label>
           <input id="set-threshold" type="number" min="0">
+        </div>
+        <div class="s-row">
+          <label>封存提醒門檻（筆數）— 有效紀錄達到此數量時顯示封存提醒橫幅</label>
+          <input id="set-archive-threshold" type="number" min="50" max="5000" placeholder="500">
         </div>
 
         <h4 style="font-size:13px; color:#546e7a; margin:20px 0 12px; border-top:1px solid #eceff1; padding-top:14px;">
@@ -938,8 +947,8 @@ async function loadRecords() {
     const voided   = active.filter(r =>  r.voided).length;
     document.getElementById('rec-count').textContent =
       `共 ${records.length} 筆（有效 ${valid}，作廢 ${voided}，封存 ${archived}）`;
-    /* 封存提醒：有效紀錄超過 200 筆時顯示橫幅 */
-    const ARCHIVE_THRESHOLD = 200;
+    /* 封存提醒：有效紀錄超過設定門檻時顯示橫幅（預設 500 筆） */
+    const ARCHIVE_THRESHOLD = subjects?.settings?.archiveThreshold || 500;
     const banner = document.getElementById('archive-banner');
     if (banner) {
       if (valid >= ARCHIVE_THRESHOLD) {
@@ -992,18 +1001,12 @@ async function loadRecords() {
                    onclick="archiveRecord('${rec.id}',false)">📂 取消封存</button>`
               : isVoid
                 ? `<button class="btn" style="padding:4px 10px;font-size:11px;background:#e3f2fd;color:#1565c0;"
-                     onclick="restoreVoid('${rec.id}')">↩️ 還原</button>
-                   <button class="btn" style="padding:4px 10px;font-size:11px;background:#0d47a1;color:#fff;"
-                     onclick="archiveRecord('${rec.id}',true)">🗄 封存</button>`
+                     onclick="restoreVoid('${rec.id}')">↩️ 還原</button>`
                 : isActuallyLocked
                   ? `<button class="btn" style="padding:4px 10px;font-size:11px;background:#e8f5e9;color:#2e7d32;"
-                       onclick="toggleLock('${rec.id}',false)">🔓 解鎖</button>
-                     <button class="btn" style="padding:4px 10px;font-size:11px;background:#0d47a1;color:#fff;"
-                       onclick="archiveRecord('${rec.id}',true)">🗄 封存</button>`
+                       onclick="toggleLock('${rec.id}',false)">🔓 解鎖</button>`
                   : `<button class="btn" style="padding:4px 10px;font-size:11px;background:#37474f;color:#fff;"
-                       onclick="toggleLock('${rec.id}',true)">🔒 鎖定</button>
-                     <button class="btn" style="padding:4px 10px;font-size:11px;background:#0d47a1;color:#fff;"
-                       onclick="archiveRecord('${rec.id}',true)">🗄 封存</button>`
+                       onclick="toggleLock('${rec.id}',true)">🔒 鎖定</button>`
             }
           </td>`;
         /* hover 預覽 */
@@ -1341,12 +1344,14 @@ function showRptTab(name, btn) {
   document.getElementById('rpt-budget-pane').style.display = name==='budget' ? '' : 'none';
   document.getElementById('rpt-cashier-pane').style.display= name==='cashier'? '' : 'none';
   document.getElementById('rpt-purpose-pane').style.display= name==='purpose'? '' : 'none';
+  document.getElementById('rpt-sysstat-pane').style.display= name==='sysstat'? '' : 'none';
   /* 只有 動支單報表/作廢報表 顯示 CSV 匯出按鈕 */
   const csvBtn = document.getElementById('rpt-csv-btn');
   if (csvBtn) csvBtn.style.display = (name==='all'||name==='voided') ? '' : 'none';
   if (name === 'budget')  renderBudgetChart();
   if (name === 'cashier') renderCashierPane();
   if (name === 'purpose') renderPurposePane();
+  if (name === 'sysstat') renderSysStatPane();
 }
 
 function exportReportCSV() {
@@ -1548,6 +1553,176 @@ async function bulkSetBudgetYear() {
     setMsg('rpt-msg', `✓ 已更新 ${checked.length} 筆`, false);
     renderBudgetChart();
   } catch(_) { setMsg('rpt-msg', '❌ 操作失敗', true); }
+}
+
+/* ════════════════════
+   SYSTEM STATUS PANE
+   ════════════════════ */
+async function renderSysStatPane() {
+  const el = document.getElementById('sysstat-content');
+  if (!el) return;
+  el.innerHTML = '<p style="color:#888; font-size:13px; padding:8px 0;">⟳ 載入中…</p>';
+
+  let allRecs = [];
+  try {
+    allRecs = await (await fetch('/api/records?all=1')).json();
+  } catch(_) { el.innerHTML = '<p style="color:#c62828;">❌ 資料載入失敗</p>'; return; }
+
+  const threshold  = subjects?.settings?.archiveThreshold || 500;
+  const archived   = allRecs.filter(r =>  r.archived);
+  const notArchived= allRecs.filter(r => !r.archived);
+  const active     = notArchived.filter(r => !r.voided);
+  const voided     = notArchived.filter(r =>  r.voided);
+  const totalCnt   = allRecs.length;
+  const activeCnt  = active.length;
+  const archivedCnt= archived.length;
+  const voidedCnt  = voided.length;
+
+  /* 進度條計算 */
+  const pct      = Math.min(activeCnt / threshold * 100, 100);
+  const barColor = pct >= 90 ? '#c62828' : pct >= 70 ? '#e65100' : '#2e7d32';
+  const remain   = threshold - activeCnt;
+
+  /* 月成長率估算（近3個月，以 savedAt 解析） */
+  function parseSavedMonth(r) {
+    const s = r.savedAt || '';
+    const m = s.match(/^(\d{3})\/(\d{2})/);  /* 格式 115/04/02 */
+    if (m) return `${m[1]}/${m[2]}`;
+    const d = s.match(/(\d{4})-(\d{2})/);    /* ISO 格式 fallback */
+    if (d) return `${parseInt(d[1])-1911}/${d[2]}`;
+    return null;
+  }
+  const monthCounts = {};
+  active.forEach(r => {
+    const ym = parseSavedMonth(r);
+    if (ym) monthCounts[ym] = (monthCounts[ym] || 0) + 1;
+  });
+  const sortedMonths = Object.keys(monthCounts).sort();
+  const last3 = sortedMonths.slice(-3);
+  const avgMonthly = last3.length
+    ? Math.round(last3.reduce((s, m) => s + monthCounts[m], 0) / last3.length)
+    : 0;
+
+  /* 封存建議 */
+  let adviceHtml = '';
+  if (activeCnt >= threshold) {
+    adviceHtml = `<span style="color:#c62828; font-weight:700;">⚠️ 已超過封存門檻，建議立即執行封存作業！</span>`;
+  } else if (avgMonthly > 0) {
+    const monthsLeft = Math.ceil(remain / avgMonthly);
+    const suggestDate = new Date();
+    suggestDate.setMonth(suggestDate.getMonth() + monthsLeft);
+    const rocY = suggestDate.getFullYear() - 1911;
+    const rocM = suggestDate.getMonth() + 1;
+    const urgency = monthsLeft <= 1 ? '🔴 本月內' : monthsLeft <= 3 ? '🟠 近期（3個月內）' : '🟢 預計';
+    adviceHtml = `${urgency} 約 <strong>${monthsLeft} 個月後</strong>（${rocY}年${rocM}月前後）達到門檻，建議屆時執行封存。<br>
+      <span style="font-size:11px; color:#78909c;">依據：近 ${last3.length} 個月平均每月 ${avgMonthly} 筆，尚餘容量 ${remain} 筆。</span>`;
+  } else {
+    adviceHtml = `<span style="color:#78909c;">尚無足夠資料計算成長率。</span>`;
+  }
+
+  /* 申請日期分布（所有紀錄，含封存） */
+  function parseApplyYM(r) {
+    const m = (r.applyDateRoc||'').match(/^(\d{2,3})年(\d{1,2})月/);
+    if (!m) return null;
+    return { key: `${m[1]}/${m[2].padStart(2,'0')}`, label: `${m[1]}年${parseInt(m[2])}月` };
+  }
+  const distMap = {};
+  allRecs.filter(r => !r.voided).forEach(r => {
+    const ym = parseApplyYM(r);
+    if (!ym) return;
+    if (!distMap[ym.key]) distMap[ym.key] = { label: ym.label, active: 0, archived: 0 };
+    if (r.archived) distMap[ym.key].archived++;
+    else            distMap[ym.key].active++;
+  });
+  const distRows = Object.keys(distMap).sort().map(k => {
+    const d = distMap[k];
+    const tot = d.active + d.archived;
+    const barW = Math.round(tot / Math.max(...Object.values(distMap).map(x=>x.active+x.archived)) * 120);
+    return `<tr>
+      <td style="white-space:nowrap; padding:2px 10px 2px 0; color:#546e7a;">${d.label}</td>
+      <td style="padding:2px 8px 2px 0;"><div style="display:inline-block; width:${barW}px; height:10px; background:#90caf9; border-radius:3px; vertical-align:middle;"></div></td>
+      <td style="text-align:right; padding:2px 8px 2px 0; color:#1565c0; font-weight:600;">${d.active}</td>
+      <td style="text-align:right; padding:2px 0; color:#78909c;">${d.archived>0?'+ '+d.archived+' 封存':''}</td>
+    </tr>`;
+  }).join('');
+
+  /* 各主科目當年月金額 */
+  const rocYear = String(new Date().getFullYear() - 1911);
+  const yearActive = active.filter(r => {
+    const ym = parseApplyYM(r);
+    return ym && ym.key.startsWith(rocYear+'/');
+  });
+  const acctMonths = {};
+  yearActive.forEach(r => {
+    const ym = parseApplyYM(r);
+    if (!ym) return;
+    const acct = r.acctName || '（未分類）';
+    if (!acctMonths[acct]) acctMonths[acct] = {};
+    const mo = parseInt(ym.key.split('/')[1]);
+    acctMonths[acct][mo] = (acctMonths[acct][mo] || 0) + (Number(r.total)||0);
+  });
+  const allMonths = [...new Set(yearActive.map(r => { const ym=parseApplyYM(r); return ym?parseInt(ym.key.split('/')[1]):null; }).filter(Boolean))].sort((a,b)=>a-b);
+  const acctRows = Object.entries(acctMonths).map(([acct, mmap]) => {
+    const ytd = Object.values(mmap).reduce((s,v)=>s+v, 0);
+    const cells = allMonths.map(m => `<td style="text-align:right; padding:2px 6px;">$${fmtN(mmap[m]||0)}</td>`).join('');
+    return `<tr><td style="padding:2px 8px 2px 0; white-space:nowrap;">${esc(acct)}</td>${cells}<td style="text-align:right; padding:2px 0 2px 10px; font-weight:700; color:#1565c0;">$${fmtN(ytd)}</td></tr>`;
+  }).join('');
+  const monthHeaders = allMonths.map(m=>`<th style="text-align:right; padding:2px 6px;">${m}月</th>`).join('');
+
+  el.innerHTML = `
+    <!-- 統計卡片 -->
+    <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:18px;">
+      ${[
+        { label:'有效紀錄', val: activeCnt, color:'#1565c0' },
+        { label:'已封存',   val: archivedCnt, color:'#0d47a1' },
+        { label:'已作廢',   val: voidedCnt, color:'#c62828' },
+        { label:'資料庫總計', val: totalCnt, color:'#37474f' },
+      ].map(c=>`
+        <div style="background:#fff; border:1px solid #e0e0e0; border-radius:8px; padding:14px 20px; min-width:120px; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,.06);">
+          <div style="font-size:11px; color:#78909c; margin-bottom:4px;">${c.label}</div>
+          <div style="font-size:28px; font-weight:700; color:${c.color}; line-height:1.1;">${c.val}</div>
+          <div style="font-size:10px; color:#b0bec5;">筆</div>
+        </div>`).join('')}
+    </div>
+
+    <!-- 安全容量進度 -->
+    <div class="budget-section" style="margin-bottom:16px;">
+      <h4 style="margin-bottom:10px;">🛡️ 動支單安全容量進度（門檻：${threshold} 筆）</h4>
+      <div style="background:#e0e0e0; border-radius:8px; height:22px; overflow:hidden; margin-bottom:8px; position:relative;">
+        <div style="width:${pct}%; background:${barColor}; height:100%; border-radius:8px; transition:width .4s;"></div>
+        <span style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-size:12px; font-weight:700; color:#fff; text-shadow:0 1px 2px rgba(0,0,0,.4);">
+          ${activeCnt} / ${threshold}（${pct.toFixed(1)}%）
+        </span>
+      </div>
+      <div style="font-size:12px; color:#546e7a;">${adviceHtml}</div>
+    </div>
+
+    <!-- 申請日期分布 -->
+    <div class="budget-section" style="margin-bottom:16px;">
+      <h4 style="margin-bottom:8px;">📅 申請日期分布（有效＋封存紀錄）</h4>
+      ${distRows ? `<table style="font-size:12px; border-collapse:collapse;">
+        <thead><tr>
+          <th style="text-align:left; color:#78909c; font-weight:400; padding:2px 10px 4px 0;">月份</th>
+          <th></th>
+          <th style="text-align:right; color:#78909c; font-weight:400; padding:2px 8px 4px 0;">有效</th>
+          <th style="color:#78909c; font-weight:400;">封存</th>
+        </tr></thead>
+        <tbody>${distRows}</tbody>
+      </table>` : '<p style="color:#888; font-size:12px;">無資料</p>'}
+    </div>
+
+    <!-- 各主科目月金額 -->
+    <div class="budget-section">
+      <h4 style="margin-bottom:8px;">📊 各主科目月金額與當年累積（${rocYear}年）</h4>
+      ${acctRows ? `<div style="overflow-x:auto;"><table style="font-size:12px; border-collapse:collapse; min-width:400px;">
+        <thead><tr>
+          <th style="text-align:left; padding:3px 8px 3px 0; color:#78909c; font-weight:400;">主科目</th>
+          ${monthHeaders}
+          <th style="text-align:right; padding:3px 0 3px 10px; color:#1565c0; font-weight:600;">年累積</th>
+        </tr></thead>
+        <tbody>${acctRows}</tbody>
+      </table></div>` : `<p style="color:#888; font-size:12px;">${rocYear}年尚無有效紀錄。</p>`}
+    </div>`;
 }
 
 /* ════════════════════
@@ -1816,6 +1991,7 @@ function fillSettings() {
   if (!subjects) return;
   document.getElementById('set-org').value       = subjects.settings?.orgName        || '';
   document.getElementById('set-threshold').value = subjects.settings?.exemptThreshold ?? 10000;
+  document.getElementById('set-archive-threshold').value = subjects.settings?.archiveThreshold ?? 500;
   document.getElementById('set-nhi-9a').value    = subjects.settings?.nhiThreshold9A  ?? 20000;
   document.getElementById('set-tax-9a').value    = subjects.settings?.taxThreshold9A  ?? 20010;
   document.getElementById('set-part50').value    = subjects.settings?.part50Threshold ?? 29500;
@@ -1892,6 +2068,7 @@ async function saveSettings() {
   subjects.settings = subjects.settings || {};
   subjects.settings.orgName         = document.getElementById('set-org').value;
   subjects.settings.exemptThreshold = parseInt(document.getElementById('set-threshold').value) || 10000;
+  subjects.settings.archiveThreshold = parseInt(document.getElementById('set-archive-threshold').value) || 200;
   subjects.settings.nhiThreshold9A  = parseInt(document.getElementById('set-nhi-9a').value)    || 20000;
   subjects.settings.taxThreshold9A  = parseInt(document.getElementById('set-tax-9a').value)    || 20010;
   subjects.settings.part50Threshold = parseInt(document.getElementById('set-part50').value)    || 29500;
