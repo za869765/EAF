@@ -460,12 +460,12 @@ body.sb-resizing * { pointer-events: none !important; }
   animation: unsavedShake .45s ease;
 }
 @keyframes unsavedShake {
-  0%   { transform: translateY(16px) rotate(0deg); opacity:0; }
-  30%  { transform: translateY(0) rotate(-2deg); opacity:1; }
-  55%  { transform: rotate(2deg); }
-  75%  { transform: rotate(-1.2deg); }
-  90%  { transform: rotate(.6deg); }
-  100% { transform: none; }
+  0%   { transform: translateY(16px); opacity:0; }
+  30%  { transform: translateY(0);    opacity:1; }
+  50%  { transform: translateY(-6px); }
+  70%  { transform: translateY(3px);  }
+  85%  { transform: translateY(-2px); }
+  100% { transform: translateY(0);    }
 }
 .unsaved-icon  { font-size: 42px; margin-bottom: 10px; }
 .unsaved-title { font-size: 16px; font-weight: bold; color: #b71c1c; margin-bottom: 8px; }
@@ -665,7 +665,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v2.4.42</div>
+      <div id="sb-version">v2.4.43</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -674,7 +674,7 @@ body.sb-resizing * { pointer-events: none !important; }
     </div>
   </div>
   <div id="sync-status">● 連線中…</div>
-  <div style="font-size:10px; color:#4a6278; padding:5px 14px 2px; flex-shrink:0;">📋 動支單申請紀錄</div>
+  <div style="font-size:10px; color:#4a6278; padding:5px 14px 2px; flex-shrink:0;">📋 動支單/🛒請購單申請紀錄</div>
   <div id="history-scroll">
     <div id="no-history">載入中…</div>
   </div>
@@ -710,7 +710,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <div class="u-main-acct" id="main-acct-lbl">請選擇</div>
       <div class="u-title-wrap">
         <div class="u-org" id="org-name">臺南市佳里區衛生所</div>
-        <div class="u-sub" id="form-subtitle">臺南市佳里區衛生所財物請(修)購單暨黏貼憑證用紙</div>
+        <div class="u-sub" id="form-subtitle">財物請(修)購單暨黏貼憑證用紙</div>
       </div>
     </div>
 
@@ -1152,7 +1152,7 @@ function applyType(type, { regen = true } = {}) {
 
   /* 副標題 */
   document.getElementById('form-subtitle').textContent =
-    isPurchase ? '臺南市佳里區衛生所財物請(修)購單暨黏貼憑證用紙' : '臺南市佳里區衛生所費用動支請示單暨黏貼憑證用紙';
+    isPurchase ? '財物請(修)購單暨黏貼憑證用紙' : '費用動支請示單暨黏貼憑證用紙';
 
   /* 下方標題 */
   document.getElementById('lower-title').textContent = isPurchase ? '臺南市佳里區衛生所財物請(修)購單' : '臺南市佳里區衛生所費用動支請示單';
@@ -2213,8 +2213,9 @@ function renderHistory(records) {
     const numB = parseInt((b.voucherNo || '').replace(/\D/g, '')) || 0;
     return numB - numA;   /* 大→小 */
   }).forEach(rec => {
-    const isExp   = rec.formType==='expense';
-    const isVoid  = !!rec.voided;
+    const isExp    = rec.formType==='expense';
+    const isVoid   = !!rec.voided;
+    const isLocked = !!(rec.locked || rec.printed);
     const div = document.createElement('div');
     const acctClass = (rec.acctName||'').includes('醫療基金') ? 'acct-medical' :
                       (rec.acctName||'').includes('保管款')   ? 'acct-custody' :
@@ -2235,7 +2236,7 @@ function renderHistory(records) {
         ? '<span class="h-void-stamp" title="已作廢，留存備查">⛔</span>'
         : `<button class="h-void" onclick="voidRecord('${rec.id}',event)" title="點擊作廢此筆">✕</button>`
       }
-      <div class="h-date">${esc(rec.savedAt||'')}　${isExp?'[動支單]':'[請購單]'}${isVoid?' ⛔':''}</div>
+      <div class="h-date">${esc(rec.savedAt||'')}　${isExp?'[動支單]':'[請購單]'}${isVoid?' ⛔':''}${isLocked&&!isVoid?' 🔒':''}</div>
       <div class="h-title">${esc(rec.voucherNo||'')} ${esc(rec.acctName)} / ${esc(rec.bpLabel)}</div>
       <div class="h-amount" style="${amtStyle}">$${fmtN(rec.total)}　${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</div>`;
     div.onclick = () => {

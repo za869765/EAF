@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v2.4.42</title>
+<title>管理者入口 — 動支單系統 v2.4.43</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -389,7 +389,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.42</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.43</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -406,7 +406,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.42</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.43</span>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
     <button id="logout-btn" onclick="logout()">登出</button>
   </div>
@@ -1019,12 +1019,14 @@ async function loadRecords() {
   setMsg('rec-msg', '⟳ 載入中…', false);
   try {
     const records = await (await fetch('/api/records?all=1')).json();
-    const archived = records.filter(r =>  r.archived).length;
-    const active   = records.filter(r => !r.archived);
-    const valid    = active.filter(r => !r.voided).length;
-    const voided   = active.filter(r =>  r.voided).length;
+    const archived     = records.filter(r =>  r.archived).length;
+    const active       = records.filter(r => !r.archived);
+    const validRecs    = active.filter(r => !r.voided);
+    const voided       = active.filter(r =>  r.voided).length;
+    const locked       = validRecs.filter(r =>  r.locked || r.printed).length;
+    const unlocked     = validRecs.filter(r => !r.locked && !r.printed).length;
     document.getElementById('rec-count').textContent =
-      `共 ${records.length} 筆（有效 ${valid}，作廢 ${voided}，封存 ${archived}）`;
+      `共 ${records.length} 筆（未鎖定 ${unlocked}　鎖定 ${locked}，已作廢 ${voided}，已封存 ${archived}）`;
     /* 封存提醒：有效紀錄超過設定門檻時顯示橫幅（預設 500 筆） */
     const ARCHIVE_THRESHOLD = subjects?.settings?.archiveThreshold || 500;
     const banner = document.getElementById('archive-banner');
@@ -1094,6 +1096,10 @@ async function loadRecords() {
         tbody.appendChild(tr);
       });
     }
+    /* 重建後重置勾選計數與全選框 */
+    const masterCb = document.querySelector('#rec-table thead input[type=checkbox]');
+    if (masterCb) masterCb.checked = false;
+    updateSelCount('rec-table');
     setMsg('rec-msg', '✓ 已載入', false);
   } catch (_) {
     setMsg('rec-msg', '❌ 載入失敗', true);
