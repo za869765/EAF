@@ -35,12 +35,12 @@ body {
   padding: 2px 7px; display: inline-block; letter-spacing: 1px;
 }
 #admin-link {
-  padding: 5px 12px; background: #1565c0; color: #fff;
-  border: none; border-radius: 5px; font-size: 12px;
-  font-family: inherit; cursor: pointer; text-decoration: none;
-  white-space: nowrap;
+  font-size: 22px; color: #78909c; text-decoration: none;
+  cursor: pointer; display: inline-block;
+  transition: color .2s, transform .25s;
+  line-height: 1;
 }
-#admin-link:hover { background: #1976d2; }
+#admin-link:hover { color: #fff; transform: rotate(45deg); }
 #sb-btns { display: flex; flex-direction: row; gap: 8px; }
 .new-btn {
   flex: 1; padding: 8px 4px; color: #fff;
@@ -662,10 +662,9 @@ body.sb-resizing * { pointer-events: none !important; }
 <aside id="sidebar">
   <div id="sb-header">
     <div id="sb-top">
-      <h2>⚙ 動支管理系統</h2>
-      <a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;}">管理入口</a>
+      <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 動支管理系統</h2>
     </div>
-    <div id="sb-version">v2.4.36</div>
+    <div id="sb-version">v2.4.37</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')"><span style="font-size:20px;">🛒</span>新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')"><span style="font-size:20px;">🧾</span>新增動支單</button>
