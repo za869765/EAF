@@ -63,9 +63,9 @@ export async function onRequest(context) {
       /* 讀取維護模式旗標 */
       let maintenance = false;
       try {
-        const sRow = await DB.prepare("SELECT data FROM subjects WHERE id = 'main' LIMIT 1").first();
+        const sRow = await DB.prepare("SELECT value FROM settings WHERE key = 'subjects'").first();
         if (sRow) {
-          const sData = JSON.parse(sRow.data);
+          const sData = JSON.parse(sRow.value);
           maintenance = !!sData?.settings?.maintenance;
         }
       } catch (_) {}
