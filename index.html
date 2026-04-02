@@ -623,7 +623,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.26</div>
+    <div id="sb-version">v2.4.27</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1296,7 +1296,7 @@ const EXPENSE_ONLY_PURPOSES = [
 ];
 
 /* 僅限請購單的用途別代碼（動支單不得選用） */
-const PURCHASE_ONLY_PURPOSES = ['2401','3106','3201','3298'];
+const PURCHASE_ONLY_PURPOSES = ['2401','3106','3201','3206','3298'];
 
 /* 講師費顯示業務計畫代碼清單 */
 const LECTURER_BP_CODES = ['21020311','21020312','21020313','21020321'];
@@ -1317,7 +1317,7 @@ const CASHIER_SLASH_BP      = ['21020302','21020311','21020312','21020313','2102
 const CASHIER_SLASH_PURPOSE = [
   '2102','2104','2201','2202','2204','2301',
   '2401','2505','2507','2607','2706','2707','2711',
-  '2810','2901','3106','4302','4501'
+  '2810','2901','3106','3206','4302','4501'
 ];
 
 /* 帳戶類別子選單（2802 / 2807） */
@@ -1409,13 +1409,15 @@ function updateCashierNote() {
   } else {
     /* 2807/2505/2507 → 財物登記格加斜線（請購單亦同） */
     const needCustodyFinSlash = isExp || purposeCode === '2807'
-                              || purposeCode === '2505' || purposeCode === '2507';
+                              || purposeCode === '2505' || purposeCode === '2507'
+                              || purposeCode === '3206';
     financialEl.classList.toggle('slash', needCustodyFinSlash);
     financialEl.innerHTML = '財物或軟體登記<br><span style="font-size:9px;">(備註財物/軟體編)</span>';
   }
   /* 2807/2505/2507 → 保管格加斜線（請購單亦同） */
   const needCustodySlash = isExp || purposeCode === '2807'
-                         || purposeCode === '2505' || purposeCode === '2507';
+                         || purposeCode === '2505' || purposeCode === '2507'
+                         || purposeCode === '3206';
   document.getElementById('sg-custody')
     .classList.toggle('slash', needCustodySlash);
 
