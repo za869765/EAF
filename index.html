@@ -654,7 +654,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;}">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.32</div>
+    <div id="sb-version">v2.4.33</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2298,7 +2298,7 @@ function validateForm() {
   if (!desc) errors.push('用途說明 不能空白');
 
   if (isPurchase) {
-    /* 2. 請購單：有資料的列必須全欄齊全；純空白列可略過 */
+    /* 2. 請購單：有資料的列必須四欄齊全（規格選填）；純空白列略過 */
     for (let i = 0; i < rowCount; i++) {
       const name  = qv(i,'name').trim();
       const spec  = qv(i,'spec').trim();
@@ -2307,12 +2307,11 @@ function validateForm() {
       const price = qv(i,'price').trim();
       if (!(name||spec||qty||unit||price)) continue;   /* 整列空白，跳過 */
       const miss = [];
-      if (!name)  miss.push('採購品名');
-      if (!spec)  miss.push('規格(樣式)');
-      if (!qty)   miss.push('數量');
-      if (!unit)  miss.push('單位');
-      if (!price) miss.push('單價');
-      if (miss.length) errors.push(`第 ${i+1} 列缺少：${miss.join('、')}`);
+      if (!name)  miss.push('「採購品名」');
+      if (!qty)   miss.push('「數量」');
+      if (!unit)  miss.push('「單位」');
+      if (!price) miss.push('「單價」');
+      if (miss.length) errors.push(`第 ${i+1} 行 ${miss.join('、')} 欄位不完整，請再確認`);
     }
     /* 3. 合計不得為 0（允許負值單項，但合計夾底後不得為 0） */
     let total = 0;
@@ -2331,8 +2330,8 @@ function validateForm() {
     for (let i = 0; i < rowCount; i++) {
       const name  = qv(i,'name').trim();
       const price = qv(i,'price').trim();
-      if (name && !price) errors.push(`第 ${i+1} 列有動支說明但缺少金額`);
-      if (!name && price) errors.push(`第 ${i+1} 列有金額但缺少動支說明`);
+      if (name && !price) errors.push(`第 ${i+1} 行 有「動支說明」但缺少「金額」，請再確認`);
+      if (!name && price) errors.push(`第 ${i+1} 行 有「金額」但缺少「動支說明」，請再確認`);
     }
     /* 3. 合計不得為 0（允許負值金額，但合計夾底後不得為 0） */
     let total = 0;
