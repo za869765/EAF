@@ -292,6 +292,7 @@ body.sb-resizing * { pointer-events: none !important; }
   padding: 0; margin: 0; display: block;
   line-height: 1.4; min-height: 1.4em;
   overflow-wrap: break-word; word-break: break-word;
+  ime-mode: active;   /* Firefox：聚焦時啟動輸入法 */
 }
 .it td.td-r { text-align: right; }
 .it td.td-r input { text-align: right; width:100%; }
@@ -622,7 +623,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.16</div>
+    <div id="sb-version">v2.4.17</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -1543,22 +1544,36 @@ function generateItemRows() {
   for (let i = 0; i < rowCount; i++) appendRow(i);
 }
 
+/* ── 金額欄 Tab → 下一列動支說明／採購品名，並以程式化 focus 帶動輸入法切換提示 ── */
+function priceTabToNextName(e, rowIdx) {
+  if (e.key !== 'Tab' || e.shiftKey) return;
+  const next = document.querySelector(`[data-r="${rowIdx + 1}"][data-c="name"]`);
+  if (!next) return;          /* 最後一列：讓瀏覽器預設 Tab 行為（跳出表格） */
+  e.preventDefault();
+  next.focus();               /* 明確 focus：讓 lang="zh-TW" 屬性有機會通知輸入法 */
+  const len = next.value.length;
+  next.setSelectionRange(len, len);  /* 游標移至末尾，符合輸入習慣 */
+}
+
 function appendRow(i) {
   const tr = document.createElement('tr');
   if (formType === 'expense') {
     tr.innerHTML = `
-      <td class="td-name" colspan="2"><textarea data-r="${i}" data-c="name" rows="1" oninput="autoResize(this)"></textarea></td>
+      <td class="td-name" colspan="2"><textarea data-r="${i}" data-c="name" rows="1" lang="zh-TW" oninput="autoResize(this)"></textarea></td>
       <td colspan="2" class="td-r" style="padding-right:2mm;">
         <input type="text" inputmode="decimal" data-r="${i}" data-c="price"
                style="text-align:right; width:100%;"
-               oninput="validateExpenseAmt(this,${i})"></td>`;
+               oninput="validateExpenseAmt(this,${i})"
+               onkeydown="priceTabToNextName(event,${i})"></td>`;
   } else {
     tr.innerHTML = `
-      <td class="td-name"><textarea data-r="${i}" data-c="name" rows="1" oninput="autoResize(this)"></textarea></td>
+      <td class="td-name"><textarea data-r="${i}" data-c="name" rows="1" lang="zh-TW" oninput="autoResize(this)"></textarea></td>
       <td class="td-spec"><textarea data-r="${i}" data-c="spec" rows="1" oninput="autoResize(this)"></textarea></td>
       <td class="td-r"><input type="text" inputmode="decimal" data-r="${i}" data-c="qty" style="text-align:right;" oninput="validateQty(this,${i})"></td>
       <td style="text-align:center;"><input type="text" data-r="${i}" data-c="unit" style="text-align:center;"></td>
-      <td class="td-r"><input type="text" inputmode="decimal" data-r="${i}" data-c="price" style="text-align:right;" oninput="validatePrice(this,${i})"></td>
+      <td class="td-r"><input type="text" inputmode="decimal" data-r="${i}" data-c="price" style="text-align:right;"
+               oninput="validatePrice(this,${i})"
+               onkeydown="priceTabToNextName(event,${i})"></td>
       <td class="td-r" id="sub${i}" style="padding-right:3mm;"></td>`;
   }
   document.getElementById('items-body').appendChild(tr);
