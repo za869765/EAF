@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v2.5.2</title>
+<title>管理者入口 — 動支單系統 v2.5.3</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -193,6 +193,8 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 .lock-badge    { background: #eceff1; color: #37474f;  border-radius: 4px; padding: 2px 6px; font-size: 11px; }
 .archive-badge { background: #e3f2fd; color: #1565c0;  border-radius: 4px; padding: 2px 6px; font-size: 11px; }
 .archived-row td { opacity: 0.55; }
+.unclassified-row td { background: rgba(198,40,40,0.08); }
+.unclassified-row td:first-child { border-left: 3px solid #ef5350; }
 .autotext-input:disabled,
 .settings-basic-input:disabled { background: #f5f5f5; color: #546e7a; cursor: not-allowed; }
 
@@ -389,7 +391,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.5.2</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.5.3</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -406,7 +408,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.5.2</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.5.3</span>
     <button id="maint-btn" onclick="toggleMaintenance()" style="padding:4px 14px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;"></button>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
     <button id="logout-btn" onclick="logout()">登出</button>
@@ -477,6 +479,16 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         <button class="btn" style="background:#1976d2;color:#fff;font-size:12px;padding:4px 12px;" onclick="bulkArchive(false)">📂 批次取消封存</button>
         <button onclick="toggleArchiveTools()"
                 style="padding:4px 10px; font-size:12px; cursor:pointer; border:1px solid #90a4ae; border-radius:4px; background:#fff; color:#546e7a;">✕ 收起</button>
+      </div>
+
+      <!-- 關鍵字過濾 -->
+      <div style="display:flex; align-items:center; gap:6px; margin:6px 0 4px;">
+        <span style="font-size:12px; color:#546e7a; white-space:nowrap;">🔍 過濾：</span>
+        <input id="rec-filter" type="text" placeholder="關鍵字搜尋（編號/科目/品名/金額…）"
+               oninput="applyRecFilter()"
+               style="flex:1; max-width:400px; padding:5px 10px; border:1px solid #90a4ae; border-radius:4px; font-size:12px; font-family:inherit;">
+        <button onclick="document.getElementById('rec-filter').value='';applyRecFilter()"
+                style="padding:4px 10px; font-size:12px; cursor:pointer; border:1px solid #90a4ae; border-radius:4px; background:#eceff1; color:#37474f;">✕ 清除</button>
       </div>
 
       <table class="rec-table" id="rec-table">
@@ -1086,8 +1098,10 @@ async function loadRecords() {
         const isLocked  = !!rec.locked;
         const isPrinted = !!rec.printed;
         const tr = document.createElement('tr');
+        const isUnclassified = !rec.acctCode && !isVoid && !isArchived;
         if (isArchived) tr.className = 'archived-row';
         else if (isVoid) tr.className = 'voided-row';
+        else if (isUnclassified) tr.className = 'unclassified-row';
         const isActuallyLocked = isLocked || isPrinted;
         const statusBadge = isArchived
           ? '<span class="archive-badge">🗄 已封存</span>'
@@ -1100,8 +1114,8 @@ async function loadRecords() {
           <td><input type="checkbox" data-id="${rec.id}" data-voided="${isVoid}" data-archived="${isArchived}" data-voucher="${esc(rec.voucherNo||'')}" onchange="updateSelCount('rec-table')"></td>
           <td>${esc(rec.voucherNo||'—')}</td>
           <td>${rec.formType==='expense'?'動支單':'請購單'}</td>
-          <td>${esc(rec.acctName||'')}</td>
-          <td>${esc(bpLabelName(rec.bpLabel))}</td>
+          <td>${rec.acctName ? esc(rec.acctName) : (isUnclassified ? '<span style="color:#c62828;font-weight:600;">⚠ 未分類</span>' : '')}</td>
+          <td>${rec.bpLabel ? esc(bpLabelName(rec.bpLabel)) : ''}</td>
           <td>${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</td>
           <td class="rec-amount td-r-admin">$${Number(rec.total||0).toLocaleString('zh-TW')}</td>
           <td style="text-align:center;">${statusBadge}</td>
@@ -1109,15 +1123,15 @@ async function loadRecords() {
           <td style="white-space:nowrap; display:flex; gap:4px; flex-wrap:wrap;">
             ${isArchived
               ? `<button class="btn" style="padding:4px 10px;font-size:11px;background:#e3f2fd;color:#1565c0;"
-                   onclick="archiveRecord('${rec.id}',false)">📂 取消封存</button>`
+                   onclick="archiveRecord('${rec.id}',false,'${esc(rec.voucherNo||'')}')">📂 取消封存</button>`
               : isVoid
                 ? `<button class="btn" style="padding:4px 10px;font-size:11px;background:#e3f2fd;color:#1565c0;"
-                     onclick="restoreVoid('${rec.id}')">↩️ 還原</button>`
+                     onclick="restoreVoid('${rec.id}','${esc(rec.voucherNo||'')}')">↩️ 還原</button>`
                 : isActuallyLocked
                   ? `<button class="btn" style="padding:4px 10px;font-size:11px;background:#e8f5e9;color:#2e7d32;"
-                       onclick="toggleLock('${rec.id}',false)">🔓 解鎖</button>`
+                       onclick="toggleLock('${rec.id}',false,'${esc(rec.voucherNo||'')}')">🔓 解鎖</button>`
                   : `<button class="btn" style="padding:4px 10px;font-size:11px;background:#37474f;color:#fff;"
-                       onclick="toggleLock('${rec.id}',true)">🔒 鎖定</button>`
+                       onclick="toggleLock('${rec.id}',true,'${esc(rec.voucherNo||'')}')">🔒 鎖定</button>`
             }
           </td>`;
         /* hover 預覽 */
@@ -1135,6 +1149,16 @@ async function loadRecords() {
   } catch (_) {
     setMsg('rec-msg', '❌ 載入失敗', true);
   }
+}
+
+function applyRecFilter() {
+  const kw = (document.getElementById('rec-filter')?.value || '').trim().toLowerCase();
+  const rows = document.querySelectorAll('#rec-table tbody tr');
+  rows.forEach(tr => {
+    if (!kw) { tr.style.display = ''; return; }
+    const text = tr.textContent.toLowerCase();
+    tr.style.display = text.includes(kw) ? '' : 'none';
+  });
 }
 
 async function exportCSV() {
@@ -1226,9 +1250,9 @@ function downloadCSV(records, filename) {
 /* ════════════════════
    LOCK / UNLOCK / RESTORE
    ════════════════════ */
-async function toggleLock(id, lock) {
+async function toggleLock(id, lock, vNo) {
   const label = lock ? '鎖定' : '解鎖';
-  const ok = await showAdminConfirm(`確定要<strong>${label}</strong>此筆紀錄？${!lock ? '<br>解鎖後使用者可在填單頁面修改。' : ''}`);
+  const ok = await showAdminConfirm(`確定要<strong>${label}</strong> ${vNo ? '<strong>'+esc(vNo)+'</strong>' : '此筆紀錄'}？${!lock ? '<br>解鎖後使用者可在填單頁面修改。' : ''}`);
   if (!ok) return;
   setMsg('rec-msg', '⟳ 處理中…', false);
   try {
@@ -1264,8 +1288,8 @@ async function bulkLock(lock) {
   } catch (_) { setMsg('rec-msg', '❌ 操作失敗', true); }
 }
 
-async function restoreVoid(id) {
-  const ok = await showAdminConfirm('確定要<strong>還原此筆作廢紀錄</strong>為未鎖定？');
+async function restoreVoid(id, vNo) {
+  const ok = await showAdminConfirm(`確定要<strong>還原${vNo ? ' '+esc(vNo)+' ' : '此筆'}作廢紀錄</strong>為未鎖定？`);
   if (!ok) return;
   setMsg('rec-msg', '⟳ 還原中…', false);
   try {
@@ -1301,10 +1325,10 @@ async function bulkRestore() {
   } catch (_) { setMsg('rec-msg', '❌ 操作失敗', true); }
 }
 
-async function archiveRecord(id, archive) {
+async function archiveRecord(id, archive, vNo) {
   const label = archive ? '封存' : '取消封存';
   const hint  = archive ? '<br>封存後使用者頁面將不再載入此紀錄。' : '';
-  const ok = await showAdminConfirm(`確定要<strong>${label}</strong>此筆紀錄？${hint}`);
+  const ok = await showAdminConfirm(`確定要<strong>${label}</strong> ${vNo ? '<strong>'+esc(vNo)+'</strong>' : '此筆紀錄'}？${hint}`);
   if (!ok) return;
   try {
     const r = await fetch(`/api/records?id=${encodeURIComponent(id)}`, {

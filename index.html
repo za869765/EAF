@@ -120,6 +120,9 @@ body {
 /* 已作廢的歷史列 */
 .h-item.voided { opacity: .65; border-left-color: #555 !important; }
 .h-item.voided .h-title { text-decoration: line-through; color: #b0bec5; }
+.h-item.unclassified { background: #3d2020; border-left-color: #ef5350 !important; }
+.h-item.unclassified:hover { background: #4a2828; }
+.h-item.unclassified .h-title::before { content: '⚠ '; }
 /* 科目別卡片底色（微色調，不影響文字可讀性） */
 .h-item.acct-medical   { background: #1f3145; border-left-color: #42a5f5; }
 .h-item.acct-custody   { background: #1e3228; border-left-color: #66bb6a; }
@@ -393,6 +396,16 @@ body.sb-resizing * { pointer-events: none !important; }
   box-shadow: none !important;
 }
 #form-page.locked #type-badge { pointer-events: none; }
+/* 未分類紀錄：預算科目區域保持可編輯 */
+#form-page.locked.unclassified #sel-main,
+#form-page.locked.unclassified #sel-bp,
+#form-page.locked.unclassified #sel-purpose { pointer-events: auto !important; opacity: 1; }
+#form-page.locked.unclassified .bp-row select { pointer-events: auto !important; }
+.unclassified-banner {
+  display: none; background: #b71c1c; color: #fff; text-align: center;
+  font-size: 12px; padding: 6px 10px; font-weight: 600; letter-spacing: 1px;
+}
+#form-page.locked.unclassified .unclassified-banner { display: block; }
 /* 鎖定後款項用途／人員類別按鈕不可點選 */
 #form-page.locked .lect-btn {
   pointer-events: none;
@@ -694,7 +707,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v2.5.2</div>
+      <div id="sb-version">v2.5.3</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -750,6 +763,7 @@ body.sb-resizing * { pointer-events: none !important; }
     <!-- 單據類型徽章（右上角，點擊切換） -->
     <div id="type-badge" onclick="toggleType()" title="點擊切換類型">請購單</div>
     <div id="void-stamp" style="display:none;"><span>作　廢</span></div>
+    <div class="unclassified-banner">⚠ 未分類 — 預算科目尚未填寫，請補登後存檔</div>
 
     <!-- ── Upper: 憑證用紙 ── -->
     <div class="u-header">
@@ -1383,7 +1397,9 @@ function buildFilterDropdowns() {
   });
   const acctSel = document.getElementById('sf-acct');
   const curAcct = acctSel.value;
+  const unclassifiedCnt = cachedRecords.filter(r => !r.acctCode).length;
   acctSel.innerHTML = '<option value="">全部帳戶</option>';
+  if (unclassifiedCnt) acctSel.appendChild(new Option('⚠ 未分類 ('+unclassifiedCnt+')', '_unclassified'));
   [...acctSet.entries()].sort((a,b)=>b[1]-a[1]).forEach(([n,c]) =>
     acctSel.appendChild(new Option(n+' ('+c+')', n)));
   acctSel.value = curAcct;
@@ -1413,7 +1429,8 @@ function applyHistoryFilter() {
       .some(f => (f||'').toLowerCase().includes(kw))
     );
   }
-  if (acct) filtered = filtered.filter(r => r.acctName === acct);
+  if (acct === '_unclassified') filtered = filtered.filter(r => !r.acctCode);
+  else if (acct) filtered = filtered.filter(r => r.acctName === acct);
   if (purp) filtered = filtered.filter(r => r.purposeName === purp);
   if (amt) {
     const [lo, hi] = amt.split('-').map(Number);
@@ -2283,6 +2300,7 @@ async function saveRecord() {
     if (idx >= 0) cachedRecords[idx] = record;
     else cachedRecords.unshift(record);
     setSyncStatus('● 已儲存', 'ok');
+    setTimeout(() => { if (!_maintenance) setSyncStatus('● 已連線', 'ok'); }, 2000);
     document.getElementById('draft-item')?.remove();
     applyHistoryFilter();
     showToast('✓ 已儲存 '+ts);
@@ -2325,6 +2343,7 @@ async function voidRecord(id, e) {
     const idx = cachedRecords.findIndex(r => r.id === id);
     if (idx >= 0) cachedRecords[idx].voided = true;
     setSyncStatus('● 已作廢，留存備查', 'ok');
+    setTimeout(() => { if (!_maintenance) setSyncStatus('● 已連線', 'ok'); }, 2000);
     applyHistoryFilter();
     if (currentId === id) loadRecord(id);
     showToast('⛔ 已作廢，留存備查');
@@ -2341,8 +2360,23 @@ async function loadRecord(id) {
     generateItemRows();
     fillForm(rec);
     lockForm();
+    const page = document.getElementById('form-page');
+    /* 未分類紀錄：鎖定但預算科目區可編輯 */
+    const isUnclassified = !rec.acctCode && !rec.voided;
+    if (isUnclassified) {
+      page.classList.add('unclassified');
+      /* 解鎖預算科目相關欄位 */
+      ['sel-main','sel-bp','sel-purpose'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.removeAttribute('disabled'); el.removeAttribute('readonly'); }
+      });
+      _setBtn('save-btn', '');
+      document.getElementById('save-btn').innerHTML = '💾 補登存檔';
+    } else {
+      page.classList.remove('unclassified');
+    }
     /* 修改鍵：未列印且未被管理者鎖定才可修改 */
-    _setBtn('edit-btn', (!rec.printed && !rec.locked) ? '' : 'none');
+    _setBtn('edit-btn', (!rec.printed && !rec.locked && !isUnclassified) ? '' : 'none');
     /* 作廢浮水印 */
     document.getElementById('void-stamp').style.display = rec.voided ? '' : 'none';
     document.getElementById('draft-item')?.remove();
@@ -2404,10 +2438,12 @@ function renderHistory(records) {
                      tot >= 10000  ? 'font-size:13px;font-weight:600;color:#a5d6a7;' :
                      tot >= 1000   ? 'font-size:12px;color:#66bb6a;' :
                                      'font-size:11.5px;color:#78909c;';
+    const isUnclassified = !rec.acctCode;
     div.className = 'h-item'
       +(rec.id===currentId?' active':'')
       +(isExp?' expense':'')
       +(isVoid?' voided':'')
+      +(isUnclassified?' unclassified':'')
       +(acctClass?' '+acctClass:'');
     div.dataset.id = rec.id;
     div.innerHTML = `
@@ -2416,7 +2452,7 @@ function renderHistory(records) {
         : `<button class="h-void" onclick="voidRecord('${rec.id}',event)" title="點擊作廢此筆">✕</button>`
       }
       <div class="h-date">${esc(rec.savedAt||'')}　${isExp?'[動支單]':'[請購單]'}${isVoid?' ⛔':''}${isLocked&&!isVoid?' 🔒':''}</div>
-      <div class="h-title">${esc(rec.voucherNo||'')} ${esc(rec.acctName)} / ${esc(rec.bpLabel)}</div>
+      <div class="h-title">${esc(rec.voucherNo||'')} ${rec.acctName ? esc(rec.acctName)+' / '+esc(rec.bpLabel) : '未分類'}</div>
       <div class="h-amount" style="${amtStyle}">$${fmtN(rec.total)}　${esc(rec.applyDateRoc||rec.applyDateRaw||'')}</div>`;
     div.onclick = () => {
       if (_editingSaved) { showUnsavedWarning(); return; }
