@@ -38,7 +38,10 @@ export async function onRequest(context) {
         ? 'SELECT data FROM records ORDER BY saved_at DESC'
         : "SELECT data FROM records WHERE COALESCE(json_extract(data,'$.archived'),0)!=1 ORDER BY saved_at DESC";
       const { results } = await DB.prepare(sql).all();
-      const records = results.map(row => JSON.parse(row.data));
+      const records = results.reduce((acc, row) => {
+        try { acc.push(JSON.parse(row.data)); } catch (_) { /* skip malformed */ }
+        return acc;
+      }, []);
       return json(records);
     } catch (e) {
       return json({ error: e.message }, 500);

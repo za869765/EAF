@@ -65,6 +65,34 @@ body {
 #history-scroll { flex: 1; overflow-y: auto; padding: 8px 10px; }
 #no-history { color: #607d8b; font-size: 12px; text-align: center; padding: 24px 0; }
 
+/* sidebar filter bar */
+#sidebar-filter {
+  padding: 4px 10px 6px; flex-shrink: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+#sidebar-filter .sf-row {
+  display: flex; gap: 4px; align-items: center;
+}
+#sf-keyword {
+  flex: 1; background: #1e2e3e; border: 1px solid #3a4f63; border-radius: 4px;
+  color: #e0e0e0; font-size: 11px; padding: 4px 6px; outline: none;
+  font-family: inherit;
+}
+#sf-keyword::placeholder { color: #5a7080; }
+#sf-keyword:focus { border-color: #5b8db8; }
+.sf-select {
+  background: #1e2e3e; border: 1px solid #3a4f63; border-radius: 4px;
+  color: #b0bec5; font-size: 10px; padding: 3px 4px; outline: none;
+  font-family: inherit; max-width: 110px;
+}
+.sf-select:focus { border-color: #5b8db8; }
+#sf-clear {
+  background: none; border: none; color: #78909c; font-size: 12px;
+  cursor: pointer; padding: 2px 4px; line-height: 1;
+}
+#sf-clear:hover { color: #fff; }
+#online-count { font-size: 9px; color: #5a7080; margin-left: 6px; }
+
 .h-item {
   background: #263545; border-radius: 5px; padding: 8px 10px;
   margin-bottom: 7px; cursor: pointer; border-left: 3px solid #1976d2;
@@ -666,7 +694,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v2.4.45</div>
+      <div id="sb-version">v2.5.0</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -674,8 +702,25 @@ body.sb-resizing * { pointer-events: none !important; }
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')"><span style="font-size:20px;">🧾</span>新增動支單</button>
     </div>
   </div>
-  <div id="sync-status">● 連線中…</div>
+  <div id="sync-status">● 連線中…<span id="online-count"></span></div>
   <div style="font-size:10px; color:#4a6278; padding:5px 14px 2px; flex-shrink:0;">📋 動支單/🛒請購單申請紀錄</div>
+  <div id="sidebar-filter">
+    <div class="sf-row">
+      <input type="text" id="sf-keyword" placeholder="🔍 關鍵字搜尋（編號/科目/品名…）" oninput="applyHistoryFilter()">
+      <button id="sf-clear" onclick="clearHistoryFilter()" title="清除篩選">✕</button>
+    </div>
+    <div class="sf-row">
+      <select class="sf-select" id="sf-acct" onchange="applyHistoryFilter()"><option value="">全部科目</option></select>
+      <select class="sf-select" id="sf-amount" onchange="applyHistoryFilter()">
+        <option value="">全部金額</option>
+        <option value="0-999">$0–999</option>
+        <option value="1000-9999">$1,000–9,999</option>
+        <option value="10000-99999">$10,000–99,999</option>
+        <option value="100000-">$100,000↑</option>
+      </select>
+      <select class="sf-select" id="sf-purpose" onchange="applyHistoryFilter()"><option value="">全部用途</option></select>
+    </div>
+  </div>
   <div id="history-scroll">
     <div id="no-history">載入中…</div>
   </div>
@@ -1257,7 +1302,10 @@ async function apiPatch(id, patch) {
 
 function setSyncStatus(msg, cls) {
   const el = document.getElementById('sync-status');
-  el.textContent = msg; el.className = cls || '';
+  const onlineSpan = document.getElementById('online-count');
+  const saved = onlineSpan ? onlineSpan.outerHTML : '';
+  el.innerHTML = esc(msg) + saved;
+  el.className = cls || '';
 }
 
 async function loadHistory() {
@@ -1271,11 +1319,100 @@ async function loadHistory() {
       wrongType.forEach(r => { r.formType = 'purchase'; });
     }
     setSyncStatus('● 已連線', 'ok');
-    renderHistory(cachedRecords);
+    buildFilterDropdowns();
+    applyHistoryFilter();
   } catch(_) {
     setSyncStatus('● 連線失敗，請確認網路', 'err');
     renderHistory([]);
   }
+}
+
+/* ══════════════════════
+   PRESENCE (在線人數)
+   ══════════════════════ */
+const _presenceSid = sessionStorage.getItem('_sid') || (() => {
+  const s = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+  sessionStorage.setItem('_sid', s); return s;
+})();
+
+async function heartbeat() {
+  try {
+    const r = await fetch('/api/presence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sid: _presenceSid }),
+    });
+    const d = await r.json();
+    const el = document.getElementById('online-count');
+    if (el && d.online != null) el.textContent = '　👤 ' + d.online + ' 人在線';
+  } catch(_) {}
+}
+heartbeat();
+setInterval(heartbeat, 60000);
+/* 任何操作都更新心跳 */
+document.addEventListener('click', () => heartbeat(), { passive: true });
+
+/* ══════════════════════
+   SIDEBAR FILTER
+   ══════════════════════ */
+function buildFilterDropdowns() {
+  /* 主科目 */
+  const acctSet = new Map();
+  const purpSet = new Map();
+  cachedRecords.forEach(r => {
+    if (r.acctName) acctSet.set(r.acctName, (acctSet.get(r.acctName)||0)+1);
+    if (r.purposeName) purpSet.set(r.purposeName, (purpSet.get(r.purposeName)||0)+1);
+  });
+  const acctSel = document.getElementById('sf-acct');
+  const curAcct = acctSel.value;
+  acctSel.innerHTML = '<option value="">全部科目</option>';
+  [...acctSet.entries()].sort((a,b)=>b[1]-a[1]).forEach(([n,c]) =>
+    acctSel.appendChild(new Option(n+' ('+c+')', n)));
+  acctSel.value = curAcct;
+
+  /* 用途別（只列目前有用到的） */
+  const purpSel = document.getElementById('sf-purpose');
+  const curPurp = purpSel.value;
+  purpSel.innerHTML = '<option value="">全部用途</option>';
+  [...purpSet.entries()].sort((a,b)=>b[1]-a[1]).forEach(([n,c]) =>
+    purpSel.appendChild(new Option(n+' ('+c+')', n)));
+  purpSel.value = curPurp;
+}
+
+function applyHistoryFilter() {
+  const kw    = (document.getElementById('sf-keyword').value||'').trim().toLowerCase();
+  const acct  = document.getElementById('sf-acct').value;
+  const amt   = document.getElementById('sf-amount').value;
+  const purp  = document.getElementById('sf-purpose').value;
+
+  let filtered = cachedRecords;
+
+  if (kw) {
+    filtered = filtered.filter(r =>
+      [r.voucherNo, r.acctName, r.bpLabel, r.purposeName, r.purposeDesc,
+       r.notes, r.applyDateRoc, String(r.total||''),
+       ...(r.items||[]).map(i=>i.name||'')]
+      .some(f => (f||'').toLowerCase().includes(kw))
+    );
+  }
+  if (acct) filtered = filtered.filter(r => r.acctName === acct);
+  if (purp) filtered = filtered.filter(r => r.purposeName === purp);
+  if (amt) {
+    const [lo, hi] = amt.split('-').map(Number);
+    filtered = filtered.filter(r => {
+      const t = Number(r.total)||0;
+      return hi ? (t >= lo && t <= hi) : (t >= lo);
+    });
+  }
+  renderHistory(filtered);
+}
+
+function clearHistoryFilter() {
+  document.getElementById('sf-keyword').value = '';
+  document.getElementById('sf-acct').value = '';
+  document.getElementById('sf-amount').value = '';
+  document.getElementById('sf-purpose').value = '';
+  applyHistoryFilter();
 }
 
 /* ══════════════════════
@@ -1361,17 +1498,27 @@ function onBpChange() {
   document.getElementById('wp-text').textContent = bp ? bp.workPlan : '';
   const pSel = document.getElementById('sel-purpose');
   const pRow = document.getElementById('row-purpose');
-  pSel.innerHTML = '<option value="">── 選擇用途別 ──</option>';
+  pSel.innerHTML = '';
   if (bp && bp.purposes.length > 0) {
     const isExp = formType === 'expense';
-    bp.purposes
-      .filter(p => {
-        if (!isExp && EXPENSE_ONLY_PURPOSES.includes(p.code))  return false; /* 請購單不含動支專用 */
-        if ( isExp && PURCHASE_ONLY_PURPOSES.includes(p.code)) return false; /* 動支單不含請購專用 */
-        return true;
-      })
-      .forEach(p => pSel.appendChild(new Option(p.code+'　'+p.name, p.code)));
-    pRow.style.display = '';
+    const validPurps = bp.purposes.filter(p => {
+      if (!isExp && EXPENSE_ONLY_PURPOSES.includes(p.code))  return false;
+      if ( isExp && PURCHASE_ONLY_PURPOSES.includes(p.code)) return false;
+      return true;
+    });
+    if (validPurps.length === 0) {
+      pRow.style.display = 'none';
+    } else if (validPurps.length === 1) {
+      /* 僅一個用途別 → 自動選取，不顯示佔位 */
+      validPurps.forEach(p => pSel.appendChild(new Option(p.code+'　'+p.name, p.code)));
+      pSel.value = validPurps[0].code;
+      pRow.style.display = '';
+      if (!_suppressAutoFill) setTimeout(() => onPurposeChange(), 0);
+    } else {
+      pSel.appendChild(new Option('── 選擇用途別 ──', ''));
+      validPurps.forEach(p => pSel.appendChild(new Option(p.code+'　'+p.name, p.code)));
+      pRow.style.display = '';
+    }
   } else { pRow.style.display = 'none'; }
   document.getElementById('row-personnel').style.display = 'none';
   /* 切換業務計畫時清除帳戶/人員類別狀態（用途別尚未選擇） */
@@ -1773,7 +1920,7 @@ function delRow() {
 
 /* ── 通用確認 Modal（Promise-based，await 使用） ── */
 let _confirmResolve = () => {};
-function showConfirm(msg, { title='請確認', icon='❓', okClass='', okText='確定', cancelText='取消' } = {}) {
+function showConfirm(msg, { title='請確認', icon='❓', okClass='', okText='確定', cancelText='取消', swapButtons=false } = {}) {
   return new Promise(resolve => {
     _confirmResolve = (val) => {
       document.getElementById('confirm-modal').style.display = 'none';
@@ -1782,10 +1929,15 @@ function showConfirm(msg, { title='請確認', icon='❓', okClass='', okText='�
     document.getElementById('confirm-icon').textContent  = icon;
     document.getElementById('confirm-title').textContent = title;
     document.getElementById('confirm-msg').innerHTML     = msg;
-    const okBtn = document.getElementById('confirm-ok-btn');
+    const okBtn     = document.getElementById('confirm-ok-btn');
+    const cancelBtn = document.getElementById('confirm-cancel-btn');
     okBtn.className   = 'confirm-ok' + (okClass ? ' '+okClass : '');
     okBtn.textContent = okText;
-    document.getElementById('confirm-cancel-btn').textContent = cancelText;
+    cancelBtn.textContent = cancelText;
+    /* swapButtons: 取消在右、確定在左，防止連點誤觸 */
+    const btnsWrap = okBtn.parentElement;
+    if (swapButtons) { btnsWrap.appendChild(cancelBtn); }
+    else { btnsWrap.appendChild(okBtn); }
     document.getElementById('confirm-modal').style.display = '';
   });
 }
@@ -2087,6 +2239,7 @@ function fillForm(rec) {
   /* 載入既有紀錄：還原 notes（calcTotal 不再即時修改 notes） */
   document.getElementById('notes').value = rec.notes || '';
   _foldNoteApplied = false;
+  _prevNotesBeforeFold = '';
 }
 
 /* ══════════════════════
@@ -2113,7 +2266,7 @@ async function saveRecord() {
     else cachedRecords.unshift(record);
     setSyncStatus('● 已儲存', 'ok');
     document.getElementById('draft-item')?.remove();
-    renderHistory(cachedRecords);
+    applyHistoryFilter();
     showToast('✓ 已儲存 '+ts);
     showMsg('✓ 已儲存 '+ts);
     lockForm();
@@ -2141,13 +2294,19 @@ async function voidRecord(id, e) {
     { title:'確認作廢', icon:'⛔' }
   );
   if (!ok) return;
+  /* 二次確認：按鈕左右對調防止誤按 */
+  const ok2 = await showConfirm(
+    `確定要作廢 <strong>${esc(rec.voucherNo||'此筆紀錄')}</strong> 嗎？<br>此操作<strong>無法復原</strong>。`,
+    { title:'再次確認作廢', icon:'🚨', okText:'確定作廢', cancelText:'取消', swapButtons: true }
+  );
+  if (!ok2) return;
   setSyncStatus('⟳ 更新中…','busy');
   try {
     await apiPatch(id, { voided: true });
     const idx = cachedRecords.findIndex(r => r.id === id);
     if (idx >= 0) cachedRecords[idx].voided = true;
     setSyncStatus('● 已作廢，留存備查', 'ok');
-    renderHistory(cachedRecords);
+    applyHistoryFilter();
     if (currentId === id) loadRecord(id);
     showToast('⛔ 已作廢，留存備查');
   } catch(_) { setSyncStatus('● 更新失敗','err'); }
@@ -2996,7 +3155,10 @@ function newForm(type) {
   rowCount = 10;
   isLecturer = '';
   income50Type = '';
+  itemType = 'consumable';
+  acctType = '';
   _foldNoteApplied = false;
+  _prevNotesBeforeFold = '';
   document.getElementById('voucher-no').value = '';
   ['purpose-desc','notes','delivery-date']
     .forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
