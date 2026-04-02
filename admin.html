@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v2.4.4</title>
+<title>管理者入口 — 動支單系統 v2.4.5</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -179,6 +179,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 .lock-badge    { background: #eceff1; color: #37474f;  border-radius: 4px; padding: 2px 6px; font-size: 11px; }
 .archive-badge { background: #e3f2fd; color: #1565c0;  border-radius: 4px; padding: 2px 6px; font-size: 11px; }
 .archived-row td { opacity: 0.55; }
+.autotext-input:disabled { background: #f5f5f5; color: #9e9e9e; cursor: not-allowed; }
 
 /* ── Admin CSS 動畫彈窗 ── */
 .adm-modal-bg {
@@ -360,7 +361,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.4</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.5</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -377,7 +378,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.4</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.5</span>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
     <button id="logout-btn" onclick="logout()">登出</button>
   </div>
@@ -536,44 +537,56 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         <div id="budget-years-wrap"></div>
         <button class="byr-add" onclick="addBudgetYear()">＋ 新增年度預算</button>
 
-        <h4 style="font-size:13px; color:#546e7a; margin:20px 0 12px; border-top:1px solid #eceff1; padding-top:14px;">
+        <h4 style="font-size:13px; color:#546e7a; margin:20px 0 8px; border-top:1px solid #eceff1; padding-top:14px; display:flex; align-items:center; gap:8px;">
           自動填入文字設定（留空則使用系統預設值）
+          <span id="autotext-lock-icon" style="font-size:13px; color:#78909c;">🔒</span>
         </h4>
-        <div class="s-row">
-          <label>2706 用途別 — 自動帶入品名（預設：檢附支出證明單）</label>
-          <input id="set-text-2706name" type="text" placeholder="檢附支出證明單">
-        </div>
-        <div class="s-row">
-          <label>2706 用途別 — 自動帶入金額（預設：30）</label>
-          <input id="set-text-2706price" type="text" placeholder="30">
-        </div>
-        <div class="s-row">
-          <label>BP510601＋2706 — 其他說明事項自動帶入（預設：匯費無收據）</label>
-          <input id="set-text-transferfee" type="text" placeholder="匯費無收據">
-        </div>
-        <div class="s-row">
-          <label>出納附記 — 列計50所得（預設：列計50所得）</label>
-          <input id="set-text-income50" type="text" placeholder="列計50所得">
-        </div>
-        <div class="s-row">
-          <label>出納附記 — 列計50所得＋補充保費（預設：列計50所得+個人補充保費）</label>
-          <input id="set-text-income50nhi" type="text" placeholder="列計50所得+個人補充保費">
-        </div>
-        <div class="s-row">
-          <label>出納附記 — 列計92所得（預設：列計92所得）</label>
-          <input id="set-text-income92" type="text" placeholder="列計92所得">
-        </div>
-        <div class="s-row">
-          <label>出納附記 — 列計9A所得（預設：列計9A所得）</label>
-          <input id="set-text-income9a" type="text" placeholder="列計9A所得">
-        </div>
-        <div class="s-row">
-          <label>出納附記 — 加班費免列計說明（預設：當月未逾46小時得免列計所得）</label>
-          <input id="set-text-overtime" type="text" placeholder="當月未逾46小時得免列計所得">
+
+        <div id="autotext-section">
+          <div class="s-row">
+            <label>2706 用途別 — 自動帶入品名（預設：檢附支出證明單）</label>
+            <input id="set-text-2706name" class="autotext-input" type="text" placeholder="檢附支出證明單" disabled>
+          </div>
+          <div class="s-row">
+            <label>2706 用途別 — 自動帶入金額（預設：30）</label>
+            <input id="set-text-2706price" class="autotext-input" type="text" placeholder="30" disabled>
+          </div>
+          <div class="s-row">
+            <label>BP510601＋2706 — 其他說明事項自動帶入（預設：匯費無收據）</label>
+            <input id="set-text-transferfee" class="autotext-input" type="text" placeholder="匯費無收據" disabled>
+          </div>
+          <div class="s-row">
+            <label>出納附記 — 列計50所得（預設：列計50所得）</label>
+            <input id="set-text-income50" class="autotext-input" type="text" placeholder="列計50所得" disabled>
+          </div>
+          <div class="s-row">
+            <label>出納附記 — 列計50所得＋補充保費（預設：列計50所得+個人補充保費）</label>
+            <input id="set-text-income50nhi" class="autotext-input" type="text" placeholder="列計50所得+個人補充保費" disabled>
+          </div>
+          <div class="s-row">
+            <label>出納附記 — 列計92所得（預設：列計92所得）</label>
+            <input id="set-text-income92" class="autotext-input" type="text" placeholder="列計92所得" disabled>
+          </div>
+          <div class="s-row">
+            <label>出納附記 — 列計9A所得（預設：列計9A所得）</label>
+            <input id="set-text-income9a" class="autotext-input" type="text" placeholder="列計9A所得" disabled>
+          </div>
+          <div class="s-row">
+            <label>出納附記 — 加班費免列計說明（預設：當月未逾46小時得免列計所得）</label>
+            <input id="set-text-overtime" class="autotext-input" type="text" placeholder="當月未逾46小時得免列計所得" disabled>
+          </div>
         </div>
 
         <div class="toolbar" style="margin-top:16px;">
-          <button class="btn btn-blue" onclick="saveSettings()">💾 儲存設定</button>
+          <!-- 鎖定狀態 -->
+          <div id="autotext-lock-bar">
+            <button class="btn" style="background:#546e7a;color:#fff;" onclick="unlockAutoText()">🔓 解鎖編輯</button>
+          </div>
+          <!-- 編輯狀態（隱藏） -->
+          <div id="autotext-edit-bar" style="display:none;">
+            <button class="btn btn-blue" onclick="saveAutoText()">💾 存檔</button>
+            <button class="btn" style="background:#b71c1c;color:#fff;" onclick="cancelAutoText()">✕ 取消</button>
+          </div>
           <span id="set-msg" class="toolbar-msg"></span>
         </div>
       </div>
@@ -1543,6 +1556,7 @@ function fillSettings() {
   document.getElementById('set-text-income92').value    = at.income92      || '';
   document.getElementById('set-text-income9a').value    = at.income9a      || '';
   document.getElementById('set-text-overtime').value    = at.overtime      || '';
+  lockAutoText();
 
   /* ── 年度預算：若舊版扁平鍵存在，遷移至 budgets['115'] ── */
   const s = subjects.settings || {};
@@ -1566,6 +1580,38 @@ function fillSettings() {
     BUDGET_YEAR_FIELDS.forEach(f => { s.budgets['115'][f.key] = f.def; });
   }
   renderBudgetYears();
+}
+
+function unlockAutoText() {
+  document.querySelectorAll('.autotext-input').forEach(el => el.disabled = false);
+  document.getElementById('autotext-lock-bar').style.display  = 'none';
+  document.getElementById('autotext-edit-bar').style.display  = '';
+  document.getElementById('autotext-lock-icon').textContent   = '🔓';
+}
+function lockAutoText() {
+  document.querySelectorAll('.autotext-input').forEach(el => el.disabled = true);
+  document.getElementById('autotext-lock-bar').style.display  = '';
+  document.getElementById('autotext-edit-bar').style.display  = 'none';
+  document.getElementById('autotext-lock-icon').textContent   = '🔒';
+}
+function cancelAutoText() {
+  /* 從目前 subjects 重填，捨棄未儲存的變更 */
+  const at = subjects?.settings?.autoText || {};
+  document.getElementById('set-text-2706name').value    = at.item2706Name  || '';
+  document.getElementById('set-text-2706price').value   = at.item2706Price || '';
+  document.getElementById('set-text-transferfee').value = at.transferFee   || '';
+  document.getElementById('set-text-income50').value    = at.income50      || '';
+  document.getElementById('set-text-income50nhi').value = at.income50nhi   || '';
+  document.getElementById('set-text-income92').value    = at.income92      || '';
+  document.getElementById('set-text-income9a').value    = at.income9a      || '';
+  document.getElementById('set-text-overtime').value    = at.overtime      || '';
+  lockAutoText();
+  setMsg('set-msg', '已取消，未儲存', false);
+  setTimeout(() => setMsg('set-msg', '', false), 2000);
+}
+async function saveAutoText() {
+  await saveSettings();
+  lockAutoText();
 }
 
 async function saveSettings() {
