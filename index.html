@@ -622,7 +622,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.12</div>
+    <div id="sb-version">v2.4.13</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2224,8 +2224,7 @@ function checkMealTimeRange() {
     if (hasValidTime) break;
   }
   if (!hasValidTime) {
-    warnings.push('「用途說明」或「其他說明事項」中未偵測到橫跨 6:00、12:00 或 18:00 的用餐時間區間，' +
-                  '建議補充如 <strong>11:30-13:00</strong> 的用餐時段。');
+    warnings.push('「用途說明」或「其他說明事項」中未偵測到橫跨 6:00、12:00 或 18:00 的用餐時間區間。');
   }
 
   /* ── ② 日期一致性檢查 ── */
@@ -2253,7 +2252,7 @@ function checkMealTimeRange() {
   if (!warnings.length) return null;
   return '⚠️ 餐費提醒：<br>' +
          warnings.map(w => `・${w}`).join('<br>') +
-         '<br><span style="color:#78909c;">（可直接按「確定存檔」繼續）</span>';
+         '<br><span style="color:#78909c;">（可直接按「確定存檔」強制存檔）</span>';
 }
 
 function openSaveConfirmModal() {
