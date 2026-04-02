@@ -622,7 +622,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.15</div>
+    <div id="sb-version">v2.4.16</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2233,10 +2233,8 @@ function checkTravelKeywords() {
 
   /* 其餘情況 → 提醒 */
   const found = KEYWORDS.filter(kw => combined.includes(kw));
-  return `🚨 差旅／交通費提醒：說明欄含「${found.join('、')}」，` +
-         `但目前科目設定不符合差旅費的標準組合。<br>` +
-         `・差旅費通常應使用：<strong>保管款專戶 ＋ 業務計劃 21020302</strong><br>` +
-         `・或：<strong>醫療基金專戶 ＋ 用途別 2301 / 2305 / 2711 / 2898</strong><br>` +
+  return `🚨 差旅／交通費提醒：說明欄含「${found.join('、')}」，但目前科目設定不符合差旅費的標準組合。<br>` +
+         `請選擇正確科目 或洽會計人員<br>` +
          `<span style="color:#78909c; font-size:12px;">（可直接按「確定存檔」強制存檔）</span>`;
 }
 
