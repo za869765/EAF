@@ -622,7 +622,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.3</div>
+    <div id="sb-version">v2.4.4</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -2368,17 +2368,39 @@ function doSave() {
 /* ══════════════════════
    COPY MODAL
    ══════════════════════ */
+let _copySearchBase = null;   /* null = 用 cachedRecords；有值 = 含封存的完整清單 */
+
 function showCopyModal() {
   if (!cachedRecords || cachedRecords.length === 0) { showToast('尚無可複製的紀錄'); return; }
+  _copySearchBase = null;
   document.getElementById('copy-kw-input').value  = '';
   document.getElementById('copy-no-input').value  = '';
   document.getElementById('copy-kw-results').innerHTML = '';
   document.getElementById('copy-no-err').style.display = 'none';
+  document.getElementById('copy-archived-chk').checked = false;
   document.getElementById('copy-modal').style.display  = '';
   setTimeout(() => document.getElementById('copy-kw-input').focus(), 80);
 }
 function closeCopyModal() {
+  _copySearchBase = null;
   document.getElementById('copy-modal').style.display = 'none';
+}
+
+async function toggleCopyArchived(cb) {
+  const box = document.getElementById('copy-kw-results');
+  if (cb.checked) {
+    box.innerHTML = '<div style="color:#888;font-size:12px;padding:6px;">⟳ 載入封存紀錄…</div>';
+    try {
+      _copySearchBase = await (await fetch('/api/records?all=1')).json();
+    } catch(_) {
+      showToast('載入封存紀錄失敗');
+      cb.checked = false;
+      _copySearchBase = null;
+    }
+  } else {
+    _copySearchBase = null;
+  }
+  kwSearchCopy();
 }
 
 /* ① 關鍵字搜尋（含分頁） */
@@ -2389,7 +2411,8 @@ function kwSearchCopy() {
   const q = document.getElementById('copy-kw-input').value.trim().toLowerCase();
   const box = document.getElementById('copy-kw-results');
   if (!q) { box.innerHTML = ''; return; }
-  _copyHits = cachedRecords.filter(r =>
+  const base = _copySearchBase || cachedRecords;
+  _copyHits = base.filter(r =>
     r.formType === formType &&
     [r.voucherNo, r.acctName, r.bpLabel, r.purposeDesc, r.notes, r.applyDateRoc,
      String(r.total||''), ...(r.items||[]).map(i=>i.name||'')]
@@ -2452,14 +2475,15 @@ function doCopyByNo() {
     : raw;
   const q = normalized.toUpperCase();
 
+  const _copyBase = _copySearchBase || cachedRecords;
   /* ① 完整比對（含正規化後的結果） */
-  let rec = cachedRecords.find(r => (r.voucherNo||'').toUpperCase() === q);
+  let rec = _copyBase.find(r => (r.voucherNo||'').toUpperCase() === q);
 
   /* ② 後碼比對：輸入純數字且長度 ≤ 4 → 比對「當年度」憑證號碼後段 */
   if (!rec && /^\d+$/.test(raw) && raw.length <= 4) {
     const inputNum    = parseInt(raw, 10);
     const curRocYear  = new Date().getFullYear() - 1911;   /* 當前民國年 */
-    const hits = cachedRecords.filter(r => {
+    const hits = _copyBase.filter(r => {
       const parts = (r.voucherNo || '').split('-');
       if (parts.length < 2) return false;
       return parseInt(parts[0], 10) === curRocYear        /* 限當年度 */
@@ -2788,6 +2812,12 @@ function showCopyPopup(no, opts = {}) {
                    font-weight:bold; padding:0 4px;" title="關閉">✕</button>
 
     <h3 style="font-size:17px; padding-right:36px;">📋 複製前次單</h3>
+
+    <!-- 含封存紀錄切換 -->
+    <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#1565c0;margin-bottom:8px;cursor:pointer;user-select:none;">
+      <input type="checkbox" id="copy-archived-chk" onchange="toggleCopyArchived(this)" style="cursor:pointer;">
+      🗄 含封存紀錄
+    </label>
 
     <!-- ① 關鍵字搜尋 -->
     <div style="font-size:12px; color:#777; margin-bottom:5px;">🔍 關鍵字搜尋（憑證號、科目、說明、金額…）</div>

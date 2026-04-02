@@ -30,12 +30,14 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const id  = url.searchParams.get('id');
 
-  /* ── GET：讀取全部紀錄 ── */
+  /* ── GET：讀取紀錄（預設排除已封存；?all=1 含封存） ── */
   if (request.method === 'GET') {
     try {
-      const { results } = await DB.prepare(
-        'SELECT data FROM records ORDER BY saved_at DESC'
-      ).all();
+      const all = url.searchParams.get('all') === '1';
+      const sql = all
+        ? 'SELECT data FROM records ORDER BY saved_at DESC'
+        : "SELECT data FROM records WHERE COALESCE(json_extract(data,'$.archived'),0)!=1 ORDER BY saved_at DESC";
+      const { results } = await DB.prepare(sql).all();
       const records = results.map(row => JSON.parse(row.data));
       return json(records);
     } catch (e) {
