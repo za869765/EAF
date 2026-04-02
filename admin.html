@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v2.4.5</title>
+<title>管理者入口 — 動支單系統 v2.4.6</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -361,7 +361,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.5</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v2.4.6</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -378,7 +378,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.5</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v2.4.6</span>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
     <button id="logout-btn" onclick="logout()">登出</button>
   </div>
@@ -477,9 +477,31 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         </table>
       </div>
       <div id="rpt-budget-pane" style="display:none; padding-top:12px;">
+        <!-- 年度選擇 -->
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+          <label style="font-size:13px; font-weight:600; color:#37474f;">📅 檢視年度：</label>
+          <select id="budget-year-sel" onchange="_budgetViewYear=this.value; renderBudgetChart();"
+                  style="padding:5px 12px; border:1.5px solid #90a4ae; border-radius:5px; font-size:15px; font-family:inherit; cursor:pointer;"></select>
+        </div>
+        <!-- 執行率圖 -->
         <div class="budget-section">
           <h4 id="budget-chart-title">預算執行率</h4>
           <div id="budget-chart-wrap"><p class="budget-no-data">載入中…</p></div>
+        </div>
+        <!-- 計入紀錄清單 -->
+        <div class="budget-section" style="margin-top:14px;">
+          <h4 style="margin-bottom:10px; display:flex; align-items:center; gap:8px;">
+            📋 計入本年度之紀錄
+            <span style="font-size:11px; color:#78909c; font-weight:400;">（申請日期與實際支付年度不同時，可在此調整）</span>
+          </h4>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+            <input type="checkbox" id="budget-rec-sel-all" onchange="document.querySelectorAll('.budget-rec-chk').forEach(c=>c.checked=this.checked)">
+            <label for="budget-rec-sel-all" style="font-size:12px; color:#546e7a; cursor:pointer;">全選</label>
+            <span style="font-size:12px; color:#546e7a; margin-left:8px;">批次指定年度：</span>
+            <select id="budget-bulk-year-sel" style="padding:3px 8px; border:1px solid #90a4ae; border-radius:4px; font-size:13px; font-family:inherit;"></select>
+            <button class="btn btn-blue" style="padding:4px 12px; font-size:12px;" onclick="bulkSetBudgetYear()">套用至勾選</button>
+          </div>
+          <div id="budget-rec-list"></div>
         </div>
       </div>
       <!-- ── 出納列計 pane ── -->
@@ -1201,21 +1223,51 @@ function exportReportCSV() {
   setMsg('rpt-msg', `✓ 已匯出 ${records.length} 筆`, false);
 }
 
+let _budgetViewYear = String(new Date().getFullYear() - 1911);
+
+function getRecordBudgetYear(r) {
+  if (r.budgetYear) return String(r.budgetYear);
+  const m = (r.applyDateRoc || '').match(/^(\d{2,3})/);
+  return m ? m[1] : _budgetViewYear;
+}
+
 function renderBudgetChart() {
-  const s   = subjects?.settings || {};
-  const rocYear = String(new Date().getFullYear() - 1911);
-  const yr  = s.budgets?.[rocYear] || s.budgets?.['115'] || {};
+  const s = subjects?.settings || {};
+
+  /* 取得可用年度清單（從 budgets 物件的 key） */
+  const availYears = Object.keys(s.budgets || {}).sort().reverse();
+  if (!availYears.length) availYears.push(_budgetViewYear);
+
+  /* 同步 & 填充年度選擇器 */
+  const sel = document.getElementById('budget-year-sel');
+  const bulkSel = document.getElementById('budget-bulk-year-sel');
+  if (sel) {
+    sel.innerHTML = availYears.map(y =>
+      `<option value="${y}" ${y===_budgetViewYear?'selected':''}>${y} 年</option>`
+    ).join('');
+    _budgetViewYear = sel.value;   /* 確保與實際選項一致 */
+  }
+  if (bulkSel) {
+    bulkSel.innerHTML = availYears.map(y =>
+      `<option value="${y}">${y} 年</option>`
+    ).join('');
+  }
+
+  const rocYear = _budgetViewYear;
+  const yr = s.budgets?.[rocYear] || s.budgets?.['115'] || {};
   /* fall back to old flat keys for backward compat */
-  const b1301        = yr.b1301        ?? s.budget1301          ?? 140000;
-  const b2807_public = yr.b2807_public ?? s.budget2807_public   ?? 60000;
-  const b2807_health = yr.b2807_health ?? s.budget2807_health   ?? 210635;
-  const b2807_clinic = yr.b2807_clinic ?? s.budget2807_clinic   ?? 137135;
-  const b2807_invoice= yr.b2807_invoice?? s.budget2807_invoice  ?? 2600;
-  const b2807_hpv    = yr.b2807_hpv    ?? s.budget2807_hpv      ?? 0;
+  const b1301         = yr.b1301         ?? s.budget1301         ?? 140000;
+  const b2807_public  = yr.b2807_public  ?? s.budget2807_public  ?? 60000;
+  const b2807_health  = yr.b2807_health  ?? s.budget2807_health  ?? 210635;
+  const b2807_clinic  = yr.b2807_clinic  ?? s.budget2807_clinic  ?? 137135;
+  const b2807_invoice = yr.b2807_invoice ?? s.budget2807_invoice ?? 2600;
+  const b2807_hpv     = yr.b2807_hpv     ?? s.budget2807_hpv     ?? 0;
   const total2807Budget = yr.b2807_total ?? s.budget2807_total ?? 410370;
-  const active = _rptRecords.filter(r => !r.voided);
-  const total2807Spent  = active.filter(r => r.purposeCode === '2807')
-                                .reduce((sum, r) => sum + (Number(r.total)||0), 0);
+
+  /* 依 budgetYear 歸屬過濾紀錄 */
+  const active = _rptRecords.filter(r => !r.voided && getRecordBudgetYear(r) === rocYear);
+  const total2807Spent = active.filter(r => r.purposeCode === '2807')
+                               .reduce((sum, r) => sum + (Number(r.total)||0), 0);
 
   const titleEl = document.getElementById('budget-chart-title');
   if (titleEl) titleEl.textContent = rocYear + '年預算執行率';
@@ -1224,30 +1276,24 @@ function renderBudgetChart() {
   if (!wrap) return;
 
   const items = [
-    { label: '1301 延長工時加班費',          code: '1301', acctType: null,
-      budget: b1301 },
-    { label: '2807 委託檢驗費　【總額】',    code: '_2807total', acctType: null,
+    { label: '1301 延長工時加班費',       code: '1301', acctType: null,   budget: b1301 },
+    { label: '2807 委託檢驗費　【總額】', code: '_2807total', acctType: null,
       budget: total2807Budget, spent: total2807Spent, isTotal: true },
-    { label: '　↳ 公立醫院',                code: '2807', acctType: '公立醫院',
-      budget: b2807_public },
-    { label: '　↳ 衛生局',                  code: '2807', acctType: '衛生局',
-      budget: b2807_health },
-    { label: '　↳ 醫療門診診所/檢驗所',     code: '2807', acctType: '醫療門診診所/檢驗所',
-      budget: b2807_clinic },
-    { label: '　↳ 開具發票廠商',            code: '2807', acctType: '開具發票廠商',
-      budget: b2807_invoice },
+    { label: '　↳ 公立醫院',             code: '2807', acctType: '公立醫院',              budget: b2807_public },
+    { label: '　↳ 衛生局',               code: '2807', acctType: '衛生局',                budget: b2807_health },
+    { label: '　↳ 醫療門診診所/檢驗所',  code: '2807', acctType: '醫療門診診所/檢驗所',   budget: b2807_clinic },
+    { label: '　↳ 開具發票廠商',         code: '2807', acctType: '開具發票廠商',           budget: b2807_invoice },
     ...(b2807_hpv > 0 ? [
-      { label: '　↳ HPV',                   code: '2807', acctType: 'HPV',
-        budget: b2807_hpv }
+      { label: '　↳ HPV', code: '2807', acctType: 'HPV', budget: b2807_hpv }
     ] : []),
   ];
 
   items.forEach(item => {
-    if (item.isTotal) return;  /* spent 已在外部計算 */
+    if (item.isTotal) return;
     item.spent = active
       .filter(r => r.purposeCode === item.code &&
                    (item.acctType === null || r.acctType === item.acctType))
-      .reduce((sum, r) => sum + (Number(r.total) || 0), 0);
+      .reduce((sum, r) => sum + (Number(r.total)||0), 0);
   });
 
   wrap.innerHTML = items.map(item => {
@@ -1258,10 +1304,8 @@ function renderBudgetChart() {
     const remainTxt = remain >= 0
       ? `<span style="color:#546e7a;">剩餘 $${fmtN(remain)}</span>`
       : `<span style="color:#c62828;">超支 $${fmtN(-remain)}</span>`;
-    const rowStyle = item.isTotal
-      ? 'background:#f0f4ff; border-radius:5px; padding:4px 6px; margin-bottom:6px;'
-      : '';
-    const labelStyle = item.isTotal ? 'font-weight:700; color:#1e2a38;' : '';
+    const rowStyle  = item.isTotal ? 'background:#f0f4ff; border-radius:5px; padding:4px 6px; margin-bottom:6px;' : '';
+    const labelStyle= item.isTotal ? 'font-weight:700; color:#1e2a38;' : '';
     return `
       <div class="budget-row" style="${rowStyle}">
         <div class="budget-label" style="${labelStyle}">${esc(item.label)}</div>
@@ -1275,6 +1319,98 @@ function renderBudgetChart() {
         </div>
       </div>`;
   }).join('');
+
+  renderBudgetRecList(rocYear, availYears);
+}
+
+function renderBudgetRecList(year, availYears) {
+  const listEl = document.getElementById('budget-rec-list');
+  if (!listEl) return;
+  const active = _rptRecords.filter(r => !r.voided && getRecordBudgetYear(r) === year);
+  if (!active.length) {
+    listEl.innerHTML = '<p style="color:#888; font-size:13px; padding:8px 0;">本年度無計入紀錄。</p>';
+    return;
+  }
+  const yearOpts = availYears.map(y => `<option value="${y}">${y}年</option>`).join('');
+  const rows = active.map(r => {
+    const curY = getRecordBudgetYear(r);
+    const isManual = !!r.budgetYear;
+    const badge = isManual
+      ? `<span style="font-size:10px; background:#e3f2fd; color:#1565c0; border-radius:3px; padding:1px 4px;">手動 ✎</span>`
+      : `<span style="font-size:10px; background:#f5f5f5; color:#78909c; border-radius:3px; padding:1px 4px;">申請日</span>`;
+    return `<tr>
+      <td><input type="checkbox" class="budget-rec-chk" data-id="${esc(r.id||'')}"></td>
+      <td>${esc(r.voucherNo||'—')}</td>
+      <td>${r.formType==='expense'?'動支':'採購'}</td>
+      <td style="white-space:nowrap;">${esc(r.applyDateRoc||'')}</td>
+      <td>${esc(r.acctName||'')}</td>
+      <td>${esc(r.purposeCode||'')} ${esc(r.purposeName||'')}</td>
+      <td class="td-r-admin">$${fmtN(r.total||0)}</td>
+      <td style="text-align:center;">${curY}年 ${badge}</td>
+      <td style="white-space:nowrap;">
+        <select data-id="${esc(r.id||'')}" class="bgt-yr-sel" style="padding:2px 5px; border:1px solid #90a4ae; border-radius:3px; font-size:11px; font-family:inherit;">
+          ${availYears.map(y=>`<option value="${y}" ${y===curY?'selected':''}>${y}年</option>`).join('')}
+        </select>
+        <button onclick="applyBudgetYr(this.previousElementSibling)"
+                style="padding:2px 7px; font-size:11px; cursor:pointer; border:1px solid #90a4ae; border-radius:3px; background:#e8f5e9; color:#2e7d32; margin-left:2px;">✓</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  listEl.innerHTML = `
+    <table class="rec-table" style="font-size:12px;">
+      <thead><tr>
+        <th style="width:28px;"></th>
+        <th>憑證編號</th><th>類型</th><th>申請日期</th><th>主科目</th>
+        <th>用途別</th><th class="td-r-admin">金額</th><th>計入依據</th><th>調整年度</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  document.getElementById('budget-rec-sel-all').onchange = function() {
+    document.querySelectorAll('.budget-rec-chk').forEach(c => c.checked = this.checked);
+  };
+}
+
+async function applyBudgetYr(selEl) {
+  await setBudgetYear(selEl.dataset.id, selEl.value);
+}
+
+async function setBudgetYear(id, year) {
+  try {
+    const r = await fetch(`/api/records?id=${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ budgetYear: year }),
+    });
+    if ((await r.json()).ok) {
+      const rec = _rptRecords.find(r => r.id === id);
+      if (rec) rec.budgetYear = year;
+      setMsg('rpt-msg', `✓ 已指定 ${year} 年`, false);
+      renderBudgetChart();
+    } else { setMsg('rpt-msg', '❌ 更新失敗', true); }
+  } catch(_) { setMsg('rpt-msg', '❌ 連線失敗', true); }
+}
+
+async function bulkSetBudgetYear() {
+  const year = document.getElementById('budget-bulk-year-sel').value;
+  const checked = [...document.querySelectorAll('.budget-rec-chk:checked')];
+  if (!checked.length) { showAdminAlert('請先勾選要調整的紀錄。'); return; }
+  const ok = await showAdminConfirm(`確定將勾選的 <strong>${checked.length} 筆</strong>紀錄計入年度改為 <strong>${year} 年</strong>？`);
+  if (!ok) return;
+  setMsg('rpt-msg', '⟳ 更新中…', false);
+  try {
+    await Promise.all(checked.map(cb => fetch(`/api/records?id=${encodeURIComponent(cb.dataset.id)}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ budgetYear: year }),
+    })));
+    checked.forEach(cb => {
+      const rec = _rptRecords.find(r => r.id === cb.dataset.id);
+      if (rec) rec.budgetYear = year;
+    });
+    setMsg('rpt-msg', `✓ 已更新 ${checked.length} 筆`, false);
+    renderBudgetChart();
+  } catch(_) { setMsg('rpt-msg', '❌ 操作失敗', true); }
 }
 
 /* ════════════════════
