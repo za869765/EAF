@@ -519,7 +519,7 @@ body.sb-resizing * { pointer-events: none !important; }
   body { background: #fff; }
   #app  { display: block; }
   #sidebar, #sidebar-resizer, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns,
-  #row-lecturer, #row-acct-type, #row-income50-type,
+  #row-lecturer, #row-acct-type, #row-income50-type, #row-item-type,
   #row-budget-info, #exempt-wrap, #copy-no-btn,
   .date-picker-btn { display: none !important; }
   /* 隱藏未選擇的佔位文字 */
@@ -623,7 +623,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2>⚙ 動支管理系統</h2>
       <a id="admin-link" href="admin.html">管理入口</a>
     </div>
-    <div id="sb-version">v2.4.28</div>
+    <div id="sb-version">v2.4.29</div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')">📄 新增請購單</button>
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')">📄 新增動支單</button>
@@ -726,6 +726,14 @@ body.sb-resizing * { pointer-events: none !important; }
           <div class="bp-row" id="row-income50-type" style="display:none;">
             <label>人員類別：</label>
             <div id="income50-type-btns" style="display:flex; flex-wrap:wrap; gap:2mm;"></div>
+          </div>
+          <div class="bp-row" id="row-item-type" style="display:none;">
+            <label>物品類型：</label>
+            <div style="display:flex; gap:4mm; align-items:center; flex-wrap:wrap;">
+              <label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="radio" name="itemType" id="itype-consumable"    value="consumable"    checked onchange="setItemType('consumable')"> 消耗品</label>
+              <label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="radio" name="itemType" id="itype-nonconsumable" value="nonconsumable" onchange="setItemType('nonconsumable')"> 非消耗品(物品)</label>
+              <label style="display:flex;align-items:center;gap:3px;cursor:pointer;"><input type="radio" name="itemType" id="itype-property"      value="property"      onchange="setItemType('property')"> 財產</label>
+            </div>
           </div>
           <div id="row-budget-info" style="display:none; margin:1.5mm 0;"></div>
         </td>
@@ -1097,10 +1105,12 @@ function applyType(type, { regen = true } = {}) {
     document.getElementById('sel-main').value    = '';
     document.getElementById('sel-bp').value      = '';
     document.getElementById('wp-text').textContent = '';
-    ['row-bp','row-purpose','row-personnel','row-lecturer','row-acct-type','row-income50-type','row-budget-info']
+    ['row-bp','row-purpose','row-personnel','row-lecturer','row-acct-type','row-income50-type','row-item-type','row-budget-info']
       .forEach(id => document.getElementById(id).style.display = 'none');
     acctType = '';
     income50Type = '';
+    itemType = 'consumable';
+    document.getElementById('itype-consumable').checked = true;
     updateCashierNote();
   }
   if (regen && changed) {
@@ -1333,6 +1343,10 @@ let acctType = '';
 const INCOME_50_PURPOSES = ['1501','2713','7103'];
 let income50Type = '';
 
+/* 物品類型 selector（3201 辦公用品 / 3298 物品-其他，請購單専用） */
+const ITEM_TYPE_PURPOSES = ['3201','3298'];
+let itemType = 'consumable';   /* consumable | nonconsumable | property */
+
 let _suppressAutoFill = false;   /* 載入已存記錄時抑制自動填入 */
 
 function setLecturer(val) {
@@ -1407,17 +1421,23 @@ function updateCashierNote() {
     financialEl.classList.remove('slash');
     financialEl.innerHTML = '藥品 / 衛材 登記';
   } else {
-    /* 2807/2505/2507 → 財物登記格加斜線（請購單亦同） */
-    const needCustodyFinSlash = isExp || purposeCode === '2807'
-                              || purposeCode === '2505' || purposeCode === '2507'
-                              || purposeCode === '3206';
+    /* 財物登記格斜線邏輯 */
+    const isItemTypePur = !isExp && ITEM_TYPE_PURPOSES.includes(purposeCode);
+    const needCustodyFinSlash = isItemTypePur
+      ? (itemType === 'consumable')
+      : (isExp || purposeCode === '2807'
+         || purposeCode === '2505' || purposeCode === '2507'
+         || purposeCode === '3206');
     financialEl.classList.toggle('slash', needCustodyFinSlash);
     financialEl.innerHTML = '財物或軟體登記<br><span style="font-size:9px;">(備註財物/軟體編)</span>';
   }
-  /* 2807/2505/2507 → 保管格加斜線（請購單亦同） */
-  const needCustodySlash = isExp || purposeCode === '2807'
-                         || purposeCode === '2505' || purposeCode === '2507'
-                         || purposeCode === '3206';
+  /* 保管格斜線邏輯 */
+  const isItemTypePur2 = !isExp && ITEM_TYPE_PURPOSES.includes(purposeCode);
+  const needCustodySlash = isItemTypePur2
+    ? (itemType === 'consumable')
+    : (isExp || purposeCode === '2807'
+       || purposeCode === '2505' || purposeCode === '2507'
+       || purposeCode === '3206');
   document.getElementById('sg-custody')
     .classList.toggle('slash', needCustodySlash);
 
@@ -1468,8 +1488,48 @@ function updateCashierNote() {
   el.style.display = note ? 'block' : 'none';
 }
 
+function setItemType(val) {
+  itemType = val;
+  document.querySelectorAll('input[name="itemType"]').forEach(r => r.checked = (r.value === val));
+  updateCashierNote();
+}
+
+function updateItemTypeRow() {
+  const purposeCode = document.getElementById('sel-purpose').value;
+  const show = formType === 'purchase' && ITEM_TYPE_PURPOSES.includes(purposeCode);
+  document.getElementById('row-item-type').style.display = show ? '' : 'none';
+  if (!show) return;
+
+  let total = 0;
+  for (let i = 0; i < rowCount; i++)
+    total += Math.round((parseFloat(qv(i,'qty'))||0) * (parseFloat(qv(i,'price'))||0));
+  total = Math.max(0, total);
+
+  const elC = document.getElementById('itype-consumable');
+  const elN = document.getElementById('itype-nonconsumable');
+  const elP = document.getElementById('itype-property');
+
+  if (total < 1000) {
+    itemType = 'consumable';
+    elC.checked = true;  elC.disabled = true;
+    elN.checked = false; elN.disabled = true;
+    elP.checked = false; elP.disabled = true;
+  } else if (total < 10000) {
+    elC.disabled = false; elN.disabled = false;
+    elP.disabled = true;
+    if (itemType === 'property') { itemType = 'consumable'; elC.checked = true; elP.checked = false; }
+  } else {
+    elC.disabled = false; elN.disabled = false; elP.disabled = false;
+  }
+  updateCashierNote();
+}
+
 function onPurposeChange() {
   const code = document.getElementById('sel-purpose').value;
+  /* 切換用途別時重設物品類型 */
+  itemType = 'consumable';
+  document.getElementById('itype-consumable').checked = true;
+  updateItemTypeRow();
   document.getElementById('row-personnel').style.display = PERSONNEL_CODES.includes(code) ? '' : 'none';
 
   /* 帳戶類別子選單（2802 / 2807） */
@@ -1746,6 +1806,8 @@ function calcTotal() {
 
   /* 免核章列：目前無內容，永不顯示 */
   document.getElementById('exempt-wrap').style.display = 'none';
+  /* 物品類型門檻依金額更新 */
+  updateItemTypeRow();
 }
 
 /* ══════════════════════
@@ -1851,6 +1913,7 @@ function getFormData() {
     lecturerType  : isLecturer || 'non-lecturer',
     acctType,
     income50Type,
+    itemType,
     applyDateRaw: document.getElementById('apply-date-input').value,
     applyDateRoc: document.getElementById('roc-date-text').textContent,
     notes: document.getElementById('notes').value,
@@ -1893,6 +1956,11 @@ function fillForm(rec) {
   /* 還原50所得人員類別（覆蓋 updateIncome50Row 設定的預設值） */
   if (rec.income50Type) {
     setIncome50Type(rec.income50Type);
+  }
+  /* 還原物品類型（在 onPurposeChange 重設後覆蓋回來） */
+  if (rec.itemType && ITEM_TYPE_PURPOSES.includes(rec.purposeCode)) {
+    itemType = rec.itemType;
+    document.querySelectorAll('input[name="itemType"]').forEach(r => r.checked = (r.value === rec.itemType));
   }
   updateCashierNote();
   _suppressAutoFill = false;
