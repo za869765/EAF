@@ -1424,8 +1424,8 @@ function applyHistoryFilter() {
 
   if (kw) {
     filtered = filtered.filter(r =>
-      [r.voucherNo, r.acctName, r.bpLabel, r.purposeName, r.purposeDesc,
-       r.notes, r.applyDateRoc, String(r.total||''),
+      [r.voucherNo, r.acctCode, r.acctName, r.bpCode, r.bpLabel,
+       r.purposeName, r.purposeDesc, r.notes, r.applyDateRoc, String(r.total||''),
        ...(r.items||[]).map(i=>i.name||'')]
       .some(f => (f||'').toLowerCase().includes(kw))
     );

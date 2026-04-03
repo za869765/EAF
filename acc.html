@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.5.14</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.5.15</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1762,146 +1762,132 @@ function exportAllowExcel(){ alert('📥 匯出備抵折讓明細 Excel（建置
    公務預算請款清單
 ════════════════════════════════════════════ */
 
-// 科目定義
-const PUB_SUBJECTS = [
-  { id:'21020301', label:'21020301 應付代收款 — 衛生所公務預算經費', group:'', budgetDef:0 },
+/* ════════════════════════════════════════════
+   公務預算（21020301）— 從 EAF 動支單抓資料
+════════════════════════════════════════════ */
+const PUB_ACCT = '21020301';
+const PUB_BUDGET_KEY = y => `acc_pub_budget_${y}`;
+
+function getPubBudget(y){ const v=localStorage.getItem(PUB_BUDGET_KEY(y)); return v!==null?+v:0; }
+function setPubBudget(y,val){ localStorage.setItem(PUB_BUDGET_KEY(y),String(val)); }
+
+// Mock 動支單（科目 21020301）—— 連線後由 API 取代
+const MOCK_PUB_RECORDS = [
+  { id:'P001', ym:'11501', date:'115/01/31', voucherNo:'11501-公務', vendor:'臺南市政府衛生局', purpose:'1301 延長工時加班費', desc:'115年1月臨時人員薪資代扣款', amount:12456, status:'已核銷' },
+  { id:'P002', ym:'11501', date:'115/01/31', voucherNo:'11501-公務', vendor:'勞工保險局',       purpose:'健保費',             desc:'115年1月員工健保費代扣繳',   amount:8320,  status:'已核銷' },
+  { id:'P003', ym:'11502', date:'115/02/28', voucherNo:'11502-公務', vendor:'臺南市政府衛生局', purpose:'1301 延長工時加班費', desc:'115年2月臨時人員薪資代扣款', amount:11890, status:'已核銷' },
+  { id:'P004', ym:'11502', date:'115/02/28', voucherNo:'11502-公務', vendor:'勞工保險局',       purpose:'健保費',             desc:'115年2月員工健保費代扣繳',   amount:8320,  status:'已核銷' },
+  { id:'P005', ym:'11503', date:'115/03/31', voucherNo:'11503-公務', vendor:'臺南市政府衛生局', purpose:'1301 延長工時加班費', desc:'115年3月臨時人員薪資代扣款', amount:13258, status:'待核銷' },
+  { id:'P006', ym:'11503', date:'115/03/31', voucherNo:'11503-公務', vendor:'勞工保險局',       purpose:'健保費',             desc:'115年3月員工健保費代扣繳',   amount:8626,  status:'待核銷' },
 ];
 
-function pubKey(y, id){ return `acc_pub_${y}_${id}`; }
-function pubBudgetKey(y, id){ return `acc_pub_budget_${y}_${id}`; }
-
-function loadPubData(y, id){
-  const raw = localStorage.getItem(pubKey(y, id));
-  return raw ? JSON.parse(raw) : [];
-}
-function savePubData(y, id, rows){
-  localStorage.setItem(pubKey(y, id), JSON.stringify(rows));
-}
-function getPubBudget(y, id, def){
-  const v = localStorage.getItem(pubBudgetKey(y, id));
-  return v !== null ? +v : def;
-}
-function setPubBudget(y, id, val){
-  localStorage.setItem(pubBudgetKey(y, id), String(val));
+// 載入動支單（未來改為 fetch('/api/records?acct=21020301&year='+y)）
+async function loadPubRecords(y){
+  // TODO: 連線後替換為 API 呼叫
+  // const r = await fetch(`/api/records?acct=${PUB_ACCT}&year=${y}`);
+  // return r.ok ? await r.json() : [];
+  return MOCK_PUB_RECORDS.filter(r => r.ym.startsWith(String(y)));
 }
 
-let _pubEditId = null; // 新增列暫存 id
-
-function renderPublicTab(){
+async function renderPublicTab(){
   const {y} = getYm();
-  document.getElementById('pub-title').textContent = `${y} 年度 公務預算請款清單`;
+  document.getElementById('pub-title').textContent = `${y} 年度 公務預算動支清單（21020301 應付代收款）`;
   const wrap = document.getElementById('pub-sections');
-  wrap.innerHTML = '';
+  wrap.innerHTML = '<p style="color:#90a4ae;padding:20px;text-align:center;font-size:12px;">載入中…</p>';
 
-  PUB_SUBJECTS.forEach(subj => {
-    const rows   = loadPubData(y, subj.id);
-    const budget = getPubBudget(y, subj.id, subj.budgetDef);
-    const spent  = rows.reduce((s,r) => s + (r.amt||0), 0);
-    const remain = budget - spent;
-    const pct    = budget > 0 ? Math.min(100, Math.round(spent/budget*100)) : 0;
-    const overBudget = remain < 0;
+  const records = await loadPubRecords(y);
+  const budget  = getPubBudget(y);
+  const spent   = records.reduce((s,r)=>s+(r.amount||0),0);
+  const remain  = budget - spent;
+  const pct     = budget>0 ? Math.min(100,Math.round(spent/budget*100)) : 0;
+  const over    = remain < 0;
 
-    const sec = document.createElement('div');
-    sec.className = 'pub-section';
-    sec.id = `pub-sec-${subj.id}`;
+  // 依年月分組
+  const byYm = {};
+  records.forEach(r=>{ (byYm[r.ym]=byYm[r.ym]||[]).push(r); });
 
-    sec.innerHTML = `
+  wrap.innerHTML = `
+    <!-- 摘要 Banner -->
+    <div class="pub-section">
       <div class="pub-hd">
-        <span>${subj.label}</span>
+        <span>21020301 應付代收款 — 衛生所公務預算經費</span>
         <div class="pub-budget-info">
-          <span>年度預算 <b>
-            <input id="pub-budget-inp-${subj.id}" type="number" value="${budget}"
-              style="width:80px;background:transparent;border:none;border-bottom:1px dashed #546e7a;color:#fff;font-size:12px;font-weight:700;text-align:right;outline:none;"
-              onchange="setPubBudget(${y},'${subj.id}',+this.value); renderPublicTab();">
-          </b></span>
-          <span>已請款 <b style="color:${overBudget?'#ff8a80':'#a5d6a7'};">${fmt(spent)}</b></span>
-          <span>剩餘 <b style="color:${overBudget?'#ff5252':'#69f0ae'};">${overBudget?'▲超額':''}${fmt(Math.abs(remain))}</b></span>
+          <span>年度預算
+            <input type="number" value="${budget}"
+              style="width:90px;background:transparent;border:none;border-bottom:1px dashed #78909c;color:#fff;font-size:12px;font-weight:700;text-align:right;outline:none;margin-left:4px;"
+              onchange="setPubBudget(${y},+this.value);renderPublicTab();" title="點此修改年度預算">
+          </span>
+          <span>已動支 <b style="color:${over?'#ff8a80':'#a5d6a7'};">${fmt(spent)}</b></span>
+          <span>剩餘 <b style="color:${over?'#ff5252':'#69f0ae'};">${over?'▲超額 ':''}${fmt(Math.abs(remain))}</b></span>
         </div>
       </div>
-      <div style="padding:0 14px 4px; background:#eceff1;">
-        <div class="pub-prog"><div class="pub-prog-bar" style="width:${pct}%; background:${overBudget?'#e53935':'#1976d2'};"></div></div>
-        <span style="font-size:10px; color:#546e7a;">${pct}% 已使用</span>
+      <div style="padding:4px 14px 6px; background:#eceff1; display:flex; align-items:center; gap:10px;">
+        <div class="pub-prog" style="flex:1;">
+          <div class="pub-prog-bar" style="width:${pct}%; background:${over?'#e53935':'#1976d2'};"></div>
+        </div>
+        <span style="font-size:11px; color:#546e7a; white-space:nowrap;">${pct}% 已使用（共 ${records.length} 筆）</span>
+      </div>
+    </div>
+
+    <!-- 動支清單（依月分組） -->
+    <div class="pub-section">
+      <div class="pub-hd" style="background:#37474f; font-size:12px;">
+        📋 動支明細清單
+        <span style="margin-left:auto; font-size:10px; color:#90a4ae;">資料來源：EAF 動支單系統（科目 21020301）</span>
       </div>
       <table class="pub-table">
         <thead><tr>
-          <th style="width:100px;">請款日期</th>
-          <th>廠商/摘要</th>
-          <th style="width:100px;text-align:right;">請款金額</th>
-          <th style="width:80px;">核銷月份</th>
-          <th>備註</th>
-          <th style="width:40px;"></th>
+          <th style="width:65px;">年月</th>
+          <th style="width:95px;">日期</th>
+          <th style="width:110px;">傳票/動支編號</th>
+          <th style="width:140px;">廠商</th>
+          <th style="width:130px;">用途別</th>
+          <th>摘要說明</th>
+          <th style="width:95px;text-align:right;">金額</th>
+          <th style="width:70px;text-align:center;">狀態</th>
         </tr></thead>
-        <tbody id="pub-tbody-${subj.id}">
-        ${rows.length === 0 ? `<tr><td colspan="6" class="empty-msg">尚無請款記錄</td></tr>` :
-          rows.map((r,idx) => `
+        <tbody>
+        ${Object.keys(byYm).sort().map(ym => {
+          const ymRows = byYm[ym];
+          const ymTotal = ymRows.reduce((s,r)=>s+(r.amount||0),0);
+          return `
+            <tr style="background:#eceff1;">
+              <td colspan="6" style="font-weight:700; font-size:11px; color:#37474f; padding:4px 10px;">▶ ${ym} 小計</td>
+              <td style="text-align:right; font-weight:700; color:#1565c0; padding:4px 10px;">${fmt(ymTotal)}</td>
+              <td></td>
+            </tr>
+            ${ymRows.map(r=>`
             <tr class="pub-data">
+              <td style="color:#90a4ae;">${r.ym}</td>
               <td>${r.date||''}</td>
-              <td>${r.desc||''}</td>
-              <td style="text-align:right; font-weight:700; color:#1565c0;">${fmt(r.amt||0)}</td>
-              <td>${r.month||''}</td>
-              <td style="color:#546e7a; font-size:11px;">${r.note||''}</td>
-              <td><button class="pub-del-btn" onclick="pubDeleteRow('${subj.id}',${idx})">✕</button></td>
-            </tr>`).join('')}
+              <td style="font-size:11px; color:#546e7a;">${r.voucherNo||''}</td>
+              <td style="font-size:11px;">${r.vendor||''}</td>
+              <td style="font-size:11px; color:#1565c0;">${r.purpose||''}</td>
+              <td style="font-size:11px;">${r.desc||''}</td>
+              <td style="text-align:right; font-weight:700; color:#1565c0;">${fmt(r.amount||0)}</td>
+              <td style="text-align:center;">
+                <span style="font-size:10px; padding:1px 6px; border-radius:3px; background:${r.status==='已核銷'?'#e8f5e9':'#fff3e0'}; color:${r.status==='已核銷'?'#2e7d32':'#e65100'};">
+                  ${r.status||'待核銷'}
+                </span>
+              </td>
+            </tr>`).join('')}`;
+        }).join('') || '<tr><td colspan="8" class="empty-msg">本年度無動支記錄</td></tr>'}
         </tbody>
+        <tfoot>
+          <tr style="background:#e3f2fd; font-weight:700;">
+            <td colspan="6" style="text-align:right; padding:7px 10px;">年度合計</td>
+            <td style="text-align:right; color:#1565c0; padding:7px 10px;">${fmt(spent)}</td>
+            <td></td>
+          </tr>
+        </tfoot>
       </table>
-      <div class="pub-foot" id="pub-foot-${subj.id}">
-        <button class="pub-add-btn" onclick="pubShowAddRow('${subj.id}')">＋ 新增請款記錄</button>
-        <div class="pub-prog" style="max-width:200px;">
-          <div class="pub-prog-bar" style="width:${pct}%; background:${overBudget?'#e53935':'#1976d2'};"></div>
-        </div>
-        <span style="color:${overBudget?'#e53935':'#546e7a'};">合計 ${fmt(spent)} / 預算 ${fmt(budget)}</span>
-      </div>`;
-    wrap.appendChild(sec);
-  });
-}
-
-function pubShowAddRow(id){
-  // 如已有新增列先移除
-  const old = document.getElementById('pub-addrow-'+id);
-  if(old){ old.remove(); return; }
-
-  const tbody = document.getElementById(`pub-tbody-${id}`);
-  // 移除空白提示列
-  const empty = tbody.querySelector('.empty-msg');
-  if(empty) empty.parentElement.remove();
-
-  const {y,m} = getYm();
-  const todayStr = `${y}/${pad(m)}/`;
-  const tr = document.createElement('tr');
-  tr.id = `pub-addrow-${id}`;
-  tr.className = 'pub-add-row';
-  tr.innerHTML = `
-    <td><input class="pub-inp pub-date" id="pub-new-date-${id}" placeholder="${todayStr}" value="${todayStr}"></td>
-    <td><input class="pub-inp pub-desc" id="pub-new-desc-${id}" placeholder="廠商名稱或摘要"></td>
-    <td><input class="pub-inp pub-amt"  id="pub-new-amt-${id}"  type="number" placeholder="0"></td>
-    <td><input class="pub-inp"          id="pub-new-month-${id}" placeholder="${y}${pad(m)}" style="width:60px;"></td>
-    <td><input class="pub-inp pub-note" id="pub-new-note-${id}" placeholder="備註（可空白）"></td>
-    <td><button class="pub-save-btn" onclick="pubSaveNewRow('${id}')">✓ 確認</button></td>`;
-  tbody.appendChild(tr);
-  document.getElementById(`pub-new-desc-${id}`)?.focus();
-}
-
-function pubSaveNewRow(id){
-  const {y} = getYm();
-  const date  = document.getElementById(`pub-new-date-${id}`)?.value.trim() || '';
-  const desc  = document.getElementById(`pub-new-desc-${id}`)?.value.trim() || '';
-  const amt   = parseFloat(document.getElementById(`pub-new-amt-${id}`)?.value)||0;
-  const month = document.getElementById(`pub-new-month-${id}`)?.value.trim() || '';
-  const note  = document.getElementById(`pub-new-note-${id}`)?.value.trim() || '';
-  if(!desc && !amt){ alert('請至少填入廠商/摘要與金額'); return; }
-  const rows = loadPubData(y, id);
-  rows.push({date, desc, amt, month, note});
-  savePubData(y, id, rows);
-  renderPublicTab();
-}
-
-function pubDeleteRow(id, idx){
-  if(!confirm('確定刪除這筆請款記錄？')) return;
-  const {y} = getYm();
-  const rows = loadPubData(y, id);
-  rows.splice(idx, 1);
-  savePubData(y, id, rows);
-  renderPublicTab();
+      <div class="pub-foot">
+        <span style="font-size:11px; color:#78909c;">💡 動支單由後台系統新增，此頁僅供查閱列印</span>
+        <span style="margin-left:auto; color:${over?'#e53935':'#546e7a'}; font-weight:600;">
+          已動支 ${fmt(spent)} ／ 年度預算 ${fmt(budget)} ／ 剩餘 ${over?'▲超額 ':''}${fmt(Math.abs(remain))}
+        </span>
+      </div>
+    </div>`;
 }
 
 /* ════════════════════════════════════════════
