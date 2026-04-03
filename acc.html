@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.8.6</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.8.7</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -771,13 +771,15 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
             <th style="width:88px;">入帳月份</th>
             <th style="width:68px;">分類</th>
             <th style="width:55px;">狀態</th>
+            <th style="width:32px;"></th>
           </tr>
         </thead>
         <tbody id="eaf-medical-tbody">
-          <tr><td colspan="7" style="text-align:center;color:#90a4ae;padding:16px;font-size:12px;">載入中…</td></tr>
+          <tr><td colspan="9" style="text-align:center;color:#90a4ae;padding:16px;font-size:12px;">載入中…</td></tr>
         </tbody>
       </table>
       </div>
+      <div id="eaf-excluded-section" style="padding:0 14px 10px;"></div>
     </div>
   </div>
 </div><!-- /tab-inventory -->
@@ -2190,10 +2192,12 @@ function addInvEntry(type){
    - 勾選 = 直接入帳（confirm 確認）
    - 已入帳可用還原鈕取消（管理者操作）
 ════════════════════════════════════════════ */
-const MED_POSTED_KEY = 'acc_med_posted';
-let medPostedIds  = new Set(JSON.parse(localStorage.getItem(MED_POSTED_KEY)||'[]'));
-let medPendingSet = new Set();   // 暫存多筆勾選，按確定才入帳
-let _medRecs      = [];
+const MED_POSTED_KEY   = 'acc_med_posted';
+const MED_EXCLUDED_KEY = 'acc_med_excluded';
+let medPostedIds   = new Set(JSON.parse(localStorage.getItem(MED_POSTED_KEY)||'[]'));
+let medExcludedIds = new Set(JSON.parse(localStorage.getItem(MED_EXCLUDED_KEY)||'[]'));
+let medPendingSet  = new Set();   // 暫存多筆勾選，按確定才入帳
+let _medRecs       = [];
 
 function updateMedBtn(){
   const btn = document.getElementById('med-confirm-btn');
@@ -2281,10 +2285,29 @@ async function loadEafMedical(){
       return { id:r.id, ym:ymStr, applyDateRoc:rawDate,
         voucherNo:r.voucherNo||'', desc:r.purposeDesc||r.notes||'', amount:r.total||0, cat };
     });
-    // 只顯示「待入帳」，已入帳的已移入明細帳，不在此列
-    const unposted = _medRecs.filter(r=>!medPostedIds.has(String(r.id)));
+    // 過濾：已入帳、已排除 皆不顯示
+    const unposted = _medRecs.filter(r=>!medPostedIds.has(String(r.id)) && !medExcludedIds.has(String(r.id)));
+    const excluded = _medRecs.filter(r=>medExcludedIds.has(String(r.id)));
+    // 渲染已排除區
+    const excSec = document.getElementById('eaf-excluded-section');
+    if(excSec){
+      if(!excluded.length){ excSec.innerHTML=''; }
+      else { excSec.innerHTML=`
+        <div style="margin-top:8px;padding:6px 10px 4px;background:#f5f5f5;border-radius:6px;border:1px solid #e0e0e0;">
+          <div style="font-size:11px;color:#90a4ae;margin-bottom:4px;font-weight:600;">⊘ 已排除（非藥品衛材）— 點還原可歸回待入帳</div>
+          <table class="voucher-table" style="opacity:.6;">
+            <tbody>${excluded.map(r=>`<tr style="background:#fafafa;">
+              <td style="font-size:11px;color:#90a4ae;">${r.ym}</td>
+              <td style="font-size:11px;color:#546e7a;">${r.voucherNo}</td>
+              <td style="font-size:11px;color:#9e9e9e;">${r.desc}</td>
+              <td style="text-align:right;color:#9e9e9e;">${fmt(r.amount)}</td>
+              <td><button class="rest-inv-btn" style="font-size:11px;color:#1976d2;" onclick="restoreMedExcluded('${r.id}')">↩ 還原</button></td>
+            </tr>`).join('')}</tbody>
+          </table>
+        </div>`; }
+    }
     if(!unposted.length){
-      tbody.innerHTML='<tr><td colspan="7" class="empty-msg" style="color:#2e7d32;">✓ 所有動支單已入帳，請至上方明細帳查閱</td></tr>';
+      tbody.innerHTML='<tr><td colspan="9" class="empty-msg" style="color:#2e7d32;">✓ 所有動支單已入帳，請至上方明細帳查閱</td></tr>';
       updateMedBtn(); return;
     }
     tbody.innerHTML = unposted.map(r=>{
@@ -2318,12 +2341,40 @@ async function loadEafMedical(){
           <option${r.cat==='藥品'?' selected':''}>藥品</option>
           <option${r.cat==='衛材'?' selected':''}>衛材</option></select></td>
         <td style="text-align:center;font-size:11px;font-weight:700;color:#e65100;">待入帳</td>
+        <td style="text-align:center;">
+          <button title="標記為非藥品衛材（排除）" onclick="markMedExcluded('${r.id}')"
+            style="background:none;border:none;color:#bdbdbd;cursor:pointer;font-size:13px;padding:2px;" >⊘</button>
+        </td>
       </tr>`;
     }).join('');
     updateMedBtn();
   } catch(_){
-    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:#e65100;padding:12px;font-size:12px;">⚠ 無法連線 EAF API</td></tr>';
+    tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:#e65100;padding:12px;font-size:12px;">⚠ 無法連線 EAF API</td></tr>';
   }
+}
+function markMedExcluded(id){
+  const r = _medRecs.find(x=>String(x.id)===id);
+  showModal({ title:'排除確認', icon:'⊘',
+    body:`確定將「<b>${r?.voucherNo||id}</b>」標記為非藥品衛材？<br><small style="color:#78909c;">排除後不再列於待入帳，可從下方已排除區還原。</small>`,
+    confirmText:'排除', danger:true,
+    onConfirm(){
+      medExcludedIds.add(String(id));
+      localStorage.setItem(MED_EXCLUDED_KEY, JSON.stringify([...medExcludedIds]));
+      loadEafMedical();
+    }
+  });
+}
+function restoreMedExcluded(id){
+  const r = _medRecs.find(x=>String(x.id)===id);
+  showModal({ title:'還原確認', icon:'↩️',
+    body:`確定將「<b>${r?.voucherNo||id}</b>」還原為待入帳？`,
+    confirmText:'還原',
+    onConfirm(){
+      medExcludedIds.delete(String(id));
+      localStorage.setItem(MED_EXCLUDED_KEY, JSON.stringify([...medExcludedIds]));
+      loadEafMedical();
+    }
+  });
 }
 function saveMedCat(id, cat){
   localStorage.setItem('acc_med_cat_'+id, cat);
