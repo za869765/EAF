@@ -734,7 +734,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <button class="lock-sec-btn" id="voucher-lock-btn" onclick="toggleVoucherLock()">🔒 鎖定中</button>
     <button class="btn btn-green" onclick="exportExcel()">📥 匯出 CSV</button>
     <button class="btn btn-gray" style="font-size:11px;" onclick="addManualVoucherRow()">＋ 手工新增列</button>
-    <button class="ym-action gen" style="padding:5px 14px; font-size:12px;" onclick="generateVouchers()">⚡ 製作轉帳傳票</button>
+    <button class="ym-action gen" style="padding:5px 14px; font-size:12px;" onclick="preCheckVoucher()">⚡ 製作轉帳傳票</button>
     <span style="font-size:11px; color:#78909c;" id="voucher-count"></span>
   </div>
   <div class="card">
@@ -1766,6 +1766,75 @@ function confirmPicker(){
   const depr = pnum(document.getElementById('exp-depr').value);
   document.getElementById('exp-depr-balance').value = fmt(STATE.property.currentBalance - depr);
   closePicker();
+}
+
+/* ════════════════════════════════════════════
+   製作前應付費用預檢
+════════════════════════════════════════════ */
+async function preCheckVoucher(){
+  const {ym, label} = getYm();
+  const selected = STATE.month.pickerItems;
+  const selTotal = selected.reduce((s,r)=>s+(r.amount||0),0);
+
+  /* 從 EAF API 抓目前月含以前的基金未付動支單 */
+  let missing = [];
+  try {
+    const resp = await fetch('/api/records',{headers:{'Content-Type':'application/json'}});
+    if(resp.ok){
+      const all = await resp.json();
+      const pickedIds = new Set(selected.map(r=>String(r.id)));
+      missing = all.filter(r=>{
+        if(r.archived||r.voided) return false;
+        /* 申請日期 ≤ 本月月底 */
+        const rym = (r.applyDateRoc||'').replace(/\//g,'').slice(0,5);
+        if(!rym || rym > ym) return false;
+        /* 排除已出帳 / 已選 */
+        if(postedIds.has(String(r.id))) return false;
+        if(pickedIds.has(String(r.id))) return false;
+        /* 排除代收款、基金負擔、公務預算 */
+        const an = r.acctName||'';
+        if(an.startsWith('代收')||an.includes('基金負擔')) return false;
+        if((r.bpCode||'')==='21020301') return false;
+        /* 只留醫療基金成本類 */
+        return true;
+      }).map(r=>({
+        id: r.id,
+        ym: (r.applyDateRoc||'').replace(/\//g,'').slice(0,5),
+        voucherNo: r.voucherNo||'',
+        name: r.acctName||r.purposeName||'',
+        purposeDesc: r.purposeDesc||r.purposeName||'',
+        amount: r.total||0,
+      }));
+    }
+  } catch(_){}
+
+  /* 建立 modal 內容 */
+  const selHtml = selected.length
+    ? `<div style="margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;color:#2e7d32;margin-bottom:4px;">✅ 已選入動支掛應付費用 ${selected.length} 筆，合計 $${fmt(selTotal)}</div>
+        ${selected.map(r=>`<div style="font-size:11px;padding:2px 6px;color:#546e7a;">▸ ${r.yearMonth} ${r.purposeDesc} <b>$${fmt(r.amount)}</b></div>`).join('')}
+       </div>`
+    : `<div style="font-size:11px;color:#78909c;margin-bottom:10px;">（未選任何動支單掛應付費用）</div>`;
+
+  const missHtml = missing.length
+    ? `<div style="background:#fff8e1;border:1px solid #ff8f00;border-radius:6px;padding:8px 10px;margin-top:8px;">
+        <div style="font-size:11px;font-weight:700;color:#e65100;margin-bottom:4px;">⚠️ 以下 ${missing.length} 筆動支單尚未選入，申請日期 ≤ ${ym.slice(0,3)}年${+ym.slice(3)}月，請確認是否須掛本月應付費用：</div>
+        ${missing.map(r=>`<div style="font-size:11px;padding:2px 6px;color:#333;">
+          <b>${r.voucherNo||r.id}</b>　${r.ym} ${r.purposeDesc||r.name}　<span style="color:#c62828;font-weight:700;">$${fmt(r.amount)}</span>
+        </div>`).join('')}
+        <div style="font-size:10px;color:#78909c;margin-top:6px;">如需納入，請關閉此視窗，回月度作業在動支 Picker 勾選後再製作傳票。</div>
+       </div>`
+    : `<div style="font-size:11px;color:#2e7d32;margin-top:6px;">✅ 無遺漏的待付動支單</div>`;
+
+  showModal({
+    icon: missing.length ? '⚠️' : '⚡',
+    title:`製作 ${label} 轉帳傳票 — 應付費用確認`,
+    body: selHtml + missHtml,
+    confirmText:'確認產製',
+    cancelText:'返回確認',
+    danger: false,
+    onConfirm: generateVouchers,
+  });
 }
 
 /* ════════════════════════════════════════════
