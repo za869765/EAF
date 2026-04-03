@@ -59,6 +59,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 .hd-purple { background: #4a148c; }
 .hd-teal   { background: #004d40; }
 .hd-amber  { background: #e65100; }
+.hd-blue   { background: #0d47a1; }
 .card-bd { padding: 12px 14px; }
 
 /* ── 提醒卡片列 ── */
@@ -2809,63 +2810,86 @@ const CUSTODIAL_SEED = {
     { code:'21020301', name:'衛生所公務預算經費', subtotal:80011, note:'受委託代收公務預算撥款，待繳回局端', color:'hd-blue',
       subs:[
         { name:'公務預算撥款', subtotal:80011, entries:[
-          { ym:'11501', day:20, ref:'100003 序8', desc:'衛生所公務預算經費撥入', amt:80011 }
+          { ym:'11501', day:20, ref:'100003 序8', desc:'115年衛生所公務預算業務經費周轉金', amt:80011 }
         ]}
       ]
     },
     { code:'21020302', name:'各業務差旅費', subtotal:2032, note:'各業務出差旅費代收保管', color:'hd-teal',
       subs:[
         { name:'差旅費', subtotal:2032, entries:[
-          { ym:'', day:'', ref:'', desc:'差旅費（含兩筆：182+1,850）', amt:2032 }
+          { ym:'11503', day:31, ref:'100014 序2', desc:'入衛生所115年第1次差旅費', amt:182 },
+          { ym:'11503', day:31, ref:'100014 序7', desc:'衛生所115年第2次差旅費', amt:1850 }
         ]}
       ]
     },
     { code:'21020311', name:'國健科', subtotal:138365, note:'國民健康署各業務補助款代收保管，待執行核銷後繳回', color:'hd-green',
       subs:[
         { name:'01 菸害防制', subtotal:20000, entries:[
-          { ym:'', day:'', ref:'', desc:'菸害防制業務補助款', amt:20000 }
+          { ym:'11503', day:31, ref:'100014 序3', desc:'入辦理115年戒菸班所需經費', amt:20000 }
         ]},
         { name:'11 衛生保健', subtotal:56000, entries:[
-          { ym:'', day:'', ref:'', desc:'衛生保健業務補助款（共5筆合計）', amt:56000 }
+          { ym:'11502', day:26, ref:'100009 序3', desc:'115年營造健康生活經費', amt:27000 },
+          { ym:'11503', day:10, ref:'100011 序10', desc:'115年提升防跌計畫', amt:6000 },
+          { ym:'11503', day:10, ref:'100011 序11', desc:'115年糖尿病支持團體經費', amt:9000 },
+          { ym:'11503', day:31, ref:'100014 序4', desc:'入115年代謝症候群認知提升宣導經費', amt:9000 },
+          { ym:'11503', day:31, ref:'100014 序6', desc:'115年更年期保健宣導經費', amt:5000 }
         ]},
         { name:'12 整合性預防及延緩失能', subtotal:31165, entries:[
-          { ym:'', day:'', ref:'', desc:'整合性預防及延緩失能業務款（含112/113年舊帳，共4筆）', amt:31165 }
+          { ym:'11201', day:9,  ref:'100008 序3', desc:'1/6入111年預防及延緩失能計畫費用', amt:14690 },
+          { ym:'11211', day:3,  ref:'100178 序6', desc:'11/3入延緩失能之長者功能經費', amt:10860 },
+          { ym:'11301', day:5,  ref:'100005 序3', desc:'1/5入預防及延緩失能長者經費', amt:4215 },
+          { ym:'11301', day:9,  ref:'100008 序3', desc:'1/9入112年預防及延緩失能計畫費用-第三期款', amt:1400 }
         ]},
         { name:'99 其他', subtotal:31200, entries:[
-          { ym:'', day:'', ref:'', desc:'母乳哺育支持團體補助 22,800', amt:22800 },
-          { ym:'', day:'', ref:'', desc:'通譯費補助 8,400', amt:8400 }
+          { ym:'11502', day:10, ref:'100007 序2', desc:'115母乳支持團體活動經費', amt:22800 },
+          { ym:'11503', day:31, ref:'100014 序8', desc:'115年2月新住民生育保健通譯費', amt:8400 }
         ]}
       ]
     },
     { code:'21020312', name:'疾管科', subtotal:53020, note:'疾病管制署業務補助款代收保管', color:'hd-purple',
       subs:[
         { name:'02 傳染病防治', subtotal:50000, entries:[
-          { ym:'11501', day:20, ref:'', desc:'M痘傳染病防治業務補助款', amt:50000 }
+          { ym:'11501', day:20, ref:'100003 序12', desc:'114年疾管署M痘預防接種門診醫療服務費用', amt:50000 }
         ]},
-        { name:'99 其他', subtotal:3020, entries:[
-          { ym:'', day:'', ref:'', desc:'針具業務收入（含114年舊帳，共5筆合計）', amt:3020 }
+        { name:'99 其他（針具收入）', subtotal:3020, entries:[
+          { ym:'11411', day:28, ref:'100132 序6', desc:'114.11 針具收入', amt:1130 },
+          { ym:'11412', day:31, ref:'100146 序5', desc:'114.12 針具收入', amt:560 },
+          { ym:'11501', day:30, ref:'100005 序8', desc:'11501 針具收入', amt:380 },
+          { ym:'11502', day:26, ref:'100009 序4', desc:'11502 針具販賣收入', amt:370 },
+          { ym:'11503', day:31, ref:'100014 序5', desc:'入11503 針販收入', amt:580 }
         ]}
       ]
     },
     { code:'21020321', name:'代收款（薪資相關）', subtotal:69739, note:'代扣員工薪資各項保費及退休金，按期繳回各主管機關', color:'hd-amber',
       subs:[
         { name:'01 公保費', subtotal:9741, entries:[
-          { ym:'', day:'', ref:'', desc:'楊建芳 公保費代扣保管', amt:9741 }
+          { ym:'11412', day:3, ref:'100136 序7', desc:'115.1-6月 楊建芳自付公保 (3,247×3)', amt:9741 }
         ]},
         { name:'02 健保費－公保人員', subtotal:34954, entries:[
-          { ym:'', day:'', ref:'', desc:'公保人員健保費代扣（共4筆）', amt:34954 }
+          { ym:'11412', day:3,  ref:'100136 序6', desc:'115.1-6月 楊建芳自付健保 (2,258×5)', amt:11290 },
+          { ym:'11501', day:30, ref:'100005 序4', desc:'115.2 健保費-職員（自付10,936）', amt:10936 },
+          { ym:'11502', day:26, ref:'100009 序5', desc:'王聖捷114.12~115.03 健保眷屬加保自付差額 (896×2)', amt:1792 },
+          { ym:'11502', day:26, ref:'100009 序8', desc:'115.3 職員健保自付', amt:10936 }
         ]},
         { name:'03 健保費－勞保人員', subtotal:7176, entries:[
-          { ym:'', day:'', ref:'', desc:'勞保人員健保費代扣（共3筆）', amt:7176 }
+          { ym:'11501', day:30, ref:'100005 序7', desc:'115.2 健保費-勞工（自付1,866）', amt:1244 },
+          { ym:'11502', day:26, ref:'100009 序9', desc:'115.3 勞工健保自付', amt:1244 },
+          { ym:'11503', day:10, ref:'100011 序7', desc:'11402臨時人員黎欣妮+方雪雲：健保補助2,856＋健保代扣1,832', amt:4688 }
         ]},
         { name:'04 勞保費', subtotal:6742, entries:[
-          { ym:'', day:'', ref:'', desc:'勞工保險費代扣（共4筆）', amt:6742 }
+          { ym:'11501', day:30, ref:'100005 序5', desc:'115.2 勞保費（自付3,006）', amt:2004 },
+          { ym:'11502', day:10, ref:'100007 序5', desc:'11501臨時人員勞保-黎欣妮(1,132+313)、方雪雲(872+240) 工資墊償6元', amt:41 },
+          { ym:'11502', day:26, ref:'100009 序10', desc:'115.3 勞保費-自付', amt:2004 },
+          { ym:'11503', day:10, ref:'100011 序8', desc:'11402臨時人員黎欣妮+方雪雲：勞保補助2,111＋勞保代扣582', amt:2693 }
         ]},
         { name:'05 退撫基金', subtotal:300, entries:[
-          { ym:'', day:'', ref:'', desc:'退撫基金代扣', amt:300 }
+          { ym:'11501', day:7, ref:'100001 序2', desc:'115年新制退撫儲金手續費', amt:300 }
         ]},
         { name:'06 勞工退休準備金', subtotal:10826, entries:[
-          { ym:'', day:'', ref:'', desc:'勞工退休準備金提撥（共4筆）', amt:10826 }
+          { ym:'11501', day:30, ref:'100005 序6', desc:'115.2 勞退金（自付7,218）', amt:4812 },
+          { ym:'11502', day:10, ref:'100007 序7', desc:'11501臨時人員勞退-黎欣妮752元、方雪雲390元', amt:15 },
+          { ym:'11502', day:26, ref:'100009 序11', desc:'115.3 勞退費-自付', amt:4812 },
+          { ym:'11503', day:10, ref:'100011 序9', desc:'11402臨時人員黎欣妮+方雪雲：勞退雇主負擔 752+435=1,187', amt:1187 }
         ]}
       ]
     }
@@ -2897,7 +2921,8 @@ function seedYearQ1Data(){
   console.log('[seedYearQ1Data] Q1 三個月資料已帶入');
 }
 async function seedCustodial(){
-  if(localStorage.getItem('acc_custodial')) return;
+  if(localStorage.getItem('acc_custodial_v2')) return;
+  localStorage.removeItem('acc_custodial');
   const val = JSON.stringify(CUSTODIAL_SEED);
   localStorage.setItem('acc_custodial', val);
   const pass = sessionStorage.getItem('adminPass')||'';
@@ -2906,7 +2931,8 @@ async function seedCustodial(){
     headers:{'Content-Type':'application/json','X-Admin-Pass':pass},
     body: JSON.stringify([{key:'acc_custodial', value:val}])
   }).catch(e=>console.warn('[seedCustodial] D1 write failed:',e));
-  console.log('[seedCustodial] 應付代收款資料已寫入 D1');
+  localStorage.setItem('acc_custodial_v2','1');
+  console.log('[seedCustodial] 應付代收款完整明細已寫入 D1');
 }
 function loadCustodial(){
   const raw = localStorage.getItem('acc_custodial');
