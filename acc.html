@@ -494,7 +494,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 
   <!-- ── 保險補付/追扣 ── -->
   <div class="card">
-    <div class="card-hd hd-amber">🏛️ 保險補付 / 追扣 登錄</div>
+    <div class="card-hd hd-amber">🏛️ 健保款補付 / 追扣 登錄</div>
     <div class="card-bd">
       <div class="table-wrap">
       <table class="adj-table">
@@ -603,9 +603,8 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
             </tr>
           </thead>
           <tbody id="drug-tbody">
-            <tr><td>11503</td><td>期初</td><td class="balance-cell" style="text-align:right;">-</td><td class="balance-cell" style="text-align:right;">101,356</td><td>115年3月期初</td></tr>
-            <tr><td>11503</td><td style="color:#c62828;">領用</td><td class="debit-cell" style="text-align:right;">-3</td><td class="balance-cell" style="text-align:right;">101,353</td><td>11503藥品領用3元</td></tr>
-            <tr><td>11503</td><td style="color:#c62828;">盤損</td><td class="debit-cell" style="text-align:right;">-2,620</td><td class="balance-cell" style="text-align:right;">98,733</td><td>11503藥品盤損校正</td></tr>
+            <tr><td>11503</td><td>期初</td><td class="balance-cell" style="text-align:right;">-</td><td class="balance-cell" style="text-align:right;">98,735</td><td>115年3月期初（2月期末結存）</td></tr>
+            <tr><td>11503</td><td style="color:#c62828;">盤損</td><td class="debit-cell" style="text-align:right;">-2</td><td class="balance-cell" style="text-align:right;">98,733</td><td>11503藥品盤損2元</td></tr>
           </tbody>
         </table>
         </div>
@@ -662,7 +661,22 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
           </tr>
         </thead>
         <tbody id="eaf-medical-tbody">
-          <tr><td colspan="7" class="empty-msg">連線後自動從動支單抓取醫療用品科目項目</td></tr>
+          <tr>
+            <td style="text-align:center;"><input type="checkbox" checked></td>
+            <td>11503</td><td>M2503-001</td>
+            <td style="font-size:11px;">11503 藥品採購（中山藥局）</td>
+            <td style="text-align:right;">7,800</td>
+            <td><select class="fi" style="font-size:11px; width:70px;"><option>藥品</option><option>衛材</option></select></td>
+            <td style="text-align:center; font-size:11px; color:#2e7d32;">✓ 已入帳</td>
+          </tr>
+          <tr>
+            <td style="text-align:center;"><input type="checkbox"></td>
+            <td>11504</td><td>M2504-001</td>
+            <td style="font-size:11px;">11504 醫療耗材採購（衛材）</td>
+            <td style="text-align:right;">3,200</td>
+            <td><select class="fi" style="font-size:11px; width:70px;"><option>衛材</option><option>藥品</option></select></td>
+            <td style="text-align:center; font-size:11px; color:#e65100;">未入帳</td>
+          </tr>
         </tbody>
       </table>
       </div>
@@ -688,7 +702,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <div class="bb-divider"></div>
     <div class="bb-item">
       <div class="bb-num">82,819</div>
-      <div class="bb-label">原始取得金額（元）</div>
+      <div class="bb-label">2月期末 / 3月期初（元）</div>
     </div>
   </div>
 
@@ -717,27 +731,13 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
             <td>期初</td>
             <td style="text-align:right;">-</td>
             <td class="balance-cell" style="text-align:right;">82,819</td>
-            <td>财產取得（期初）</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>11501</td>
-            <td class="debit-cell" style="text-align:right;">-2,193</td>
-            <td class="balance-cell" style="text-align:right;">80,626</td>
-            <td>11501雜項設備折舊2,193元</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>11502</td>
-            <td class="debit-cell" style="text-align:right;">-2,193</td>
-            <td class="balance-cell" style="text-align:right;">78,433</td>
-            <td>11502雜項設備折舊2,193元</td>
+            <td>2月期末結存（3月期初）</td>
             <td></td>
           </tr>
           <tr>
             <td>11503</td>
             <td class="debit-cell" style="text-align:right;">-2,193</td>
-            <td class="balance-cell" style="text-align:right;">76,240</td>
+            <td class="balance-cell" style="text-align:right;">80,626</td>
             <td>11503雜項設備折舊2,193元</td>
             <td></td>
           </tr>
@@ -826,8 +826,11 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
       <button class="pk-close" onclick="closePicker()">✕ 關閉</button>
     </div>
     <div id="pk-filter">
-      <input class="pk-in" type="text" placeholder="🔍 搜尋摘要" oninput="filterPicker(this.value)" style="max-width:260px;">
-      <span style="font-size:11px; color:#78909c; flex:1;">近兩個月，僅醫療基金門診醫療成本</span>
+      <input class="pk-in" type="text" placeholder="🔍 搜尋摘要" oninput="filterPicker(this.value)" style="max-width:220px;">
+      <span style="font-size:11px; color:#78909c; flex:1;">當年度，僅醫療基金門診醫療成本</span>
+      <label style="display:flex; align-items:center; gap:4px; font-size:11px; color:#546e7a; cursor:pointer; white-space:nowrap;">
+        <input type="checkbox" id="pk-show-posted" onchange="renderPicker(document.querySelector('#pk-filter input[type=text]').value)"> 顯示已出帳
+      </label>
       <button class="btn btn-gray" style="font-size:11px; padding:3px 10px;" onclick="selectAllPk()">全選</button>
       <button class="btn btn-gray" style="font-size:11px; padding:3px 10px;" onclick="deselectAllPk()">全不選</button>
     </div>
@@ -889,14 +892,25 @@ let STATE = {
 /* Mock 未出帳動支單（連線後由 API 提供） */
 const MOCK_UNPOSTED = [
   { id:'U001', yearMonth:'11503', voucher:'待出帳-01', subject:'510601 門診醫療成本', purposeCode:'2713', purposeDesc:'計時與計件人員酬金',
-    desc:'11503臨時人員（黎欣妮3,801+方雪雲3,977=7,778+補助代扣8,568=16,346）', amount:16346, applied:false },
+    desc:'11503臨時人員（黎欣妮3,801+方雪雲3,977=7,778+補助代扣8,568=16,346）', amount:16346 },
   { id:'U002', yearMonth:'11503', voucher:'待出帳-02', subject:'510601 門診醫療成本', purposeCode:'2202', purposeDesc:'電話費',
-    desc:'11503中華電信電話費998+4212+172=5382', amount:5382, applied:false },
+    desc:'11503中華電信電話費998+4212+172=5382', amount:5382 },
   { id:'U003', yearMonth:'11503', voucher:'待出帳-03', subject:'510601 門診醫療成本', purposeCode:'2204', purposeDesc:'數據通信費',
-    desc:'11503中華電信數據通信費175+1691=1866', amount:1866, applied:false },
+    desc:'11503中華電信數據通信費175+1691=1866', amount:1866 },
   { id:'U004', yearMonth:'11504', voucher:'待出帳-04', subject:'510601 門診醫療成本', purposeCode:'1501', purposeDesc:'績效獎金',
-    desc:'11503當月繳局統籌款378+719+4527=7186', amount:7186, applied:false },
+    desc:'11503當月繳局統籌款378+719+4527=7186', amount:7186 },
 ];
+
+// 已出帳紀錄（localStorage 持久化）
+const POSTED_KEY = 'acc_picker_posted';
+let postedIds = new Set(JSON.parse(localStorage.getItem(POSTED_KEY)||'[]'));
+
+function markPosted(id){
+  postedIds.add(id);
+  pickerSelected.delete(id);
+  localStorage.setItem(POSTED_KEY, JSON.stringify([...postedIds]));
+  renderPicker(document.querySelector('#pk-filter input[type=text]')?.value || '');
+}
 
 let pickerSelected = new Set();
 
@@ -1213,22 +1227,35 @@ function closePickerBg(e){ if(e.target===document.getElementById('picker-overlay
 function renderPicker(kw){
   const list = document.getElementById('pk-list');
   list.innerHTML = '';
-  const filtered = MOCK_UNPOSTED.filter(r =>
-    (r.desc+r.subject+r.purposeDesc).toLowerCase().includes(kw.toLowerCase())
-  );
-  if(!filtered.length){ list.innerHTML='<p class="empty-msg">無符合條件的未出帳動支單</p>'; return; }
+  const showPosted = document.getElementById('pk-show-posted')?.checked;
+  const filtered = MOCK_UNPOSTED.filter(r => {
+    if(!showPosted && postedIds.has(r.id)) return false;
+    return (r.desc+r.subject+r.purposeDesc).toLowerCase().includes((kw||'').toLowerCase());
+  });
+  if(!filtered.length){
+    list.innerHTML=`<p class="empty-msg">${showPosted?'無符合條件的動支單':'無未出帳動支單（已出帳項目可勾選「顯示已出帳」查看）'}</p>`;
+    return;
+  }
   filtered.forEach(r => {
+    const isPosted = postedIds.has(r.id);
     const div = document.createElement('div');
-    div.className = 'pk-rec' + (pickerSelected.has(r.id)?' picked':'');
+    div.className = 'pk-rec' + (pickerSelected.has(r.id)?' picked':'') + (isPosted?' posted-item':'');
+    if(isPosted) div.style.cssText = 'opacity:.5; background:#f5f5f5;';
     div.innerHTML = `
-      <input type="checkbox" ${pickerSelected.has(r.id)?'checked':''} onchange="togglePk('${r.id}',this)">
+      <input type="checkbox" ${pickerSelected.has(r.id)?'checked':''} ${isPosted?'disabled':''} onchange="togglePk('${r.id}',this)">
       <div class="pk-info">
-        <div class="pk-title">${r.subject} <span style="font-size:10px;color:#90a4ae;">${r.purposeDesc} ${r.purposeCode}</span>
-          <span style="font-size:10px;background:#f3e5f5;color:#8e24aa;border-radius:3px;padding:1px 5px;margin-left:4px;">未出帳 ${r.yearMonth}</span>
+        <div class="pk-title">${r.subject}
+          <span style="font-size:10px;color:#90a4ae;">${r.purposeDesc} ${r.purposeCode}</span>
+          <span style="font-size:10px;background:${isPosted?'#e8f5e9':'#f3e5f5'};color:${isPosted?'#2e7d32':'#8e24aa'};border-radius:3px;padding:1px 5px;margin-left:4px;">
+            ${isPosted?'✓ 已出帳':'未出帳'} ${r.yearMonth}
+          </span>
         </div>
         <div class="pk-sub">${r.desc}</div>
       </div>
-      <div class="pk-amt">$${fmt(r.amount)}</div>`;
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div class="pk-amt" ${isPosted?'style="color:#90a4ae;"':'}>$${fmt(r.amount)}</div>
+        ${!isPosted ? `<button style="padding:2px 8px;border:1px solid #ccc;border-radius:4px;font-size:10px;cursor:pointer;background:#fff8e1;color:#e65100;" onclick="markPosted('${r.id}')">已出帳 ✓</button>` : ''}
+      </div>`;
     list.appendChild(div);
   });
   updatePkFoot();
