@@ -1253,7 +1253,7 @@ function renderPicker(kw){
         <div class="pk-sub">${r.desc}</div>
       </div>
       <div style="display:flex; align-items:center; gap:8px;">
-        <div class="pk-amt" ${isPosted?'style="color:#90a4ae;"':'}>$${fmt(r.amount)}</div>
+        <div class="pk-amt" ${isPosted?'style="color:#90a4ae;"':''}>$${fmt(r.amount)}</div>
         ${!isPosted ? `<button style="padding:2px 8px;border:1px solid #ccc;border-radius:4px;font-size:10px;cursor:pointer;background:#fff8e1;color:#e65100;" onclick="markPosted('${r.id}')">已出帳 ✓</button>` : ''}
       </div>`;
     list.appendChild(div);
