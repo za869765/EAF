@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.5</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.6</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -314,7 +314,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v2.9.5</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v2.9.6</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -352,11 +352,13 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
       <div class="r-num" id="rc-inv-total">101,205</div>
       <div class="r-label">📦 醫療用品庫存</div>
       <div class="r-sub">💊<span id="rc-drug">98,733</span>＋🩹<span id="rc-supply">2,472</span></div>
+      <div class="r-sub" style="font-size:9px;color:#90a4ae;margin-top:2px;">資料至 <span id="rc-inv-date">—</span></div>
     </div>
     <div class="r-card rc-blue">
       <div class="r-num" id="rc-property">80,626</div>
       <div class="r-label">🏚️ 財產帳面淨值</div>
       <div class="r-sub">每月扣 2,193</div>
+      <div class="r-sub" style="font-size:9px;color:#90a4ae;margin-top:2px;">資料至 <span id="rc-prop-date">—</span></div>
     </div>
     <div class="r-card rc-blue">
       <div class="r-num" id="rc-fund5">-</div>
@@ -931,7 +933,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     </div>
     <div class="bb-divider"></div>
     <div class="bb-item">
-      <div class="bb-num">82,819</div>
+      <div class="bb-num" id="prop-prev-bal">82,819</div>
       <div class="bb-label" id="prop-prev-label">2月期末（元）</div>
     </div>
   </div>
@@ -960,8 +962,22 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
           <tr>
             <td>期初</td>
             <td style="text-align:right;">-</td>
+            <td class="balance-cell" style="text-align:right;">87,205</td>
+            <td>115年1月1日帳面淨值</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>11501</td>
+            <td class="debit-cell" style="text-align:right;">-2,193</td>
+            <td class="balance-cell" style="text-align:right;">85,012</td>
+            <td>11501雜項設備折舊2,193元</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>11502</td>
+            <td class="debit-cell" style="text-align:right;">-2,193</td>
             <td class="balance-cell" style="text-align:right;">82,819</td>
-            <td>115年2月期末結存</td>
+            <td>11502雜項設備折舊2,193元</td>
             <td></td>
           </tr>
           <tr>
@@ -1127,7 +1143,7 @@ let STATE = {
   },
   property: {
     monthlyDepr: 2193,
-    currentBalance: 80626,
+    currentBalance: 82819,   /* 11502月末帳面淨值（11503折舊尚未入帳前） */
   },
   allowance: {
     currentBalance: 57539,
@@ -1771,7 +1787,8 @@ function loadVoucherView(){
 
 function saveVouchers(){
   const {ym} = getYm();
-  localStorage.setItem(`acc_vouchers_${ym}`, JSON.stringify(STATE.vouchers));
+  /* 同步寫 localStorage + D1（acc_vouchers_* 在 acc_* 命名空間內） */
+  accSave(`acc_vouchers_${ym}`, STATE.vouchers);
   const now = new Date();
   const ts = `${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
   localStorage.setItem(`acc_vouchers_${ym}_ts`, ts);
@@ -2209,12 +2226,11 @@ function renderAllowLedger(){
       <td><input class="fi" type="text" value="${r.ym||''}" placeholder="年月" style="width:54px;font-size:11px;"
           onchange="updateAllowRow(${i},'ym',this.value)"></td>
       <td><select class="fi" style="font-size:11px;" onchange="updateAllowRow(${i},'type',this.value)">${opts}</select></td>
-      <td class="${amtClass}" style="text-align:right;">${amtSign}${fmt(amt)}<br>
+      <td class="${amtClass}" style="text-align:right;">
         <input class="num-in" type="text" value="${fmt(amt)}" placeholder="0"
-          style="max-width:75px;font-size:11px;" oninput="updateAllowRow(${i},'amt',this.value)"></td>
+          style="max-width:80px;text-align:right;font-size:13px;font-weight:700;" oninput="updateAllowRow(${i},'amt',this.value)"></td>
       <td class="balance-cell" style="text-align:right;">${fmt(bal)}</td>
-      <td><input class="fi" type="text" value="${r.note||''}" placeholder="摘要"
-          style="width:100%;font-size:11px;" onchange="updateAllowRow(${i},'note',this.value)"></td>
+      <td style="font-size:11px;color:#546e7a;padding:4px 8px;">${(r.note||'').replace(/</g,'&lt;')}</td>
       <td><button class="del-btn" onclick="confirmDelAllow(${i})">✕</button></td></tr>`;
   });
 
@@ -2367,9 +2383,44 @@ const Q1_REF = [
   })},
   /* 備抵折讓明細帳 — Q1三個月核銷（來源：轉帳傳票115300002~115300004） */
   { key:'acc_allow_ledger', val: JSON.stringify([
-    { ym:'11501', type:'ded', amt:5751, note:'11501備抵醫療折讓核銷' },
-    { ym:'11502', type:'ded', amt:4739, note:'11502備抵醫療折讓核銷' },
-    { ym:'11503', type:'ded', amt:8215, note:'11503備抵醫療折讓核銷' }
+    { ym:'11501', type:'ded', amt:5751, note:'11501備抵醫療折讓核銷（借110306/貸110305）' },
+    { ym:'11502', type:'ded', amt:4739, note:'11502備抵醫療折讓核銷（借110306/貸110305）' },
+    { ym:'11503', type:'ded', amt:8215, note:'11503備抵醫療折讓核銷（借110306/貸110305）' }
+  ])},
+  /* 藥品庫存月底實際盤點（與帳面相符，因已做盤盈損調整） */
+  { key:'acc_inv_drug_close_11501', val:'96857' },
+  { key:'acc_inv_drug_close_11502', val:'90231' },
+  { key:'acc_inv_drug_close_11503', val:'95275' },
+  /* Q1 轉帳傳票明細（來源：115300002~115300004，供4月起產製參考） */
+  { key:'acc_vouchers_11501', val: JSON.stringify([
+    { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用', dr:8028, cr:0 },
+    { group:'',                      type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用', dr:0, cr:8028 },
+    { group:'藥品盤盈（115300002）', type:'debit',  subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤盈1元', dr:1, cr:0 },
+    { group:'',                      type:'credit', subject:'510607 存貨盤盈盈虧', subAccount:'', purpose:'', desc:'11501藥品盤盈1元', dr:0, cr:1 },
+    { group:'折舊（115300002）',     type:'debit',  subject:'510610 折舊費用', subAccount:'', purpose:'', desc:'11501雜項設備折舊', dr:2193, cr:0 },
+    { group:'',                      type:'credit', subject:'120206 累積折舊-什項設備', subAccount:'', purpose:'', desc:'11501雜項設備折舊', dr:0, cr:2193 },
+    { group:'備抵折讓核銷（115300002）', type:'debit', subject:'110306 備抵醫療折讓', subAccount:'', purpose:'', desc:'11501備抵折讓核銷5,751元', dr:5751, cr:0 },
+    { group:'',                          type:'credit', subject:'110305 應收醫療帳款', subAccount:'', purpose:'', desc:'11501備抵折讓核銷5,751元', dr:0, cr:5751 }
+  ])},
+  { key:'acc_vouchers_11502', val: JSON.stringify([
+    { group:'藥品領用（115300003）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用', dr:6623, cr:0 },
+    { group:'',                      type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用', dr:0, cr:6623 },
+    { group:'藥品盤損（115300003）', type:'debit',  subject:'510607 存貨盤盈盈虧', subAccount:'', purpose:'', desc:'11502藥品盤損3元', dr:3, cr:0 },
+    { group:'',                      type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤損3元', dr:0, cr:3 },
+    { group:'折舊（115300003）',     type:'debit',  subject:'510610 折舊費用', subAccount:'', purpose:'', desc:'11502雜項設備折舊', dr:2193, cr:0 },
+    { group:'',                      type:'credit', subject:'120206 累積折舊-什項設備', subAccount:'', purpose:'', desc:'11502雜項設備折舊', dr:0, cr:2193 },
+    { group:'備抵折讓核銷（115300003）', type:'debit', subject:'110306 備抵醫療折讓', subAccount:'', purpose:'', desc:'11502備抵折讓核銷4,739元', dr:4739, cr:0 },
+    { group:'',                          type:'credit', subject:'110305 應收醫療帳款', subAccount:'', purpose:'', desc:'11502備抵折讓核銷4,739元', dr:0, cr:4739 }
+  ])},
+  { key:'acc_vouchers_11503', val: JSON.stringify([
+    { group:'藥品領用（115300004）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11503藥品領用', dr:7800, cr:0 },
+    { group:'',                      type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11503藥品領用', dr:0, cr:7800 },
+    { group:'藥品盤盈（115300004）', type:'debit',  subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11503藥品盤盈2元', dr:2, cr:0 },
+    { group:'',                      type:'credit', subject:'510607 存貨盤盈盈虧', subAccount:'', purpose:'', desc:'11503藥品盤盈2元', dr:0, cr:2 },
+    { group:'折舊（115300004）',     type:'debit',  subject:'510610 折舊費用', subAccount:'', purpose:'', desc:'11503雜項設備折舊', dr:2193, cr:0 },
+    { group:'',                      type:'credit', subject:'120206 累積折舊-什項設備', subAccount:'', purpose:'', desc:'11503雜項設備折舊', dr:0, cr:2193 },
+    { group:'備抵折讓核銷（115300004）', type:'debit', subject:'110306 備抵醫療折讓', subAccount:'', purpose:'', desc:'11503備抵折讓核銷8,215元', dr:8215, cr:0 },
+    { group:'',                          type:'credit', subject:'110305 應收醫療帳款', subAccount:'', purpose:'', desc:'11503備抵折讓核銷8,215元', dr:0, cr:8215 }
   ])},
 ];
 async function seedQ1Ref(){
@@ -2503,12 +2554,27 @@ function recalcInvLedger(type){
     if(bEl) bEl.textContent=voided?'-':fmt(bal);
   });
   saveInvLedger(type);
-  if(type==='drug'){ STATE.inventory.drug.balance=bal; const e=document.getElementById('inv-drug-bal'); if(e) e.textContent=fmt(bal); }
-  else             { STATE.inventory.supply.balance=bal; const e=document.getElementById('inv-supply-bal'); if(e) e.textContent=fmt(bal); }
+  if(type==='drug'){
+    STATE.inventory.drug.balance=bal;
+    const e=document.getElementById('inv-drug-bal'); if(e) e.textContent=fmt(bal);
+    const rc=document.getElementById('rc-drug'); if(rc) rc.textContent=fmt(bal);
+  } else {
+    STATE.inventory.supply.balance=bal;
+    const e=document.getElementById('inv-supply-bal'); if(e) e.textContent=fmt(bal);
+    const rc=document.getElementById('rc-supply'); if(rc) rc.textContent=fmt(bal);
+  }
   updateInvTotal();
   renderMonthlyClose(type);
   /* 每次明細帳重算後，同步更新月度作業的上月期末 / 當月帳面 */
   if(typeof updatePrevMonthLabels === 'function') updatePrevMonthLabels();
+  /* 儀表板庫存截止月份（取明細帳最後一筆有效年月） */
+  const _rows = loadInvLedger(type).filter(r=>!r.voided&&r.ym);
+  if(_rows.length){
+    const _last = _rows.map(r=>String(r.ym)).sort().pop();
+    const _y=_last.slice(0,3), _m=+_last.slice(3);
+    const rcDate=document.getElementById('rc-inv-date');
+    if(rcDate) rcDate.textContent=`${_y}/${_m}`;
+  }
 }
 function renderMonthlyClose(type){
   const tbody = document.getElementById(type+'-monthly-close');
@@ -2897,14 +2963,20 @@ function updateDeprBalance(){
   document.getElementById('exp-depr-balance').value = fmt(balance);
   document.getElementById('depr-balance-label').textContent = `（${y}年${m}月期末）`;
   document.getElementById('depr-balance-hint').textContent  = `帳面淨值：${fmt(balance)} 元`;
-  // 財產管理頁標籤
+  // 財產管理頁標籤 + 數值
   const curLabel  = document.getElementById('prop-cur-label');
   const prevLabel = document.getElementById('prop-prev-label');
+  const curBal    = document.getElementById('prop-balance');
+  const prevBal   = document.getElementById('prop-prev-bal');
   if(curLabel)  curLabel.textContent  = `🏚️ ${m}月期末（元）`;
   if(prevLabel) prevLabel.textContent = `${prevM}月期末（元）`;
-  // 提醒卡片
+  if(curBal)    curBal.textContent    = fmt(balance);
+  if(prevBal)   prevBal.textContent   = fmt(STATE.property.currentBalance);
+  // 提醒卡片 + 資料截止日
   const rcProp = document.getElementById('rc-property');
   if(rcProp) rcProp.textContent = fmt(balance);
+  const rcPropDate = document.getElementById('rc-prop-date');
+  if(rcPropDate) rcPropDate.textContent = `${y}/${prevM}`;
 }
 
 /* 上月期末標籤 */
