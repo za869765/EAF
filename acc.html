@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.7.6</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.7.7</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -279,7 +279,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span style="font-size:10px; color:#78909c;">v2.7.6</span>
+  <span style="font-size:10px; color:#78909c;">v2.7.7</span>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
 </div>
@@ -727,6 +727,12 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   <div class="card">
     <div class="card-hd hd-dark">📋 動支單「醫療用品」科目進貨核對 <span style="font-size:10px; font-weight:400; color:#90a4ae; margin-left:6px;">可人工勾選校正藥品/衛材分類</span></div>
     <div class="card-bd" style="padding:0;">
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:#f5f5f5;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;">
+        <button class="btn btn-gray" style="font-size:11px;padding:3px 10px;" onclick="medSelectAll()">全選未入帳</button>
+        <button class="btn btn-gray" style="font-size:11px;padding:3px 10px;" onclick="medDeselectAll()">取消勾選</button>
+        <button class="btn btn-green" id="med-confirm-btn" style="font-size:11px;padding:3px 12px;" onclick="confirmMedPosted()">✓ 確定入帳（0）</button>
+        <span style="font-size:11px;color:#78909c;">勾選後按「確定入帳」才會寫入，入帳後不可還原</span>
+      </div>
       <div class="table-wrap">
       <table class="voucher-table" id="eaf-medical-table">
         <thead>
@@ -2086,9 +2092,54 @@ function addInvEntry(type){
 
 /* ════════════════════════════════════════════
    動支單「醫療用品」進貨核對（EAF API）
+   - 勾選只是暫存（medPendingSet）
+   - 按「確定入帳」才寫入明細帳 + localStorage
+   - 已入帳 = 永久，下次載入不會還原
 ════════════════════════════════════════════ */
 const MED_POSTED_KEY = 'acc_med_posted';
-let medPostedIds = new Set(JSON.parse(localStorage.getItem(MED_POSTED_KEY)||'[]'));
+let medPostedIds  = new Set(JSON.parse(localStorage.getItem(MED_POSTED_KEY)||'[]'));
+let medPendingSet = new Set();   // 暫存勾選，未確認前不寫入
+let _medRecs      = [];          // cache 供 confirm 使用
+
+function updateMedConfirmBtn(){
+  const btn = document.getElementById('med-confirm-btn');
+  if(btn) btn.textContent = `✓ 確定入帳（${medPendingSet.size}）`;
+}
+function toggleMedPending(id, cb){
+  if(cb.checked) medPendingSet.add(String(id));
+  else           medPendingSet.delete(String(id));
+  updateMedConfirmBtn();
+}
+function medSelectAll(){
+  document.querySelectorAll('.med-cb:not([disabled])').forEach(cb=>{
+    cb.checked=true; medPendingSet.add(cb.dataset.id);
+  });
+  updateMedConfirmBtn();
+}
+function medDeselectAll(){
+  document.querySelectorAll('.med-cb:not([disabled])').forEach(cb=>{ cb.checked=false; });
+  medPendingSet.clear();
+  updateMedConfirmBtn();
+}
+function confirmMedPosted(){
+  if(!medPendingSet.size){ alert('請先勾選要入帳的項目'); return; }
+  if(!confirm(`確定將 ${medPendingSet.size} 筆標記為已入帳並移入明細帳？\n入帳後不可還原。`)) return;
+  medPendingSet.forEach(id=>{
+    const r = _medRecs.find(x=>String(x.id)===id);
+    if(!r) return;
+    // 加一筆「進貨」到對應明細帳
+    const type = r.cat==='藥品' ? 'drug' : 'supply';
+    const data = loadInvLedger(type);
+    data.push({ ym:r.ym, type:'進貨', amt:r.amount, desc:`${r.voucherNo} ${r.desc}`.trim() });
+    localStorage.setItem('acc_inv_'+type, JSON.stringify(data));
+    medPostedIds.add(String(id));
+  });
+  localStorage.setItem(MED_POSTED_KEY, JSON.stringify([...medPostedIds]));
+  medPendingSet.clear();
+  renderInvLedger('drug');
+  renderInvLedger('supply');
+  loadEafMedical();
+}
 
 async function loadEafMedical(){
   const tbody = document.getElementById('eaf-medical-tbody');
@@ -2096,47 +2147,57 @@ async function loadEafMedical(){
     const resp = await fetch('/api/records',{headers:{'Content-Type':'application/json'}});
     if(!resp.ok) throw new Error('API error');
     const all = await resp.json();
-    const recs = all.filter(r=>
+    _medRecs = all.filter(r=>
       (r.bpLabel||'').includes('醫療用品') && !r.archived && !r.voided
     ).map(r=>{
-      // 管理者手動改過分類優先，否則依「藥品」關鍵字自動判斷
       const manualCat = localStorage.getItem('acc_med_cat_'+r.id);
       const txt = (r.purposeName||'')+(r.purposeDesc||'')+(r.notes||'');
-      const autoCat = txt.includes('藥品') ? '藥品' : '衛材';
-      const cat = manualCat || autoCat;
+      const cat = manualCat || (txt.includes('藥品') ? '藥品' : '衛材');
       return { id:r.id, ym:(r.applyDateRoc||'').replace(/\//g,'').slice(0,5)||'?',
         voucherNo:r.voucherNo||'', desc:r.purposeDesc||r.notes||'', amount:r.total||0, cat };
     });
-    if(!recs.length){
+    if(!_medRecs.length){
       tbody.innerHTML='<tr><td colspan="7" class="empty-msg">目前無醫療用品動支單</td></tr>'; return;
     }
-    tbody.innerHTML = recs.map(r=>{
-      const posted = medPostedIds.has(String(r.id));
-      return `<tr>
-        <td style="text-align:center;"><input type="checkbox" ${posted?'disabled checked':''} onchange="toggleMedPosted('${r.id}',this)"></td>
+    // 未入帳在上，已入帳在下（永久分隔）
+    const unposted = _medRecs.filter(r=>!medPostedIds.has(String(r.id)));
+    const posted   = _medRecs.filter(r=> medPostedIds.has(String(r.id)));
+    const sorted   = [...unposted, ...posted];
+    tbody.innerHTML = sorted.map(r=>{
+      const isPosted = medPostedIds.has(String(r.id));
+      const isPending = medPendingSet.has(String(r.id));
+      return `<tr style="${isPosted?'opacity:.55;':''}">
+        <td style="text-align:center;">
+          <input type="checkbox" class="med-cb" data-id="${r.id}"
+            ${isPosted?'disabled checked':''}
+            ${isPending&&!isPosted?'checked':''}
+            ${isPosted?'':` onchange="toggleMedPending('${r.id}',this)"`}>
+        </td>
         <td style="color:#90a4ae;">${r.ym}</td>
         <td style="font-size:11px;color:#546e7a;">${r.voucherNo}</td>
         <td style="font-size:11px;">${r.desc}</td>
         <td style="text-align:right;font-weight:700;color:#1565c0;">${fmt(r.amount)}</td>
-        <td><select class="fi" style="font-size:11px;width:72px;" onchange="saveMedCat('${r.id}',this.value)">
-          <option${r.cat==='藥品'?' selected':''}>藥品</option>
-          <option${r.cat==='衛材'?' selected':''}>衛材</option></select></td>
-        <td style="text-align:center;font-size:11px;color:${posted?'#2e7d32':'#e65100'};">${posted?'✓ 已入帳':'未入帳'}</td>
+        <td>${isPosted
+          ? `<span style="font-size:11px;color:#78909c;">${r.cat}</span>`
+          : `<select class="fi" style="font-size:11px;width:72px;" onchange="saveMedCat('${r.id}',this.value)">
+              <option${r.cat==='藥品'?' selected':''}>藥品</option>
+              <option${r.cat==='衛材'?' selected':''}>衛材</option></select>`}
+        </td>
+        <td style="text-align:center;font-size:11px;font-weight:700;color:${isPosted?'#2e7d32':'#e65100'};">
+          ${isPosted?'✓ 已入帳':'待入帳'}
+        </td>
       </tr>`;
     }).join('');
+    updateMedConfirmBtn();
   } catch(_){
     tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:#e65100;padding:12px;font-size:12px;">⚠ 無法連線 EAF API</td></tr>';
   }
 }
-function toggleMedPosted(id, cb){
-  if(cb.checked){ medPostedIds.add(String(id)); }
-  else { medPostedIds.delete(String(id)); }
-  localStorage.setItem(MED_POSTED_KEY, JSON.stringify([...medPostedIds]));
-  loadEafMedical();
-}
 function saveMedCat(id, cat){
-  const key='acc_med_cat_'+id;
-  localStorage.setItem(key, cat);
+  localStorage.setItem('acc_med_cat_'+id, cat);
+  // 更新 cache
+  const r = _medRecs.find(x=>String(x.id)===id);
+  if(r) r.cat = cat;
 }
 
 /* ════════════════════════════════════════════
