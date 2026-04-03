@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.8.7</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.8.8</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -133,6 +133,10 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 .del-btn  { background: none; border: none; color: #ef5350; cursor: pointer; font-size: 13px; padding: 2px 4px; }
 .rest-inv-btn { background: none; border: none; color: #1976d2; cursor: pointer; font-size: 13px; padding: 2px 4px; opacity:.7; }
 .rest-inv-btn:hover { opacity:1; }
+/* 軟性作廢列 */
+.row-voided { opacity:.35; }
+.row-voided input, .row-voided select { pointer-events:none; color:#9e9e9e !important; }
+.row-voided .inv-bal { color:#9e9e9e !important; }
 .add-adj-btn { padding: 4px 12px; border: 1.5px dashed #90a4ae; border-radius: 4px; background: none; color: #546e7a; font-size: 11px; cursor: pointer; margin-top: 6px; }
 .add-adj-btn:hover { border-color: #1976d2; color: #1565c0; }
 
@@ -2118,10 +2122,12 @@ function loadInvLedger(type){
 }
 function saveInvLedger(type){
   const rows = [...document.querySelectorAll('#'+type+'-tbody tr')].map(tr=>({
-    ym:   (tr.querySelector('.inv-ym')  ||{}).value||'',
-    type: tr.dataset.type || '進貨',
-    amt:  pnum((tr.querySelector('.inv-amt')||{}).value||'0'),
-    desc: (tr.querySelector('.inv-desc')||{}).value||''
+    ym:    (tr.querySelector('.inv-ym')  ||{}).value||'',
+    type:  tr.dataset.type || '進貨',
+    amt:   pnum((tr.querySelector('.inv-amt')||{}).value||'0'),
+    desc:  (tr.querySelector('.inv-desc')||{}).value||'',
+    medId: tr.dataset.medId||'',
+    voided: tr.dataset.voided==='1'
   }));
   localStorage.setItem('acc_inv_'+type, JSON.stringify(rows));
 }
@@ -2129,11 +2135,15 @@ function recalcInvLedger(type){
   const tbody = document.getElementById(type+'-tbody');
   let bal = 0;
   tbody.querySelectorAll('tr').forEach(tr=>{
+    const voided = tr.dataset.voided==='1';
     const t=tr.dataset.type||'進貨', aEl=tr.querySelector('.inv-amt'), bEl=tr.querySelector('.inv-bal');
     if(!aEl) return;
     const amt=pnum(aEl.value);
-    if(t==='期初') bal=amt; else bal+=( INV_DIR[t]??1 )*amt;
-    if(bEl) bEl.textContent=fmt(bal);
+    // 作廢列不計入餘額，但仍更新餘額顯示（顯示灰色）
+    if(!voided){
+      if(t==='期初') bal=amt; else bal+=( INV_DIR[t]??1 )*amt;
+    }
+    if(bEl) bEl.textContent=voided?'-':fmt(bal);
   });
   saveInvLedger(type);
   if(type==='drug'){ STATE.inventory.drug.balance=bal; const e=document.getElementById('inv-drug-bal'); if(e) e.textContent=fmt(bal); }
@@ -2143,30 +2153,51 @@ function recalcInvLedger(type){
 function renderInvLedger(type){
   const data = loadInvLedger(type);
   const tbody = document.getElementById(type+'-tbody');
-  tbody.innerHTML = data.map(r=>`
-    <tr data-type="${r.type||'進貨'}">
+  tbody.innerHTML = data.map(r=>{
+    const voided = !!r.voided;
+    const rowCls = voided ? 'row-voided' : '';
+    const typeTag = r.type&&r.type!=='進貨'&&!voided
+      ? `<select class="fi" style="font-size:10px;width:46px;color:#546e7a;margin-right:4px;" onchange="this.closest('tr').dataset.type=this.value;recalcInvLedger('${type}')">${INV_TYPES.map(t=>`<option${t===r.type?' selected':''}>${t}</option>`).join('')}</select>` : '';
+    const descW = r.type&&r.type!=='進貨'&&!voided ? 'calc(100% - 54px)' : '100%';
+    let actionBtn;
+    if(voided){
+      actionBtn = `<button class="rest-inv-btn" title="還原此列" onclick="toggleInvVoid(this,'${type}')">↩</button>`;
+    } else if(r.medId){
+      actionBtn = `<button class="rest-inv-btn" title="還原為未入帳" onclick="medRestore('${r.medId}')">↩</button>`;
+    } else {
+      actionBtn = `<button class="del-btn" title="作廢此列" onclick="toggleInvVoid(this,'${type}')">✕</button>`;
+    }
+    return `<tr data-type="${r.type||'進貨'}" ${r.medId?`data-med-id="${r.medId}"`:''}  ${voided?'data-voided="1"':''} class="${rowCls}">
       <td><input class="fi inv-ym" type="text" value="${r.ym||''}" style="width:75px;font-size:11px;" oninput="recalcInvLedger('${type}')"></td>
       <td><input class="num-in inv-amt" type="text" value="${r.amt||''}" style="max-width:80px;" oninput="recalcInvLedger('${type}')"></td>
       <td class="inv-bal" style="text-align:right;font-weight:700;color:#1565c0;"></td>
-      <td>
-        ${r.type&&r.type!=='進貨'?`<select class="fi" style="font-size:10px;width:46px;color:#546e7a;margin-right:4px;" onchange="this.closest('tr').dataset.type=this.value;recalcInvLedger('${type}')">${INV_TYPES.map(t=>`<option${t===r.type?' selected':''}>${t}</option>`).join('')}</select>`:''}
-        <input class="fi inv-desc" type="text" value="${r.desc||''}" style="width:${r.type&&r.type!=='進貨'?'calc(100% - 54px)':'100%'};font-size:11px;" oninput="saveInvLedger('${type}')">
-      </td>
-      <td>${r.medId
-        ? `<button class="rest-inv-btn" title="還原為未入帳" onclick="medRestore('${r.medId}')">↩</button>`
-        : `<button class="del-btn" onclick="confirmDelInv(this,'${type}')">✕</button>`
-      }</td>
-    </tr>`).join('');
+      <td>${typeTag}<input class="fi inv-desc" type="text" value="${r.desc||''}" style="width:${descW};font-size:11px;" oninput="saveInvLedger('${type}')"></td>
+      <td>${actionBtn}</td>
+    </tr>`;
+  }).join('');
   recalcInvLedger(type);
 }
-function confirmDelInv(btn, type){
+function toggleInvVoid(btn, type){
   const tr = btn.closest('tr');
-  const desc = (tr.querySelector('.inv-desc')||{}).value || '此筆紀錄';
-  showModal({ title:'刪除確認', icon:'🗑️',
-    body:`確定要刪除「<b>${desc}</b>」？<br><span style="color:#e53935;font-size:12px;">此動作無法復原</span>`,
-    confirmText:'刪除', danger:true,
-    onConfirm: ()=>{ tr.remove(); recalcInvLedger(type); }
-  });
+  if(tr.dataset.voided==='1'){
+    showModal({ title:'還原確認', icon:'↩️', body:'確定還原此筆記錄？還原後重新計入結存。',
+      confirmText:'還原',
+      onConfirm(){
+        delete tr.dataset.voided; tr.classList.remove('row-voided');
+        btn.textContent='✕'; btn.className='del-btn'; recalcInvLedger(type);
+      }
+    });
+  } else {
+    const desc = (tr.querySelector('.inv-desc')||{}).value||'此筆紀錄';
+    showModal({ title:'作廢確認', icon:'🚫',
+      body:`確定作廢「<b>${desc}</b>」？<br><span style="color:#78909c;font-size:12px;">作廢後不計入結存，按 ↩ 可還原。</span>`,
+      confirmText:'作廢', danger:true,
+      onConfirm(){
+        tr.dataset.voided='1'; tr.classList.add('row-voided');
+        btn.textContent='↩'; btn.className='rest-inv-btn'; recalcInvLedger(type);
+      }
+    });
+  }
 }
 function addInvEntry(type){
   const tbody = document.getElementById(type+'-tbody');
@@ -2182,7 +2213,7 @@ function addInvEntry(type){
       </select>
       <input class="fi inv-desc" type="text" placeholder="摘要" style="width:calc(100% - 54px);font-size:11px;" oninput="saveInvLedger('${type}')">
     </td>
-    <td><button class="del-btn" onclick="confirmDelInv(this,'${type}')">✕</button></td>`;
+    <td><button class="del-btn" onclick="toggleInvVoid(this,'${type}')">✕</button></td>`;
   tbody.appendChild(tr);
   recalcInvLedger(type);
 }
