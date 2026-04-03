@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.8.9</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -314,7 +314,8 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v2.8.9</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v2.9.0</span>
+  <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
 </div>
@@ -2100,7 +2101,7 @@ function confirmDelAllow(btn){
   });
 }
 function getAllowInit(){ const v=localStorage.getItem('acc_allow_init'); return v!==null?+v:65754; }
-function saveAllowInit(raw){ const v=+(String(raw).replace(/,/g,'')); if(!isNaN(v)) localStorage.setItem('acc_allow_init',String(v)); }
+function saveAllowInit(raw){ const v=+(String(raw).replace(/,/g,'')); if(!isNaN(v)) accSave('acc_allow_init',String(v)); }
 function initAllowInitInp(){
   const inp=document.getElementById('al-initial-inp');
   if(inp){ const v=getAllowInit(); inp.value=fmt(v); }
@@ -2130,10 +2131,51 @@ function recalcAllowLedger(){
 }
 
 /* ════════════════════════════════════════════
+   D1 雲端同步（acc_* 命名空間，不影響其他 EAF 資料）
+   - accSave(key, value)   : 同時寫 localStorage + D1
+   - accSave(key, null)    : 從 localStorage 移除 + 在 D1 儲存 null 哨兵
+   - accInitSync()         : 頁面初始化時從 D1 拉取所有 acc_* 覆寫 localStorage
+════════════════════════════════════════════ */
+function accSave(key, value){
+  /* 永遠先寫 localStorage，保持介面即時回應 */
+  if(value === null){
+    localStorage.removeItem(key);
+  } else {
+    localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+  }
+  /* 非同步寫入 D1（fire-and-forget；失敗只 warn，不影響介面） */
+  const pass = sessionStorage.getItem('adminPass')||'';
+  fetch('/api/acc', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Admin-Pass': pass },
+    body: JSON.stringify({ key, value })          /* value=null → D1 儲存 JSON null */
+  }).catch(e => console.warn('[accSave] D1 write failed:', key, e));
+}
+async function accInitSync(){
+  /* 從 D1 拉取全部 acc_* 覆寫 localStorage（若 D1 有資料，以 D1 為準） */
+  try {
+    const resp = await fetch('/api/acc');
+    if(!resp.ok) return;
+    const data = await resp.json();
+    if(!data || typeof data !== 'object') return;
+    for(const [k, v] of Object.entries(data)){
+      if(v === null){
+        localStorage.removeItem(k);
+      } else {
+        localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+      }
+    }
+    console.log('[accInitSync] 已從 D1 同步', Object.keys(data).length, '筆設定');
+  } catch(e){
+    console.warn('[accInitSync] D1 同步失敗（將使用本機快取）:', e);
+  }
+}
+
+/* ════════════════════════════════════════════
    庫存補登
 ════════════════════════════════════════════ */
 /* ════════════════════════════════════════════
-   醫療用品 明細帳（localStorage 存取、可編輯刪除）
+   醫療用品 明細帳（localStorage + D1 雙寫）
 ════════════════════════════════════════════ */
 const INV_DIR = { '期初':0, '進貨':1, '盤盈':1, '領用':-1, '報廢':-1, '盤損':-1 };
 const INV_TYPES = ['期初','進貨','領用','報廢','盤盈','盤損'];
@@ -2158,7 +2200,7 @@ function saveInvLedger(type){
     medId: tr.dataset.medId||'',
     voided: tr.dataset.voided==='1'
   }));
-  localStorage.setItem('acc_inv_'+type, JSON.stringify(rows));
+  accSave('acc_inv_'+type, rows);
 }
 function recalcInvLedger(type){
   const tbody = document.getElementById(type+'-tbody');
@@ -2217,8 +2259,8 @@ function renderMonthlyClose(type){
 }
 function saveMonthlyClose(type, ym, raw){
   const v = pnum(raw);
-  if(!isNaN(v) && String(raw).trim()!=='') localStorage.setItem(`acc_inv_${type}_close_${ym}`, String(v));
-  else localStorage.removeItem(`acc_inv_${type}_close_${ym}`);
+  if(!isNaN(v) && String(raw).trim()!=='') accSave(`acc_inv_${type}_close_${ym}`, String(v));
+  else accSave(`acc_inv_${type}_close_${ym}`, null);   /* null → D1 存哨兵，localStorage 移除 */
   renderMonthlyClose(type);
 }
 function renderInvLedger(type){
@@ -2296,8 +2338,8 @@ function addInvEntry(type){
 ════════════════════════════════════════════ */
 const MED_POSTED_KEY   = 'acc_med_posted';
 const MED_EXCLUDED_KEY = 'acc_med_excluded';
-let medPostedIds   = new Set(JSON.parse(localStorage.getItem(MED_POSTED_KEY)||'[]'));
-let medExcludedIds = new Set(JSON.parse(localStorage.getItem(MED_EXCLUDED_KEY)||'[]'));
+let medPostedIds   = new Set();   /* 於 init() 中 accInitSync 後才填入 */
+let medExcludedIds = new Set();   /* 於 init() 中 accInitSync 後才填入 */
 let medPendingSet  = new Set();   // 暫存多筆勾選，按確定才入帳
 let _medRecs       = [];
 
@@ -2326,10 +2368,10 @@ function _doMedPost(ids){
     const postYm = localStorage.getItem('acc_med_postym_'+r.id) || r.ym;
     const data = loadInvLedger(type);
     data.push({ ym:postYm, type:'進貨', amt:r.amount, desc:`${r.voucherNo} ${r.desc}`.trim(), medId:String(r.id) });
-    localStorage.setItem('acc_inv_'+type, JSON.stringify(data));
+    accSave('acc_inv_'+type, data);
     medPostedIds.add(String(id));
   });
-  localStorage.setItem(MED_POSTED_KEY, JSON.stringify([...medPostedIds]));
+  accSave(MED_POSTED_KEY, [...medPostedIds]);
   medPendingSet.clear();
   renderInvLedger('drug'); renderInvLedger('supply'); loadEafMedical();
 }
@@ -2350,7 +2392,7 @@ function medRestore(id){
     onConfirm(){
       // 從 medPostedIds 移除
       medPostedIds.delete(String(id));
-      localStorage.setItem(MED_POSTED_KEY, JSON.stringify([...medPostedIds]));
+      accSave(MED_POSTED_KEY, [...medPostedIds]);
       // 同時從明細帳刪除對應進貨列（比對 desc 含 voucherNo，防止重複寫入）
       if(r){
         const matchDesc = r.voucherNo;
@@ -2358,7 +2400,7 @@ function medRestore(id){
           const data = loadInvLedger(type);
           const cleaned = data.filter(row=> !(row.type==='進貨' && (row.desc||'').includes(matchDesc)));
           if(cleaned.length !== data.length){
-            localStorage.setItem('acc_inv_'+type, JSON.stringify(cleaned));
+            accSave('acc_inv_'+type, cleaned);
           }
         });
         renderInvLedger('drug');
@@ -2438,7 +2480,7 @@ async function loadEafMedical(){
         <td style="font-size:11px;">${r.desc}</td>
         <td style="text-align:right;font-weight:700;color:#1565c0;">${fmt(r.amount)}</td>
         <td><select class="fi" style="font-size:11px;width:80px;"
-              onchange="localStorage.setItem('acc_med_postym_${r.id}',this.value)">${opts.join('')}</select></td>
+              onchange="accSave('acc_med_postym_${r.id}',this.value)">${opts.join('')}</select></td>
         <td><select class="fi" style="font-size:11px;width:68px;" onchange="saveMedCat('${r.id}',this.value)">
           <option${r.cat==='藥品'?' selected':''}>藥品</option>
           <option${r.cat==='衛材'?' selected':''}>衛材</option></select></td>
@@ -2461,7 +2503,7 @@ function markMedExcluded(id){
     confirmText:'排除', danger:true,
     onConfirm(){
       medExcludedIds.add(String(id));
-      localStorage.setItem(MED_EXCLUDED_KEY, JSON.stringify([...medExcludedIds]));
+      accSave(MED_EXCLUDED_KEY, [...medExcludedIds]);
       loadEafMedical();
     }
   });
@@ -2473,13 +2515,13 @@ function restoreMedExcluded(id){
     confirmText:'還原',
     onConfirm(){
       medExcludedIds.delete(String(id));
-      localStorage.setItem(MED_EXCLUDED_KEY, JSON.stringify([...medExcludedIds]));
+      accSave(MED_EXCLUDED_KEY, [...medExcludedIds]);
       loadEafMedical();
     }
   });
 }
 function saveMedCat(id, cat){
-  localStorage.setItem('acc_med_cat_'+id, cat);
+  accSave('acc_med_cat_'+id, cat);
   // 更新 cache
   const r = _medRecs.find(x=>String(x.id)===id);
   if(r) r.cat = cat;
@@ -2654,7 +2696,12 @@ function logout(){ window.location.href = '/admin.html'; }
 /* ════════════════════════════════════════════
    初始化
 ════════════════════════════════════════════ */
-(function init(){
+(async function init(){
+  // ① 先從 D1 同步（以雲端資料覆寫 localStorage，確保換裝置或清 Cookie 後資料不遺失）
+  await accInitSync();
+  // ② 同步完成後，重新讀取 medPostedIds / medExcludedIds（確保拿到 D1 最新資料）
+  medPostedIds   = new Set(JSON.parse(localStorage.getItem(MED_POSTED_KEY)||'[]'));
+  medExcludedIds = new Set(JSON.parse(localStorage.getItem(MED_EXCLUDED_KEY)||'[]'));
   // 讀設定
   const raw = localStorage.getItem(LS.settings);
   if(raw) try{ Object.assign(STATE.settings, JSON.parse(raw)); } catch(e){}
@@ -2690,7 +2737,7 @@ function logout(){ window.location.href = '/admin.html'; }
   renderInvLedger('supply');
   // 動支單進貨核對（EAF API）
   loadEafMedical();
-})();
+})().catch(e=>console.error('[init] 初始化發生錯誤:', e));
 
 function updateInvTotal(){
   const drug   = STATE.inventory.drug.balance;
