@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.9</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.0.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -314,7 +314,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v2.9.7</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.0.0</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -329,6 +329,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   <button class="tab-btn" onclick="switchTab('allowance',this)">🔻 備抵醫療折讓</button>
   <button class="tab-btn" onclick="switchTab('public',this)">💼 公務預算</button>
   <button class="tab-btn" onclick="switchTab('payable',this)">💰 應付費用</button>
+  <button class="tab-btn" onclick="switchTab('custodial',this)">🏦 代收款</button>
 </div>
 
 <div id="content">
@@ -794,10 +795,11 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
         <!-- 年度期初 -->
         <div style="padding:6px 14px 6px; border-bottom:1px solid #ede7f6; background:#f9f5ff; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
           <span style="font-size:11px; color:#6a1b9a; font-weight:700;">年度期初結存</span>
-          <input id="drug-init-inp" class="fi num-in" type="text" inputmode="numeric" placeholder="0"
-            style="width:110px; text-align:right; font-size:13px; font-weight:700; color:#4a148c;"
+          <input id="drug-init-inp" class="fi num-in" type="text" inputmode="numeric" placeholder="0" readonly
+            style="width:110px; text-align:right; font-size:13px; font-weight:700; color:#4a148c; background:#f3e5f5; cursor:default;"
             onblur="saveInvInit('drug',this.value)"
             onkeydown="if(event.key==='Enter')this.blur()">
+          <button id="drug-init-lock-btn" class="lock-btn locked" onclick="toggleInvInitLock('drug')" style="font-size:11px;">🔒 鎖定</button>
           <span style="font-size:10px; color:#9e9e9e;">前年度結轉至本年度1月1日帳面庫存</span>
         </div>
         <div class="table-wrap">
@@ -841,10 +843,11 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
         <!-- 年度期初 -->
         <div style="padding:6px 14px 6px; border-bottom:1px solid #e0f2f1; background:#f4fffe; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
           <span style="font-size:11px; color:#00695c; font-weight:700;">年度期初結存</span>
-          <input id="supply-init-inp" class="fi num-in" type="text" inputmode="numeric" placeholder="0"
-            style="width:110px; text-align:right; font-size:13px; font-weight:700; color:#004d40;"
+          <input id="supply-init-inp" class="fi num-in" type="text" inputmode="numeric" placeholder="0" readonly
+            style="width:110px; text-align:right; font-size:13px; font-weight:700; color:#004d40; background:#e0f2f1; cursor:default;"
             onblur="saveInvInit('supply',this.value)"
             onkeydown="if(event.key==='Enter')this.blur()">
+          <button id="supply-init-lock-btn" class="lock-btn locked" onclick="toggleInvInitLock('supply')" style="font-size:11px;">🔒 鎖定</button>
           <span style="font-size:10px; color:#9e9e9e;">前年度結轉至本年度1月1日帳面庫存</span>
         </div>
         <div class="table-wrap">
@@ -1131,6 +1134,43 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   </div>
   <div id="payable-sections"></div>
 </div><!-- /tab-payable -->
+
+<!-- ══════════════════════════════════════════
+     TAB 8：應付代收款（210203）
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-custodial">
+  <div class="balance-banner">
+    <div class="bb-item">
+      <div class="bb-num" id="cust-total">343,167</div>
+      <div class="bb-label">210203 應付代收款（合計）</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" id="cust-301">80,011</div>
+      <div class="bb-label">21020301 公務預算經費</div>
+    </div>
+    <div class="bb-item">
+      <div class="bb-num" id="cust-302">2,032</div>
+      <div class="bb-label">21020302 各業務差旅費</div>
+    </div>
+    <div class="bb-item">
+      <div class="bb-num" id="cust-311">138,365</div>
+      <div class="bb-label">21020311 國健科</div>
+    </div>
+    <div class="bb-item">
+      <div class="bb-num" id="cust-312">53,020</div>
+      <div class="bb-label">21020312 疾管科</div>
+    </div>
+    <div class="bb-item">
+      <div class="bb-num" id="cust-321">69,739</div>
+      <div class="bb-label">21020321 代收款</div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:#78909c;padding:0 2px 10px;">
+    💡 代收保管款 — 受委託代收、待繳回各業務主管機關｜截至 115年3月31日
+  </div>
+  <div id="custodial-sections"></div>
+</div><!-- /tab-custodial -->
 
 </div><!-- /content -->
 
@@ -2307,6 +2347,25 @@ function updateAllowRow(idx, field, value){
   renderAllowLedger();
 }
 let _allowLocked = true;
+function toggleInvInitLock(type){
+  const inp = document.getElementById(type+'-init-inp');
+  const btn = document.getElementById(type+'-init-lock-btn');
+  if(!inp||!btn) return;
+  const locked = inp.hasAttribute('readonly');
+  if(locked){
+    inp.removeAttribute('readonly');
+    inp.style.background='';
+    inp.style.cursor='';
+    btn.textContent='🔓 解鎖中';
+    btn.classList.remove('locked');
+  } else {
+    inp.setAttribute('readonly','');
+    inp.style.background = type==='drug'?'#f3e5f5':'#e0f2f1';
+    inp.style.cursor='default';
+    btn.textContent='🔒 鎖定';
+    btn.classList.add('locked');
+  }
+}
 function toggleAllowLock(){
   _allowLocked = !_allowLocked;
   const btn = document.getElementById('allow-lock-btn');
@@ -2561,20 +2620,20 @@ async function seedQ1DrugEntries(){
 const PAYABLE_SEED = {
   asOf:'11503', account:'210205', name:'應付費用', total:115323,
   categories:[
-    { code:'01', name:'繳局統籌款', subtotal:25862, entries:[
+    { code:'01', name:'繳局統籌款', subtotal:25862, note:'依規定繳回局端，不可分配給員工', entries:[
       { ym:'11501', day:30, ref:'300002 序27', desc:'114年度雜項收入：繳局統籌款(66123×0.95×0.1=6,281)+11409醫師獎勵金(3300×0.95×0.9×0.7=1,975)', amt:8256 },
       { ym:'11501', day:30, ref:'300003 序2',  desc:'11501當月繳局統籌款525+3,310+1,418=5,253', amt:5253 },
       { ym:'11502', day:26, ref:'300004 序17', desc:'114年度雜項收入：繳局統籌款(900×0.95×0.1=86)+11409醫師獎勵金(900×0.95×0.9×0.7=538)', amt:624 },
       { ym:'11502', day:26, ref:'300004 序31', desc:'11502當月繳局統籌款378+719+4,527=7,186', amt:7186 },
       { ym:'11503', day:31, ref:'300005 序15', desc:'114年度雜項收入：繳局統籌款(6224×0.1=622)+11412醫師獎勵金(6,224×0.9×0.7=3,921)', amt:4543 }
     ]},
-    { code:'02', name:'員工獎勵金', subtotal:67577, entries:[
+    { code:'02', name:'員工獎勵金', subtotal:67577, note:'實際分發給員工的獎勵金（含醫師績效獎金）', entries:[
       { ym:'11412', day:31, ref:'300114 序2',  desc:'114.12員工獎勵金', amt:11104 },
       { ym:'11501', day:30, ref:'300002 序26', desc:'11404醫師獎勵金(62823×0.95×0.9×0.7=37,600)+114年度員工獎勵金(66123×0.95×0.9×0.3=16,961)', amt:54561 },
       { ym:'11502', day:26, ref:'300004 序16', desc:'114012員工獎勵金(900×0.95×0.9×0.3=231)', amt:231 },
       { ym:'11503', day:31, ref:'300005 序14', desc:'11412員工獎勵金(6,224×0.9×0.3=1,681)', amt:1681 }
     ]},
-    { code:'03', name:'員工款', subtotal:21884, entries:[
+    { code:'03', name:'員工款', subtotal:21884, note:'臨時人員實領工資＋代扣款（勞保/健保/勞退），直接發給員工或代繳', entries:[
       { ym:'11503', day:31, ref:'300005 序11', desc:'11503臨時人員實領13,258元：黎欣妮6,937+方雪雲6,321', amt:13258 },
       { ym:'11503', day:31, ref:'300005 序12', desc:'115.3臨時人員補助代扣款8,626元（勞保2,736+健保4,685+勞退1,202）', amt:8626 }
     ]}
@@ -2609,6 +2668,26 @@ async function seedPayable(){
     body: JSON.stringify([{key:'acc_payable', value:val}])
   }).catch(e=>console.warn('[seedPayable] D1 write failed:',e));
   console.log('[seedPayable] 應付費用資料已寫入 D1');
+}
+/* 清除舊版 select option 文字污染 desc 欄位（v3.0.0 migration） */
+async function fixCorruptedDesc(){
+  if(localStorage.getItem('acc_fix_desc_300')) return;
+  const INV_TYPE_PAT = /^(期初|進貨|領用|報廢|盤盈|盤損|\s){3,}$/;
+  ['drug','supply'].forEach(type=>{
+    const data = loadInvLedger(type);
+    let changed = false;
+    data.forEach(r=>{
+      if(r.desc && INV_TYPE_PAT.test(r.desc)){
+        r.desc = '';
+        changed = true;
+      }
+    });
+    if(changed){
+      accSave('acc_inv_'+type, data);
+      console.log('[fixCorruptedDesc] 清除', type, '損壞 desc');
+    }
+  });
+  localStorage.setItem('acc_fix_desc_300','1');
 }
 async function fixDrugCloseValues(){
   if(localStorage.getItem('acc_fix_dclose_298')) return;
@@ -2657,6 +2736,7 @@ function renderPayable(){
         ${CAT_ICN[cat.code]||''} ${cat.code}　${cat.name}
         <span style="margin-left:auto;font-size:13px;font-weight:700;">小計 ${fmt(cat.subtotal)}</span>
       </div>
+      ${cat.note?`<div style="font-size:11px;padding:6px 12px;color:#546e7a;background:#f9f9f9;border-bottom:1px solid #e0e0e0;">💡 ${cat.note}</div>`:''}
       <div class="card-bd" style="padding:0;">
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <thead><tr style="background:#f5f5f5;color:#546e7a;">
@@ -2679,6 +2759,131 @@ function renderPayable(){
           </tbody>
         </table>
       </div>
+    </div>`).join('');
+}
+
+/* ════ 應付代收款 210203 ════ */
+const CUSTODIAL_SEED = {
+  asOf:'11503', account:'210203', name:'應付代收款', total:343167,
+  groups:[
+    { code:'21020301', name:'衛生所公務預算經費', subtotal:80011, note:'受委託代收公務預算撥款，待繳回局端', color:'hd-blue',
+      subs:[
+        { name:'公務預算撥款', subtotal:80011, entries:[
+          { ym:'11501', day:20, ref:'100003 序8', desc:'衛生所公務預算經費撥入', amt:80011 }
+        ]}
+      ]
+    },
+    { code:'21020302', name:'各業務差旅費', subtotal:2032, note:'各業務出差旅費代收保管', color:'hd-teal',
+      subs:[
+        { name:'差旅費', subtotal:2032, entries:[
+          { ym:'', day:'', ref:'', desc:'差旅費（含兩筆：182+1,850）', amt:2032 }
+        ]}
+      ]
+    },
+    { code:'21020311', name:'國健科', subtotal:138365, note:'國民健康署各業務補助款代收保管，待執行核銷後繳回', color:'hd-green',
+      subs:[
+        { name:'01 菸害防制', subtotal:20000, entries:[
+          { ym:'', day:'', ref:'', desc:'菸害防制業務補助款', amt:20000 }
+        ]},
+        { name:'11 衛生保健', subtotal:56000, entries:[
+          { ym:'', day:'', ref:'', desc:'衛生保健業務補助款（共5筆合計）', amt:56000 }
+        ]},
+        { name:'12 整合性預防及延緩失能', subtotal:31165, entries:[
+          { ym:'', day:'', ref:'', desc:'整合性預防及延緩失能業務款（含112/113年舊帳，共4筆）', amt:31165 }
+        ]},
+        { name:'99 其他', subtotal:31200, entries:[
+          { ym:'', day:'', ref:'', desc:'母乳哺育支持團體補助 22,800', amt:22800 },
+          { ym:'', day:'', ref:'', desc:'通譯費補助 8,400', amt:8400 }
+        ]}
+      ]
+    },
+    { code:'21020312', name:'疾管科', subtotal:53020, note:'疾病管制署業務補助款代收保管', color:'hd-purple',
+      subs:[
+        { name:'02 傳染病防治', subtotal:50000, entries:[
+          { ym:'11501', day:20, ref:'', desc:'M痘傳染病防治業務補助款', amt:50000 }
+        ]},
+        { name:'99 其他', subtotal:3020, entries:[
+          { ym:'', day:'', ref:'', desc:'針具業務收入（含114年舊帳，共5筆合計）', amt:3020 }
+        ]}
+      ]
+    },
+    { code:'21020321', name:'代收款（薪資相關）', subtotal:69739, note:'代扣員工薪資各項保費及退休金，按期繳回各主管機關', color:'hd-amber',
+      subs:[
+        { name:'01 公保費', subtotal:9741, entries:[
+          { ym:'', day:'', ref:'', desc:'楊建芳 公保費代扣保管', amt:9741 }
+        ]},
+        { name:'02 健保費－公保人員', subtotal:34954, entries:[
+          { ym:'', day:'', ref:'', desc:'公保人員健保費代扣（共4筆）', amt:34954 }
+        ]},
+        { name:'03 健保費－勞保人員', subtotal:7176, entries:[
+          { ym:'', day:'', ref:'', desc:'勞保人員健保費代扣（共3筆）', amt:7176 }
+        ]},
+        { name:'04 勞保費', subtotal:6742, entries:[
+          { ym:'', day:'', ref:'', desc:'勞工保險費代扣（共4筆）', amt:6742 }
+        ]},
+        { name:'05 退撫基金', subtotal:300, entries:[
+          { ym:'', day:'', ref:'', desc:'退撫基金代扣', amt:300 }
+        ]},
+        { name:'06 勞工退休準備金', subtotal:10826, entries:[
+          { ym:'', day:'', ref:'', desc:'勞工退休準備金提撥（共4筆）', amt:10826 }
+        ]}
+      ]
+    }
+  ]
+};
+async function seedCustodial(){
+  if(localStorage.getItem('acc_custodial')) return;
+  const val = JSON.stringify(CUSTODIAL_SEED);
+  localStorage.setItem('acc_custodial', val);
+  const pass = sessionStorage.getItem('adminPass')||'';
+  fetch('/api/acc',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Admin-Pass':pass},
+    body: JSON.stringify([{key:'acc_custodial', value:val}])
+  }).catch(e=>console.warn('[seedCustodial] D1 write failed:',e));
+  console.log('[seedCustodial] 應付代收款資料已寫入 D1');
+}
+function loadCustodial(){
+  const raw = localStorage.getItem('acc_custodial');
+  if(!raw) return CUSTODIAL_SEED;
+  try{ return JSON.parse(raw); }catch(e){ return CUSTODIAL_SEED; }
+}
+function renderCustodial(){
+  const data = loadCustodial();
+  const totalEl = document.getElementById('cust-total');
+  if(totalEl) totalEl.textContent = fmt(data.total||0);
+  const ID_MAP = {'21020301':'cust-301','21020302':'cust-302','21020311':'cust-311','21020312':'cust-312','21020321':'cust-321'};
+  (data.groups||[]).forEach(g=>{ const el=document.getElementById(ID_MAP[g.code]); if(el) el.textContent=fmt(g.subtotal||0); });
+  const sec = document.getElementById('custodial-sections');
+  if(!sec) return;
+  sec.innerHTML = (data.groups||[]).map(g=>`
+    <div class="card">
+      <div class="card-hd ${g.color||'hd-dark'}">
+        🏦 ${g.code}　${g.name}
+        <span style="margin-left:auto;font-size:13px;font-weight:700;">合計 ${fmt(g.subtotal)}</span>
+      </div>
+      ${g.note?`<div style="font-size:11px;padding:6px 12px;color:#546e7a;background:#f9f9f9;border-bottom:1px solid #e0e0e0;">💡 ${g.note}</div>`:''}
+      ${(g.subs||[]).map(sub=>`
+        <div style="padding:0 0 0 0;">
+          <div style="background:#eceff1;padding:5px 12px;font-size:11px;font-weight:600;color:#37474f;border-bottom:1px solid #e0e0e0;">
+            ${sub.name}
+            <span style="float:right;color:#1b5e20;">${fmt(sub.subtotal)}</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <tbody>
+              ${(sub.entries||[]).map((e,i)=>`<tr style="${i%2?'background:#fafafa':''}">
+                <td style="padding:5px 10px;color:#546e7a;white-space:nowrap;width:70px;">${e.ym?fmtPayDate(e.ym,e.day):''}</td>
+                <td style="padding:5px 10px;color:#1565c0;font-size:11px;white-space:nowrap;width:95px;">${(e.ref||'').replace(/</g,'&lt;')}</td>
+                <td style="padding:5px 10px;color:#333;font-size:11px;">${(e.desc||'').replace(/</g,'&lt;')}</td>
+                <td style="padding:5px 10px;text-align:right;font-weight:600;color:#1b5e20;width:85px;">${fmt(e.amt)}</td>
+              </tr>`).join('')}
+              <tr style="background:#e8f5e9;border-top:1px solid #c8e6c9;">
+                <td colspan="3" style="padding:5px 10px;text-align:right;font-size:11px;color:#546e7a;font-weight:600;">小計</td>
+                <td style="padding:5px 10px;text-align:right;font-weight:700;color:#1b5e20;">${fmt(sub.subtotal)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>`).join('')}
     </div>`).join('');
 }
 
@@ -3405,11 +3610,16 @@ function logout(){ window.location.href = '/admin.html'; }
   renderPublicTab();
   // 補種1月缺漏進貨（115-0013/0014/0015）
   await seedMissingJanDrug();
+  // 清除舊版 desc 污染
+  await fixCorruptedDesc();
   renderInvLedger('drug');
   // 應付費用分頁
   await seedPayable();
   await fixDrugCloseValues();
   renderPayable();
+  // 應付代收款分頁
+  await seedCustodial();
+  renderCustodial();
   // 備抵折讓：期初餘額 input 初始化 + 動態渲染
   initAllowInitInp();
   renderAllowLedger();
