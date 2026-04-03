@@ -564,7 +564,11 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div class="tab-pane" id="tab-voucher">
   <div class="toolbar">
     <span style="font-size:13px; font-weight:600; color:#1e2a38;" id="voucher-ym-title">115 年 4 月 轉帳傳票</span>
-    <button class="btn btn-green" onclick="exportExcel()">📥 匯出 Excel</button>
+    <label style="font-size:11px; color:#546e7a; display:flex; align-items:center; gap:5px;">
+      傳票編號
+      <input class="fi" id="voucher-no" type="text" style="width:100px; font-size:12px;" placeholder="115040001">
+    </label>
+    <button class="btn btn-green" onclick="exportExcel()">📥 匯出 CSV</button>
     <button class="btn btn-gray" onclick="generateVouchers()">🔄 重新產生</button>
     <span style="font-size:11px; color:#78909c;" id="voucher-count"></span>
   </div>
@@ -575,17 +579,19 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
       <table class="voucher-table" id="voucher-table">
         <thead>
           <tr>
-            <th style="width:60px;">序</th>
+            <th style="width:40px;">序</th>
             <th style="width:80px;">製票日期</th>
-            <th style="width:130px;">會計科目</th>
-            <th style="width:80px;">用途別</th>
+            <th style="width:90px;">傳票編號</th>
+            <th style="width:155px;">會計科目</th>
+            <th style="width:110px;">沖銷科目子目</th>
+            <th style="width:120px;">用途別科目</th>
             <th>摘要</th>
-            <th style="width:90px; text-align:right;">借方金額</th>
-            <th style="width:90px; text-align:right;">貸方金額</th>
+            <th style="width:85px; text-align:right;">借方金額</th>
+            <th style="width:85px; text-align:right;">貸方金額</th>
           </tr>
         </thead>
         <tbody id="voucher-tbody">
-          <tr><td colspan="7" class="empty-msg">請先在「月度作業」輸入資料，再按「⚡ 產生傳票」</td></tr>
+          <tr><td colspan="9" class="empty-msg">請先在「月度作業」輸入資料，再按「⚡ 產生傳票」</td></tr>
         </tbody>
       </table>
       </div>
@@ -1378,8 +1384,8 @@ function generateVouchers(){
 
   // 4. 未出帳動支單 → 掛應付費用
   STATE.month.pickerItems.forEach(r => {
-    vouchers.push({ group:`動支掛應付（${r.yearMonth}）`, type:'debit',  subject:'510601 門診醫療成本', purpose:`${r.purposeCode} ${r.purposeDesc}`, desc:r.desc, dr:r.amount, cr:0 });
-    vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', purpose:`03 員工款`, desc:r.desc, dr:0, cr:r.amount });
+    vouchers.push({ group:`動支掛應付（${r.yearMonth}）`, type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:`${r.purposeCode} ${r.purposeDesc}`, desc:r.desc, dr:r.amount, cr:0 });
+    vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'03 員工款', purpose:'', desc:r.desc, dr:0, cr:r.amount });
   });
 
   // 5. 醫療折讓（若需提列）
@@ -1440,15 +1446,15 @@ function generateVouchers(){
       if(fromCost>0)  vouchers.push({ group:'', type:'debit', subject:'510601 門診醫療成本', purpose:'', desc:`${ym2}當年追扣超額${fmt(fromCost)}`, dr:fromCost, cr:0 });
       vouchers.push({ group:'', type:'credit', subject:'110305 應收醫療帳款', purpose:'', desc:`${ym2}當年追扣${fmt(amt)}`, dr:0, cr:amt });
     } else if(typeTxt.includes('以前年度補付')){
-      const catMap = { bureau:'應付費用/01繳局統籌款', doctor:'210205應付費用/02績效獎金-員工款（醫師）', staff:'210205應付費用/03績效獎金-員工款（員工）', fund5:'420298雜項收入' };
-      const crSubj = cat==='doctor'?'210205 應付費用':cat==='staff'?'210205 應付費用':cat==='bureau'?'210205 應付費用':'420298 雜項收入';
-      const crPurp = cat==='doctor'?'02 績效獎金':cat==='staff'?'03 績效獎金':cat==='bureau'?'01 繳局統籌款':'';
-      vouchers.push({ group:`以前年度補付（${ym2}）`, type:'debit', subject:'110305 應收醫療帳款', purpose:'', desc:`${ym2}以前年度補付${fmt(amt)}`, dr:amt, cr:0 });
-      vouchers.push({ group:'', type:'credit', subject:crSubj, purpose:crPurp, desc:`${ym2}以前年度補付${fmt(amt)}`, dr:0, cr:amt });
+      const crSubj = (cat==='fund5') ? '420298 雜項收入' : '210205 應付費用';
+      const crSub  = cat==='doctor'?'02 績效獎金-員工款':cat==='staff'?'03 績效獎金-員工款':cat==='bureau'?'01 繳局統籌款':'';
+      const crPurp = (cat==='fund5') ? '' : '';
+      vouchers.push({ group:`以前年度補付（${ym2}）`, type:'debit', subject:'110305 應收醫療帳款', subAccount:'', purpose:'', desc:`${ym2}以前年度補付${fmt(amt)}`, dr:amt, cr:0 });
+      vouchers.push({ group:'', type:'credit', subject:crSubj, subAccount:crSub, purpose:crPurp, desc:`${ym2}以前年度補付${fmt(amt)}`, dr:0, cr:amt });
     } else if(typeTxt.includes('當年補付')){
-      const crPurp = cat==='doctor'?'02 醫師獎勵金':cat==='staff'?'03 員工獎勵金':'01 繳局統籌款';
-      vouchers.push({ group:`當年補付（${ym2}）`, type:'debit', subject:'110305 應收醫療帳款', purpose:'', desc:`${ym2}當年補付${fmt(amt)}（直接加入當年分配）`, dr:amt, cr:0 });
-      vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', purpose:crPurp, desc:`${ym2}當年補付${fmt(amt)}`, dr:0, cr:amt });
+      const crSub = cat==='doctor'?'02 醫師獎勵金':cat==='staff'?'03 員工獎勵金':'01 繳局統籌款';
+      vouchers.push({ group:`當年補付（${ym2}）`, type:'debit', subject:'110305 應收醫療帳款', subAccount:'', purpose:'', desc:`${ym2}當年補付${fmt(amt)}（直接加入當年分配）`, dr:amt, cr:0 });
+      vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:crSub, purpose:'', desc:`${ym2}當年補付${fmt(amt)}`, dr:0, cr:amt });
     }
   });
 
@@ -1466,14 +1472,15 @@ function renderVouchers(){
   tbody.innerHTML = '';
   const {y,m} = getYm();
   const dateStr = `${y}/${pad(m)}/30`;
-  if(!STATE.vouchers.length){ tbody.innerHTML='<tr><td colspan="7" class="empty-msg">尚無傳票資料</td></tr>'; return; }
+  const vno = document.getElementById('voucher-no')?.value || `${y}${pad(m)}0001`;
+  if(!STATE.vouchers.length){ tbody.innerHTML='<tr><td colspan="9" class="empty-msg">尚無傳票資料</td></tr>'; return; }
   let totalDr=0, totalCr=0, seq=0;
   STATE.vouchers.forEach(v => {
     seq++;
     if(v.group){
       const sep = document.createElement('tr');
       sep.className = 'group-sep';
-      sep.innerHTML = `<td colspan="7">▶ ${v.group}</td>`;
+      sep.innerHTML = `<td colspan="9">▶ ${v.group}</td>`;
       tbody.appendChild(sep);
     }
     const tr = document.createElement('tr');
@@ -1481,7 +1488,9 @@ function renderVouchers(){
     tr.innerHTML = `
       <td>${seq}</td>
       <td>${dateStr}</td>
-      <td>${v.subject}</td>
+      <td style="font-size:11px; color:#90a4ae;">${vno}</td>
+      <td style="font-weight:600;">${v.subject}</td>
+      <td style="font-size:11px; color:#546e7a;">${v.subAccount||''}</td>
       <td style="font-size:11px; color:#546e7a;">${v.purpose||''}</td>
       <td style="font-size:11px;">${v.desc}</td>
       <td style="text-align:right;" class="${v.dr?'v-dr':''}">${v.dr?fmt(v.dr):''}</td>
@@ -1489,27 +1498,66 @@ function renderVouchers(){
     tbody.appendChild(tr);
     totalDr += v.dr; totalCr += v.cr;
   });
+  // 合計列
+  const foot = document.createElement('tr');
+  foot.style.cssText='background:#eceff1; font-weight:700;';
+  foot.innerHTML=`<td colspan="7" style="text-align:right; font-size:12px;">合計</td>
+    <td style="text-align:right; color:#1565c0;">${fmt(totalDr)}</td>
+    <td style="text-align:right; color:#c62828;">${fmt(totalCr)}</td>`;
+  tbody.appendChild(foot);
   document.getElementById('total-debit').textContent  = fmt(totalDr);
   document.getElementById('total-credit').textContent = fmt(totalCr);
   document.getElementById('voucher-count').textContent = `共 ${STATE.vouchers.length} 筆`;
 }
 
 /* ════════════════════════════════════════════
-   匯出 Excel（CSV格式）
+   匯出 CSV（對齊 11503.csv 格式）
+   欄位：製票日期,入帳日期,傳票編號,會計科目,沖銷科目子目,用途別科目,摘要,借方金額,貸方金額,受繳款人資料,受繳款人金額
 ════════════════════════════════════════════ */
 function exportExcel(){
   const {y,m,label} = getYm();
+  // 取月底最後一天（簡單取30）
   const dateStr = `${y}/${pad(m)}/30`;
-  let csv = '\uFEFF'; // BOM for Excel UTF-8
-  csv += '製票日期\t入帳日期\t傳票種類\t會計科目\t用途別科目\t摘要\t借方金額\t貸方金額\n';
+  const vno = document.getElementById('voucher-no')?.value || `${y}${pad(m)}0001`;
+
+  // CSV 欄位轉義（含逗號/引號時加引號）
+  const esc = v => {
+    const s = String(v??'');
+    return (s.includes(',') || s.includes('"') || s.includes('\n'))
+      ? '"' + s.replace(/"/g,'""') + '"' : s;
+  };
+  const row = (...cols) => cols.map(esc).join(',') + '\r\n';
+
+  let csv = '\uFEFF'; // UTF-8 BOM
+  // 標題行
+  csv += esc(`佳里區衛生所傳票明細表`) + ',,,,,,,,,' + esc(`列印日期：${new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'})}`) + '\r\n';
+  // 欄頭
+  csv += row('製  票  日  期','入  帳  日  期','傳 票 編 號','會     計     科     目','沖     銷     科     目     子     目','用     途     別     科     目','摘                                 要','借方金額','貸方金額','受    繳    款    人    資    料','受繳款人金額');
+
+  let totalDr=0, totalCr=0;
   STATE.vouchers.forEach(v => {
-    csv += [dateStr, dateStr, '轉帳', v.subject, v.purpose||'', v.desc, v.dr||'', v.cr||''].join('\t') + '\n';
+    csv += row(
+      dateStr, dateStr, vno,
+      v.subject,
+      v.subAccount||'',
+      v.purpose||'',
+      v.desc,
+      v.dr || 0,
+      v.cr || 0,
+      '', 0
+    );
+    totalDr += v.dr; totalCr += v.cr;
   });
-  const blob = new Blob([csv], { type: 'text/tab-separated-values;charset=utf-8;' });
+  // 合計行
+  csv += row('','','','','','', '', totalDr, totalCr, 0, '');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href = url; a.download = `轉帳傳票_${label.replace(/ /g,'')}.tsv`;
-  a.click(); URL.revokeObjectURL(url);
+  a.href = url;
+  a.download = `轉帳傳票_${y}${pad(m)}_${vno}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 function exportInvExcel(type){ alert(`📥 匯出${type==='drug'?'藥品':'衛材'}明細帳 Excel（建置中）`); }
 function exportPropExcel(){ alert('📥 匯出財產折舊存摺 Excel（建置中）'); }
