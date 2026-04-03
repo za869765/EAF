@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.6.9</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.6.10</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -279,7 +279,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span style="font-size:10px; color:#78909c;">v2.6.9</span>
+  <span style="font-size:10px; color:#78909c;">v2.6.10</span>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
 </div>
@@ -1783,6 +1783,31 @@ function setPubBudget(y,val){ localStorage.setItem(PUB_BUDGET_KEY(y),String(val)
 const PUB_SETTLED_KEY = y => `acc_pub_settled_${y}`;
 function getPubSettled(y){ const v=localStorage.getItem(PUB_SETTLED_KEY(y)); return new Set(v?JSON.parse(v):[]); }
 function savePubSettled(y,set){ localStorage.setItem(PUB_SETTLED_KEY(y),JSON.stringify([...set])); }
+
+let _pubRecords = [];  // 快取，供 updatePubTotals 使用
+
+function updatePubTotals(){
+  const {y}=getYm();
+  const settled=getPubSettled(y);
+  const budget=getPubBudget(y);
+  const spent=_pubRecords.filter(r=>settled.has(String(r.id))).reduce((s,r)=>s+(r.amount||0),0);
+  const remain=budget-spent;
+  const over=remain<0;
+  const pct=budget>0?Math.min(100,Math.round(spent/budget*100)):0;
+  const sv=document.getElementById('pub-spent-val');
+  const rv=document.getElementById('pub-remain-val');
+  const pv=document.getElementById('pub-pct-txt');
+  const bar=document.getElementById('pub-bar-el');
+  const tot=document.getElementById('pub-tfoot-total');
+  const foot=document.getElementById('pub-foot-summary');
+  if(sv){ sv.style.color=over?'#ff8a80':'#a5d6a7'; sv.textContent=fmt(spent); }
+  if(rv){ rv.style.color=over?'#ff5252':'#69f0ae'; rv.textContent=(over?'▲超額 ':'')+fmt(Math.abs(remain)); }
+  if(pv) pv.textContent=`${pct}% 已使用（共 ${_pubRecords.length} 筆）`;
+  if(bar){ bar.style.width=`${pct}%`; bar.style.background=over?'#e53935':'#1976d2'; }
+  if(tot) tot.textContent=fmt(spent);
+  if(foot){ foot.style.color=over?'#e53935':'#546e7a'; foot.textContent=`已動支 ${fmt(spent)} ／ 年度預算 ${fmt(budget)} ／ 剩餘 ${over?'▲超額 ':''}${fmt(Math.abs(remain))}`; }
+}
+
 function togglePubSettled(id,checked){
   const {y}=getYm();
   const set=getPubSettled(y);
@@ -1794,6 +1819,7 @@ function togglePubSettled(id,checked){
     badge.style.color=checked?'#2e7d32':'#e65100';
     badge.textContent=checked?'已核銷':'待核銷';
   }
+  updatePubTotals();
 }
 
 // 載入動支單：從 EAF API 抓全部，再 client 端 filter bpCode=21020301 + purposeName 含 99
@@ -1835,6 +1861,7 @@ async function renderPublicTab(){
       <p style="padding:20px;color:#e65100;font-size:12px;">⚠ 無法連線 EAF API，請確認網路或重新整理。</p></div>`;
     return;
   }
+  _pubRecords = records;               // 快取供 updatePubTotals 使用
   const settled = getPubSettled(y);   // 本頁自己維護，與 locked/傳票無關
   const budget  = getPubBudget(y);
   const spent   = records.filter(r=>settled.has(String(r.id))).reduce((s,r)=>s+(r.amount||0),0);
@@ -1859,15 +1886,15 @@ async function renderPublicTab(){
               onkeydown="if(event.key==='Enter'){this.blur();}"
               title="直接輸入年度預算金額（Enter 或點外側確認）">
           </span>
-          <span>已動支 <b style="color:${over?'#ff8a80':'#a5d6a7'};">${fmt(spent)}</b></span>
-          <span>剩餘 <b style="color:${over?'#ff5252':'#69f0ae'};">${over?'▲超額 ':''}${fmt(Math.abs(remain))}</b></span>
+          <span>已動支 <b id="pub-spent-val" style="color:${over?'#ff8a80':'#a5d6a7'};">${fmt(spent)}</b></span>
+          <span>剩餘 <b id="pub-remain-val" style="color:${over?'#ff5252':'#69f0ae'};">${over?'▲超額 ':''}${fmt(Math.abs(remain))}</b></span>
         </div>
       </div>
       <div style="padding:4px 14px 6px; background:#eceff1; display:flex; align-items:center; gap:10px;">
         <div class="pub-prog" style="flex:1;">
-          <div class="pub-prog-bar" style="width:${pct}%; background:${over?'#e53935':'#1976d2'};"></div>
+          <div id="pub-bar-el" class="pub-prog-bar" style="width:${pct}%; background:${over?'#e53935':'#1976d2'};"></div>
         </div>
-        <span style="font-size:11px; color:#546e7a; white-space:nowrap;">${pct}% 已使用（共 ${records.length} 筆）</span>
+        <span id="pub-pct-txt" style="font-size:11px; color:#546e7a; white-space:nowrap;">${pct}% 已使用（共 ${records.length} 筆）</span>
       </div>
     </div>
 
@@ -1924,14 +1951,14 @@ async function renderPublicTab(){
         <tfoot>
           <tr style="background:#e3f2fd; font-weight:700;">
             <td colspan="5" style="text-align:right; padding:7px 10px;">年度合計</td>
-            <td style="text-align:right; color:#1565c0; padding:7px 10px;">${fmt(spent)}</td>
+            <td id="pub-tfoot-total" style="text-align:right; color:#1565c0; padding:7px 10px;">${fmt(spent)}</td>
             <td></td>
           </tr>
         </tfoot>
       </table>
       <div class="pub-foot">
         <span style="font-size:11px; color:#78909c;">💡 動支單由後台系統新增，此頁僅供查閱列印</span>
-        <span style="margin-left:auto; color:${over?'#e53935':'#546e7a'}; font-weight:600;">
+        <span id="pub-foot-summary" style="margin-left:auto; color:${over?'#e53935':'#546e7a'}; font-weight:600;">
           已動支 ${fmt(spent)} ／ 年度預算 ${fmt(budget)} ／ 剩餘 ${over?'▲超額 ':''}${fmt(Math.abs(remain))}
         </span>
       </div>
