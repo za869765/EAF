@@ -1779,22 +1779,31 @@ const PUB_BUDGET_KEY = y => `acc_pub_budget_${y}`;
 function getPubBudget(y){ const v=localStorage.getItem(PUB_BUDGET_KEY(y)); return v!==null?+v:0; }
 function setPubBudget(y,val){ localStorage.setItem(PUB_BUDGET_KEY(y),String(val)); }
 
-// Mock 動支單（科目 21020301）—— 連線後由 API 取代
-const MOCK_PUB_RECORDS = [
-  { id:'P001', ym:'11501', date:'115/01/31', voucherNo:'11501-公務', vendor:'臺南市政府衛生局', purpose:'1301 延長工時加班費', desc:'115年1月臨時人員薪資代扣款', amount:12456, status:'已核銷' },
-  { id:'P002', ym:'11501', date:'115/01/31', voucherNo:'11501-公務', vendor:'勞工保險局',       purpose:'健保費',             desc:'115年1月員工健保費代扣繳',   amount:8320,  status:'已核銷' },
-  { id:'P003', ym:'11502', date:'115/02/28', voucherNo:'11502-公務', vendor:'臺南市政府衛生局', purpose:'1301 延長工時加班費', desc:'115年2月臨時人員薪資代扣款', amount:11890, status:'已核銷' },
-  { id:'P004', ym:'11502', date:'115/02/28', voucherNo:'11502-公務', vendor:'勞工保險局',       purpose:'健保費',             desc:'115年2月員工健保費代扣繳',   amount:8320,  status:'已核銷' },
-  { id:'P005', ym:'11503', date:'115/03/31', voucherNo:'11503-公務', vendor:'臺南市政府衛生局', purpose:'1301 延長工時加班費', desc:'115年3月臨時人員薪資代扣款', amount:13258, status:'待核銷' },
-  { id:'P006', ym:'11503', date:'115/03/31', voucherNo:'11503-公務', vendor:'勞工保險局',       purpose:'健保費',             desc:'115年3月員工健保費代扣繳',   amount:8626,  status:'待核銷' },
-];
-
-// 載入動支單（未來改為 fetch('/api/records?acct=21020301&year='+y)）
+// 載入動支單：從 EAF API 抓全部，再 client 端 filter bpCode=21020301 + purposeName 含 99
 async function loadPubRecords(y){
-  // TODO: 連線後替換為 API 呼叫
-  // const r = await fetch(`/api/records?acct=${PUB_ACCT}&year=${y}`);
-  // return r.ok ? await r.json() : [];
-  return MOCK_PUB_RECORDS.filter(r => r.ym.startsWith(String(y)));
+  try {
+    const resp = await fetch('/api/records', { headers:{ 'Content-Type':'application/json' } });
+    if(!resp.ok) throw new Error('API error');
+    const all = await resp.json();
+    return all.filter(r =>
+      r.bpCode === '21020301' &&
+      (r.purposeName||'').startsWith('99') &&
+      !r.archived &&
+      !r.voided
+    ).map(r => ({
+      id:          r.id,
+      ym:          (r.applyDateRoc||'').replace(/\//g,'').slice(0,5) || '?',
+      date:        r.applyDateRoc || '',
+      voucherNo:   r.voucherNo || '',
+      purposeName: r.purposeName || '',
+      purposeDesc: r.purposeDesc || r.notes || '',
+      amount:      r.total || 0,
+      locked:      !!r.locked,
+    }));
+  } catch(_){
+    // 連線失敗或本機測試時顯示提示
+    return null;
+  }
 }
 
 async function renderPublicTab(){
@@ -1804,6 +1813,11 @@ async function renderPublicTab(){
   wrap.innerHTML = '<p style="color:#90a4ae;padding:20px;text-align:center;font-size:12px;">載入中…</p>';
 
   const records = await loadPubRecords(y);
+  if(records === null){
+    wrap.innerHTML = `<div class="pub-section"><div class="pub-hd">21020301 應付代收款 — 衛生所公務預算經費</div>
+      <p style="padding:20px;color:#e65100;font-size:12px;">⚠ 無法連線 EAF API，請確認網路或重新整理。</p></div>`;
+    return;
+  }
   const budget  = getPubBudget(y);
   const spent   = records.reduce((s,r)=>s+(r.amount||0),0);
   const remain  = budget - spent;
@@ -1845,14 +1859,13 @@ async function renderPublicTab(){
       </div>
       <table class="pub-table">
         <thead><tr>
-          <th style="width:65px;">年月</th>
-          <th style="width:95px;">日期</th>
-          <th style="width:110px;">傳票/動支編號</th>
-          <th style="width:140px;">廠商</th>
-          <th style="width:130px;">用途別</th>
-          <th>摘要說明</th>
+          <th style="width:60px;">年月</th>
+          <th style="width:95px;">申請日期</th>
+          <th style="width:110px;">動支單號</th>
+          <th style="width:100px;">用途別</th>
+          <th>用途說明</th>
           <th style="width:95px;text-align:right;">金額</th>
-          <th style="width:70px;text-align:center;">狀態</th>
+          <th style="width:65px;text-align:center;">狀態</th>
         </tr></thead>
         <tbody>
         ${Object.keys(byYm).sort().map(ym => {
@@ -1860,26 +1873,25 @@ async function renderPublicTab(){
           const ymTotal = ymRows.reduce((s,r)=>s+(r.amount||0),0);
           return `
             <tr style="background:#eceff1;">
-              <td colspan="6" style="font-weight:700; font-size:11px; color:#37474f; padding:4px 10px;">▶ ${ym} 小計</td>
-              <td style="text-align:right; font-weight:700; color:#1565c0; padding:4px 10px;">${fmt(ymTotal)}</td>
+              <td colspan="5" style="font-weight:700;font-size:11px;color:#37474f;padding:4px 10px;">▶ ${ym} 小計</td>
+              <td style="text-align:right;font-weight:700;color:#1565c0;padding:4px 10px;">${fmt(ymTotal)}</td>
               <td></td>
             </tr>
             ${ymRows.map(r=>`
             <tr class="pub-data">
               <td style="color:#90a4ae;">${r.ym}</td>
               <td>${r.date||''}</td>
-              <td style="font-size:11px; color:#546e7a;">${r.voucherNo||''}</td>
-              <td style="font-size:11px;">${r.vendor||''}</td>
-              <td style="font-size:11px; color:#1565c0;">${r.purpose||''}</td>
-              <td style="font-size:11px;">${r.desc||''}</td>
-              <td style="text-align:right; font-weight:700; color:#1565c0;">${fmt(r.amount||0)}</td>
+              <td style="font-size:11px;color:#546e7a;">${r.voucherNo||''}</td>
+              <td style="font-size:11px;color:#1565c0;">${r.purposeName||'99 其他'}</td>
+              <td style="font-size:11px;">${r.purposeDesc||''}</td>
+              <td style="text-align:right;font-weight:700;color:#1565c0;">${fmt(r.amount||0)}</td>
               <td style="text-align:center;">
-                <span style="font-size:10px; padding:1px 6px; border-radius:3px; background:${r.status==='已核銷'?'#e8f5e9':'#fff3e0'}; color:${r.status==='已核銷'?'#2e7d32':'#e65100'};">
-                  ${r.status||'待核銷'}
+                <span style="font-size:10px;padding:1px 6px;border-radius:3px;background:${r.locked?'#e8f5e9':'#fff3e0'};color:${r.locked?'#2e7d32':'#e65100'};">
+                  ${r.locked?'已核銷':'待核銷'}
                 </span>
               </td>
             </tr>`).join('')}`;
-        }).join('') || '<tr><td colspan="8" class="empty-msg">本年度無動支記錄</td></tr>'}
+        }).join('') || '<tr><td colspan="7" class="empty-msg">本年度無 21020301／99 動支記錄</td></tr>'}
         </tbody>
         <tfoot>
           <tr style="background:#e3f2fd; font-weight:700;">
