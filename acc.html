@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.7.0</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.7.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -279,7 +279,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span style="font-size:10px; color:#78909c;">v2.7.0</span>
+  <span style="font-size:10px; color:#78909c;">v2.7.1</span>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
 </div>
@@ -848,8 +848,13 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     </div>
     <div class="bb-divider"></div>
     <div class="bb-item">
-      <div class="bb-num" style="color:#ef9a9a;">8,215</div>
-      <div class="bb-label">已核銷金額（累計）</div>
+      <div class="bb-num" id="al-provision" style="color:#80cbc4;">0</div>
+      <div class="bb-label">本年度提列金額（累計）</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" id="al-settled" style="color:#ef9a9a;">0</div>
+      <div class="bb-label">已折讓金額（累計）</div>
     </div>
   </div>
 
@@ -1989,21 +1994,25 @@ function addAllowEntry(){
 }
 function delAllowRow(btn){ btn.closest('tr').remove(); recalcAllowLedger(); }
 function recalcAllowLedger(){
-  // 重算餘額欄（簡易版）
   let bal = 65754; // 期初
+  let provision = 0, settled = 0;
   document.querySelectorAll('#allow-tbody tr').forEach(tr => {
     const sel = tr.querySelector('select');
     const inp = tr.querySelector('.num-in');
     const balCell = tr.querySelector('.balance-cell');
     if(!sel || !inp) return;
     const amt = pnum(inp.value);
-    if(sel.value === 'sup') bal += amt;
-    else bal -= amt;
+    if(sel.value === 'sup'){ bal += amt; provision += amt; }
+    else { bal -= amt; settled += amt; }
     if(balCell) balCell.textContent = fmt(bal);
   });
   STATE.allowance.currentBalance = bal;
   document.getElementById('al-balance').textContent = fmt(bal);
   document.getElementById('rc-allowance').textContent = fmt(bal);
+  const pEl = document.getElementById('al-provision');
+  const sEl = document.getElementById('al-settled');
+  if(pEl) pEl.textContent = fmt(provision);
+  if(sEl) sEl.textContent = fmt(settled);
 }
 
 /* ════════════════════════════════════════════
