@@ -804,6 +804,7 @@ async function login() {
     });
     if (r.ok) {
       PASS = pw;
+      sessionStorage.setItem('adminPass', pw); // 同 session 內自動還原
       document.getElementById('login-wrap').style.display = 'none';
       document.getElementById('panel').style.display = 'flex';
       document.getElementById('panel').style.flexDirection = 'column';
@@ -821,6 +822,7 @@ async function login() {
 
 function logout() {
   PASS = ''; subjects = null;
+  sessionStorage.removeItem('adminPass');
   document.getElementById('panel').style.display = 'none';
   document.getElementById('login-wrap').style.display = 'flex';
   document.getElementById('pass').value = '';
@@ -2979,5 +2981,31 @@ function resolveAdminPrompt(ok) {
     </div>
   </div>
 </div>
+
+<script>
+/* ── 自動還原登入（同 session 內從 acc.html 等頁面返回時免重打密碼） ── */
+(async function autoRestore(){
+  const saved = sessionStorage.getItem('adminPass');
+  if(!saved) return;
+  try {
+    const r = await fetch('/api/auth', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({password: saved})
+    });
+    if(r.ok){
+      PASS = saved;
+      document.getElementById('login-wrap').style.display = 'none';
+      document.getElementById('panel').style.display = 'flex';
+      document.getElementById('panel').style.flexDirection = 'column';
+      await loadSubjects();
+      updateMaintBtn();
+      await loadRecords();
+    } else {
+      sessionStorage.removeItem('adminPass'); // 密碼已失效
+    }
+  } catch(_){}
+})();
+</script>
 </body>
 </html>
