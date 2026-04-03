@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.5.12</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.5.13</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,7 +37,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 #save-msg { font-size: 11px; color: #66bb6a; }
 
 /* ── Tab Nav ── */
-#tab-nav { background: #263545; display: flex; padding: 0 20px; gap: 2px; position: sticky; top: 82px; z-index: 190; }
+#tab-nav { background: #263545; display: flex; padding: 0 20px; gap: 2px; position: sticky; top: 50px; z-index: 190; }
 .tab-btn { padding: 9px 16px; background: transparent; color: #90a4ae; border: none; font-size: 12px; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
 .tab-btn:hover { color: #cfd8dc; }
 .tab-btn.active { color: #fff; border-bottom-color: #42a5f5; font-weight: 600; }
@@ -271,30 +271,9 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span style="font-size:10px; color:#78909c;">v2.5.8</span>
+  <span style="font-size:10px; color:#78909c;">v2.5.12</span>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
-  <a class="tbtn tbtn-blue" href="/public.html" target="_blank">💼 公務預算</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
-</div>
-
-<!-- ── Year/Month Bar ── -->
-<div id="ym-bar">
-  <label>年度</label>
-  <select class="ym-sel" id="sel-year" onchange="onYmChange()">
-    <option value="115" selected>115</option>
-    <option value="114">114</option>
-  </select>
-  <label>月份</label>
-  <select class="ym-sel" id="sel-month" onchange="onYmChange()">
-    <option value="1">1</option><option value="2">2</option>
-    <option value="3">3</option><option value="4" selected>4</option>
-    <option value="5">5</option><option value="6">6</option>
-    <option value="7">7</option><option value="8">8</option>
-    <option value="9">9</option><option value="10">10</option>
-    <option value="11">11</option><option value="12">12</option>
-  </select>
-  <span class="ym-title" id="ym-title">115 年 4 月</span>
-  <button class="ym-action gen" onclick="generateVouchers()">⚡ 製作轉帳傳票</button>
 </div>
 
 <!-- ── Tab Nav ── -->
@@ -313,6 +292,10 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
      TAB 1：月度作業
 ══════════════════════════════════════════ -->
 <div class="tab-pane active" id="tab-work">
+  <div style="padding:6px 0 2px; font-size:12px; color:#546e7a; display:flex; align-items:center; gap:8px;">
+    <span id="work-month-title" style="font-weight:700; font-size:14px; color:#1e2a38;">115 年 3 月 月度作業</span>
+    <span style="font-size:11px; color:#90a4ae;">（切換月份請至「📄 轉帳傳票」分頁）</span>
+  </div>
 
   <!-- 提醒 Dashboard -->
   <div class="reminder-grid" id="reminder-grid">
@@ -601,14 +584,28 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
      TAB 2：轉帳傳票
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-voucher">
-  <!-- 傳票頁工具列（月份跟頂部年月列同步） -->
-  <div class="toolbar" style="flex-wrap:wrap; gap:8px;">
-    <span style="font-size:13px; font-weight:600; color:#1e2a38;" id="voucher-ym-title">115 年 3 月 轉帳傳票</span>
+  <!-- 傳票頁工具列：年月選單就在這裡 -->
+  <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
+    <label style="font-size:11px; color:#90a4ae;">年度</label>
+    <select class="ym-sel" id="sel-year" onchange="onYmChange()" style="font-size:12px; padding:3px 8px;">
+      <option value="115" selected>115</option>
+      <option value="114">114</option>
+    </select>
+    <label style="font-size:11px; color:#90a4ae;">月份</label>
+    <select class="ym-sel" id="sel-month" onchange="onYmChange()" style="font-size:12px; padding:3px 8px; width:52px;">
+      <option value="1">1</option><option value="2">2</option>
+      <option value="3" selected>3</option><option value="4">4</option>
+      <option value="5">5</option><option value="6">6</option>
+      <option value="7">7</option><option value="8">8</option>
+      <option value="9">9</option><option value="10">10</option>
+      <option value="11">11</option><option value="12">12</option>
+    </select>
+    <span style="font-size:13px; font-weight:700; color:#fff;" id="voucher-ym-title">115 年 3 月 轉帳傳票</span>
     <span style="font-size:10px; color:#e65100; background:#fff3e0; border-radius:4px; padding:2px 7px; display:none;" id="voucher-src-badge"></span>
-    <button class="lock-sec-btn" id="voucher-lock-btn" onclick="toggleVoucherLock()" style="margin-left:4px;">🔒 鎖定中</button>
-    <button class="btn btn-green" onclick="exportExcel()" style="margin-left:8px;">📥 匯出 CSV</button>
+    <button class="lock-sec-btn" id="voucher-lock-btn" onclick="toggleVoucherLock()">🔒 鎖定中</button>
+    <button class="btn btn-green" onclick="exportExcel()">📥 匯出 CSV</button>
     <button class="btn btn-gray" style="font-size:11px;" onclick="addManualVoucherRow()">＋ 手工新增列</button>
-    <button class="btn btn-gray" onclick="generateVouchers()">🔄 從月度作業產生</button>
+    <button class="ym-action gen" style="padding:5px 14px; font-size:12px;" onclick="generateVouchers()">⚡ 製作轉帳傳票</button>
     <span style="font-size:11px; color:#78909c;" id="voucher-count"></span>
   </div>
   <div class="card">
@@ -1047,7 +1044,9 @@ function switchTab(name, btn){
 ════════════════════════════════════════════ */
 function onYmChange(){
   const {y,m,label} = getYm();
-  document.getElementById('ym-title').textContent = label;
+  // 月度作業標題同步
+  const workTitle = document.getElementById('work-month-title');
+  if(workTitle) workTitle.textContent = `${label} 月度作業`;
   loadMonthData();
   updateDeprBalance();
   updatePrevMonthLabels();
