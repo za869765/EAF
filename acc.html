@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.5.10</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.5.11</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -137,12 +137,19 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 /* ── 傳票表格 ── */
 .voucher-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .voucher-table th { background: #1e2a38; color: #cfd8dc; padding: 7px 10px; text-align: left; font-size: 11px; white-space: nowrap; }
-.voucher-table td { padding: 6px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; white-space: nowrap; }
+.voucher-table td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
 .voucher-table .debit  td { border-left: 3px solid #1976d2; }
 .voucher-table .credit td { border-left: 3px solid #e53935; }
 .voucher-table .group-sep td { background: #eceff1; font-size: 10px; color: #90a4ae; font-weight: 600; padding: 3px 10px; }
 .v-dr { color: #1565c0; font-weight: 700; }
 .v-cr { color: #c62828; font-weight: 700; }
+/* 傳票編輯輸入框 */
+.v-inp { border: 1px solid #cfd8dc; border-radius: 3px; padding: 2px 5px; font-size: 12px; font-family: inherit; background: #fafafa; width: 100%; outline: none; }
+.v-inp:focus { border-color: #42a5f5; background: #fff; }
+.v-inp.v-num { text-align: right; width: 80px; }
+.v-type-sel { font-size: 10px; padding: 1px 3px; border: 1px solid #cfd8dc; border-radius: 3px; background: #fafafa; cursor: pointer; }
+.v-del-btn { background: #ffebee; border: 1px solid #ef9a9a; border-radius: 3px; cursor: pointer; font-size: 10px; padding: 1px 5px; color: #c62828; }
+.v-del-btn:hover { background: #ffcdd2; }
 
 /* ── 存摺式帳 ── */
 .ledger-table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -256,7 +263,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <option value="11">11</option><option value="12">12</option>
   </select>
   <span class="ym-title" id="ym-title">115 年 4 月</span>
-  <button class="ym-action gen" onclick="generateVouchers()">⚡ 產生傳票</button>
+  <button class="ym-action gen" onclick="generateVouchers()">⚡ 製作轉帳傳票</button>
 </div>
 
 <!-- ── Tab Nav ── -->
@@ -562,14 +569,14 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
      TAB 2：轉帳傳票
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-voucher">
-  <div class="toolbar">
-    <span style="font-size:13px; font-weight:600; color:#1e2a38;" id="voucher-ym-title">115 年 4 月 轉帳傳票</span>
-    <label style="font-size:11px; color:#546e7a; display:flex; align-items:center; gap:5px;">
-      傳票編號
-      <input class="fi" id="voucher-no" type="text" style="width:100px; font-size:12px;" placeholder="115040001">
-    </label>
-    <button class="btn btn-green" onclick="exportExcel()">📥 匯出 CSV</button>
-    <button class="btn btn-gray" onclick="generateVouchers()">🔄 重新產生</button>
+  <!-- 傳票頁工具列（月份跟頂部年月列同步） -->
+  <div class="toolbar" style="flex-wrap:wrap; gap:8px;">
+    <span style="font-size:13px; font-weight:600; color:#1e2a38;" id="voucher-ym-title">115 年 3 月 轉帳傳票</span>
+    <span style="font-size:10px; color:#e65100; background:#fff3e0; border-radius:4px; padding:2px 7px; display:none;" id="voucher-src-badge"></span>
+    <button class="lock-sec-btn" id="voucher-lock-btn" onclick="toggleVoucherLock()" style="margin-left:4px;">🔒 鎖定中</button>
+    <button class="btn btn-green" onclick="exportExcel()" style="margin-left:8px;">📥 匯出 CSV</button>
+    <button class="btn btn-gray" style="font-size:11px;" onclick="addManualVoucherRow()">＋ 手工新增列</button>
+    <button class="btn btn-gray" onclick="generateVouchers()">🔄 從月度作業產生</button>
     <span style="font-size:11px; color:#78909c;" id="voucher-count"></span>
   </div>
   <div class="card">
@@ -579,19 +586,19 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
       <table class="voucher-table" id="voucher-table">
         <thead>
           <tr>
-            <th style="width:40px;">序</th>
+            <th style="width:30px;">序</th>
             <th style="width:80px;">製票日期</th>
-            <th style="width:90px;">傳票編號</th>
             <th style="width:155px;">會計科目</th>
             <th style="width:110px;">沖銷科目子目</th>
-            <th style="width:120px;">用途別科目</th>
+            <th style="width:110px;">用途別科目</th>
             <th>摘要</th>
             <th style="width:85px; text-align:right;">借方金額</th>
             <th style="width:85px; text-align:right;">貸方金額</th>
+            <th style="width:30px;"></th>
           </tr>
         </thead>
         <tbody id="voucher-tbody">
-          <tr><td colspan="9" class="empty-msg">請先在「月度作業」輸入資料，再按「⚡ 產生傳票」</td></tr>
+          <tr><td colspan="9" class="empty-msg">請先在「月度作業」輸入資料，再按「🔄 從月度作業產生」，或手工新增列</td></tr>
         </tbody>
       </table>
       </div>
@@ -670,7 +677,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
             </tr>
           </thead>
           <tbody id="supply-tbody">
-            <tr><td>11503</td><td>期初</td><td class="balance-cell" style="text-align:right;">-</td><td class="balance-cell" style="text-align:right;">2,472</td><td>115年3月期初</td></tr>
+            <tr><td>11503</td><td>期初</td><td class="balance-cell" style="text-align:right;">-</td><td class="balance-cell" style="text-align:right;">2,472</td><td>115年2月期末結存</td></tr>
           </tbody>
         </table>
         </div>
@@ -731,7 +738,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   <div class="balance-banner">
     <div class="bb-item">
       <div class="bb-num" id="prop-balance">80,626</div>
-      <div class="bb-label">🏚️ 財產帳面淨值（元）</div>
+      <div class="bb-label" id="prop-cur-label">🏚️ 3月期末（元）</div>
     </div>
     <div class="bb-divider"></div>
     <div class="bb-item">
@@ -741,7 +748,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <div class="bb-divider"></div>
     <div class="bb-item">
       <div class="bb-num">82,819</div>
-      <div class="bb-label">2月期末 / 3月期初（元）</div>
+      <div class="bb-label" id="prop-prev-label">2月期末（元）</div>
     </div>
   </div>
 
@@ -995,13 +1002,14 @@ function switchTab(name, btn){
    年月切換
 ════════════════════════════════════════════ */
 function onYmChange(){
-  const {label} = getYm();
+  const {y,m,label} = getYm();
   document.getElementById('ym-title').textContent = label;
-  document.getElementById('voucher-ym-title').textContent = label + ' 轉帳傳票';
   loadMonthData();
   updateDeprBalance();
   updatePrevMonthLabels();
   checkDrugEntered();
+  // 傳票頁同步（重新載入該月儲存的傳票）
+  loadVoucherView();
 }
 
 /* ════════════════════════════════════════════
@@ -1475,55 +1483,184 @@ function generateVouchers(){
   });
 
   STATE.vouchers = vouchers;
+  saveVouchers();        // 自動存入 localStorage（按月份 key）
+  voucherLocked = true;
+  updateVoucherLockBtn();
   renderVouchers();
   // 切換至傳票頁
   document.querySelectorAll('.tab-btn')[1].click();
 }
 
 /* ════════════════════════════════════════════
-   渲染傳票
+   傳票頁：月份切換 + 儲存/讀取 + 鎖定/解鎖
+════════════════════════════════════════════ */
+let voucherLocked = true;
+
+// 傳票頁直接沿用頂部年月選擇器
+function getVoucherYm(){ return getYm(); }
+
+function loadVoucherView(){
+  const {y,m,ym} = getYm();
+  const raw = localStorage.getItem(`acc_vouchers_${ym}`);
+  STATE.vouchers = raw ? JSON.parse(raw) : [];
+  const title = document.getElementById('voucher-ym-title');
+  if(title) title.textContent = `${y} 年 ${m} 月 轉帳傳票`;
+  const badge = document.getElementById('voucher-src-badge');
+  const ts = localStorage.getItem(`acc_vouchers_${ym}_ts`);
+  if(badge){
+    if(ts){ badge.textContent=`已儲存 ${ts}`; badge.style.display=''; }
+    else   { badge.style.display='none'; }
+  }
+  voucherLocked = true;
+  updateVoucherLockBtn();
+  renderVouchers();
+}
+
+function saveVouchers(){
+  const {ym} = getYm();
+  localStorage.setItem(`acc_vouchers_${ym}`, JSON.stringify(STATE.vouchers));
+  const now = new Date();
+  const ts = `${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+  localStorage.setItem(`acc_vouchers_${ym}_ts`, ts);
+  const badge = document.getElementById('voucher-src-badge');
+  if(badge){ badge.textContent=`已儲存 ${ts}`; badge.style.display=''; }
+}
+
+function toggleVoucherLock(){
+  if(voucherLocked){
+    // 解鎖
+    voucherLocked = false;
+  } else {
+    // 鎖定並存檔
+    saveVouchers();
+    voucherLocked = true;
+  }
+  updateVoucherLockBtn();
+  renderVouchers();
+}
+
+function updateVoucherLockBtn(){
+  const btn = document.getElementById('voucher-lock-btn');
+  if(!btn) return;
+  if(voucherLocked){
+    btn.textContent = '🔒 鎖定中';
+    btn.classList.remove('locked');
+  } else {
+    btn.textContent = '🔓 解鎖中，點此存檔';
+    btn.classList.add('locked');
+  }
+}
+
+function editVoucherCell(idx, field, val){
+  if(!STATE.vouchers[idx]) return;
+  if(field==='dr'||field==='cr') STATE.vouchers[idx][field] = parseFloat(String(val).replace(/,/g,''))||0;
+  else STATE.vouchers[idx][field] = val;
+  // 即時更新合計
+  let dr=0, cr=0;
+  STATE.vouchers.forEach(v=>{ dr+=(v.dr||0); cr+=(v.cr||0); });
+  const totDr = document.getElementById('total-debit');
+  const totCr = document.getElementById('total-credit');
+  if(totDr) totDr.textContent = fmt(dr);
+  if(totCr) totCr.textContent = fmt(cr);
+  const tdr = document.getElementById('v-tot-dr');
+  const tcr = document.getElementById('v-tot-cr');
+  if(tdr) tdr.textContent = fmt(dr);
+  if(tcr) tcr.textContent = fmt(cr);
+}
+
+function deleteVoucherRow(idx){
+  STATE.vouchers.splice(idx,1);
+  renderVouchers();
+}
+
+function addManualVoucherRow(){
+  if(voucherLocked){ alert('請先點「🔒 鎖定中」解鎖後再新增'); return; }
+  STATE.vouchers.push({group:'',type:'debit',subject:'',subAccount:'',purpose:'',desc:'',dr:0,cr:0});
+  renderVouchers();
+  // 捲動到最後一列
+  document.getElementById('voucher-tbody')?.lastElementChild?.previousElementSibling?.scrollIntoView({block:'center'});
+}
+
+/* ════════════════════════════════════════════
+   渲染傳票（支援鎖定/解鎖編輯）
 ════════════════════════════════════════════ */
 function renderVouchers(){
   const tbody = document.getElementById('voucher-tbody');
+  if(!tbody) return;
   tbody.innerHTML = '';
-  const {y,m} = getYm();
+  const {y,m} = getVoucherYm();
   const dateStr = `${y}/${pad(m)}/30`;
-  const vno = document.getElementById('voucher-no')?.value || `${y}${pad(m)}0001`;
-  if(!STATE.vouchers.length){ tbody.innerHTML='<tr><td colspan="9" class="empty-msg">尚無傳票資料</td></tr>'; return; }
+  const cols = voucherLocked ? 8 : 9;
+
+  if(!STATE.vouchers.length){
+    tbody.innerHTML=`<tr><td colspan="${cols}" class="empty-msg">${
+      voucherLocked
+        ? '無傳票記錄。點「🔒 鎖定中」解鎖後可手工新增，或切回月度作業產生。'
+        : '解鎖中，點「＋ 手工新增列」新增資料列。'
+    }</td></tr>`;
+    document.getElementById('total-debit').textContent  = '0';
+    document.getElementById('total-credit').textContent = '0';
+    document.getElementById('voucher-count').textContent = '';
+    return;
+  }
+
+  const esc = s => (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   let totalDr=0, totalCr=0, seq=0;
-  STATE.vouchers.forEach(v => {
-    seq++;
+
+  STATE.vouchers.forEach((v, idx) => {
+    // 分組標題列
     if(v.group){
       const sep = document.createElement('tr');
       sep.className = 'group-sep';
-      sep.innerHTML = `<td colspan="9">▶ ${v.group}</td>`;
+      sep.innerHTML = `<td colspan="${cols}">▶ ${esc(v.group)}</td>`;
       tbody.appendChild(sep);
     }
+    seq++;
     const tr = document.createElement('tr');
     tr.className = v.type === 'debit' ? 'debit' : 'credit';
-    tr.innerHTML = `
-      <td>${seq}</td>
-      <td>${dateStr}</td>
-      <td style="font-size:11px; color:#90a4ae;">${vno}</td>
-      <td style="font-weight:600;">${v.subject}</td>
-      <td style="font-size:11px; color:#546e7a;">${v.subAccount||''}</td>
-      <td style="font-size:11px; color:#546e7a;">${v.purpose||''}</td>
-      <td style="font-size:11px;">${v.desc}</td>
-      <td style="text-align:right;" class="${v.dr?'v-dr':''}">${v.dr?fmt(v.dr):''}</td>
-      <td style="text-align:right;" class="${v.cr?'v-cr':''}">${v.cr?fmt(v.cr):''}</td>`;
+
+    if(voucherLocked){
+      tr.innerHTML = `
+        <td style="text-align:center;color:#90a4ae;width:28px;">${seq}</td>
+        <td style="width:80px;">${dateStr}</td>
+        <td style="font-weight:600;">${esc(v.subject)}</td>
+        <td style="font-size:11px;color:#546e7a;">${esc(v.subAccount||'')}</td>
+        <td style="font-size:11px;color:#546e7a;">${esc(v.purpose||'')}</td>
+        <td style="font-size:11px;">${esc(v.desc)}</td>
+        <td style="text-align:right;" class="${v.dr?'v-dr':''}">${v.dr?fmt(v.dr):''}</td>
+        <td style="text-align:right;" class="${v.cr?'v-cr':''}">${v.cr?fmt(v.cr):''}</td>`;
+    } else {
+      const typeOpts = ['debit','credit'].map(t=>
+        `<option value="${t}" ${v.type===t?'selected':''}>${t==='debit'?'借':'貸'}</option>`).join('');
+      tr.innerHTML = `
+        <td style="text-align:center;color:#90a4ae;width:28px;">${seq}</td>
+        <td style="width:60px;font-size:11px;">${dateStr}<br>
+          <select class="v-type-sel" onchange="STATE.vouchers[${idx}].type=this.value; this.closest('tr').className=this.value==='debit'?'debit':'credit';">${typeOpts}</select></td>
+        <td><input class="v-inp" value="${esc(v.subject)}" onchange="editVoucherCell(${idx},'subject',this.value)"></td>
+        <td><input class="v-inp" value="${esc(v.subAccount||'')}" onchange="editVoucherCell(${idx},'subAccount',this.value)" placeholder="如 03 員工款"></td>
+        <td><input class="v-inp" value="${esc(v.purpose||'')}" onchange="editVoucherCell(${idx},'purpose',this.value)" placeholder="如 3303 藥品"></td>
+        <td><input class="v-inp" value="${esc(v.desc)}" onchange="editVoucherCell(${idx},'desc',this.value)"></td>
+        <td><input class="v-inp v-num" type="number" min="0" value="${v.dr||''}" onchange="editVoucherCell(${idx},'dr',this.value)" placeholder="0"></td>
+        <td><input class="v-inp v-num" type="number" min="0" value="${v.cr||''}" onchange="editVoucherCell(${idx},'cr',this.value)" placeholder="0"></td>
+        <td><button class="v-del-btn" onclick="deleteVoucherRow(${idx})">✕</button></td>`;
+    }
     tbody.appendChild(tr);
-    totalDr += v.dr; totalCr += v.cr;
+    totalDr += (v.dr||0); totalCr += (v.cr||0);
   });
+
   // 合計列
   const foot = document.createElement('tr');
-  foot.style.cssText='background:#eceff1; font-weight:700;';
-  foot.innerHTML=`<td colspan="7" style="text-align:right; font-size:12px;">合計</td>
-    <td style="text-align:right; color:#1565c0;">${fmt(totalDr)}</td>
-    <td style="text-align:right; color:#c62828;">${fmt(totalCr)}</td>`;
+  foot.style.cssText = 'background:#eceff1; font-weight:700;';
+  foot.innerHTML = `
+    <td colspan="${voucherLocked?6:7}" style="text-align:right;font-size:12px;">合計</td>
+    <td style="text-align:right;color:#1565c0;" id="v-tot-dr">${fmt(totalDr)}</td>
+    <td style="text-align:right;color:#c62828;" id="v-tot-cr">${fmt(totalCr)}</td>
+    ${voucherLocked?'':'<td></td>'}`;
   tbody.appendChild(foot);
+
   document.getElementById('total-debit').textContent  = fmt(totalDr);
   document.getElementById('total-credit').textContent = fmt(totalCr);
-  document.getElementById('voucher-count').textContent = `共 ${STATE.vouchers.length} 筆`;
+  document.getElementById('voucher-count').textContent = `共 ${STATE.vouchers.filter(v=>!v._sep).length} 筆`;
 }
 
 /* ════════════════════════════════════════════
@@ -1532,9 +1669,7 @@ function renderVouchers(){
 ════════════════════════════════════════════ */
 function exportExcel(){
   const {y,m,label} = getYm();
-  // 取月底最後一天（簡單取30）
   const dateStr = `${y}/${pad(m)}/30`;
-  const vno = document.getElementById('voucher-no')?.value || `${y}${pad(m)}0001`;
 
   // CSV 欄位轉義（含逗號/引號時加引號）
   const esc = v => {
@@ -1545,15 +1680,15 @@ function exportExcel(){
   const row = (...cols) => cols.map(esc).join(',') + '\r\n';
 
   let csv = '\uFEFF'; // UTF-8 BOM
-  // 標題行（轉帳傳票共9欄）
-  csv += esc(`佳里區衛生所傳票明細表`) + ',,,,,,,' + esc(`列印日期：${new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'})}`) + '\r\n';
+  // 標題行（轉帳傳票共8欄，傳票編號由官方系統填入）
+  csv += esc(`佳里區衛生所傳票明細表`) + ',,,,,,' + esc(`列印日期：${new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'})}`) + '\r\n';
   // 欄頭
-  csv += row('製  票  日  期','入  帳  日  期','傳 票 編 號','會     計     科     目','沖     銷     科     目     子     目','用     途     別     科     目','摘                                 要','借方金額','貸方金額');
+  csv += row('製  票  日  期','入  帳  日  期','會     計     科     目','沖     銷     科     目     子     目','用     途     別     科     目','摘                                 要','借方金額','貸方金額');
 
   let totalDr=0, totalCr=0;
   STATE.vouchers.forEach(v => {
     csv += row(
-      dateStr, dateStr, vno,
+      dateStr, dateStr,
       v.subject,
       v.subAccount||'',
       v.purpose||'',
@@ -1564,13 +1699,13 @@ function exportExcel(){
     totalDr += v.dr; totalCr += v.cr;
   });
   // 合計行
-  csv += row('','','','','','', '', totalDr, totalCr);
+  csv += row('','','','','', '', totalDr, totalCr);
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href = url;
-  a.download = `轉帳傳票_${y}${pad(m)}_${vno}.csv`;
+  a.download = `轉帳傳票_${y}${pad(m)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1707,11 +1842,20 @@ function checkDrugEntered(){
 /* 財產帳面淨值 + 月份標籤 自動填入 */
 function updateDeprBalance(){
   const {y, m} = getYm();
+  const prevM = m === 1 ? 12 : m - 1;
   const depr = pnum(document.getElementById('exp-depr').value);
   const balance = STATE.property.currentBalance - depr;
   document.getElementById('exp-depr-balance').value = fmt(balance);
   document.getElementById('depr-balance-label').textContent = `（${y}年${m}月期末）`;
   document.getElementById('depr-balance-hint').textContent  = `帳面淨值：${fmt(balance)} 元`;
+  // 財產管理頁標籤
+  const curLabel  = document.getElementById('prop-cur-label');
+  const prevLabel = document.getElementById('prop-prev-label');
+  if(curLabel)  curLabel.textContent  = `🏚️ ${m}月期末（元）`;
+  if(prevLabel) prevLabel.textContent = `${prevM}月期末（元）`;
+  // 提醒卡片
+  const rcProp = document.getElementById('rc-property');
+  if(rcProp) rcProp.textContent = fmt(balance);
 }
 
 /* 上月期末標籤 */
@@ -1822,6 +1966,8 @@ function logout(){ window.location.href = '/admin.html'; }
   updatePrevMonthLabels();
   // 藥品/衛材未輸入提醒
   checkDrugEntered();
+  // 傳票頁：載入當月已儲存的傳票
+  loadVoucherView();
 })();
 
 function updateInvTotal(){
