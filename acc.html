@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.0.5</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.0.6</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -315,7 +315,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.0.5</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.0.6</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -839,7 +839,10 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
         </div>
         <!-- 月底結存對帳 -->
         <div style="padding:6px 14px 4px; border-top:1px solid #eceff1;">
-          <div style="font-size:10px;color:#90a4ae;font-weight:600;margin-bottom:4px;letter-spacing:.5px;">月底結存對帳</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <span style="font-size:10px;color:#90a4ae;font-weight:600;letter-spacing:.5px;">月底結存對帳</span>
+            <button id="inv-close-lock-btn" class="lock-btn locked" onclick="toggleInvCloseLock()" style="font-size:10px;padding:1px 7px;">🔒 鎖定</button>
+          </div>
           <table class="ledger-table" style="font-size:11px;">
             <thead><tr>
               <th style="width:80px;">月份</th>
@@ -887,7 +890,9 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
         </div>
         <!-- 月底結存對帳 -->
         <div style="padding:6px 14px 4px; border-top:1px solid #eceff1;">
-          <div style="font-size:10px;color:#90a4ae;font-weight:600;margin-bottom:4px;letter-spacing:.5px;">月底結存對帳</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <span style="font-size:10px;color:#90a4ae;font-weight:600;letter-spacing:.5px;">月底結存對帳</span>
+          </div>
           <table class="ledger-table" style="font-size:11px;">
             <thead><tr>
               <th style="width:80px;">月份</th>
@@ -1490,6 +1495,7 @@ function calcReminders(){
 }
 
 let _yearTableLocked = true;
+let _invCloseLocked  = true;
 function toggleYearTableLock(){
   _yearTableLocked = !_yearTableLocked;
   const btn = document.getElementById('year-lock-btn');
@@ -3274,6 +3280,16 @@ function recalcInvLedger(type){
     if(rcDate) rcDate.textContent=`${_y}/${_m}`;
   }
 }
+function toggleInvCloseLock(){
+  _invCloseLocked = !_invCloseLocked;
+  const btn = document.getElementById('inv-close-lock-btn');
+  if(btn){
+    btn.textContent = _invCloseLocked ? '🔒 鎖定' : '🔓 解鎖';
+    btn.classList.toggle('locked', _invCloseLocked);
+  }
+  renderMonthlyClose('drug');
+  renderMonthlyClose('supply');
+}
 function renderMonthlyClose(type){
   const tbody = document.getElementById(type+'-monthly-close');
   if(!tbody) return;
@@ -3301,8 +3317,9 @@ function renderMonthlyClose(type){
       <td style="color:#546e7a;">${ym}</td>
       <td style="text-align:right;font-weight:700;color:#1565c0;">${fmt(calc)}</td>
       <td><input class="fi num-in" type="text" inputmode="numeric"
-           value="${actual!==null?fmt(actual):''}" placeholder="手動輸入"
-           style="width:85px;text-align:right;font-size:11px;"
+           value="${actual!==null?fmt(actual):''}" placeholder="${_invCloseLocked?'—':'手動輸入'}"
+           style="width:85px;text-align:right;font-size:11px;${_invCloseLocked?'background:#f5f5f5;color:#546e7a;cursor:default;':''}"
+           ${_invCloseLocked?'readonly':''}
            onblur="saveMonthlyClose('${type}','${ym}',this.value)"
            onkeydown="if(event.key==='Enter')this.blur()"></td>
       <td style="text-align:right;font-weight:700;color:${diffColor};">${diff!==null?(diff>=0?'+':'')+fmt(diff):'-'}</td>
