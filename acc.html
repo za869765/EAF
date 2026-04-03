@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.8</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.9</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -944,8 +944,8 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     </div>
     <div class="bb-divider"></div>
     <div class="bb-item">
-      <div class="bb-num" id="prop-prev-bal">82,819</div>
-      <div class="bb-label" id="prop-prev-label">2月期末淨值（元）</div>
+      <div class="bb-num" id="prop-next-bal">78,433</div>
+      <div class="bb-label" id="prop-next-label">🔮 4月期末預計（元）</div>
     </div>
   </div>
 
@@ -1062,7 +1062,8 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <div class="card-hd hd-red">
       🔻 備抵醫療折讓 明細帳（110306）
       <span style="margin-left:auto; display:flex; gap:6px;">
-        <button class="btn btn-gray" style="font-size:11px; padding:3px 10px;" onclick="addAllowEntry()">＋ 補登</button>
+        <button class="lock-btn locked" id="allow-lock-btn" onclick="toggleAllowLock()" style="font-size:11px;">🔒 鎖定</button>
+        <button id="allow-new-btn" class="btn btn-gray" style="font-size:11px;padding:3px 10px;display:none;" onclick="addAllowEntry()">＋ 新建</button>
         <button class="btn btn-green" style="font-size:11px; padding:3px 10px;" onclick="exportAllowExcel()">📥 匯出</button>
       </span>
     </div>
@@ -2265,6 +2266,11 @@ function renderAllowLedger(){
     <td style="font-size:11px;color:#546e7a;">115年1月1日期初備抵醫療折讓</td>
     <td></td></tr>`;
 
+  const ALLOW_TYPE_STYLE = {
+    'sup':   'background:#e8f5e9;color:#1b5e20',
+    'ded':   'background:#fce4ec;color:#880e4f',
+    'offset':'background:#fff3e0;color:#e65100'
+  };
   rows.forEach((r, i) => {
     const amt = +r.amt || 0;
     const isInc = r.type === 'sup';
@@ -2272,15 +2278,11 @@ function renderAllowLedger(){
     else     { bal -= amt; settled  += amt; }
     const amtClass = isInc ? 'credit-cell' : 'debit-cell';
     const amtSign  = isInc ? '+' : '-';
-    const opts = ['sup','ded','offset'].map(v=>
-      `<option value="${v}"${r.type===v?' selected':''}>${TYPE_LABEL[v]}</option>`).join('');
+    const bStyle = ALLOW_TYPE_STYLE[r.type]||'background:#f5f5f5;color:#546e7a';
     html += `<tr>
-      <td><input class="fi" type="text" value="${r.ym||''}" placeholder="年月" style="width:54px;font-size:11px;"
-          onchange="updateAllowRow(${i},'ym',this.value)"></td>
-      <td><select class="fi" style="font-size:11px;" onchange="updateAllowRow(${i},'type',this.value)">${opts}</select></td>
-      <td class="${amtClass}" style="text-align:right;">
-        <input class="num-in" type="text" value="${fmt(amt)}" placeholder="0"
-          style="max-width:80px;text-align:right;font-size:13px;font-weight:700;" oninput="updateAllowRow(${i},'amt',this.value)"></td>
+      <td style="font-size:11px;color:#546e7a;white-space:nowrap;">${r.ym||''}</td>
+      <td><span style="font-size:10px;padding:1px 6px;border-radius:3px;${bStyle};white-space:nowrap;">${TYPE_LABEL[r.type]||r.type}</span></td>
+      <td class="${amtClass}" style="text-align:right;font-weight:700;">${amtSign}${fmt(amt)}</td>
       <td class="balance-cell" style="text-align:right;">${fmt(bal)}</td>
       <td style="font-size:11px;color:#546e7a;padding:4px 8px;">${(r.note||'').replace(/</g,'&lt;')}</td>
       <td><button class="del-btn" onclick="confirmDelAllow(${i})">✕</button></td></tr>`;
@@ -2304,11 +2306,47 @@ function updateAllowRow(idx, field, value){
   saveAllowLedger(rows);
   renderAllowLedger();
 }
+let _allowLocked = true;
+function toggleAllowLock(){
+  _allowLocked = !_allowLocked;
+  const btn = document.getElementById('allow-lock-btn');
+  const newBtn = document.getElementById('allow-new-btn');
+  if(btn){ btn.textContent = _allowLocked ? '🔒 鎖定' : '🔓 解鎖中'; if(_allowLocked) btn.classList.add('locked'); else btn.classList.remove('locked'); }
+  if(newBtn) newBtn.style.display = _allowLocked ? 'none' : '';
+}
 function addAllowEntry(){
-  const rows = loadAllowLedger();
-  rows.push({ ym:'', type:'ded', amt:0, note:'' });
-  saveAllowLedger(rows);
-  renderAllowLedger();
+  const TYPE_OPTS = [
+    {v:'ded',   l:'核銷（借方減）'},
+    {v:'sup',   l:'提列（貸方增）'},
+    {v:'offset',l:'追扣抵用（借方減）'}
+  ];
+  showModal({
+    icon:'➕', title:'新建備抵折讓明細',
+    body:`<div style="display:grid;gap:10px;margin-top:6px;">
+      <div><label style="font-size:11px;color:#546e7a;">年月（如 11504）</label>
+        <input id="al-new-ym" class="fi" type="text" placeholder="11504" style="width:100%;margin-top:3px;font-size:13px;"></div>
+      <div><label style="font-size:11px;color:#546e7a;">類型</label>
+        <select id="al-new-type" class="fi" style="width:100%;margin-top:3px;font-size:13px;">
+          ${TYPE_OPTS.map(o=>`<option value="${o.v}">${o.l}</option>`).join('')}
+        </select></div>
+      <div><label style="font-size:11px;color:#546e7a;">金額</label>
+        <input id="al-new-amt" class="num-in" type="text" placeholder="0" inputmode="numeric" style="width:100%;margin-top:3px;font-size:13px;"></div>
+      <div><label style="font-size:11px;color:#546e7a;">摘要</label>
+        <input id="al-new-note" class="fi" type="text" placeholder="說明" style="width:100%;margin-top:3px;font-size:13px;"></div>
+    </div>`,
+    confirmText:'✔ 確認新建', cancelText:'取消',
+    onConfirm(){
+      const ym   = (document.getElementById('al-new-ym')||{}).value?.trim()||'';
+      const type = (document.getElementById('al-new-type')||{}).value||'ded';
+      const amt  = pnum((document.getElementById('al-new-amt')||{}).value||'0');
+      const note = (document.getElementById('al-new-note')||{}).value?.trim()||'';
+      if(!ym||!amt){ alert('請填入年月和金額'); return; }
+      const rows = loadAllowLedger();
+      rows.push({ ym, type, amt, note });
+      saveAllowLedger(rows);
+      renderAllowLedger();
+    }
+  });
 }
 function confirmDelAllow(idx){
   showModal({ title:'刪除確認', icon:'🗑️',
@@ -2542,6 +2580,24 @@ const PAYABLE_SEED = {
     ]}
   ]
 };
+/* 補種 115-0013/0014/0015 一月進貨（picker 過濾不到，直接寫入明細帳） */
+async function seedMissingJanDrug(){
+  if(localStorage.getItem('acc_fix_jan_drug_299')) return;
+  const data = loadInvLedger('drug');
+  /* 避免重複：若已存在相同 desc 則跳過 */
+  const descs = data.map(r=>r.desc||'');
+  const toAdd = [
+    { ym:'11501', type:'進貨', amt:919,  desc:'115-0013 門診藥品進貨', medId:'', voided:false },
+    { ym:'11501', type:'進貨', amt:1139, desc:'115-0014 門診藥品進貨', medId:'', voided:false },
+    { ym:'11501', type:'進貨', amt:1400, desc:'115-0015 門診藥品進貨', medId:'', voided:false }
+  ].filter(r=>!descs.includes(r.desc));
+  if(toAdd.length){
+    toAdd.forEach(r=>data.push(r));
+    accSave('acc_inv_drug', data);
+    console.log('[seedMissingJanDrug] 補入', toAdd.length, '筆1月進貨');
+  }
+  localStorage.setItem('acc_fix_jan_drug_299','1');
+}
 async function seedPayable(){
   if(localStorage.getItem('acc_payable')) return;
   const val = JSON.stringify(PAYABLE_SEED);
@@ -2699,31 +2755,35 @@ function loadInvLedger(type){
   return rows;
 }
 function saveInvLedger(type){
-  const rows = [...document.querySelectorAll('#'+type+'-tbody tr')].map(tr=>({
-    ym:    (tr.querySelector('.inv-ym')  ||{}).value||'',
-    type:  tr.dataset.type || '進貨',
-    amt:   pnum((tr.querySelector('.inv-amt')||{}).value||'0'),
-    desc:  (el=>el?(el.value!==undefined&&el.tagName==='INPUT'?el.value:el.textContent):'')(tr.querySelector('.inv-desc')),
-    medId: tr.dataset.medId||'',
-    voided: tr.dataset.voided==='1'
-  }));
+  /* 讀取 data 屬性（鎖定列）和 input（新增列）合併後寫入 */
+  const rows = [...document.querySelectorAll('#'+type+'-tbody tr')].map(tr=>{
+    const ymEl  = tr.querySelector('.inv-ym');
+    const amtEl = tr.querySelector('.inv-amt');
+    const descEl= tr.querySelector('.inv-desc-inp') || tr.querySelector('.inv-desc');
+    return {
+      ym:    ymEl  ? ymEl.value.trim()                           : (tr.dataset.ym||''),
+      type:  tr.dataset.type || '進貨',
+      amt:   amtEl ? pnum(amtEl.value)                          : +(tr.dataset.amt||0),
+      desc:  descEl? (descEl.value!==undefined&&descEl.tagName==='INPUT'?descEl.value:descEl.textContent.trim()) : '',
+      medId: tr.dataset.medId||'',
+      voided: tr.dataset.voided==='1'
+    };
+  });
   accSave('acc_inv_'+type, rows);
 }
 function recalcInvLedger(type){
+  /* 只需更新新增輸入列的餘額欄，鎖定列的餘額已在 renderInvLedger 算好 */
   const tbody = document.getElementById(type+'-tbody');
-  let bal = getInvInit(type);   /* 從年度期初結存開始 */
+  let bal = getInvInit(type);
   tbody.querySelectorAll('tr').forEach(tr=>{
     const voided = tr.dataset.voided==='1';
-    const t=tr.dataset.type||'進貨', aEl=tr.querySelector('.inv-amt'), bEl=tr.querySelector('.inv-bal');
-    if(!aEl) return;
-    const amt=pnum(aEl.value);
-    // 作廢列不計入餘額，但仍更新餘額顯示（顯示灰色）
-    if(!voided){
-      if(t==='期初') bal=amt; else bal+=( INV_DIR[t]??1 )*amt;
-    }
-    if(bEl) bEl.textContent=voided?'-':fmt(bal);
+    const t = tr.dataset.type||'進貨';
+    const amtEl = tr.querySelector('.inv-amt');
+    const amt = amtEl ? pnum(amtEl.value) : +(tr.dataset.amt||0);
+    const bEl = tr.querySelector('.inv-bal');
+    if(!voided){ if(t==='期初') bal=amt; else bal+=(INV_DIR[t]??1)*amt; }
+    if(bEl) bEl.textContent = voided?'-':fmt(bal);
   });
-  saveInvLedger(type);
   if(type==='drug'){
     STATE.inventory.drug.balance=bal;
     const e=document.getElementById('inv-drug-bal'); if(e) e.textContent=fmt(bal);
@@ -2753,10 +2813,10 @@ function renderMonthlyClose(type){
   const monthClose = {};
   document.querySelectorAll('#'+type+'-tbody tr').forEach(tr=>{
     if(tr.dataset.voided==='1') return;
-    const ymEl=tr.querySelector('.inv-ym'), balEl=tr.querySelector('.inv-bal');
-    if(!ymEl||!balEl||balEl.textContent==='-') return;
-    const ym=ymEl.value.trim();
-    if(ym) monthClose[ym] = pnum(balEl.textContent.replace(/,/g,''));
+    const ym = tr.dataset.ym || (tr.querySelector('.inv-ym')||{}).value?.trim()||'';
+    const balEl = tr.querySelector('.inv-bal');
+    if(!ym||!balEl||balEl.textContent==='-') return;
+    monthClose[ym] = pnum(balEl.textContent.replace(/,/g,''));
   });
   const months = Object.keys(monthClose).sort();
   if(!months.length){
@@ -2787,9 +2847,16 @@ function saveMonthlyClose(type, ym, raw){
   else accSave(`acc_inv_${type}_close_${ym}`, null);   /* null → D1 存哨兵，localStorage 移除 */
   renderMonthlyClose(type);
 }
+const INV_TYPE_STYLE = {
+  '期初':'background:#e3f2fd;color:#1565c0',
+  '進貨':'background:#e8f5e9;color:#1b5e20',
+  '領用':'background:#fce4ec;color:#880e4f',
+  '報廢':'background:#fbe9e7;color:#bf360c',
+  '盤盈':'background:#f3e5f5;color:#6a1b9a',
+  '盤損':'background:#fff3e0;color:#e65100',
+};
 function renderInvLedger(type){
   const data = loadInvLedger(type);
-  /* 依年月排序，相同年月內：進貨→領用/報廢→盤盈/盤損（符合帳務順序） */
   const TYPE_ORD = {'期初':0,'進貨':1,'領用':2,'報廢':2,'盤盈':3,'盤損':3};
   data.sort((a,b)=>{
     const ya=String(a.ym||''), yb=String(b.ym||'');
@@ -2797,69 +2864,103 @@ function renderInvLedger(type){
     return (TYPE_ORD[a.type||'進貨']??1)-(TYPE_ORD[b.type||'進貨']??1);
   });
   const tbody = document.getElementById(type+'-tbody');
+  let bal = getInvInit(type);
   tbody.innerHTML = data.map(r=>{
     const voided = !!r.voided;
-    const rowCls = voided ? 'row-voided' : '';
-    const typeTag = r.type&&r.type!=='進貨'&&!voided
-      ? `<select class="fi" style="font-size:10px;width:46px;color:#546e7a;margin-right:4px;" onchange="this.closest('tr').dataset.type=this.value;recalcInvLedger('${type}')">${INV_TYPES.map(t=>`<option${t===r.type?' selected':''}>${t}</option>`).join('')}</select>` : '';
-    const descW = r.type&&r.type!=='進貨'&&!voided ? 'calc(100% - 54px)' : '100%';
+    const t = r.type||'進貨';
+    if(!voided){ if(t==='期初') bal=+r.amt; else bal+=(INV_DIR[t]??1)*(+r.amt||0); }
+    const bStyle = INV_TYPE_STYLE[t]||'background:#f5f5f5;color:#546e7a';
     let actionBtn;
     if(voided){
-      actionBtn = `<button class="rest-inv-btn" title="還原此列" onclick="toggleInvVoid(this,'${type}')">↩</button>`;
+      actionBtn = `<button class="rest-inv-btn" title="還原此列" onclick="invVoidToggle(this,'${type}')">↩</button>`;
     } else if(r.medId){
       actionBtn = `<button class="rest-inv-btn" title="還原為未入帳" onclick="medRestore('${r.medId}')">↩</button>`;
     } else {
-      actionBtn = `<button class="del-btn" title="作廢此列" onclick="toggleInvVoid(this,'${type}')">✕</button>`;
+      actionBtn = `<button class="del-btn" title="刪除" onclick="invRowDelete(this,'${type}')">✕</button>`;
     }
-    return `<tr data-type="${r.type||'進貨'}" ${r.medId?`data-med-id="${r.medId}"`:''}  ${voided?'data-voided="1"':''} class="${rowCls}">
-      <td><input class="fi inv-ym" type="text" value="${r.ym||''}" style="width:75px;font-size:11px;" oninput="recalcInvLedger('${type}')"></td>
-      <td><input class="num-in inv-amt" type="text" value="${r.amt||''}" style="max-width:80px;" oninput="recalcInvLedger('${type}')"></td>
-      <td class="inv-bal" style="text-align:right;font-weight:700;color:#1565c0;"></td>
-      <td><span class="inv-desc" style="font-size:11px;color:#546e7a;">${typeTag ? typeTag+' ' : ''}${(r.desc||'').replace(/</g,'&lt;')}</span></td>
+    return `<tr data-type="${t}" data-ym="${r.ym||''}" data-amt="${r.amt||0}" ${r.medId?`data-med-id="${r.medId}"`:''}  ${voided?'data-voided="1"':''} ${voided?'class="row-voided"':''}>
+      <td style="font-size:11px;color:#546e7a;white-space:nowrap;">${r.ym||''}</td>
+      <td><span style="font-size:10px;padding:1px 5px;border-radius:3px;${bStyle};white-space:nowrap;">${t}</span></td>
+      <td style="text-align:right;font-weight:600;">${voided?'-':fmt(r.amt||0)}</td>
+      <td class="inv-bal" style="text-align:right;font-weight:700;color:#1565c0;">${voided?'-':fmt(bal)}</td>
+      <td class="inv-desc" style="font-size:11px;color:#546e7a;">${(r.desc||'').replace(/</g,'&lt;')}</td>
       <td>${actionBtn}</td>
     </tr>`;
   }).join('');
-  recalcInvLedger(type);
-}
-function toggleInvVoid(btn, type){
-  const tr = btn.closest('tr');
-  if(tr.dataset.voided==='1'){
-    showModal({ title:'還原確認', icon:'↩️', body:'確定還原此筆記錄？還原後重新計入結存。',
-      confirmText:'還原',
-      onConfirm(){
-        delete tr.dataset.voided; tr.classList.remove('row-voided');
-        btn.textContent='✕'; btn.className='del-btn'; recalcInvLedger(type);
-      }
-    });
+  /* 更新 dashboard */
+  if(type==='drug'){
+    STATE.inventory.drug.balance=bal;
+    const e=document.getElementById('inv-drug-bal'); if(e) e.textContent=fmt(bal);
+    const rc=document.getElementById('rc-drug'); if(rc) rc.textContent=fmt(bal);
   } else {
-    const desc = (tr.querySelector('.inv-desc')||{}).value||'此筆紀錄';
-    showModal({ title:'作廢確認', icon:'🚫',
-      body:`確定作廢「<b>${desc}</b>」？<br><span style="color:#78909c;font-size:12px;">作廢後不計入結存，按 ↩ 可還原。</span>`,
-      confirmText:'作廢', danger:true,
-      onConfirm(){
-        tr.dataset.voided='1'; tr.classList.add('row-voided');
-        btn.textContent='↩'; btn.className='rest-inv-btn'; recalcInvLedger(type);
-      }
-    });
+    STATE.inventory.supply.balance=bal;
+    const e=document.getElementById('inv-supply-bal'); if(e) e.textContent=fmt(bal);
+    const rc=document.getElementById('rc-supply'); if(rc) rc.textContent=fmt(bal);
   }
+  updateInvTotal();
+  renderMonthlyClose(type);
+}
+function invVoidToggle(btn, type){
+  const tr = btn.closest('tr');
+  const isVoided = tr.dataset.voided==='1';
+  showModal({
+    title: isVoided?'還原確認':'作廢確認', icon: isVoided?'↩️':'🚫',
+    body: isVoided?'確定還原此筆記錄？':'確定作廢此筆記錄？作廢後不計入結存。',
+    confirmText: isVoided?'還原':'作廢', danger:!isVoided,
+    onConfirm(){
+      const data = loadInvLedger(type);
+      const match = data.find(r=>
+        String(r.ym)===tr.dataset.ym && String(r.amt)===tr.dataset.amt &&
+        r.type===tr.dataset.type && !r.medId && (r.voided===isVoided));
+      if(match){ match.voided = !isVoided; accSave('acc_inv_'+type, data); }
+      renderInvLedger(type);
+    }
+  });
+}
+function invRowDelete(btn, type){
+  const tr = btn.closest('tr');
+  const desc = (tr.querySelector('.inv-desc')||{}).textContent?.trim()||'此筆記錄';
+  showModal({ icon:'🗑️', title:'刪除確認', danger:true,
+    body:`確定刪除「<b>${desc.slice(0,30)}</b>」？`,
+    confirmText:'刪除', cancelText:'取消',
+    onConfirm(){
+      const data = loadInvLedger(type);
+      const idx = data.findIndex(r=>
+        String(r.ym)===tr.dataset.ym && String(r.amt)===tr.dataset.amt &&
+        r.type===tr.dataset.type && !r.medId && !r.voided);
+      if(idx>-1){ data.splice(idx,1); accSave('acc_inv_'+type, data); }
+      renderInvLedger(type);
+    }
+  });
 }
 function addInvEntry(type){
-  const tbody = document.getElementById(type+'-tbody');
-  const tr = document.createElement('tr');
-  tr.dataset.type = '進貨';
-  tr.innerHTML = `
-    <td><input class="fi inv-ym" type="text" placeholder="年月" style="width:75px;font-size:11px;" oninput="recalcInvLedger('${type}')"></td>
-    <td><input class="num-in inv-amt" type="text" placeholder="0" style="max-width:80px;" oninput="recalcInvLedger('${type}')"></td>
-    <td class="inv-bal" style="text-align:right;font-weight:700;color:#1565c0;">-</td>
-    <td>
-      <select class="fi" style="font-size:10px;width:46px;color:#546e7a;margin-right:4px;" onchange="this.closest('tr').dataset.type=this.value;recalcInvLedger('${type}')">
-        ${INV_TYPES.map(t=>`<option>${t}</option>`).join('')}
-      </select>
-      <input class="fi inv-desc" type="text" placeholder="摘要" style="width:calc(100% - 54px);font-size:11px;" oninput="saveInvLedger('${type}')">
-    </td>
-    <td><button class="del-btn" onclick="toggleInvVoid(this,'${type}')">✕</button></td>`;
-  tbody.appendChild(tr);
-  recalcInvLedger(type);
+  showModal({
+    icon:'➕', title:`新建${type==='drug'?'藥品':'衛材'}明細`,
+    body:`<div style="display:grid;gap:10px;margin-top:6px;">
+      <div><label style="font-size:11px;color:#546e7a;">年月（如 11504）</label>
+        <input id="inv-new-ym" class="fi" type="text" placeholder="11504" style="width:100%;margin-top:3px;font-size:13px;"></div>
+      <div><label style="font-size:11px;color:#546e7a;">類型</label>
+        <select id="inv-new-type" class="fi" style="width:100%;margin-top:3px;font-size:13px;">
+          ${INV_TYPES.map(t=>`<option>${t}</option>`).join('')}
+        </select></div>
+      <div><label style="font-size:11px;color:#546e7a;">金額</label>
+        <input id="inv-new-amt" class="num-in" type="text" placeholder="0" inputmode="numeric" style="width:100%;margin-top:3px;font-size:13px;"></div>
+      <div><label style="font-size:11px;color:#546e7a;">摘要</label>
+        <input id="inv-new-desc" class="fi" type="text" placeholder="說明" style="width:100%;margin-top:3px;font-size:13px;"></div>
+    </div>`,
+    confirmText:'✔ 確認新建', cancelText:'取消',
+    onConfirm(){
+      const ym  = (document.getElementById('inv-new-ym')||{}).value?.trim()||'';
+      const t   = (document.getElementById('inv-new-type')||{}).value||'進貨';
+      const amt = pnum((document.getElementById('inv-new-amt')||{}).value||'0');
+      const desc= (document.getElementById('inv-new-desc')||{}).value?.trim()||'';
+      if(!ym||!amt){ alert('請填入年月和金額'); return; }
+      const data = loadInvLedger(type);
+      data.push({ ym, type:t, amt, desc, medId:'', voided:false });
+      accSave('acc_inv_'+type, data);
+      renderInvLedger(type);
+    }
+  });
 }
 
 /* ════════════════════════════════════════════
@@ -3302,6 +3403,9 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
+  // 補種1月缺漏進貨（115-0013/0014/0015）
+  await seedMissingJanDrug();
+  renderInvLedger('drug');
   // 應付費用分頁
   await seedPayable();
   await fixDrugCloseValues();
