@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.8.4</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.8.5</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -131,6 +131,8 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 .bt-pysup { background: #e3f2fd; color: #1565c0; }
 .bt-pyded { background: #fff3e0; color: #e65100; }
 .del-btn  { background: none; border: none; color: #ef5350; cursor: pointer; font-size: 13px; padding: 2px 4px; }
+.rest-inv-btn { background: none; border: none; color: #1976d2; cursor: pointer; font-size: 13px; padding: 2px 4px; opacity:.7; }
+.rest-inv-btn:hover { opacity:1; }
 .add-adj-btn { padding: 4px 12px; border: 1.5px dashed #90a4ae; border-radius: 4px; background: none; color: #546e7a; font-size: 11px; cursor: pointer; margin-top: 6px; }
 .add-adj-btn:hover { border-color: #1976d2; color: #1565c0; }
 
@@ -892,7 +894,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
             <th style="width:100px;">類型</th>
             <th style="width:90px; text-align:right;">金額</th>
             <th style="width:100px; text-align:right;">餘額</th>
-            <th>摘要（可修改）</th>
+            <th>摘要</th>
             <th style="width:40px;"></th>
           </tr>
         </thead>
@@ -902,7 +904,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
             <td><span class="badge-type bt-sup">期初餘額</span></td>
             <td class="credit-cell" style="text-align:right;">+65,754</td>
             <td class="balance-cell" style="text-align:right;">65,754</td>
-            <td><input class="fi" type="text" value="115年1月1日期初備抵醫療折讓" style="width:100%; font-size:11px;"></td>
+            <td style="font-size:11px; color:#546e7a;">115年1月1日期初備抵醫療折讓</td>
             <td></td>
           </tr>
           <tr>
@@ -910,8 +912,8 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
             <td><span class="badge-type bt-ded">核銷</span></td>
             <td class="debit-cell" style="text-align:right;">-8,215</td>
             <td class="balance-cell" style="text-align:right;">57,539</td>
-            <td><input class="fi" type="text" value="11503備抵醫療折讓核銷（114年追扣4,463+核減176+流感追扣100=4,739+...）" style="width:100%; font-size:11px;"></td>
-            <td><button class="del-btn" onclick="delAllowRow(this)">✕</button></td>
+            <td style="font-size:11px; color:#546e7a;">11503備抵醫療折讓核銷（114年追扣4,463+核減176+流感追扣100=4,739+...）</td>
+            <td></td>
           </tr>
         </tbody>
       </table>
@@ -2051,10 +2053,17 @@ function addAllowEntry(){
     <td><input class="num-in" type="text" placeholder="0" style="max-width:80px;" oninput="recalcAllowLedger()"></td>
     <td class="balance-cell" style="text-align:right;">${fmt(lastBal)}</td>
     <td><input class="fi" type="text" placeholder="摘要" style="width:100%; font-size:11px;"></td>
-    <td><button class="del-btn" onclick="this.closest('tr').remove(); recalcAllowLedger();">✕</button></td>`;
+    <td><button class="del-btn" onclick="confirmDelAllow(this)">✕</button></td>`;
   tbody.appendChild(tr);
 }
 function delAllowRow(btn){ btn.closest('tr').remove(); recalcAllowLedger(); }
+function confirmDelAllow(btn){
+  showModal({ title:'刪除確認', icon:'🗑️',
+    body:'確定要刪除這筆備抵折讓記錄？<br><span style="color:#e53935;font-size:12px;">此動作無法復原</span>',
+    confirmText:'刪除', danger:true,
+    onConfirm: ()=>{ btn.closest('tr').remove(); recalcAllowLedger(); }
+  });
+}
 function getAllowInit(){ const v=localStorage.getItem('acc_allow_init'); return v!==null?+v:65754; }
 function saveAllowInit(raw){ const v=+(String(raw).replace(/,/g,'')); if(!isNaN(v)) localStorage.setItem('acc_allow_init',String(v)); }
 function initAllowInitInp(){
@@ -2134,7 +2143,10 @@ function renderInvLedger(type){
         ${r.type&&r.type!=='進貨'?`<select class="fi" style="font-size:10px;width:46px;color:#546e7a;margin-right:4px;" onchange="this.closest('tr').dataset.type=this.value;recalcInvLedger('${type}')">${INV_TYPES.map(t=>`<option${t===r.type?' selected':''}>${t}</option>`).join('')}</select>`:''}
         <input class="fi inv-desc" type="text" value="${r.desc||''}" style="width:${r.type&&r.type!=='進貨'?'calc(100% - 54px)':'100%'};font-size:11px;" oninput="saveInvLedger('${type}')">
       </td>
-      <td><button class="del-btn" onclick="confirmDelInv(this,'${type}')">✕</button></td>
+      <td>${r.medId
+        ? `<button class="rest-inv-btn" title="還原為未入帳" onclick="medRestore('${r.medId}')">↩</button>`
+        : `<button class="del-btn" onclick="confirmDelInv(this,'${type}')">✕</button>`
+      }</td>
     </tr>`).join('');
   recalcInvLedger(type);
 }
@@ -2157,7 +2169,7 @@ function addInvEntry(type){
     <td class="inv-bal" style="text-align:right;font-weight:700;color:#1565c0;">-</td>
     <td>
       <select class="fi" style="font-size:10px;width:46px;color:#546e7a;margin-right:4px;" onchange="this.closest('tr').dataset.type=this.value;recalcInvLedger('${type}')">
-        ${INV_TYPES.filter(t=>t!=='期初').map(t=>`<option>${t}</option>`).join('')}
+        ${INV_TYPES.map(t=>`<option>${t}</option>`).join('')}
       </select>
       <input class="fi inv-desc" type="text" placeholder="摘要" style="width:calc(100% - 54px);font-size:11px;" oninput="saveInvLedger('${type}')">
     </td>
@@ -2200,7 +2212,7 @@ function _doMedPost(ids){
     // 入帳月份（管理者可選，預設用申請月份）
     const postYm = localStorage.getItem('acc_med_postym_'+r.id) || r.ym;
     const data = loadInvLedger(type);
-    data.push({ ym:postYm, type:'進貨', amt:r.amount, desc:`${r.voucherNo} ${r.desc}`.trim() });
+    data.push({ ym:postYm, type:'進貨', amt:r.amount, desc:`${r.voucherNo} ${r.desc}`.trim(), medId:String(r.id) });
     localStorage.setItem('acc_inv_'+type, JSON.stringify(data));
     medPostedIds.add(String(id));
   });
