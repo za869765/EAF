@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.6.7</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.6.8</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -279,7 +279,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span style="font-size:10px; color:#78909c;">v2.6.7</span>
+  <span style="font-size:10px; color:#78909c;">v2.6.8</span>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
 </div>
@@ -1853,9 +1853,11 @@ async function renderPublicTab(){
         <span>21020301 應付代收款 — 衛生所公務預算經費</span>
         <div class="pub-budget-info">
           <span>年度預算
-            <input type="number" value="${budget}"
-              style="width:90px;background:transparent;border:none;border-bottom:1px dashed #78909c;color:#fff;font-size:12px;font-weight:700;text-align:right;outline:none;margin-left:4px;"
-              onchange="setPubBudget(${y},+this.value);renderPublicTab();" title="點此修改年度預算">
+            <input type="text" inputmode="numeric" value="${fmt(budget)}"
+              style="width:100px;background:transparent;border:none;border-bottom:1px dashed #78909c;color:#fff;font-size:12px;font-weight:700;text-align:right;outline:none;margin-left:4px;"
+              onblur="setPubBudget(${y},+(this.value.replace(/,/g,'')));renderPublicTab();"
+              onkeydown="if(event.key==='Enter'){this.blur();}"
+              title="直接輸入年度預算金額（Enter 或點外側確認）">
           </span>
           <span>已動支 <b style="color:${over?'#ff8a80':'#a5d6a7'};">${fmt(spent)}</b></span>
           <span>剩餘 <b style="color:${over?'#ff5252':'#69f0ae'};">${over?'▲超額 ':''}${fmt(Math.abs(remain))}</b></span>
