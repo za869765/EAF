@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.5.8</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.5.9</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1529,10 +1529,10 @@ function exportExcel(){
   const row = (...cols) => cols.map(esc).join(',') + '\r\n';
 
   let csv = '\uFEFF'; // UTF-8 BOM
-  // 標題行
-  csv += esc(`佳里區衛生所傳票明細表`) + ',,,,,,,,,' + esc(`列印日期：${new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'})}`) + '\r\n';
+  // 標題行（轉帳傳票共9欄）
+  csv += esc(`佳里區衛生所傳票明細表`) + ',,,,,,,' + esc(`列印日期：${new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'})}`) + '\r\n';
   // 欄頭
-  csv += row('製  票  日  期','入  帳  日  期','傳 票 編 號','會     計     科     目','沖     銷     科     目     子     目','用     途     別     科     目','摘                                 要','借方金額','貸方金額','受    繳    款    人    資    料','受繳款人金額');
+  csv += row('製  票  日  期','入  帳  日  期','傳 票 編 號','會     計     科     目','沖     銷     科     目     子     目','用     途     別     科     目','摘                                 要','借方金額','貸方金額');
 
   let totalDr=0, totalCr=0;
   STATE.vouchers.forEach(v => {
@@ -1543,13 +1543,12 @@ function exportExcel(){
       v.purpose||'',
       v.desc,
       v.dr || 0,
-      v.cr || 0,
-      '', 0
+      v.cr || 0
     );
     totalDr += v.dr; totalCr += v.cr;
   });
   // 合計行
-  csv += row('','','','','','', '', totalDr, totalCr, 0, '');
+  csv += row('','','','','','', '', totalDr, totalCr);
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
