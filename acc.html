@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.5.9</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.5.10</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -876,6 +876,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <div id="pk-list"></div>
     <div id="pk-foot">
       <span class="pk-sel-info" id="pk-sel-info">已選 0 項，合計 $0</span>
+      <button style="padding:5px 14px;border:1px solid #e65100;border-radius:5px;font-size:12px;cursor:pointer;background:#fff3e0;color:#e65100;font-weight:600;" onclick="confirmMarkPosted()" id="btn-mark-posted" title="將右側打勾的項目標記為已出帳（不可還原）">✓ 確定已出帳</button>
       <button class="pk-confirm" onclick="confirmPicker()">✓ 確認帶入</button>
     </div>
   </div>
@@ -942,12 +943,25 @@ const MOCK_UNPOSTED = [
 
 // 已出帳紀錄（localStorage 持久化）
 const POSTED_KEY = 'acc_picker_posted';
-let postedIds = new Set(JSON.parse(localStorage.getItem(POSTED_KEY)||'[]'));
+let postedIds   = new Set(JSON.parse(localStorage.getItem(POSTED_KEY)||'[]'));
+let postMarkSet = new Set(); // 暫存「勾選要標記已出帳」的 id，按確定才真正寫入
 
-function markPosted(id){
-  postedIds.add(id);
-  pickerSelected.delete(id);
+function togglePostMark(id, checked){
+  if(checked) postMarkSet.add(id);
+  else postMarkSet.delete(id);
+  // 更新按鈕提示計數
+  const btn = document.getElementById('btn-mark-posted');
+  if(btn) btn.textContent = postMarkSet.size > 0 ? `✓ 確定已出帳（${postMarkSet.size}）` : '✓ 確定已出帳';
+}
+
+function confirmMarkPosted(){
+  if(!postMarkSet.size){ alert('請先在右側勾選要標記為已出帳的項目'); return; }
+  if(!confirm(`確定將 ${postMarkSet.size} 筆標記為「已出帳」？\n標記後無法還原。`)) return;
+  postMarkSet.forEach(id => { postedIds.add(id); pickerSelected.delete(id); });
+  postMarkSet.clear();
   localStorage.setItem(POSTED_KEY, JSON.stringify([...postedIds]));
+  const btn = document.getElementById('btn-mark-posted');
+  if(btn) btn.textContent = '✓ 確定已出帳';
   renderPicker(document.querySelector('#pk-filter input[type=text]')?.value || '');
 }
 
@@ -1296,7 +1310,9 @@ function renderPicker(kw){
       </div>
       <div style="display:flex; align-items:center; gap:8px;">
         <div class="pk-amt" ${isPosted?'style="color:#90a4ae;"':''}>$${fmt(r.amount)}</div>
-        ${!isPosted ? `<button style="padding:2px 8px;border:1px solid #ccc;border-radius:4px;font-size:10px;cursor:pointer;background:#fff8e1;color:#e65100;" onclick="markPosted('${r.id}')">已出帳 ✓</button>` : ''}
+        ${!isPosted ? `<label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#e65100;cursor:pointer;white-space:nowrap;" title="勾選後按「確定已出帳」才會標記">
+          <input type="checkbox" ${postMarkSet.has(r.id)?'checked':''} onchange="togglePostMark('${r.id}',this.checked)" onclick="event.stopPropagation()">已出帳
+        </label>` : ''}
       </div>`;
     list.appendChild(div);
   });
