@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.7.5</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.7.6</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -279,7 +279,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span style="font-size:10px; color:#78909c;">v2.7.5</span>
+  <span style="font-size:10px; color:#78909c;">v2.7.6</span>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
 </div>
@@ -683,12 +683,10 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
               <th style="width:80px; text-align:right;">金額</th>
               <th style="width:90px; text-align:right;">結存</th>
               <th>摘要</th>
+              <th style="width:36px;"></th>
             </tr>
           </thead>
-          <tbody id="drug-tbody">
-            <tr><td>11503</td><td>期初</td><td class="balance-cell" style="text-align:right;">-</td><td class="balance-cell" style="text-align:right;">98,735</td><td>115年2月期末結存</td></tr>
-            <tr><td>11503</td><td style="color:#c62828;">盤損</td><td class="debit-cell" style="text-align:right;">-2</td><td class="balance-cell" style="text-align:right;">98,733</td><td>11503藥品盤損2元</td></tr>
-          </tbody>
+          <tbody id="drug-tbody"></tbody>
         </table>
         </div>
         <div style="padding:8px 14px; display:flex; gap:8px;">
@@ -711,11 +709,10 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
               <th style="width:80px; text-align:right;">金額</th>
               <th style="width:90px; text-align:right;">結存</th>
               <th>摘要</th>
+              <th style="width:36px;"></th>
             </tr>
           </thead>
-          <tbody id="supply-tbody">
-            <tr><td>11503</td><td>期初</td><td class="balance-cell" style="text-align:right;">-</td><td class="balance-cell" style="text-align:right;">2,472</td><td>115年2月期末結存</td></tr>
-          </tbody>
+          <tbody id="supply-tbody"></tbody>
         </table>
         </div>
         <div style="padding:8px 14px; display:flex; gap:8px;">
@@ -744,22 +741,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
           </tr>
         </thead>
         <tbody id="eaf-medical-tbody">
-          <tr>
-            <td style="text-align:center;"><input type="checkbox" checked></td>
-            <td>11503</td><td>M2503-001</td>
-            <td style="font-size:11px;">11503 藥品採購（中山藥局）</td>
-            <td style="text-align:right;">7,800</td>
-            <td><select class="fi" style="font-size:11px; width:70px;"><option>藥品</option><option>衛材</option></select></td>
-            <td style="text-align:center; font-size:11px; color:#2e7d32;">✓ 已入帳</td>
-          </tr>
-          <tr>
-            <td style="text-align:center;"><input type="checkbox"></td>
-            <td>11504</td><td>M2504-001</td>
-            <td style="font-size:11px;">11504 醫療耗材採購（衛材）</td>
-            <td style="text-align:right;">3,200</td>
-            <td><select class="fi" style="font-size:11px; width:70px;"><option>衛材</option><option>藥品</option></select></td>
-            <td style="text-align:center; font-size:11px; color:#e65100;">未入帳</td>
-          </tr>
+          <tr><td colspan="7" style="text-align:center;color:#90a4ae;padding:16px;font-size:12px;">載入中…</td></tr>
         </tbody>
       </table>
       </div>
@@ -2038,20 +2020,123 @@ function recalcAllowLedger(){
 /* ════════════════════════════════════════════
    庫存補登
 ════════════════════════════════════════════ */
+/* ════════════════════════════════════════════
+   醫療用品 明細帳（localStorage 存取、可編輯刪除）
+════════════════════════════════════════════ */
+const INV_DIR = { '期初':0, '進貨':1, '盤盈':1, '領用':-1, '報廢':-1, '盤損':-1 };
+const INV_TYPES = ['期初','進貨','領用','報廢','盤盈','盤損'];
+
+function loadInvLedger(type){
+  const v = localStorage.getItem('acc_inv_'+type);
+  return v ? JSON.parse(v) : [];
+}
+function saveInvLedger(type){
+  const rows = [...document.querySelectorAll('#'+type+'-tbody tr')].map(tr=>({
+    ym:   (tr.querySelector('.inv-ym')  ||{}).value||'',
+    type: (tr.querySelector('.inv-type')||{}).value||'期初',
+    amt:  pnum((tr.querySelector('.inv-amt')||{}).value||'0'),
+    desc: (tr.querySelector('.inv-desc')||{}).value||''
+  }));
+  localStorage.setItem('acc_inv_'+type, JSON.stringify(rows));
+}
+function recalcInvLedger(type){
+  const tbody = document.getElementById(type+'-tbody');
+  let bal = 0;
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    const tEl=tr.querySelector('.inv-type'), aEl=tr.querySelector('.inv-amt'), bEl=tr.querySelector('.inv-bal');
+    if(!tEl||!aEl) return;
+    const t=tEl.value, amt=pnum(aEl.value);
+    if(t==='期初') bal=amt; else bal+=( INV_DIR[t]??1 )*amt;
+    if(bEl) bEl.textContent=fmt(bal);
+  });
+  saveInvLedger(type);
+  if(type==='drug'){ STATE.inventory.drug.balance=bal; const e=document.getElementById('inv-drug-bal'); if(e) e.textContent=fmt(bal); }
+  else             { STATE.inventory.supply.balance=bal; const e=document.getElementById('inv-supply-bal'); if(e) e.textContent=fmt(bal); }
+  updateInvTotal();
+}
+function renderInvLedger(type){
+  const data = loadInvLedger(type);
+  const tbody = document.getElementById(type+'-tbody');
+  tbody.innerHTML = data.map(r=>`
+    <tr>
+      <td><input class="fi inv-ym" type="text" value="${r.ym||''}" style="width:52px;font-size:11px;" oninput="recalcInvLedger('${type}')"></td>
+      <td><select class="fi inv-type" style="font-size:11px;width:72px;" onchange="recalcInvLedger('${type}')">
+        ${INV_TYPES.map(t=>`<option${t===r.type?' selected':''}>${t}</option>`).join('')}</select></td>
+      <td><input class="num-in inv-amt" type="text" value="${r.amt||''}" style="max-width:80px;" oninput="recalcInvLedger('${type}')"></td>
+      <td class="inv-bal" style="text-align:right;font-weight:700;color:#1565c0;"></td>
+      <td><input class="fi inv-desc" type="text" value="${r.desc||''}" style="width:100%;font-size:11px;" oninput="saveInvLedger('${type}')"></td>
+      <td><button class="del-btn" onclick="this.closest('tr').remove();recalcInvLedger('${type}')">✕</button></td>
+    </tr>`).join('');
+  recalcInvLedger(type);
+}
 function addInvEntry(type){
   const tbody = document.getElementById(type+'-tbody');
   const tr = document.createElement('tr');
   tr.innerHTML = `
-    <td><input class="fi" type="text" placeholder="年月" style="width:54px; font-size:11px;"></td>
-    <td>
-      <select class="fi" style="font-size:11px; width:70px;">
-        <option>進貨</option><option>領用</option><option>報廢</option><option>盤盈</option><option>盤損</option>
-      </select>
-    </td>
-    <td><input class="num-in" type="text" placeholder="0" style="max-width:80px;"></td>
-    <td style="text-align:right; color:#1565c0; font-weight:700;">-</td>
-    <td><input class="fi" type="text" placeholder="摘要" style="width:100%; font-size:11px;"></td>`;
+    <td><input class="fi inv-ym" type="text" placeholder="年月" style="width:52px;font-size:11px;" oninput="recalcInvLedger('${type}')"></td>
+    <td><select class="fi inv-type" style="font-size:11px;width:72px;" onchange="recalcInvLedger('${type}')">
+      ${INV_TYPES.filter(t=>t!=='期初').map(t=>`<option>${t}</option>`).join('')}</select></td>
+    <td><input class="num-in inv-amt" type="text" placeholder="0" style="max-width:80px;" oninput="recalcInvLedger('${type}')"></td>
+    <td class="inv-bal" style="text-align:right;font-weight:700;color:#1565c0;">-</td>
+    <td><input class="fi inv-desc" type="text" placeholder="摘要" style="width:100%;font-size:11px;" oninput="saveInvLedger('${type}')"></td>
+    <td><button class="del-btn" onclick="this.closest('tr').remove();recalcInvLedger('${type}')">✕</button></td>`;
   tbody.appendChild(tr);
+  recalcInvLedger(type);
+}
+
+/* ════════════════════════════════════════════
+   動支單「醫療用品」進貨核對（EAF API）
+════════════════════════════════════════════ */
+const MED_POSTED_KEY = 'acc_med_posted';
+let medPostedIds = new Set(JSON.parse(localStorage.getItem(MED_POSTED_KEY)||'[]'));
+
+async function loadEafMedical(){
+  const tbody = document.getElementById('eaf-medical-tbody');
+  try {
+    const resp = await fetch('/api/records',{headers:{'Content-Type':'application/json'}});
+    if(!resp.ok) throw new Error('API error');
+    const all = await resp.json();
+    const recs = all.filter(r=>
+      (r.bpLabel||'').includes('醫療用品') && !r.archived && !r.voided
+    ).map(r=>{
+      // 管理者手動改過分類優先，否則依「藥品」關鍵字自動判斷
+      const manualCat = localStorage.getItem('acc_med_cat_'+r.id);
+      const txt = (r.purposeName||'')+(r.purposeDesc||'')+(r.notes||'');
+      const autoCat = txt.includes('藥品') ? '藥品' : '衛材';
+      const cat = manualCat || autoCat;
+      return { id:r.id, ym:(r.applyDateRoc||'').replace(/\//g,'').slice(0,5)||'?',
+        voucherNo:r.voucherNo||'', desc:r.purposeDesc||r.notes||'', amount:r.total||0, cat };
+    });
+    if(!recs.length){
+      tbody.innerHTML='<tr><td colspan="7" class="empty-msg">目前無醫療用品動支單</td></tr>'; return;
+    }
+    tbody.innerHTML = recs.map(r=>{
+      const posted = medPostedIds.has(String(r.id));
+      return `<tr>
+        <td style="text-align:center;"><input type="checkbox" ${posted?'disabled checked':''} onchange="toggleMedPosted('${r.id}',this)"></td>
+        <td style="color:#90a4ae;">${r.ym}</td>
+        <td style="font-size:11px;color:#546e7a;">${r.voucherNo}</td>
+        <td style="font-size:11px;">${r.desc}</td>
+        <td style="text-align:right;font-weight:700;color:#1565c0;">${fmt(r.amount)}</td>
+        <td><select class="fi" style="font-size:11px;width:72px;" onchange="saveMedCat('${r.id}',this.value)">
+          <option${r.cat==='藥品'?' selected':''}>藥品</option>
+          <option${r.cat==='衛材'?' selected':''}>衛材</option></select></td>
+        <td style="text-align:center;font-size:11px;color:${posted?'#2e7d32':'#e65100'};">${posted?'✓ 已入帳':'未入帳'}</td>
+      </tr>`;
+    }).join('');
+  } catch(_){
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:#e65100;padding:12px;font-size:12px;">⚠ 無法連線 EAF API</td></tr>';
+  }
+}
+function toggleMedPosted(id, cb){
+  if(cb.checked){ medPostedIds.add(String(id)); }
+  else { medPostedIds.delete(String(id)); }
+  localStorage.setItem(MED_POSTED_KEY, JSON.stringify([...medPostedIds]));
+  loadEafMedical();
+}
+function saveMedCat(id, cat){
+  const key='acc_med_cat_'+id;
+  localStorage.setItem(key, cat);
 }
 
 /* ════════════════════════════════════════════
@@ -2254,12 +2339,19 @@ function logout(){ window.location.href = '/admin.html'; }
   // 備抵折讓：期初餘額 input 初始化 + 重算
   initAllowInitInp();
   recalcAllowLedger();
+  // 醫療用品明細帳
+  renderInvLedger('drug');
+  renderInvLedger('supply');
+  // 動支單進貨核對（EAF API）
+  loadEafMedical();
 })();
 
 function updateInvTotal(){
   const drug   = STATE.inventory.drug.balance;
   const supply = STATE.inventory.supply.balance;
-  document.getElementById('rc-inv-total').textContent = fmt(drug + supply);
+  const tot = drug + supply;
+  document.getElementById('rc-inv-total').textContent = fmt(tot);
+  const e = document.getElementById('inv-total-bal'); if(e) e.textContent = fmt(tot);
 }
 </script>
 </body>
