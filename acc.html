@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.0.1</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.0.2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -315,7 +315,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.0.1</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.0.2</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -385,7 +385,8 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   <div class="card" style="margin-bottom:12px;">
     <div class="card-hd hd-dark" style="cursor:pointer;" onclick="toggleYearPanel()">
       📅 115年度各月可分配收入補登
-      <span id="year-panel-toggle" style="margin-left:auto; font-size:10px; color:#90a4ae;">▼ 展開</span>
+      <button id="year-lock-btn" class="lock-btn locked" onclick="event.stopPropagation();toggleYearTableLock()" title="鎖定/解鎖年度輸入欄位" style="margin-left:auto;">🔒 鎖定</button>
+      <span id="year-panel-toggle" style="margin-left:8px; font-size:10px; color:#90a4ae;">▼ 展開</span>
     </div>
     <div id="year-panel" style="display:none; padding:10px 14px;">
       <p style="font-size:11px; color:#78909c; margin-bottom:8px;">
@@ -1468,6 +1469,17 @@ function calcReminders(){
   recalcYearTotals();
 }
 
+let _yearTableLocked = true;
+function toggleYearTableLock(){
+  _yearTableLocked = !_yearTableLocked;
+  const btn = document.getElementById('year-lock-btn');
+  if(btn){
+    btn.textContent = _yearTableLocked ? '🔒 鎖定' : '🔓 解鎖';
+    btn.classList.toggle('locked', _yearTableLocked);
+  }
+  renderYearTable();
+}
+
 /* 年度明細表 渲染（三欄：累積賸餘、繳局統籌款、員工款） */
 function renderYearTable(){
   const {y, m: curM, ym: curYm2} = getYm();
@@ -1495,10 +1507,10 @@ function renderYearTable(){
     const bold  = isCur ? 'font-weight:700; color:#2e7d32;' : '';
 
     const inp = (field, val) =>
-      `<input class="num-in" type="text" style="max-width:110px; text-align:right; font-size:12px;"
+      `<input class="num-in" type="text" style="max-width:110px; text-align:right; font-size:12px;${_yearTableLocked?'background:#f5f5f5;color:#546e7a;cursor:default;':''}"
          value="${val>0?fmt(val):''}" placeholder="-"
          data-ym="${ymKey}" data-field="${field}"
-         oninput="onYearFieldChange(this)">`;
+         ${_yearTableLocked?'readonly':''} oninput="onYearFieldChange(this)">`;
 
     const tr = document.createElement('tr');
     tr.style.background = bg;
@@ -2710,15 +2722,16 @@ async function seedPayable(){
   }).catch(e=>console.warn('[seedPayable] D1 write failed:',e));
   console.log('[seedPayable] 應付費用資料已寫入 D1');
 }
-/* 清除舊版 select option 文字污染 desc 欄位（v3.0.1 migration） */
+/* 清除舊版 select option 文字污染 desc 欄位（v3.0.2 migration） */
 async function fixCorruptedDesc(){
-  if(localStorage.getItem('acc_fix_desc_300')) return;
-  const INV_TYPE_PAT = /^(期初|進貨|領用|報廢|盤盈|盤損|\s){3,}$/;
+  if(localStorage.getItem('acc_fix_desc_302')) return;
+  localStorage.removeItem('acc_fix_desc_300');
+  const CORRUPT_PAT = /期初進貨領用報廢盤盈盤損/;
   ['drug','supply'].forEach(type=>{
     const data = loadInvLedger(type);
     let changed = false;
     data.forEach(r=>{
-      if(r.desc && INV_TYPE_PAT.test(r.desc)){
+      if(r.desc && CORRUPT_PAT.test(r.desc)){
         r.desc = '';
         changed = true;
       }
@@ -2728,7 +2741,7 @@ async function fixCorruptedDesc(){
       console.log('[fixCorruptedDesc] 清除', type, '損壞 desc');
     }
   });
-  localStorage.setItem('acc_fix_desc_300','1');
+  localStorage.setItem('acc_fix_desc_302','1');
 }
 async function fixDrugCloseValues(){
   if(localStorage.getItem('acc_fix_dclose_298')) return;
@@ -2877,19 +2890,23 @@ const CUSTODIAL_SEED = {
         { name:'🟡 勞健（勞保人員健保費）', subtotal:7176, entries:[
           { ym:'11501', day:30, ref:'100005 序7', desc:'👥 全體職員｜115.2 勞工健保自付', amt:1244 },
           { ym:'11502', day:26, ref:'100009 序9', desc:'👥 全體職員｜115.3 勞工健保自付', amt:1244 },
-          { ym:'11503', day:10, ref:'100011 序7', desc:'👤 黎欣妮＋方雪雲｜11402 健保補助 2,856＋健保代扣 1,832', amt:4688 }
+          { ym:'11503', day:10, ref:'100011 序7', desc:'👤 黎欣妮｜11402 機關負擔1,428＋代扣1,374', amt:2802 },
+          { ym:'11503', day:10, ref:'100011 序7', desc:'👤 方雪雲｜11402 機關負擔1,428＋代扣458', amt:1886 }
         ]},
         { name:'🔴 勞保（勞工保險費）', subtotal:6742, entries:[
           { ym:'11501', day:30, ref:'100005 序5', desc:'👥 全體職員｜115.2 勞保費自付 3,006', amt:2004 },
           { ym:'11502', day:26, ref:'100009 序10', desc:'👥 全體職員｜115.3 勞保費自付', amt:2004 },
-          { ym:'11502', day:10, ref:'100007 序5', desc:'👤 黎欣妮＋方雪雲｜11501 工資墊償 黎(1,132+313)、方(872+240)', amt:41 },
-          { ym:'11503', day:10, ref:'100011 序8', desc:'👤 黎欣妮＋方雪雲｜11402 勞保補助 2,111＋勞保代扣 582', amt:2693 }
+          { ym:'11502', day:10, ref:'100007 序5', desc:'⚙️ 工資墊償基金（黎欣妮＋方雪雲 11501）', amt:41 },
+          { ym:'11503', day:10, ref:'100011 序8', desc:'👤 黎欣妮｜11402 機關負擔1,132＋代扣313', amt:1445 },
+          { ym:'11503', day:10, ref:'100011 序8', desc:'👤 方雪雲｜11402 機關負擔975＋代扣269', amt:1244 },
+          { ym:'11503', day:10, ref:'100011 序8', desc:'⚙️ 工資墊償基金', amt:4 }
         ]},
         { name:'🟠 勞退（勞工退休準備金）', subtotal:10826, entries:[
           { ym:'11501', day:30, ref:'100005 序6', desc:'👥 全體職員｜115.2 勞退金自付 7,218', amt:4812 },
           { ym:'11502', day:26, ref:'100009 序11', desc:'👥 全體職員｜115.3 勞退費自付', amt:4812 },
-          { ym:'11502', day:10, ref:'100007 序7', desc:'👤 黎欣妮＋方雪雲｜11501 機關負擔 黎752、方390（差額）', amt:15 },
-          { ym:'11503', day:10, ref:'100011 序9', desc:'👤 黎欣妮＋方雪雲｜11402 雇主負擔 黎752＋方435', amt:1187 }
+          { ym:'11502', day:10, ref:'100007 序7', desc:'⚙️ 差額調整（黎欣妮＋方雪雲 11501）', amt:15 },
+          { ym:'11503', day:10, ref:'100011 序9', desc:'👤 黎欣妮｜11402 雇主負擔', amt:752 },
+          { ym:'11503', day:10, ref:'100011 序9', desc:'👤 方雪雲｜11402 雇主負擔', amt:435 }
         ]}
       ]
     }
@@ -2921,8 +2938,8 @@ function seedYearQ1Data(){
   console.log('[seedYearQ1Data] Q1 三個月資料已帶入');
 }
 async function seedCustodial(){
-  if(localStorage.getItem('acc_custodial_v5')) return;
-  ['acc_custodial','acc_custodial_v2','acc_custodial_v3','acc_custodial_v4'].forEach(k=>localStorage.removeItem(k));
+  if(localStorage.getItem('acc_custodial_v6')) return;
+  ['acc_custodial','acc_custodial_v2','acc_custodial_v3','acc_custodial_v4','acc_custodial_v5'].forEach(k=>localStorage.removeItem(k));
   const val = JSON.stringify(CUSTODIAL_SEED);
   localStorage.setItem('acc_custodial', val);
   const pass = sessionStorage.getItem('adminPass')||'';
@@ -2931,7 +2948,7 @@ async function seedCustodial(){
     headers:{'Content-Type':'application/json','X-Admin-Pass':pass},
     body: JSON.stringify([{key:'acc_custodial', value:val}])
   }).catch(e=>console.warn('[seedCustodial] D1 write failed:',e));
-  localStorage.setItem('acc_custodial_v5','1');
+  localStorage.setItem('acc_custodial_v6','1');
   console.log('[seedCustodial] 應付代收款完整明細已寫入 D1');
 }
 function loadCustodial(){
@@ -3005,7 +3022,7 @@ function renderSurplusTab(){
     const bg = mo%2===0 ? 'background:#fafafa;' : '';
     rows += `<tr style="${bg}">
       <td style="padding:6px 10px;color:#546e7a;">${y}/${String(mo).padStart(2,'0')}</td>
-      <td style="padding:6px 10px;color:#333;font-size:11px;">${amt>0?`${mo}月可分配收入 × 5% 累積賸餘提撥`:'（無資料）'}</td>
+      <td style="padding:6px 10px;color:#333;font-size:11px;">${amt>0?`${mo}月獎前收支淨餘數 × 5% 累積賸餘提撥`:'（無資料）'}</td>
       <td style="padding:6px 10px;text-align:right;font-weight:600;color:${amt>0?'#1b5e20':'#bdbdbd'};">${amt>0?fmt(amt):'—'}</td>
       <td style="padding:6px 10px;text-align:right;font-weight:700;color:#1565c0;">${fmt(bal)}</td>
     </tr>`;

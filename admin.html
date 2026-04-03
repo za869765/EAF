@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v3.0.1</title>
+<title>管理者入口 — 動支單系統 v3.0.2</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -305,9 +305,9 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 .cashier-year-bar select { padding:4px 8px; border:1px solid #b0bec5; border-radius:5px; font-size:13px; }
 .cashier-chart { margin:0 0 16px; background:#f8f9fa; border-radius:8px; padding:16px 20px; }
 .cashier-chart-title { font-size:13px; font-weight:600; color:#37474f; margin-bottom:14px; }
-.cashier-bars-wrap { display:flex; align-items:flex-end; height:130px; gap:4px; border-bottom:2px solid #cfd8dc; }
-.cbar-col { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
-.cbar-amt-lbl { font-size:9px; color:#1565c0; white-space:nowrap; text-align:center; min-height:11px; margin-bottom:2px; writing-mode:initial; }
+.cashier-bars-wrap { display:flex; align-items:flex-end; height:140px; gap:4px; border-bottom:2px solid #cfd8dc; padding-top:16px; }
+.cbar-col { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; position:relative; }
+.cbar-amt-lbl { font-size:9px; color:#1565c0; white-space:nowrap; text-align:center; position:absolute; top:0; left:50%; transform:translateX(-50%); pointer-events:none; line-height:1.2; }
 .cbar-bar-inner { width:80%; background:linear-gradient(to top,#1565c0,#64b5f6); border-radius:2px 2px 0 0; }
 .cbar-month-lbl { font-size:10px; color:#78909c; margin-top:5px; white-space:nowrap; }
 .pm-sel { font-size:12px; padding:2px 4px; border:1px solid #cfd8dc; border-radius:4px; cursor:pointer; }
@@ -391,7 +391,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v3.0.1</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v3.0.2</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -408,7 +408,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v3.0.1</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v3.0.2</span>
     <button id="maint-btn" onclick="toggleMaintenance()" style="padding:4px 14px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;"></button>
     <a class="link-btn" href="/acc.html" style="background:#1b5e20;">📒 會計帳務</a>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
@@ -525,7 +525,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         </div>
         <div class="stat-card" style="border-top-color:#1565c0;">
           <div class="stat-num" id="rpt-total-amt" style="color:#1565c0; font-size:20px;">—</div>
-          <div class="stat-label">有效總金額</div>
+          <div class="stat-label">申請總動支金額</div>
         </div>
         <div class="stat-card" style="border-top-color:#37474f;">
           <div class="stat-num" id="rpt-expense-cnt" style="color:#37474f; font-size:20px;">—</div>
