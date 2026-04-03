@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.8.1</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.8.2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -305,7 +305,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span style="font-size:10px; color:#78909c;">v2.8.1</span>
+  <span style="font-size:10px; color:#78909c;">v2.8.2</span>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
 </div>
@@ -2256,14 +2256,15 @@ async function loadEafMedical(){
     tbody.innerHTML = unposted.map(r=>{
       const applyYm  = r.ym;
       const savedYm  = localStorage.getItem('acc_med_postym_'+r.id) || applyYm;
-      // 同年 1-12 月 + 跨年（前後各1年）共 3 年月份選項
+      // 申請月份前後各3個月，共7個選項
       const rocY = parseInt(applyYm.slice(0,3))||115;
+      const rocM = parseInt(applyYm.slice(3))||1;
       const opts = [];
-      for(let yr=rocY-1; yr<=rocY+1; yr++){
-        for(let m=1; m<=12; m++){
-          const val=`${yr}${String(m).padStart(2,'0')}`;
-          opts.push(`<option value="${val}"${val===savedYm?' selected':''}>${yr}年${m}月</option>`);
-        }
+      for(let delta=-3; delta<=3; delta++){
+        let m = rocM + delta, y = rocY;
+        if(m<=0){ m+=12; y--; } else if(m>12){ m-=12; y++; }
+        const val = `${y}${String(m).padStart(2,'0')}`;
+        opts.push(`<option value="${val}"${val===savedYm?' selected':''}>${y}年${m}月</option>`);
       }
       return `
       <tr>
