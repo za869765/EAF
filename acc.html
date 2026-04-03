@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.5.13</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.5.14</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1762,13 +1762,9 @@ function exportAllowExcel(){ alert('📥 匯出備抵折讓明細 Excel（建置
    公務預算請款清單
 ════════════════════════════════════════════ */
 
-// 科目定義（可擴充）
+// 科目定義
 const PUB_SUBJECTS = [
-  { id:'1301',          label:'1301 延長工時加班費',               group:'', budgetDef:140000 },
-  { id:'2807_public',   label:'2807 委託檢驗費 — 公立醫院',        group:'2807 委託檢驗費', budgetDef:60000  },
-  { id:'2807_health',   label:'2807 委託檢驗費 — 衛生局',          group:'2807 委託檢驗費', budgetDef:210635 },
-  { id:'2807_clinic',   label:'2807 委託檢驗費 — 診所/檢驗所',     group:'2807 委託檢驗費', budgetDef:137135 },
-  { id:'2807_invoice',  label:'2807 委託檢驗費 — 開具發票廠商',    group:'2807 委託檢驗費', budgetDef:2600   },
+  { id:'21020301', label:'21020301 應付代收款 — 衛生所公務預算經費', group:'', budgetDef:0 },
 ];
 
 function pubKey(y, id){ return `acc_pub_${y}_${id}`; }
