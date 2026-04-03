@@ -1,0 +1,1519 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.5.8</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px; background: #f0f2f5; color: #1a1a2e; }
+
+/* ── Top Bar ── */
+#top-bar {
+  background: #1e2a38; color: #fff; padding: 0 20px;
+  display: flex; align-items: center; height: 50px; gap: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25); position: sticky; top: 0; z-index: 300;
+}
+#top-bar h1 { font-size: 14px; font-weight: 600; flex: 1; }
+.badge-fund { background: #1b5e20; color: #a5d6a7; font-size: 10px; border-radius: 4px; padding: 2px 8px; font-weight:600; }
+.tbtn { padding: 4px 12px; border: none; border-radius: 4px; font-size: 11px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.tbtn-gray { background: #37474f; color: #cfd8dc; } .tbtn-gray:hover { background: #455a64; }
+.tbtn-blue { background: #1565c0; color: #fff; }   .tbtn-blue:hover { background: #1976d2; }
+
+/* ── Year/Month Bar ── */
+#ym-bar {
+  background: #263545; padding: 5px 20px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  position: sticky; top: 50px; z-index: 200; border-bottom: 2px solid #1e2a38;
+}
+#ym-bar label { font-size: 11px; color: #90a4ae; }
+.ym-sel { background: #1e2e3e; border: 1px solid #3a4f63; border-radius: 4px; color: #e0e0e0; font-size: 13px; padding: 3px 9px; outline: none; font-family: inherit; font-weight: 600; cursor: pointer; }
+.ym-sel:focus { border-color: #42a5f5; }
+.ym-title { font-size: 13px; font-weight: 700; color: #fff; }
+.ym-action { padding: 4px 13px; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; font-family: inherit; font-weight: 600; }
+.ym-action.gen  { background: #1565c0; color: #fff; margin-left: auto; }
+.ym-action.gen:hover  { background: #1976d2; }
+#save-msg { font-size: 11px; color: #66bb6a; }
+
+/* ── Tab Nav ── */
+#tab-nav { background: #263545; display: flex; padding: 0 20px; gap: 2px; position: sticky; top: 82px; z-index: 190; }
+.tab-btn { padding: 9px 16px; background: transparent; color: #90a4ae; border: none; font-size: 12px; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
+.tab-btn:hover { color: #cfd8dc; }
+.tab-btn.active { color: #fff; border-bottom-color: #42a5f5; font-weight: 600; }
+
+/* ── Content ── */
+#content { padding: 14px 20px; max-width: 1400px; }
+.tab-pane { display: none; }
+.tab-pane.active { display: block; }
+
+/* ── Card ── */
+.card { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,.08); margin-bottom: 12px; overflow: hidden; }
+.card-hd { padding: 8px 14px; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #fff; }
+.hd-dark   { background: #263545; }
+.hd-green  { background: #1b5e20; }
+.hd-red    { background: #b71c1c; }
+.hd-purple { background: #4a148c; }
+.hd-teal   { background: #004d40; }
+.hd-amber  { background: #e65100; }
+.card-bd { padding: 12px 14px; }
+
+/* ── 提醒卡片列 ── */
+.reminder-grid { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.r-card {
+  flex: 1; min-width: 130px; background: #fff; border-radius: 8px;
+  padding: 10px 14px; box-shadow: 0 2px 6px rgba(0,0,0,.08);
+  border-top: 4px solid #e0e0e0; text-align: center; cursor: default;
+}
+.r-num   { font-size: 18px; font-weight: 700; line-height: 1.2; }
+.r-label { font-size: 10px; color: #78909c; margin-top: 3px; }
+.r-sub   { font-size: 10px; color: #aaa; margin-top: 2px; }
+.rc-pink   { border-top-color: #ad1457; } .rc-pink .r-num   { color: #880e4f; }
+.rc-teal   { border-top-color: #00897b; } .rc-teal .r-num   { color: #00695c; }
+.rc-orange { border-top-color: #fb8c00; } .rc-orange .r-num { color: #e65100; }
+.rc-purple { border-top-color: #8e24aa; } .rc-purple .r-num { color: #6a1b9a; }
+.rc-red    { border-top-color: #e53935; } .rc-red .r-num    { color: #c62828; }
+.rc-blue   { border-top-color: #1976d2; } .rc-blue .r-num   { color: #1565c0; }
+
+/* ── 醫療折讓提醒框 ── */
+.discount-box {
+  border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  border: 1.5px solid #e0e0e0;
+}
+.discount-box.warn { background: #fff8e1; border-color: #ff8f00; }
+.discount-box.ok   { background: #f1f8e9; border-color: #558b2f; }
+.discount-icon { font-size: 22px; }
+.discount-text { flex: 1; min-width: 180px; }
+.discount-text strong { font-size: 13px; }
+.discount-text p { font-size: 11px; color: #546e7a; margin-top: 2px; }
+.discount-inputs { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.toggle-row { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
+.toggle-row input[type=checkbox] { width: 15px; height: 15px; accent-color: #e65100; cursor: pointer; }
+
+/* ── 輸入表格 ── */
+.input-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.input-group { display: flex; flex-direction: column; gap: 4px; }
+.input-group label { font-size: 11px; color: #546e7a; font-weight: 600; }
+.input-group .hint  { font-size: 10px; color: #90a4ae; margin-top: 1px; }
+.num-in {
+  padding: 5px 9px; border: 1.5px solid #e0e0e0; border-radius: 5px;
+  font-size: 13px; text-align: right; outline: none; font-family: inherit; background: #fafffe; width: 100%;
+}
+.num-in:focus { border-color: #1976d2; background: #fff; }
+.num-in.auto  { background: #f5f5f5; color: #546e7a; cursor: not-allowed; }
+.num-in.locked { background: #fff8e1; color: #e65100; }
+.sum-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; font-size: 13px; font-weight: 700; }
+.sum-row .sum-label { color: #546e7a; font-size: 12px; }
+.sum-row .sum-val   { color: #1565c0; }
+
+/* ── 未出帳動支單選取 ── */
+.picker-trigger {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+  border: 1.5px dashed #90a4ae; border-radius: 8px; cursor: pointer;
+  transition: border-color .15s, background .15s; margin-bottom: 8px;
+}
+.picker-trigger:hover { border-color: #1976d2; background: #f5f9ff; }
+.picker-trigger .ptxt  { flex: 1; font-size: 12px; color: #546e7a; }
+.picker-trigger .pamt  { font-size: 14px; font-weight: 700; color: #1565c0; }
+.picked-list { font-size: 11px; color: #546e7a; margin-top: 4px; line-height: 1.8; }
+.picked-list span { background: #e3f2fd; color: #1565c0; border-radius: 3px; padding: 1px 6px; margin-right: 4px; }
+
+/* ── 保險補付/追扣 ── */
+.adj-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.adj-table th { background: #37474f; color: #cfd8dc; padding: 6px 10px; text-align: left; font-size: 11px; }
+.adj-table td { padding: 6px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+.adj-table tr:last-child td { border-bottom: none; }
+.adj-table .add-row td { background: #fafafa; }
+.badge-type { display: inline-block; border-radius: 3px; padding: 1px 6px; font-size: 10px; }
+.bt-sup   { background: #e8f5e9; color: #2e7d32; }
+.bt-ded   { background: #fce4ec; color: #c62828; }
+.bt-pysup { background: #e3f2fd; color: #1565c0; }
+.bt-pyded { background: #fff3e0; color: #e65100; }
+.del-btn  { background: none; border: none; color: #ef5350; cursor: pointer; font-size: 13px; padding: 2px 4px; }
+.add-adj-btn { padding: 4px 12px; border: 1.5px dashed #90a4ae; border-radius: 4px; background: none; color: #546e7a; font-size: 11px; cursor: pointer; margin-top: 6px; }
+.add-adj-btn:hover { border-color: #1976d2; color: #1565c0; }
+
+/* ── 傳票表格 ── */
+.voucher-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.voucher-table th { background: #1e2a38; color: #cfd8dc; padding: 7px 10px; text-align: left; font-size: 11px; white-space: nowrap; }
+.voucher-table td { padding: 6px 10px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; white-space: nowrap; }
+.voucher-table .debit  td { border-left: 3px solid #1976d2; }
+.voucher-table .credit td { border-left: 3px solid #e53935; }
+.voucher-table .group-sep td { background: #eceff1; font-size: 10px; color: #90a4ae; font-weight: 600; padding: 3px 10px; }
+.v-dr { color: #1565c0; font-weight: 700; }
+.v-cr { color: #c62828; font-weight: 700; }
+
+/* ── 存摺式帳 ── */
+.ledger-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ledger-table th { background: #263545; color: #cfd8dc; padding: 7px 10px; text-align: left; font-size: 11px; }
+.ledger-table td { padding: 6px 10px; border-bottom: 1px solid #f0f0f0; }
+.ledger-table tr:hover td { background: #fafafa; }
+.ledger-table .balance-cell { font-weight: 700; color: #1565c0; }
+.ledger-table .debit-cell  { color: #c62828; }
+.ledger-table .credit-cell { color: #2e7d32; }
+.balance-banner {
+  background: linear-gradient(135deg, #263545, #1e2a38);
+  color: #fff; border-radius: 10px; padding: 14px 20px;
+  display: flex; gap: 24px; margin-bottom: 14px; flex-wrap: wrap;
+}
+.bb-item .bb-num   { font-size: 22px; font-weight: 700; }
+.bb-item .bb-label { font-size: 10px; color: #90a4ae; margin-top: 2px; }
+.bb-divider { width: 1px; background: rgba(255,255,255,.15); }
+
+/* ── 庫存分欄 ── */
+.inventory-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 700px) { .inventory-cols { grid-template-columns: 1fr; } }
+
+/* ── 鎖定按鈕 ── */
+.lock-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 10px; border: 1.5px solid #b0bec5; border-radius: 4px;
+  background: #f5f5f5; color: #546e7a; font-size: 11px; cursor: pointer;
+}
+.lock-btn.locked { background: #fff8e1; border-color: #ff8f00; color: #e65100; }
+.lock-btn:hover  { border-color: #1976d2; color: #1565c0; }
+
+/* ── Popup ── */
+#picker-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 1000; align-items: center; justify-content: center; }
+#picker-overlay.open { display: flex; }
+#picker-box { background: #fff; border-radius: 12px; width: 820px; max-width: 96vw; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 8px 40px rgba(0,0,0,.3); }
+#pk-head { background: #1e2a38; color: #fff; padding: 12px 18px; border-radius: 12px 12px 0 0; display: flex; align-items: center; gap: 10px; }
+#pk-head h3 { flex: 1; font-size: 14px; }
+.pk-close { background: rgba(255,255,255,.15); border: none; color: #fff; border-radius: 4px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+#pk-filter { padding: 8px 14px; border-bottom: 1px solid #e0e0e0; display: flex; gap: 8px; }
+.pk-in { padding: 5px 9px; border: 1.5px solid #cfd8dc; border-radius: 5px; font-size: 12px; outline: none; font-family: inherit; flex: 1; }
+.pk-in:focus { border-color: #1976d2; }
+#pk-list { flex: 1; overflow-y: auto; padding: 10px 14px; }
+.pk-rec { border: 1.5px solid #e0e0e0; border-radius: 7px; padding: 9px 12px; margin-bottom: 6px; display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.pk-rec:hover  { border-color: #1976d2; background: #f5f9ff; }
+.pk-rec.picked { border-color: #1976d2; background: #e3f2fd; }
+.pk-rec input[type=checkbox] { width: 15px; height: 15px; margin-top: 2px; flex-shrink: 0; accent-color: #1565c0; }
+.pk-info { flex: 1; }
+.pk-title { font-size: 12px; font-weight: 600; }
+.pk-sub   { font-size: 10px; color: #78909c; margin-top: 2px; }
+.pk-amt   { font-size: 13px; font-weight: 700; color: #1565c0; }
+.pk-cat-sel { display: inline-flex; gap: 4px; }
+.pk-cat-sel select { padding: 3px 6px; border: 1.5px solid #cfd8dc; border-radius: 4px; font-size: 11px; outline: none; }
+#pk-foot { padding: 10px 14px; border-top: 1px solid #e0e0e0; display: flex; align-items: center; gap: 10px; }
+#pk-foot .pk-sel-info { font-size: 12px; color: #546e7a; flex: 1; }
+.pk-confirm { padding: 6px 18px; background: #1565c0; color: #fff; border: none; border-radius: 5px; font-size: 12px; cursor: pointer; font-weight: 600; }
+.pk-confirm:hover { background: #1976d2; }
+
+/* ── Misc ── */
+.toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.btn { padding: 5px 13px; border: none; border-radius: 5px; font-size: 12px; cursor: pointer; font-family: inherit; }
+.btn-blue  { background: #1565c0; color: #fff; } .btn-blue:hover  { background: #1976d2; }
+.btn-green { background: #2e7d32; color: #fff; } .btn-green:hover { background: #388e3c; }
+.btn-gray  { background: #546e7a; color: #fff; } .btn-gray:hover  { background: #607d8b; }
+.btn-red   { background: #c62828; color: #fff; } .btn-red:hover   { background: #e53935; }
+.fi { padding: 5px 9px; border: 1.5px solid #cfd8dc; border-radius: 5px; font-size: 12px; outline: none; font-family: inherit; }
+.fi:focus { border-color: #1976d2; }
+.table-wrap { overflow-x: auto; }
+.section-title { font-size: 12px; font-weight: 700; color: #37474f; margin: 12px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #e0e0e0; display: flex; align-items: center; gap: 6px; }
+.empty-msg { text-align: center; color: #90a4ae; padding: 20px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<!-- ── Top Bar ── -->
+<div id="top-bar">
+  <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
+  <span class="badge-fund">醫療基金專戶</span>
+  <span style="font-size:10px; color:#78909c;">v2.5.8</span>
+  <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
+  <a class="tbtn tbtn-blue" href="/public.html" target="_blank">💼 公務預算</a>
+  <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
+</div>
+
+<!-- ── Year/Month Bar ── -->
+<div id="ym-bar">
+  <label>年度</label>
+  <select class="ym-sel" id="sel-year" onchange="onYmChange()">
+    <option value="115" selected>115</option>
+    <option value="114">114</option>
+  </select>
+  <label>月份</label>
+  <select class="ym-sel" id="sel-month" onchange="onYmChange()">
+    <option value="1">1</option><option value="2">2</option>
+    <option value="3">3</option><option value="4" selected>4</option>
+    <option value="5">5</option><option value="6">6</option>
+    <option value="7">7</option><option value="8">8</option>
+    <option value="9">9</option><option value="10">10</option>
+    <option value="11">11</option><option value="12">12</option>
+  </select>
+  <span class="ym-title" id="ym-title">115 年 4 月</span>
+  <button class="ym-action gen" onclick="generateVouchers()">⚡ 產生傳票</button>
+  <button class="ym-action" style="background:#2e7d32;color:#fff;" onclick="saveMonthData()">💾 儲存本月</button>
+  <span id="save-msg"></span>
+</div>
+
+<!-- ── Tab Nav ── -->
+<div id="tab-nav">
+  <button class="tab-btn active" onclick="switchTab('work',this)">🔔 月度作業</button>
+  <button class="tab-btn" onclick="switchTab('voucher',this)">📄 轉帳傳票</button>
+  <button class="tab-btn" onclick="switchTab('inventory',this)">📦 醫療用品庫存</button>
+  <button class="tab-btn" onclick="switchTab('property',this)">🏚️ 財產管理</button>
+  <button class="tab-btn" onclick="switchTab('allowance',this)">🔻 備抵醫療折讓</button>
+</div>
+
+<div id="content">
+
+<!-- ══════════════════════════════════════════
+     TAB 1：月度作業
+══════════════════════════════════════════ -->
+<div class="tab-pane active" id="tab-work">
+
+  <!-- 提醒 Dashboard -->
+  <div class="reminder-grid" id="reminder-grid">
+    <div class="r-card rc-pink">
+      <div class="r-num" id="rc-allowance">57,539</div>
+      <div class="r-label">🔻 備抵折讓餘額</div>
+      <div class="r-sub">110306</div>
+    </div>
+    <div class="r-card rc-teal">
+      <div class="r-num" id="rc-drug">98,733</div>
+      <div class="r-label">💊 藥品庫存</div>
+      <div class="r-sub">結存</div>
+    </div>
+    <div class="r-card rc-teal">
+      <div class="r-num" id="rc-supply">2,472</div>
+      <div class="r-label">🩹 衛材庫存</div>
+      <div class="r-sub">結存</div>
+    </div>
+    <div class="r-card rc-blue">
+      <div class="r-num" id="rc-property">80,626</div>
+      <div class="r-label">🏚️ 財產帳面淨值</div>
+      <div class="r-sub">每月扣 2,193</div>
+    </div>
+    <div class="r-card rc-orange">
+      <div class="r-num" id="rc-bureau">-</div>
+      <div class="r-label">繳局統籌款（×10%）</div>
+      <div class="r-sub" id="rc-bureau-sub">本月試算</div>
+    </div>
+    <div class="r-card rc-purple">
+      <div class="r-num" id="rc-doctor">-</div>
+      <div class="r-label">醫師獎勵金（×90%×70%）</div>
+      <div class="r-sub" id="rc-doctor-sub">本月試算</div>
+    </div>
+    <div class="r-card rc-red">
+      <div class="r-num" id="rc-staff">-</div>
+      <div class="r-label">員工獎勵金（×90%×30%）</div>
+      <div class="r-sub" id="rc-staff-sub">本月試算</div>
+    </div>
+    <div class="r-card rc-blue">
+      <div class="r-num" id="rc-fund5">-</div>
+      <div class="r-label">醫療作業基金（×5%）</div>
+      <div class="r-sub" id="rc-fund5-sub">本月試算</div>
+    </div>
+  </div>
+
+  <!-- 醫療折讓提醒 -->
+  <div class="discount-box warn" id="discount-box">
+    <span class="discount-icon">⚠️</span>
+    <div class="discount-text">
+      <strong id="discount-title">本月是否提列醫療折讓？</strong>
+      <p id="discount-hint">請確認備抵折讓餘額是否足夠，勾選後輸入折讓率</p>
+    </div>
+    <div class="discount-inputs">
+      <label class="toggle-row">
+        <input type="checkbox" id="discount-needed" onchange="onDiscountToggle()">
+        本月需提列
+      </label>
+      <div id="discount-rate-wrap" style="display:none; align-items:center; gap:6px;">
+        <label style="font-size:11px; color:#546e7a;">折讓率</label>
+        <input class="num-in" id="discount-rate" type="text" style="width:90px; text-align:center;"
+               placeholder="0.0211" oninput="onDiscountCalc()">
+        <label style="font-size:11px; color:#546e7a;">提列金額</label>
+        <span id="discount-amount" style="font-size:14px; font-weight:700; color:#c62828;">-</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 收入輸入 ── -->
+  <div class="card">
+    <div class="card-hd hd-dark">💰 收入端輸入 <span style="font-size:10px; font-weight:400; color:#90a4ae; margin-left:6px;">掛帳金額將自動加總</span></div>
+    <div class="card-bd">
+      <div class="section-title">🏥 門診健保 &amp; NIIS疫苗接種</div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>A：門診健保掛帳</label>
+          <input class="num-in" id="inc-hi" type="text" placeholder="0" oninput="calcIncome()">
+        </div>
+        <div class="input-group">
+          <label>B1：新冠疫苗（NIIS）</label>
+          <input class="num-in" id="inc-covid" type="text" placeholder="0" oninput="calcIncome()">
+        </div>
+        <div class="input-group">
+          <label>B2：流感疫苗（NIIS）</label>
+          <input class="num-in" id="inc-flu" type="text" placeholder="0" oninput="calcIncome()">
+        </div>
+        <div class="input-group">
+          <label>B3：常規疫苗（NIIS）</label>
+          <input class="num-in" id="inc-routine" type="text" placeholder="0" oninput="calcIncome()">
+        </div>
+        <div class="input-group">
+          <label style="color:#1565c0;">掛帳金額合計（自動）</label>
+          <input class="num-in auto" id="inc-total" type="text" readonly>
+          <div class="hint">A + B1 + B2 + B3</div>
+        </div>
+      </div>
+      <div class="section-title" style="margin-top:14px;">🧾 健保不給付及部分負擔</div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>A：檢驗收入</label>
+          <input class="num-in" id="inc-lab" type="text" placeholder="0" oninput="calcOther()">
+        </div>
+        <div class="input-group">
+          <label>B：部分負擔</label>
+          <input class="num-in" id="inc-copay" type="text" placeholder="0" oninput="calcOther()">
+        </div>
+        <div class="input-group">
+          <label>C：健保不給付</label>
+          <input class="num-in" id="inc-noncov" type="text" placeholder="0" oninput="calcOther()">
+        </div>
+        <div class="input-group">
+          <label style="color:#1565c0;">小計（自動）</label>
+          <input class="num-in auto" id="inc-other-total" type="text" readonly>
+          <div class="hint">A + B + C</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 支出輸入 ── -->
+  <div class="card">
+    <div class="card-hd hd-green">💸 支出端輸入（醫療基金 510601 門診醫療成本）</div>
+    <div class="card-bd">
+
+      <!-- 未出帳動支單 -->
+      <div class="section-title">📋 未出帳動支單（近兩個月，掛 210205 應付費用）</div>
+      <div class="picker-trigger" onclick="openPicker()">
+        <span style="font-size:18px;">🔍</span>
+        <div class="ptxt">
+          <div style="font-weight:600; font-size:13px;">選擇未出帳動支單…</div>
+          <div style="font-size:11px; color:#90a4ae;">僅顯示「醫療基金 &gt; 510601 門診醫療成本」近兩個月申請</div>
+        </div>
+        <div class="pamt" id="picker-total">-</div>
+      </div>
+      <div class="picked-list" id="picked-list"></div>
+
+      <!-- 固定成本 -->
+      <div class="section-title" style="margin-top:14px;">🏚️ 固定成本（每月）</div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>
+            什項設備折舊
+            <button class="lock-btn locked" id="depr-lock-btn" onclick="toggleDeprLock()" style="margin-left:6px;">🔒 鎖定</button>
+          </label>
+          <input class="num-in locked" id="exp-depr" type="text" value="2,193" readonly>
+          <div class="hint" id="depr-hint">11503雜項設備折舊（預設鎖定）</div>
+        </div>
+        <div class="input-group">
+          <label style="color:#546e7a;">財產帳面淨值（扣後）</label>
+          <input class="num-in auto" id="exp-depr-balance" type="text" readonly>
+        </div>
+      </div>
+
+      <!-- 藥品領用 -->
+      <div class="section-title" style="margin-top:14px;">💊 藥品領用</div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>藥品領用金額</label>
+          <input class="num-in" id="exp-drug" type="text" placeholder="0" oninput="calcDrug()">
+          <div class="hint">11503藥品領用（藥品帳減少）</div>
+        </div>
+        <div class="input-group">
+          <label>衛材領用金額</label>
+          <input class="num-in" id="exp-supply" type="text" placeholder="0" oninput="calcDrug()">
+          <div class="hint">11503藥品領用（衛材帳減少）</div>
+        </div>
+        <div class="input-group">
+          <label style="color:#1565c0;">領用合計</label>
+          <input class="num-in auto" id="exp-drug-total" type="text" readonly>
+        </div>
+      </div>
+
+      <!-- 藥品盤盈損 -->
+      <div class="section-title" style="margin-top:14px;">📦 藥品盤盈 / 盤損（帳目校正）</div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>報表藥品實際金額</label>
+          <input class="num-in" id="inv-drug-real" type="text" placeholder="輸入藥庫報表數" oninput="calcInv()">
+          <div class="hint">帳面：<span id="inv-drug-book">98,733</span></div>
+        </div>
+        <div class="input-group">
+          <label>報表衛材實際金額</label>
+          <input class="num-in" id="inv-supply-real" type="text" placeholder="輸入藥庫報表數" oninput="calcInv()">
+          <div class="hint">帳面：<span id="inv-supply-book">2,472</span></div>
+        </div>
+        <div class="input-group">
+          <label style="color:#1565c0;">系統計算校正量</label>
+          <input class="num-in auto" id="inv-diff" type="text" readonly>
+          <div class="hint" id="inv-diff-hint">正數=盤損（增加成本），負數=盤盈</div>
+        </div>
+        <div class="input-group">
+          <label style="color:#546e7a;">自動說明</label>
+          <input class="num-in auto" id="inv-note" type="text" readonly style="font-size:11px;">
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── 保險補付/追扣 ── -->
+  <div class="card">
+    <div class="card-hd hd-amber">🏛️ 保險補付 / 追扣 登錄</div>
+    <div class="card-bd">
+      <div class="table-wrap">
+      <table class="adj-table">
+        <thead>
+          <tr>
+            <th style="width:80px;">類型</th>
+            <th style="width:90px;">年月</th>
+            <th style="width:130px;">項目</th>
+            <th>金額（元）</th>
+            <th style="width:200px;">自動科目判斷</th>
+            <th style="width:30px;"></th>
+          </tr>
+        </thead>
+        <tbody id="adj-tbody">
+          <!-- 動態產生 -->
+        </tbody>
+      </table>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+        <button class="add-adj-btn" onclick="addAdj('sup')">＋ 當年補付</button>
+        <button class="add-adj-btn" onclick="addAdj('ded')">＋ 當年追扣</button>
+        <button class="add-adj-btn" onclick="addAdj('pysup')">＋ 以前年度補付</button>
+        <button class="add-adj-btn" onclick="addAdj('pyded')">＋ 以前年度追扣</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /tab-work -->
+
+
+<!-- ══════════════════════════════════════════
+     TAB 2：轉帳傳票
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-voucher">
+  <div class="toolbar">
+    <span style="font-size:13px; font-weight:600; color:#1e2a38;" id="voucher-ym-title">115 年 4 月 轉帳傳票</span>
+    <button class="btn btn-green" onclick="exportExcel()">📥 匯出 Excel</button>
+    <button class="btn btn-gray" onclick="generateVouchers()">🔄 重新產生</button>
+    <span style="font-size:11px; color:#78909c;" id="voucher-count"></span>
+  </div>
+  <div class="card">
+    <div class="card-hd hd-dark">📄 轉帳傳票清單 <span style="font-size:10px; font-weight:400; margin-left:6px; color:#90a4ae;">藍色=借方　紅色=貸方</span></div>
+    <div class="card-bd" style="padding:0;">
+      <div class="table-wrap">
+      <table class="voucher-table" id="voucher-table">
+        <thead>
+          <tr>
+            <th style="width:60px;">序</th>
+            <th style="width:80px;">製票日期</th>
+            <th style="width:130px;">會計科目</th>
+            <th style="width:80px;">用途別</th>
+            <th>摘要</th>
+            <th style="width:90px; text-align:right;">借方金額</th>
+            <th style="width:90px; text-align:right;">貸方金額</th>
+          </tr>
+        </thead>
+        <tbody id="voucher-tbody">
+          <tr><td colspan="7" class="empty-msg">請先在「月度作業」輸入資料，再按「⚡ 產生傳票」</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex; justify-content:flex-end; gap:20px; font-size:13px; font-weight:700; padding: 6px 4px;">
+    <span>借方合計：<span id="total-debit" style="color:#1565c0;">0</span></span>
+    <span>貸方合計：<span id="total-credit" style="color:#c62828;">0</span></span>
+  </div>
+</div><!-- /tab-voucher -->
+
+
+<!-- ══════════════════════════════════════════
+     TAB 3：醫療用品庫存
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-inventory">
+  <div class="balance-banner">
+    <div class="bb-item">
+      <div class="bb-num" id="inv-drug-bal">98,733</div>
+      <div class="bb-label">💊 藥品結存（元）</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" id="inv-supply-bal">2,472</div>
+      <div class="bb-label">🩹 衛材結存（元）</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" id="inv-total-bal">101,205</div>
+      <div class="bb-label">合計結存（元）</div>
+    </div>
+  </div>
+
+  <div class="inventory-cols">
+    <!-- 藥品 -->
+    <div class="card">
+      <div class="card-hd hd-purple">💊 藥品 明細帳</div>
+      <div class="card-bd" style="padding:0;">
+        <div class="table-wrap">
+        <table class="ledger-table" id="drug-ledger">
+          <thead>
+            <tr>
+              <th style="width:60px;">年月</th>
+              <th style="width:80px;">類型</th>
+              <th style="width:80px; text-align:right;">金額</th>
+              <th style="width:90px; text-align:right;">結存</th>
+              <th>摘要</th>
+            </tr>
+          </thead>
+          <tbody id="drug-tbody">
+            <tr><td>11503</td><td>期初</td><td class="balance-cell" style="text-align:right;">-</td><td class="balance-cell" style="text-align:right;">101,356</td><td>115年3月期初</td></tr>
+            <tr><td>11503</td><td style="color:#c62828;">領用</td><td class="debit-cell" style="text-align:right;">-3</td><td class="balance-cell" style="text-align:right;">101,353</td><td>11503藥品領用3元</td></tr>
+            <tr><td>11503</td><td style="color:#c62828;">盤損</td><td class="debit-cell" style="text-align:right;">-2,620</td><td class="balance-cell" style="text-align:right;">98,733</td><td>11503藥品盤損校正</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div style="padding:8px 14px; display:flex; gap:8px;">
+          <button class="btn btn-gray" style="font-size:11px;" onclick="addInvEntry('drug')">＋ 補登</button>
+          <button class="btn btn-green" style="font-size:11px;" onclick="exportInvExcel('drug')">📥 匯出</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 衛材 -->
+    <div class="card">
+      <div class="card-hd hd-teal">🩹 衛材 明細帳</div>
+      <div class="card-bd" style="padding:0;">
+        <div class="table-wrap">
+        <table class="ledger-table" id="supply-ledger">
+          <thead>
+            <tr>
+              <th style="width:60px;">年月</th>
+              <th style="width:80px;">類型</th>
+              <th style="width:80px; text-align:right;">金額</th>
+              <th style="width:90px; text-align:right;">結存</th>
+              <th>摘要</th>
+            </tr>
+          </thead>
+          <tbody id="supply-tbody">
+            <tr><td>11503</td><td>期初</td><td class="balance-cell" style="text-align:right;">-</td><td class="balance-cell" style="text-align:right;">2,472</td><td>115年3月期初</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <div style="padding:8px 14px; display:flex; gap:8px;">
+          <button class="btn btn-gray" style="font-size:11px;" onclick="addInvEntry('supply')">＋ 補登</button>
+          <button class="btn btn-green" style="font-size:11px;" onclick="exportInvExcel('supply')">📥 匯出</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 動支單進貨核對 -->
+  <div class="card">
+    <div class="card-hd hd-dark">📋 動支單「醫療用品」科目進貨核對 <span style="font-size:10px; font-weight:400; color:#90a4ae; margin-left:6px;">可人工勾選校正藥品/衛材分類</span></div>
+    <div class="card-bd" style="padding:0;">
+      <div class="table-wrap">
+      <table class="voucher-table" id="eaf-medical-table">
+        <thead>
+          <tr>
+            <th style="width:50px;">勾選</th>
+            <th style="width:60px;">年月</th>
+            <th style="width:90px;">動支編號</th>
+            <th>摘要</th>
+            <th style="width:80px; text-align:right;">金額</th>
+            <th style="width:100px;">分類</th>
+            <th style="width:60px;">已入帳</th>
+          </tr>
+        </thead>
+        <tbody id="eaf-medical-tbody">
+          <tr><td colspan="7" class="empty-msg">連線後自動從動支單抓取醫療用品科目項目</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div><!-- /tab-inventory -->
+
+
+<!-- ══════════════════════════════════════════
+     TAB 4：財產管理
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-property">
+  <div class="balance-banner">
+    <div class="bb-item">
+      <div class="bb-num" id="prop-balance">80,626</div>
+      <div class="bb-label">🏚️ 財產帳面淨值（元）</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" id="prop-depr">2,193</div>
+      <div class="bb-label">每月折舊額（元）</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num">82,819</div>
+      <div class="bb-label">原始取得金額（元）</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd hd-dark">
+      🏚️ 財產折舊存摺
+      <span style="margin-left:auto;">
+        <button class="lock-btn locked" id="prop-lock-btn" onclick="togglePropLock()" style="font-size:11px;">🔒 鎖定</button>
+        <button class="btn btn-gray" style="font-size:11px; padding:3px 10px; margin-left:6px;" onclick="exportPropExcel()">📥 匯出</button>
+      </span>
+    </div>
+    <div class="card-bd" style="padding:0;">
+      <div class="table-wrap">
+      <table class="ledger-table" id="prop-ledger">
+        <thead>
+          <tr>
+            <th style="width:60px;">年月</th>
+            <th style="width:80px; text-align:right;">本月折舊</th>
+            <th style="width:100px; text-align:right;">帳面淨值</th>
+            <th>摘要</th>
+            <th style="width:60px;"></th>
+          </tr>
+        </thead>
+        <tbody id="prop-tbody">
+          <tr>
+            <td>期初</td>
+            <td style="text-align:right;">-</td>
+            <td class="balance-cell" style="text-align:right;">82,819</td>
+            <td>财產取得（期初）</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>11501</td>
+            <td class="debit-cell" style="text-align:right;">-2,193</td>
+            <td class="balance-cell" style="text-align:right;">80,626</td>
+            <td>11501雜項設備折舊2,193元</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>11502</td>
+            <td class="debit-cell" style="text-align:right;">-2,193</td>
+            <td class="balance-cell" style="text-align:right;">78,433</td>
+            <td>11502雜項設備折舊2,193元</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>11503</td>
+            <td class="debit-cell" style="text-align:right;">-2,193</td>
+            <td class="balance-cell" style="text-align:right;">76,240</td>
+            <td>11503雜項設備折舊2,193元</td>
+            <td></td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div><!-- /tab-property -->
+
+
+<!-- ══════════════════════════════════════════
+     TAB 5：備抵醫療折讓
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-allowance">
+  <div class="balance-banner">
+    <div class="bb-item">
+      <div class="bb-num" id="al-balance">57,539</div>
+      <div class="bb-label">🔻 備抵折讓餘額（110306）</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" style="color:#66bb6a;">65,754</div>
+      <div class="bb-label">年度期初餘額</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" style="color:#ef9a9a;">8,215</div>
+      <div class="bb-label">已核銷金額（累計）</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd hd-red">
+      🔻 備抵醫療折讓 明細帳（110306）
+      <span style="margin-left:auto; display:flex; gap:6px;">
+        <button class="btn btn-gray" style="font-size:11px; padding:3px 10px;" onclick="addAllowEntry()">＋ 補登</button>
+        <button class="btn btn-green" style="font-size:11px; padding:3px 10px;" onclick="exportAllowExcel()">📥 匯出</button>
+      </span>
+    </div>
+    <div class="card-bd" style="padding:0;">
+      <div class="table-wrap">
+      <table class="ledger-table" id="allow-ledger">
+        <thead>
+          <tr>
+            <th style="width:60px;">年月</th>
+            <th style="width:100px;">類型</th>
+            <th style="width:90px; text-align:right;">金額</th>
+            <th style="width:100px; text-align:right;">餘額</th>
+            <th>摘要（可修改）</th>
+            <th style="width:40px;"></th>
+          </tr>
+        </thead>
+        <tbody id="allow-tbody">
+          <tr>
+            <td>期初</td>
+            <td><span class="badge-type bt-sup">期初餘額</span></td>
+            <td class="credit-cell" style="text-align:right;">+65,754</td>
+            <td class="balance-cell" style="text-align:right;">65,754</td>
+            <td><input class="fi" type="text" value="115年1月1日期初備抵醫療折讓" style="width:100%; font-size:11px;"></td>
+            <td></td>
+          </tr>
+          <tr>
+            <td>11503</td>
+            <td><span class="badge-type bt-ded">核銷</span></td>
+            <td class="debit-cell" style="text-align:right;">-8,215</td>
+            <td class="balance-cell" style="text-align:right;">57,539</td>
+            <td><input class="fi" type="text" value="11503備抵醫療折讓核銷（114年追扣4,463+核減176+流感追扣100=4,739+...）" style="width:100%; font-size:11px;"></td>
+            <td><button class="del-btn" onclick="delAllowRow(this)">✕</button></td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div><!-- /tab-allowance -->
+
+</div><!-- /content -->
+
+
+<!-- ════════ 動支單選取 Popup ════════ -->
+<div id="picker-overlay" onclick="closePickerBg(event)">
+  <div id="picker-box">
+    <div id="pk-head">
+      <h3>📋 選擇未出帳動支單（醫療基金 &gt; 510601 門診醫療成本）</h3>
+      <button class="pk-close" onclick="closePicker()">✕ 關閉</button>
+    </div>
+    <div id="pk-filter">
+      <input class="pk-in" type="text" placeholder="🔍 搜尋摘要" oninput="filterPicker(this.value)" style="max-width:260px;">
+      <span style="font-size:11px; color:#78909c; flex:1;">近兩個月，僅醫療基金門診醫療成本</span>
+      <button class="btn btn-gray" style="font-size:11px; padding:3px 10px;" onclick="selectAllPk()">全選</button>
+      <button class="btn btn-gray" style="font-size:11px; padding:3px 10px;" onclick="deselectAllPk()">全不選</button>
+    </div>
+    <div id="pk-list"></div>
+    <div id="pk-foot">
+      <span class="pk-sel-info" id="pk-sel-info">已選 0 項，合計 $0</span>
+      <button class="pk-confirm" onclick="confirmPicker()">✓ 確認帶入</button>
+    </div>
+  </div>
+</div>
+
+
+<script>
+/* ════════════════════════════════════════════
+   LocalStorage Key 常數
+════════════════════════════════════════════ */
+const LS = {
+  settings:  'acc_settings',
+  property:  'acc_property',
+  allowance: 'acc_allowance',
+  inventory: 'acc_inventory',
+  monthly:   ym => `acc_monthly_${ym}`,
+};
+
+/* ════════════════════════════════════════════
+   初始狀態
+════════════════════════════════════════════ */
+let STATE = {
+  settings: {
+    discountRate: '0.0211',
+    deprLocked: true,
+    propLocked: true,
+  },
+  property: {
+    monthlyDepr: 2193,
+    currentBalance: 80626,
+  },
+  allowance: {
+    currentBalance: 57539,
+  },
+  inventory: {
+    drug:   { balance: 98733 },
+    supply: { balance: 2472  },
+  },
+  // 當月資料
+  month: {
+    pickerItems: [],   // 已選未出帳動支單
+    adjRows: [],       // 補付/追扣列
+    discount: { needed: false, rate: '', amount: 0 },
+    income: {},
+    expense: {},
+  },
+  // 傳票
+  vouchers: [],
+};
+
+/* Mock 未出帳動支單（連線後由 API 提供） */
+const MOCK_UNPOSTED = [
+  { id:'U001', yearMonth:'11503', voucher:'待出帳-01', subject:'510601 門診醫療成本', purposeCode:'2713', purposeDesc:'計時與計件人員酬金',
+    desc:'11503臨時人員（黎欣妮3,801+方雪雲3,977=7,778+補助代扣8,568=16,346）', amount:16346, applied:false },
+  { id:'U002', yearMonth:'11503', voucher:'待出帳-02', subject:'510601 門診醫療成本', purposeCode:'2202', purposeDesc:'電話費',
+    desc:'11503中華電信電話費998+4212+172=5382', amount:5382, applied:false },
+  { id:'U003', yearMonth:'11503', voucher:'待出帳-03', subject:'510601 門診醫療成本', purposeCode:'2204', purposeDesc:'數據通信費',
+    desc:'11503中華電信數據通信費175+1691=1866', amount:1866, applied:false },
+  { id:'U004', yearMonth:'11504', voucher:'待出帳-04', subject:'510601 門診醫療成本', purposeCode:'1501', purposeDesc:'績效獎金',
+    desc:'11503當月繳局統籌款378+719+4527=7186', amount:7186, applied:false },
+];
+
+let pickerSelected = new Set();
+
+/* ════════════════════════════════════════════
+   工具函式
+════════════════════════════════════════════ */
+function pnum(v){ const s=String(v||'').replace(/,/g,'').trim(); return parseFloat(s)||0; }
+function fmt(n){ return Math.round(n).toLocaleString('zh-TW'); }
+function curYm(){ return document.getElementById('sel-year').value + pad(document.getElementById('sel-month').value); }
+function pad(n){ return String(n).padStart(2,'0'); }
+function getYm(){ const y=document.getElementById('sel-year').value; const m=document.getElementById('sel-month').value; return {y,m,ym:`${y}${pad(m)}`,label:`${y} 年 ${m} 月`}; }
+function showSaveMsg(msg='✓ 已儲存', ok=true){
+  const el=document.getElementById('save-msg');
+  el.textContent=msg; el.style.color=ok?'#66bb6a':'#ef5350';
+  setTimeout(()=>el.textContent='',2500);
+}
+
+/* ════════════════════════════════════════════
+   Tab 切換
+════════════════════════════════════════════ */
+function switchTab(name, btn){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn') .forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+
+/* ════════════════════════════════════════════
+   年月切換
+════════════════════════════════════════════ */
+function onYmChange(){
+  const {label} = getYm();
+  document.getElementById('ym-title').textContent = label;
+  document.getElementById('voucher-ym-title').textContent = label + ' 轉帳傳票';
+  loadMonthData();
+}
+
+/* ════════════════════════════════════════════
+   收入計算
+════════════════════════════════════════════ */
+function calcIncome(){
+  const hi=pnum(document.getElementById('inc-hi').value);
+  const c=pnum(document.getElementById('inc-covid').value);
+  const f=pnum(document.getElementById('inc-flu').value);
+  const r=pnum(document.getElementById('inc-routine').value);
+  document.getElementById('inc-total').value = fmt(hi+c+f+r);
+  calcReminders();
+}
+function calcOther(){
+  const a=pnum(document.getElementById('inc-lab').value);
+  const b=pnum(document.getElementById('inc-copay').value);
+  const c=pnum(document.getElementById('inc-noncov').value);
+  document.getElementById('inc-other-total').value = fmt(a+b+c);
+}
+
+/* ════════════════════════════════════════════
+   醫療折讓
+════════════════════════════════════════════ */
+function onDiscountToggle(){
+  const needed = document.getElementById('discount-needed').checked;
+  const wrap = document.getElementById('discount-rate-wrap');
+  const box  = document.getElementById('discount-box');
+  wrap.style.display = needed ? 'flex' : 'none';
+  box.className = 'discount-box ' + (needed ? 'warn' : 'ok');
+  document.getElementById('discount-title').textContent = needed
+    ? '⚠️ 本月需提列醫療折讓'
+    : '✅ 本月不需提列醫療折讓';
+  // 帶入記憶折讓率
+  if(needed && STATE.settings.discountRate){
+    document.getElementById('discount-rate').value = STATE.settings.discountRate;
+    onDiscountCalc();
+  }
+  if(!needed) calcReminders();
+}
+function onDiscountCalc(){
+  const rate = pnum(document.getElementById('discount-rate').value);
+  const bill = pnum(document.getElementById('inc-total').value);
+  const amount = Math.round(bill * rate);
+  document.getElementById('discount-amount').textContent = amount > 0 ? fmt(amount) + ' 元' : '-';
+  STATE.settings.discountRate = document.getElementById('discount-rate').value;
+  STATE.month.discount = { needed: true, rate, amount };
+  // 更新說明文字
+  if(amount > 0){
+    document.getElementById('discount-hint').textContent =
+      `提列 ${fmt(amount)} 元 → 四格分配金額已依公式調降`;
+  }
+  calcReminders();
+}
+
+/* ════════════════════════════════════════════
+   四格試算（奬前收支淨餘分配）
+   公式：
+     可分配 = 健保掛帳合計 - 醫療折讓提列（若勾選）
+     醫療作業基金5% = 可分配 × 5%
+     剩餘95% = 可分配 × 95%
+     繳局統籌款    = 剩餘95% × 10%
+     醫師獎勵金    = 剩餘95% × 90% × 70%
+     員工獎勵金    = 剩餘95% × 90% × 30%
+════════════════════════════════════════════ */
+function calcReminders(){
+  const hi    = pnum(document.getElementById('inc-hi').value);
+  const covid = pnum(document.getElementById('inc-covid').value);
+  const flu   = pnum(document.getElementById('inc-flu').value);
+  const rout  = pnum(document.getElementById('inc-routine').value);
+  const totalHI = hi + covid + flu + rout;
+
+  const discNeeded = document.getElementById('discount-needed').checked;
+  const discAmt = discNeeded ? (STATE.month.discount.amount || 0) : 0;
+
+  const distributable = totalHI - discAmt;
+
+  if(distributable <= 0){
+    ['rc-bureau','rc-doctor','rc-staff','rc-fund5'].forEach(id=>{
+      document.getElementById(id).textContent = distributable === 0 ? '0' : '-';
+    });
+    document.getElementById('rc-fund5-sub').textContent = '本月試算';
+    return;
+  }
+
+  const fund5    = Math.round(distributable * 0.05);
+  const remain95 = distributable - fund5;
+  const bureau   = Math.round(remain95 * 0.10);
+  const doctor   = Math.round(remain95 * 0.90 * 0.70);
+  const staff    = Math.round(remain95 * 0.90 * 0.30);
+
+  document.getElementById('rc-fund5').textContent  = fmt(fund5);
+  document.getElementById('rc-bureau').textContent = fmt(bureau);
+  document.getElementById('rc-doctor').textContent = fmt(doctor);
+  document.getElementById('rc-staff').textContent  = fmt(staff);
+
+  // 若有折讓提列，在 r-sub 顯示扣減提示
+  const subNote = discNeeded && discAmt > 0
+    ? `已扣折讓 ${fmt(discAmt)} 元`
+    : '本月試算';
+  ['rc-bureau-sub','rc-doctor-sub','rc-staff-sub','rc-fund5-sub'].forEach(id=>{
+    document.getElementById(id).textContent = subNote;
+  });
+}
+
+/* ════════════════════════════════════════════
+   支出計算
+════════════════════════════════════════════ */
+function calcDrug(){
+  const d=pnum(document.getElementById('exp-drug').value);
+  const s=pnum(document.getElementById('exp-supply').value);
+  document.getElementById('exp-drug-total').value = fmt(d+s);
+}
+function calcInv(){
+  const drugReal   = pnum(document.getElementById('inv-drug-real').value);
+  const supplyReal = pnum(document.getElementById('inv-supply-real').value);
+  const drugBook   = STATE.inventory.drug.balance;
+  const supplyBook = STATE.inventory.supply.balance;
+  if(!drugReal && !supplyReal){ document.getElementById('inv-diff').value=''; document.getElementById('inv-note').value=''; return; }
+  const totalReal  = (drugReal||drugBook) + (supplyReal||supplyBook);
+  const totalBook  = drugBook + supplyBook;
+  const diff       = totalBook - totalReal;  // 正=帳多於實=盤損，負=帳少=盤盈
+  document.getElementById('inv-diff').value = diff !== 0 ? (diff>0?'+':'')+fmt(Math.abs(diff)) : '無差異';
+  document.getElementById('inv-diff-hint').textContent = diff>0?'帳面>實際：提列盤損': diff<0?'帳面<實際：提列盤盈':'帳實相符，無需調整';
+  document.getElementById('inv-note').value = diff>0 ? `11503藥品盤損${fmt(diff)}元` : diff<0 ? `11503藥品盤盈${fmt(Math.abs(diff))}元` : '';
+}
+
+/* ════════════════════════════════════════════
+   折舊鎖定切換
+════════════════════════════════════════════ */
+function toggleDeprLock(){
+  STATE.settings.deprLocked = !STATE.settings.deprLocked;
+  const inp = document.getElementById('exp-depr');
+  const btn = document.getElementById('depr-lock-btn');
+  const hint= document.getElementById('depr-hint');
+  if(STATE.settings.deprLocked){
+    inp.readOnly=true; inp.className='num-in locked';
+    btn.textContent='🔒 鎖定'; btn.className='lock-btn locked';
+    hint.textContent='11503雜項設備折舊（預設鎖定）';
+  } else {
+    inp.readOnly=false; inp.className='num-in';
+    btn.textContent='🔓 已解鎖'; btn.className='lock-btn';
+    hint.textContent='⚠️ 解鎖後可修改折舊金額';
+  }
+}
+function togglePropLock(){
+  STATE.settings.propLocked = !STATE.settings.propLocked;
+  const btn = document.getElementById('prop-lock-btn');
+  btn.textContent = STATE.settings.propLocked ? '🔒 鎖定' : '🔓 已解鎖';
+  btn.className   = 'lock-btn ' + (STATE.settings.propLocked ? 'locked' : '');
+  // 讓表格欄位可/不可編輯
+  document.querySelectorAll('#prop-tbody .edit-depr').forEach(el => {
+    el.readOnly = STATE.settings.propLocked;
+    el.className = STATE.settings.propLocked ? 'fi' : 'fi';
+    el.style.background = STATE.settings.propLocked ? '#f5f5f5' : '#fff';
+  });
+}
+
+/* ════════════════════════════════════════════
+   保險補付/追扣
+════════════════════════════════════════════ */
+let adjIdx = 0;
+const ADJ_TYPE = {
+  sup:   { label:'當年補付',    badge:'bt-sup',  hint: v => `直接加進當年分配（繳局/醫師/員工獎勵金增加）` },
+  ded:   { label:'當年追扣',    badge:'bt-ded',  hint: v => `先借備抵折讓（110306），不足再借門診醫療成本` },
+  pysup: { label:'以前年度補付', badge:'bt-pysup', hint: v => '' },
+  pyded: { label:'以前年度追扣', badge:'bt-pyded', hint: v => `雜項支出：先從備抵折讓抵用，不足加門診醫療成本` },
+};
+function addAdj(type){
+  adjIdx++;
+  const idx = adjIdx;
+  const t = ADJ_TYPE[type];
+  const row = document.createElement('tr');
+  row.id = 'adj-'+idx;
+  row.innerHTML = `
+    <td><span class="badge-type ${t.badge}">${t.label}</span></td>
+    <td><input class="fi" type="text" placeholder="年月" style="width:70px; font-size:11px;" id="adj-ym-${idx}"></td>
+    <td>
+      <select class="fi" style="font-size:11px; width:120px;" id="adj-cat-${idx}" onchange="updateAdjHint(${idx},'${type}')">
+        ${type==='pysup'?`
+          <option value="bureau">繳局統籌款</option>
+          <option value="doctor">醫師獎勵金（114年6月前）</option>
+          <option value="staff">員工獎勵金（114年含以前）</option>
+          <option value="fund5">醫療作業基金5%</option>
+        `:type==='sup'?`
+          <option value="bureau">繳局統籌款</option>
+          <option value="doctor">醫師獎勵金</option>
+          <option value="staff">員工獎勵金</option>
+        `:`<option value="misc">雜項支出/追扣</option>`}
+      </select>
+    </td>
+    <td><input class="num-in" type="text" placeholder="0" style="max-width:100px;" id="adj-amt-${idx}" oninput="updateAdjHint(${idx},'${type}')"></td>
+    <td style="font-size:10px; color:#546e7a;" id="adj-hint-${idx}">${t.hint('')}</td>
+    <td><button class="del-btn" onclick="document.getElementById('adj-${idx}').remove()">✕</button></td>`;
+  document.getElementById('adj-tbody').appendChild(row);
+}
+function updateAdjHint(idx, type){
+  const cat = document.getElementById('adj-cat-'+idx)?.value;
+  const amt = pnum(document.getElementById('adj-amt-'+idx)?.value);
+  const el  = document.getElementById('adj-hint-'+idx);
+  if(!el) return;
+  const hints = {
+    sup:   { bureau:`貸 210205/01繳局統籌款`, doctor:`貸 210205/02醫師獎勵金`, staff:`貸 210205/03員工獎勵金` },
+    ded:   { misc: `借 110306備抵折讓（餘額${fmt(STATE.allowance.currentBalance)}）→不足借510601門診醫療成本` },
+    pysup: {
+      bureau:`借 110305應收醫療帳款 / 貸 420298雜項收入 + 210205/01繳局統籌`,
+      doctor:`借 110305應收醫療帳款 / 貸 210205/02績效獎金-員工款（醫師，114/6前）`,
+      staff: `借 110305應收醫療帳款 / 貸 210205/03績效獎金-員工款（員工，114年前）`,
+      fund5: `借 110305應收醫療帳款 / 貸 420298雜項收入`
+    },
+    pyded: { misc:`借 110306備抵折讓（優先）→不足借510601門診醫療成本 / 貸 110305應收醫療帳款` },
+  };
+  el.textContent = (hints[type]||{})[cat] || '';
+}
+
+/* ════════════════════════════════════════════
+   動支單 Picker
+════════════════════════════════════════════ */
+function openPicker(){
+  renderPicker('');
+  document.getElementById('picker-overlay').classList.add('open');
+}
+function closePicker(){ document.getElementById('picker-overlay').classList.remove('open'); }
+function closePickerBg(e){ if(e.target===document.getElementById('picker-overlay')) closePicker(); }
+
+function renderPicker(kw){
+  const list = document.getElementById('pk-list');
+  list.innerHTML = '';
+  const filtered = MOCK_UNPOSTED.filter(r =>
+    (r.desc+r.subject+r.purposeDesc).toLowerCase().includes(kw.toLowerCase())
+  );
+  if(!filtered.length){ list.innerHTML='<p class="empty-msg">無符合條件的未出帳動支單</p>'; return; }
+  filtered.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'pk-rec' + (pickerSelected.has(r.id)?' picked':'');
+    div.innerHTML = `
+      <input type="checkbox" ${pickerSelected.has(r.id)?'checked':''} onchange="togglePk('${r.id}',this)">
+      <div class="pk-info">
+        <div class="pk-title">${r.subject} <span style="font-size:10px;color:#90a4ae;">${r.purposeDesc} ${r.purposeCode}</span>
+          <span style="font-size:10px;background:#f3e5f5;color:#8e24aa;border-radius:3px;padding:1px 5px;margin-left:4px;">未出帳 ${r.yearMonth}</span>
+        </div>
+        <div class="pk-sub">${r.desc}</div>
+      </div>
+      <div class="pk-amt">$${fmt(r.amount)}</div>`;
+    list.appendChild(div);
+  });
+  updatePkFoot();
+}
+function togglePk(id, cb){
+  if(cb.checked) pickerSelected.add(id); else pickerSelected.delete(id);
+  cb.closest('.pk-rec').classList.toggle('picked', cb.checked);
+  updatePkFoot();
+}
+function updatePkFoot(){
+  let sum=0, cnt=0;
+  pickerSelected.forEach(id=>{ const r=MOCK_UNPOSTED.find(x=>x.id===id); if(r){sum+=r.amount;cnt++;} });
+  document.getElementById('pk-sel-info').textContent=`已選 ${cnt} 項，合計 $${fmt(sum)}`;
+}
+function filterPicker(kw){ renderPicker(kw); }
+function selectAllPk(){ MOCK_UNPOSTED.forEach(r=>pickerSelected.add(r.id)); renderPicker(''); }
+function deselectAllPk(){ pickerSelected.clear(); renderPicker(''); }
+
+function confirmPicker(){
+  let sum=0; const items=[];
+  pickerSelected.forEach(id=>{ const r=MOCK_UNPOSTED.find(x=>x.id===id); if(r){sum+=r.amount; items.push(r);} });
+  STATE.month.pickerItems = items;
+  document.getElementById('picker-total').textContent = sum>0 ? `$${fmt(sum)}` : '-';
+  const pl = document.getElementById('picked-list');
+  pl.innerHTML = items.map(r=>`<span>${r.yearMonth} ${r.purposeDesc} $${fmt(r.amount)}</span>`).join('');
+  // 更新折舊後淨值
+  const depr = pnum(document.getElementById('exp-depr').value);
+  document.getElementById('exp-depr-balance').value = fmt(STATE.property.currentBalance - depr);
+  closePicker();
+}
+
+/* ════════════════════════════════════════════
+   產生傳票
+════════════════════════════════════════════ */
+function generateVouchers(){
+  const {y, m, ym, label} = getYm();
+  const yymm = ym; // e.g. "11504"
+  const date  = `${y}/${pad(m)}/月底`;
+  const vouchers = [];
+
+  // 1. 固定折舊
+  const depr = pnum(document.getElementById('exp-depr').value);
+  if(depr > 0){
+    vouchers.push({ group:'固定成本', type:'debit',  subject:'510601 門診醫療成本', purpose:'5151 什項設備折舊', desc:`${yymm}雜項設備折舊${fmt(depr)}元`, dr:depr, cr:0 });
+    vouchers.push({ group:'',         type:'credit', subject:'130603 累計折舊－什項設備', purpose:'', desc:`${yymm}雜項設備折舊${fmt(depr)}元`, dr:0, cr:depr });
+  }
+
+  // 2. 藥品領用
+  const drug   = pnum(document.getElementById('exp-drug').value);
+  const supply = pnum(document.getElementById('exp-supply').value);
+  if(drug > 0){
+    vouchers.push({ group:'藥品領用', type:'debit',  subject:'510601 門診醫療成本', purpose:'3303 藥品', desc:`${yymm}藥品領用${fmt(drug)}元`, dr:drug, cr:0 });
+    vouchers.push({ group:'',         type:'credit', subject:'110404 醫療用品', purpose:'', desc:`${yymm}藥品領用${fmt(drug)}元`, dr:0, cr:drug });
+  }
+  if(supply > 0){
+    vouchers.push({ group:'衛材領用', type:'debit',  subject:'510601 門診醫療成本', purpose:'3303 藥品', desc:`${yymm}衛材領用${fmt(supply)}元`, dr:supply, cr:0 });
+    vouchers.push({ group:'',         type:'credit', subject:'110404 醫療用品', purpose:'', desc:`${yymm}衛材領用${fmt(supply)}元`, dr:0, cr:supply });
+  }
+
+  // 3. 藥品盤盈/損
+  const drugReal   = pnum(document.getElementById('inv-drug-real').value);
+  const supplyReal = pnum(document.getElementById('inv-supply-real').value);
+  if(drugReal || supplyReal){
+    const totalReal = (drugReal||STATE.inventory.drug.balance) + (supplyReal||STATE.inventory.supply.balance);
+    const totalBook = STATE.inventory.drug.balance + STATE.inventory.supply.balance;
+    const diff = totalBook - totalReal;
+    if(diff !== 0){
+      const isLoss = diff > 0;
+      const amt = Math.abs(diff);
+      vouchers.push({ group:isLoss?'藥品盤損':'藥品盤盈',
+        type: isLoss?'debit':'credit',
+        subject: isLoss?'510601 門診醫療成本':'110404 醫療用品',
+        purpose: '3303 藥品',
+        desc: `${yymm}${isLoss?'藥品盤損':'藥品盤盈'}${fmt(amt)}元`,
+        dr: isLoss?amt:0, cr: isLoss?0:amt });
+      vouchers.push({ group:'',
+        type: isLoss?'credit':'debit',
+        subject: isLoss?'110404 醫療用品':'510601 門診醫療成本',
+        purpose: '',
+        desc: `${yymm}${isLoss?'藥品盤損':'藥品盤盈'}${fmt(amt)}元`,
+        dr: isLoss?0:amt, cr: isLoss?amt:0 });
+    }
+  }
+
+  // 4. 未出帳動支單 → 掛應付費用
+  STATE.month.pickerItems.forEach(r => {
+    vouchers.push({ group:`動支掛應付（${r.yearMonth}）`, type:'debit',  subject:'510601 門診醫療成本', purpose:`${r.purposeCode} ${r.purposeDesc}`, desc:r.desc, dr:r.amount, cr:0 });
+    vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', purpose:`03 員工款`, desc:r.desc, dr:0, cr:r.amount });
+  });
+
+  // 5. 醫療折讓（若需提列）
+  const discountNeeded = document.getElementById('discount-needed').checked;
+  if(discountNeeded){
+    const discAmt = STATE.month.discount.amount || 0;
+    if(discAmt > 0){
+      vouchers.push({ group:'醫療折讓提列', type:'debit',  subject:'410698 醫療折讓', purpose:'', desc:`${yymm}醫療折讓${fmt(discAmt)}元`, dr:discAmt, cr:0 });
+      vouchers.push({ group:'', type:'credit', subject:'110306 備抵醫療折讓', purpose:'', desc:`${yymm}醫療折讓${fmt(discAmt)}元`, dr:0, cr:discAmt });
+    }
+  }
+
+  // 6. 健保掛帳（應收醫療帳款）
+  const hi    = pnum(document.getElementById('inc-hi').value);
+  const covid = pnum(document.getElementById('inc-covid').value);
+  const flu   = pnum(document.getElementById('inc-flu').value);
+  const rout  = pnum(document.getElementById('inc-routine').value);
+  const totalHI = hi + covid + flu + rout;
+  if(totalHI > 0){
+    vouchers.push({ group:'健保掛帳', type:'debit', subject:'110305 應收醫療帳款', purpose:'', desc:`${yymm}門診健保掛帳${fmt(hi)}+NIIS${fmt(covid+flu+rout)}=${fmt(totalHI)}`, dr:totalHI, cr:0 });
+    if(hi > 0)    vouchers.push({ group:'', type:'credit', subject:'41060102 門診收入', purpose:'', desc:`${yymm}門診健保總額${fmt(hi)}`, dr:0, cr:hi });
+    if(covid > 0) vouchers.push({ group:'', type:'credit', subject:'41060102 門診收入', purpose:'', desc:`${yymm}NIIS新冠疫苗接種處置費${fmt(covid)}`, dr:0, cr:covid });
+    if(flu > 0)   vouchers.push({ group:'', type:'credit', subject:'41060102 門診收入', purpose:'', desc:`${yymm}NIIS流感疫苗接種處置費${fmt(flu)}`, dr:0, cr:flu });
+    if(rout > 0)  vouchers.push({ group:'', type:'credit', subject:'41060102 門診收入', purpose:'', desc:`${yymm}NIIS常規疫苗接種處置費${fmt(rout)}`, dr:0, cr:rout });
+  }
+
+  // 7. 其他收入項目
+  const lab   = pnum(document.getElementById('inc-lab').value);
+  const copay = pnum(document.getElementById('inc-copay').value);
+  const nc    = pnum(document.getElementById('inc-noncov').value);
+  if(lab > 0){
+    vouchers.push({ group:'醫事服務費', type:'debit', subject:'110305 應收醫療帳款', purpose:'', desc:`${yymm}醫事服務費收入（檢驗）${fmt(lab)}`, dr:lab, cr:0 });
+    vouchers.push({ group:'', type:'credit', subject:'41060103 檢驗收入', purpose:'', desc:`${yymm}醫事服務費收入（檢驗）${fmt(lab)}`, dr:0, cr:lab });
+  }
+
+  // 8. 保險補付/追扣
+  document.querySelectorAll('#adj-tbody tr').forEach(tr => {
+    const typeEl = tr.querySelector('[class^="badge-type"]');
+    if(!typeEl) return;
+    const cat = tr.querySelector('select')?.value;
+    const amt = pnum(tr.querySelector('.num-in')?.value);
+    const ym2 = tr.querySelector('.fi')?.value || '';
+    if(!amt) return;
+    const typeTxt = typeEl.textContent;
+    if(typeTxt.includes('以前年度追扣')){
+      // 先備抵再門診成本
+      const allowBal = STATE.allowance.currentBalance;
+      const fromAllow = Math.min(allowBal, amt);
+      const fromCost  = amt - fromAllow;
+      if(fromAllow>0) vouchers.push({ group:`以前年度追扣（${ym2}）`, type:'debit', subject:'110306 備抵醫療折讓', purpose:'', desc:`${ym2}以前年度追扣，備抵折讓抵用${fmt(fromAllow)}`, dr:fromAllow, cr:0 });
+      if(fromCost>0)  vouchers.push({ group:'', type:'debit', subject:'510601 門診醫療成本', purpose:'', desc:`${ym2}以前年度追扣超額${fmt(fromCost)}掛門診成本`, dr:fromCost, cr:0 });
+      vouchers.push({ group:'', type:'credit', subject:'110305 應收醫療帳款', purpose:'', desc:`${ym2}以前年度追扣${fmt(amt)}`, dr:0, cr:amt });
+    } else if(typeTxt.includes('當年追扣')){
+      const allowBal = STATE.allowance.currentBalance;
+      const fromAllow = Math.min(allowBal, amt);
+      const fromCost  = amt - fromAllow;
+      if(fromAllow>0) vouchers.push({ group:`當年追扣（${ym2}）`, type:'debit', subject:'110306 備抵醫療折讓', purpose:'', desc:`${ym2}當年追扣，備抵折讓抵用${fmt(fromAllow)}`, dr:fromAllow, cr:0 });
+      if(fromCost>0)  vouchers.push({ group:'', type:'debit', subject:'510601 門診醫療成本', purpose:'', desc:`${ym2}當年追扣超額${fmt(fromCost)}`, dr:fromCost, cr:0 });
+      vouchers.push({ group:'', type:'credit', subject:'110305 應收醫療帳款', purpose:'', desc:`${ym2}當年追扣${fmt(amt)}`, dr:0, cr:amt });
+    } else if(typeTxt.includes('以前年度補付')){
+      const catMap = { bureau:'應付費用/01繳局統籌款', doctor:'210205應付費用/02績效獎金-員工款（醫師）', staff:'210205應付費用/03績效獎金-員工款（員工）', fund5:'420298雜項收入' };
+      const crSubj = cat==='doctor'?'210205 應付費用':cat==='staff'?'210205 應付費用':cat==='bureau'?'210205 應付費用':'420298 雜項收入';
+      const crPurp = cat==='doctor'?'02 績效獎金':cat==='staff'?'03 績效獎金':cat==='bureau'?'01 繳局統籌款':'';
+      vouchers.push({ group:`以前年度補付（${ym2}）`, type:'debit', subject:'110305 應收醫療帳款', purpose:'', desc:`${ym2}以前年度補付${fmt(amt)}`, dr:amt, cr:0 });
+      vouchers.push({ group:'', type:'credit', subject:crSubj, purpose:crPurp, desc:`${ym2}以前年度補付${fmt(amt)}`, dr:0, cr:amt });
+    } else if(typeTxt.includes('當年補付')){
+      const crPurp = cat==='doctor'?'02 醫師獎勵金':cat==='staff'?'03 員工獎勵金':'01 繳局統籌款';
+      vouchers.push({ group:`當年補付（${ym2}）`, type:'debit', subject:'110305 應收醫療帳款', purpose:'', desc:`${ym2}當年補付${fmt(amt)}（直接加入當年分配）`, dr:amt, cr:0 });
+      vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', purpose:crPurp, desc:`${ym2}當年補付${fmt(amt)}`, dr:0, cr:amt });
+    }
+  });
+
+  STATE.vouchers = vouchers;
+  renderVouchers();
+  // 切換至傳票頁
+  document.querySelectorAll('.tab-btn')[1].click();
+}
+
+/* ════════════════════════════════════════════
+   渲染傳票
+════════════════════════════════════════════ */
+function renderVouchers(){
+  const tbody = document.getElementById('voucher-tbody');
+  tbody.innerHTML = '';
+  const {y,m} = getYm();
+  const dateStr = `${y}/${pad(m)}/30`;
+  if(!STATE.vouchers.length){ tbody.innerHTML='<tr><td colspan="7" class="empty-msg">尚無傳票資料</td></tr>'; return; }
+  let totalDr=0, totalCr=0, seq=0;
+  STATE.vouchers.forEach(v => {
+    seq++;
+    if(v.group){
+      const sep = document.createElement('tr');
+      sep.className = 'group-sep';
+      sep.innerHTML = `<td colspan="7">▶ ${v.group}</td>`;
+      tbody.appendChild(sep);
+    }
+    const tr = document.createElement('tr');
+    tr.className = v.type === 'debit' ? 'debit' : 'credit';
+    tr.innerHTML = `
+      <td>${seq}</td>
+      <td>${dateStr}</td>
+      <td>${v.subject}</td>
+      <td style="font-size:11px; color:#546e7a;">${v.purpose||''}</td>
+      <td style="font-size:11px;">${v.desc}</td>
+      <td style="text-align:right;" class="${v.dr?'v-dr':''}">${v.dr?fmt(v.dr):''}</td>
+      <td style="text-align:right;" class="${v.cr?'v-cr':''}">${v.cr?fmt(v.cr):''}</td>`;
+    tbody.appendChild(tr);
+    totalDr += v.dr; totalCr += v.cr;
+  });
+  document.getElementById('total-debit').textContent  = fmt(totalDr);
+  document.getElementById('total-credit').textContent = fmt(totalCr);
+  document.getElementById('voucher-count').textContent = `共 ${STATE.vouchers.length} 筆`;
+}
+
+/* ════════════════════════════════════════════
+   匯出 Excel（CSV格式）
+════════════════════════════════════════════ */
+function exportExcel(){
+  const {y,m,label} = getYm();
+  const dateStr = `${y}/${pad(m)}/30`;
+  let csv = '\uFEFF'; // BOM for Excel UTF-8
+  csv += '製票日期\t入帳日期\t傳票種類\t會計科目\t用途別科目\t摘要\t借方金額\t貸方金額\n';
+  STATE.vouchers.forEach(v => {
+    csv += [dateStr, dateStr, '轉帳', v.subject, v.purpose||'', v.desc, v.dr||'', v.cr||''].join('\t') + '\n';
+  });
+  const blob = new Blob([csv], { type: 'text/tab-separated-values;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `轉帳傳票_${label.replace(/ /g,'')}.tsv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+function exportInvExcel(type){ alert(`📥 匯出${type==='drug'?'藥品':'衛材'}明細帳 Excel（建置中）`); }
+function exportPropExcel(){ alert('📥 匯出財產折舊存摺 Excel（建置中）'); }
+function exportAllowExcel(){ alert('📥 匯出備抵折讓明細 Excel（建置中）'); }
+
+/* ════════════════════════════════════════════
+   備抵折讓
+════════════════════════════════════════════ */
+function addAllowEntry(){
+  const tbody = document.getElementById('allow-tbody');
+  const lastBal = STATE.allowance.currentBalance;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input class="fi" type="text" placeholder="年月" style="width:54px; font-size:11px;"></td>
+    <td>
+      <select class="fi" style="font-size:11px;" onchange="recalcAllowLedger()">
+        <option value="sup">提列（貸方增）</option>
+        <option value="ded">核銷（借方減）</option>
+        <option value="offset">追扣抵用（借方減）</option>
+      </select>
+    </td>
+    <td><input class="num-in" type="text" placeholder="0" style="max-width:80px;" oninput="recalcAllowLedger()"></td>
+    <td class="balance-cell" style="text-align:right;">${fmt(lastBal)}</td>
+    <td><input class="fi" type="text" placeholder="摘要" style="width:100%; font-size:11px;"></td>
+    <td><button class="del-btn" onclick="this.closest('tr').remove(); recalcAllowLedger();">✕</button></td>`;
+  tbody.appendChild(tr);
+}
+function delAllowRow(btn){ btn.closest('tr').remove(); recalcAllowLedger(); }
+function recalcAllowLedger(){
+  // 重算餘額欄（簡易版）
+  let bal = 65754; // 期初
+  document.querySelectorAll('#allow-tbody tr').forEach(tr => {
+    const sel = tr.querySelector('select');
+    const inp = tr.querySelector('.num-in');
+    const balCell = tr.querySelector('.balance-cell');
+    if(!sel || !inp) return;
+    const amt = pnum(inp.value);
+    if(sel.value === 'sup') bal += amt;
+    else bal -= amt;
+    if(balCell) balCell.textContent = fmt(bal);
+  });
+  STATE.allowance.currentBalance = bal;
+  document.getElementById('al-balance').textContent = fmt(bal);
+  document.getElementById('rc-allowance').textContent = fmt(bal);
+}
+
+/* ════════════════════════════════════════════
+   庫存補登
+════════════════════════════════════════════ */
+function addInvEntry(type){
+  const tbody = document.getElementById(type+'-tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input class="fi" type="text" placeholder="年月" style="width:54px; font-size:11px;"></td>
+    <td>
+      <select class="fi" style="font-size:11px; width:70px;">
+        <option>進貨</option><option>領用</option><option>報廢</option><option>盤盈</option><option>盤損</option>
+      </select>
+    </td>
+    <td><input class="num-in" type="text" placeholder="0" style="max-width:80px;"></td>
+    <td style="text-align:right; color:#1565c0; font-weight:700;">-</td>
+    <td><input class="fi" type="text" placeholder="摘要" style="width:100%; font-size:11px;"></td>`;
+  tbody.appendChild(tr);
+}
+
+/* ════════════════════════════════════════════
+   儲存/讀取月份資料（LocalStorage）
+════════════════════════════════════════════ */
+function saveMonthData(){
+  const ym = curYm();
+  const data = {
+    income: {
+      hi:    document.getElementById('inc-hi').value,
+      covid: document.getElementById('inc-covid').value,
+      flu:   document.getElementById('inc-flu').value,
+      rout:  document.getElementById('inc-routine').value,
+      lab:   document.getElementById('inc-lab').value,
+      copay: document.getElementById('inc-copay').value,
+      nc:    document.getElementById('inc-noncov').value,
+    },
+    discount: {
+      needed: document.getElementById('discount-needed').checked,
+      rate:   document.getElementById('discount-rate').value,
+    },
+    expense: {
+      depr:   document.getElementById('exp-depr').value,
+      drug:   document.getElementById('exp-drug').value,
+      supply: document.getElementById('exp-supply').value,
+      drugReal:   document.getElementById('inv-drug-real').value,
+      supplyReal: document.getElementById('inv-supply-real').value,
+    },
+    pickerIds: [...pickerSelected],
+  };
+  localStorage.setItem(LS.monthly(ym), JSON.stringify(data));
+  localStorage.setItem(LS.settings, JSON.stringify(STATE.settings));
+  showSaveMsg('✓ 已儲存');
+}
+function loadMonthData(){
+  const ym = curYm();
+  const raw = localStorage.getItem(LS.monthly(ym));
+  if(!raw) return;
+  try {
+    const d = JSON.parse(raw);
+    if(d.income){
+      document.getElementById('inc-hi').value    = d.income.hi||'';
+      document.getElementById('inc-covid').value = d.income.covid||'';
+      document.getElementById('inc-flu').value   = d.income.flu||'';
+      document.getElementById('inc-routine').value = d.income.rout||'';
+      document.getElementById('inc-lab').value   = d.income.lab||'';
+      document.getElementById('inc-copay').value = d.income.copay||'';
+      document.getElementById('inc-noncov').value= d.income.nc||'';
+      calcIncome(); calcOther();
+    }
+    if(d.discount){
+      document.getElementById('discount-needed').checked = d.discount.needed;
+      document.getElementById('discount-rate').value = d.discount.rate||'';
+      onDiscountToggle();
+    }
+    if(d.expense){
+      document.getElementById('exp-drug').value   = d.expense.drug||'';
+      document.getElementById('exp-supply').value = d.expense.supply||'';
+      document.getElementById('inv-drug-real').value   = d.expense.drugReal||'';
+      document.getElementById('inv-supply-real').value = d.expense.supplyReal||'';
+      calcDrug(); calcInv();
+    }
+    if(d.pickerIds){
+      pickerSelected = new Set(d.pickerIds);
+      confirmPicker(); // 更新顯示但不關 popup
+    }
+  } catch(e){ console.warn('loadMonthData error', e); }
+}
+
+/* ════════════════════════════════════════════
+   登出
+════════════════════════════════════════════ */
+function logout(){ window.location.href = '/admin.html'; }
+
+/* ════════════════════════════════════════════
+   初始化
+════════════════════════════════════════════ */
+(function init(){
+  // 讀設定
+  const raw = localStorage.getItem(LS.settings);
+  if(raw) try{ Object.assign(STATE.settings, JSON.parse(raw)); } catch(e){}
+  // 折舊淨值顯示
+  document.getElementById('exp-depr-balance').value = fmt(STATE.property.currentBalance - STATE.property.monthlyDepr);
+  // 帳面庫存顯示
+  document.getElementById('inv-drug-book').textContent   = fmt(STATE.inventory.drug.balance);
+  document.getElementById('inv-supply-book').textContent = fmt(STATE.inventory.supply.balance);
+  // 讀本月資料
+  loadMonthData();
+  // 初始試算提醒卡
+  calcReminders();
+})();
+</script>
+</body>
+</html>
