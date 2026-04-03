@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.8.3</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.8.4</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -2134,9 +2134,18 @@ function renderInvLedger(type){
         ${r.type&&r.type!=='進貨'?`<select class="fi" style="font-size:10px;width:46px;color:#546e7a;margin-right:4px;" onchange="this.closest('tr').dataset.type=this.value;recalcInvLedger('${type}')">${INV_TYPES.map(t=>`<option${t===r.type?' selected':''}>${t}</option>`).join('')}</select>`:''}
         <input class="fi inv-desc" type="text" value="${r.desc||''}" style="width:${r.type&&r.type!=='進貨'?'calc(100% - 54px)':'100%'};font-size:11px;" oninput="saveInvLedger('${type}')">
       </td>
-      <td><button class="del-btn" onclick="this.closest('tr').remove();recalcInvLedger('${type}')">✕</button></td>
+      <td><button class="del-btn" onclick="confirmDelInv(this,'${type}')">✕</button></td>
     </tr>`).join('');
   recalcInvLedger(type);
+}
+function confirmDelInv(btn, type){
+  const tr = btn.closest('tr');
+  const desc = (tr.querySelector('.inv-desc')||{}).value || '此筆紀錄';
+  showModal({ title:'刪除確認', icon:'🗑️',
+    body:`確定要刪除「<b>${desc}</b>」？<br><span style="color:#e53935;font-size:12px;">此動作無法復原</span>`,
+    confirmText:'刪除', danger:true,
+    onConfirm: ()=>{ tr.remove(); recalcInvLedger(type); }
+  });
 }
 function addInvEntry(type){
   const tbody = document.getElementById(type+'-tbody');
@@ -2152,7 +2161,7 @@ function addInvEntry(type){
       </select>
       <input class="fi inv-desc" type="text" placeholder="摘要" style="width:calc(100% - 54px);font-size:11px;" oninput="saveInvLedger('${type}')">
     </td>
-    <td><button class="del-btn" onclick="this.closest('tr').remove();recalcInvLedger('${type}')">✕</button></td>`;
+    <td><button class="del-btn" onclick="confirmDelInv(this,'${type}')">✕</button></td>`;
   tbody.appendChild(tr);
   recalcInvLedger(type);
 }
