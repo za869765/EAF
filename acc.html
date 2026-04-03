@@ -291,25 +291,61 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
       <div class="r-label">🏚️ 財產帳面淨值</div>
       <div class="r-sub">每月扣 2,193</div>
     </div>
+    <div class="r-card rc-blue">
+      <div class="r-num" id="rc-fund5">-</div>
+      <div class="r-label">💰 累積賸餘</div>
+      <div class="r-sub">115年度累積</div>
+    </div>
     <div class="r-card rc-orange">
       <div class="r-num" id="rc-bureau">-</div>
-      <div class="r-label">繳局統籌款（×10%）</div>
-      <div class="r-sub" id="rc-bureau-sub">本月試算</div>
-    </div>
-    <div class="r-card rc-purple">
-      <div class="r-num" id="rc-doctor">-</div>
-      <div class="r-label">醫師獎勵金（×90%×70%）</div>
-      <div class="r-sub" id="rc-doctor-sub">本月試算</div>
+      <div class="r-label">🏛️ 繳局統籌款</div>
+      <div class="r-sub">115年度累積</div>
     </div>
     <div class="r-card rc-red">
       <div class="r-num" id="rc-staff">-</div>
-      <div class="r-label">員工獎勵金（×90%×30%）</div>
-      <div class="r-sub" id="rc-staff-sub">本月試算</div>
+      <div class="r-label">👥 員工款</div>
+      <div class="r-sub">115年度累積</div>
     </div>
-    <div class="r-card rc-blue">
-      <div class="r-num" id="rc-fund5">-</div>
-      <div class="r-label">醫療作業基金（×5%）</div>
-      <div class="r-sub" id="rc-fund5-sub">本月試算</div>
+  </div>
+
+  <!-- ── 年度各月可分配收入補登 ── -->
+  <div class="card" style="margin-bottom:12px;">
+    <div class="card-hd hd-dark" style="cursor:pointer;" onclick="toggleYearPanel()">
+      📅 115年度各月可分配收入補登
+      <span id="year-panel-toggle" style="margin-left:auto; font-size:10px; color:#90a4ae;">▼ 展開</span>
+    </div>
+    <div id="year-panel" style="display:none; padding:10px 14px;">
+      <p style="font-size:11px; color:#78909c; margin-bottom:8px;">
+        輸入各月「健保掛帳合計 − 醫療折讓提列」後的<strong>可分配收入</strong>，系統自動依公式計算年度累積。
+        目前年月對應列為<strong>自動帶入</strong>，不需手動輸入。
+      </p>
+      <p style="font-size:11px; color:#78909c; margin-bottom:8px; line-height:1.8;">
+        各欄依各月傳票<strong>帳面金額手動KEY入</strong>，系統只做加總顯示於上方三格。<br>
+        ⚠️ 醫師獎勵金依規定通常併入<strong>繳局統籌款</strong>，請照傳票實際數字填入對應欄。
+      </p>
+      <div class="table-wrap">
+      <table class="voucher-table" id="year-dist-table">
+        <thead>
+          <tr>
+            <th style="width:55px;">月份</th>
+            <th style="width:130px; text-align:right;">💰 累積賸餘</th>
+            <th style="width:140px; text-align:right;">🏛️ 繳局統籌款<br><span style="font-weight:400; font-size:9px; color:#90a4ae;">（含醫師獎勵金）</span></th>
+            <th style="width:120px; text-align:right;">👥 員工款</th>
+          </tr>
+        </thead>
+        <tbody id="year-dist-tbody">
+          <!-- 動態產生至當月 -->
+        </tbody>
+        <tfoot>
+          <tr style="background:#eceff1; font-weight:700; font-size:12px;">
+            <td>合計</td>
+            <td style="text-align:right; color:#1565c0;" id="yt-total-fund5">-</td>
+            <td style="text-align:right; color:#e65100;" id="yt-total-bureau">-</td>
+            <td style="text-align:right; color:#c62828;" id="yt-total-staff">-</td>
+          </tr>
+        </tfoot>
+      </table>
+      </div>
     </div>
   </div>
 
@@ -856,6 +892,8 @@ let STATE = {
   },
   // 傳票
   vouchers: [],
+  // 年度各月可分配收入（手動補登，key = "11501"~"11512"，value = distributable 金額）
+  yearData: {},
 };
 
 /* Mock 未出帳動支單（連線後由 API 提供） */
@@ -959,53 +997,107 @@ function onDiscountCalc(){
 }
 
 /* ════════════════════════════════════════════
-   四格試算（奬前收支淨餘分配）
-   公式：
-     可分配 = 健保掛帳合計 - 醫療折讓提列（若勾選）
-     醫療作業基金5% = 可分配 × 5%
-     剩餘95% = 可分配 × 95%
-     繳局統籌款    = 剩餘95% × 10%
-     醫師獎勵金    = 剩餘95% × 90% × 70%
-     員工獎勵金    = 剩餘95% × 90% × 30%
+   年度帳面分配金額（手動KEY入）
+   STATE.yearData[ymKey] = { bureau, doctor, staff, fund5 }
+   四格卡片 = 所有月份加總
 ════════════════════════════════════════════ */
+
+/* 收入/折讓變動時呼叫 → 只重算三格卡片（不重繪整個年度表格） */
 function calcReminders(){
-  const hi    = pnum(document.getElementById('inc-hi').value);
-  const covid = pnum(document.getElementById('inc-covid').value);
-  const flu   = pnum(document.getElementById('inc-flu').value);
-  const rout  = pnum(document.getElementById('inc-routine').value);
-  const totalHI = hi + covid + flu + rout;
+  recalcYearTotals();
+}
 
-  const discNeeded = document.getElementById('discount-needed').checked;
-  const discAmt = discNeeded ? (STATE.month.discount.amount || 0) : 0;
+/* 年度明細表 渲染（三欄：累積賸餘、繳局統籌款、員工款） */
+function renderYearTable(){
+  const {y, m: curM, ym: curYm2} = getYm();
+  const tbody = document.getElementById('year-dist-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = '';
 
-  const distributable = totalHI - discAmt;
+  let sumFund5=0, sumBureau=0, sumStaff=0;
 
-  if(distributable <= 0){
-    ['rc-bureau','rc-doctor','rc-staff','rc-fund5'].forEach(id=>{
-      document.getElementById(id).textContent = distributable === 0 ? '0' : '-';
-    });
-    document.getElementById('rc-fund5-sub').textContent = '本月試算';
-    return;
+  for(let mo=1; mo<=parseInt(curM); mo++){
+    const ymKey = y + String(mo).padStart(2,'0');
+    const isCur = (ymKey === curYm2);
+    const saved = STATE.yearData[ymKey] || {};
+
+    const vFund5  = saved.fund5  || 0;
+    const vBureau = saved.bureau || 0;
+    const vStaff  = saved.staff  || 0;
+
+    sumFund5  += vFund5;
+    sumBureau += vBureau;
+    sumStaff  += vStaff;
+
+    const bg    = isCur ? '#e8f5e9' : (mo%2===0?'#fafafa':'#fff');
+    const label = isCur ? `${mo}月 ◀` : `${mo}月`;
+    const bold  = isCur ? 'font-weight:700; color:#2e7d32;' : '';
+
+    const inp = (field, val) =>
+      `<input class="num-in" type="text" style="max-width:110px; text-align:right; font-size:12px;"
+         value="${val>0?fmt(val):''}" placeholder="-"
+         data-ym="${ymKey}" data-field="${field}"
+         oninput="onYearFieldChange(this)">`;
+
+    const tr = document.createElement('tr');
+    tr.style.background = bg;
+    tr.innerHTML = `
+      <td style="${bold} padding-left:10px;">${label}</td>
+      <td style="text-align:right;">${inp('fund5',  vFund5)}</td>
+      <td style="text-align:right;">${inp('bureau', vBureau)}</td>
+      <td style="text-align:right;">${inp('staff',  vStaff)}</td>`;
+    tbody.appendChild(tr);
   }
 
-  const fund5    = Math.round(distributable * 0.05);
-  const remain95 = distributable - fund5;
-  const bureau   = Math.round(remain95 * 0.10);
-  const doctor   = Math.round(remain95 * 0.90 * 0.70);
-  const staff    = Math.round(remain95 * 0.90 * 0.30);
+  // tfoot 合計
+  document.getElementById('yt-total-fund5').textContent  = sumFund5>0  ? fmt(sumFund5)  : '-';
+  document.getElementById('yt-total-bureau').textContent = sumBureau>0 ? fmt(sumBureau) : '-';
+  document.getElementById('yt-total-staff').textContent  = sumStaff>0  ? fmt(sumStaff)  : '-';
 
-  document.getElementById('rc-fund5').textContent  = fmt(fund5);
-  document.getElementById('rc-bureau').textContent = fmt(bureau);
-  document.getElementById('rc-doctor').textContent = fmt(doctor);
-  document.getElementById('rc-staff').textContent  = fmt(staff);
+  // 三格卡片
+  document.getElementById('rc-fund5').textContent  = sumFund5>0  ? fmt(sumFund5)  : '-';
+  document.getElementById('rc-bureau').textContent = sumBureau>0 ? fmt(sumBureau) : '-';
+  document.getElementById('rc-staff').textContent  = sumStaff>0  ? fmt(sumStaff)  : '-';
 
-  // 若有折讓提列，在 r-sub 顯示扣減提示
-  const subNote = discNeeded && discAmt > 0
-    ? `已扣折讓 ${fmt(discAmt)} 元`
-    : '本月試算';
-  ['rc-bureau-sub','rc-doctor-sub','rc-staff-sub','rc-fund5-sub'].forEach(id=>{
-    document.getElementById(id).textContent = subNote;
+  // 儲存
+  localStorage.setItem('acc_yeardata_'+y, JSON.stringify(STATE.yearData));
+}
+
+function onYearFieldChange(inp){
+  const ymKey = inp.getAttribute('data-ym');
+  const field = inp.getAttribute('data-field');
+  const val   = pnum(inp.value);
+  if(!STATE.yearData[ymKey]) STATE.yearData[ymKey] = {};
+  if(val > 0) STATE.yearData[ymKey][field] = val;
+  else delete STATE.yearData[ymKey][field];
+  // 只重算合計，不重繪整表（避免游標跳動）
+  recalcYearTotals();
+}
+
+function recalcYearTotals(){
+  const {y} = getYm();
+  let sumFund5=0, sumBureau=0, sumStaff=0;
+  Object.values(STATE.yearData).forEach(d=>{
+    sumFund5  += d.fund5  || 0;
+    sumBureau += d.bureau || 0;
+    sumStaff  += d.staff  || 0;
   });
+  document.getElementById('yt-total-fund5').textContent  = sumFund5>0  ? fmt(sumFund5)  : '-';
+  document.getElementById('yt-total-bureau').textContent = sumBureau>0 ? fmt(sumBureau) : '-';
+  document.getElementById('yt-total-staff').textContent  = sumStaff>0  ? fmt(sumStaff)  : '-';
+  document.getElementById('rc-fund5').textContent  = sumFund5>0  ? fmt(sumFund5)  : '-';
+  document.getElementById('rc-bureau').textContent = sumBureau>0 ? fmt(sumBureau) : '-';
+  document.getElementById('rc-staff').textContent  = sumStaff>0  ? fmt(sumStaff)  : '-';
+  localStorage.setItem('acc_yeardata_'+y, JSON.stringify(STATE.yearData));
+}
+
+function toggleYearPanel(){
+  const p = document.getElementById('year-panel');
+  const t = document.getElementById('year-panel-toggle');
+  const open = p.style.display === 'block';
+  p.style.display = open ? 'none' : 'block';
+  t.textContent = open ? '▼ 展開' : '▲ 收合';
+  if(!open) renderYearTable();
 }
 
 /* ════════════════════════════════════════════
@@ -1514,10 +1606,14 @@ function logout(){ window.location.href = '/admin.html'; }
   // 帳面庫存顯示
   document.getElementById('inv-drug-book').textContent   = fmt(STATE.inventory.drug.balance);
   document.getElementById('inv-supply-book').textContent = fmt(STATE.inventory.supply.balance);
+  // 讀年度分配資料（localStorage）
+  const {y} = getYm();
+  const yrRaw = localStorage.getItem('acc_yeardata_'+y);
+  if(yrRaw) try{ STATE.yearData = JSON.parse(yrRaw); } catch(e){}
   // 讀本月資料
   loadMonthData();
-  // 初始試算提醒卡
-  calcReminders();
+  // 三格卡片（年度累積）
+  recalcYearTotals();
   // 醫療用品合計
   updateInvTotal();
 })();
