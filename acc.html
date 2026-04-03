@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.1</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -314,7 +314,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v2.9.1</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v2.9.2</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -617,6 +617,63 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
         <button class="add-adj-btn" onclick="addAdj('ded')">＋ 當年追扣</button>
         <button class="add-adj-btn" onclick="addAdj('pysup')">＋ 以前年度補付</button>
         <button class="add-adj-btn" onclick="addAdj('pyded')">＋ 以前年度追扣</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 115年度期初餘額 -->
+  <div class="card" id="card-initbal">
+    <div class="card-hd hd-dark" style="display:flex; align-items:center;">
+      📋 115年度期初餘額
+      <span style="font-size:10px; font-weight:400; color:#90a4ae; margin-left:8px;">（解鎖後可修改，儲存時同步 D1）</span>
+      <span style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+        <span id="initbal-saved-ts" style="font-size:10px; color:#a5d6a7;"></span>
+        <button class="lock-btn locked" id="initbal-lock-btn" onclick="toggleInitBalLock()" style="font-size:11px;">🔒 鎖定</button>
+      </span>
+    </div>
+    <div class="card-bd">
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px;">
+        <!-- 醫療用品 -->
+        <div class="input-group">
+          <label style="color:#6a1b9a; font-size:11px;">💊 藥品庫存期初</label>
+          <input id="initbal-drug" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
+        </div>
+        <div class="input-group">
+          <label style="color:#00695c; font-size:11px;">🩹 衛材庫存期初</label>
+          <input id="initbal-supply" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
+        </div>
+        <!-- 備抵折讓 -->
+        <div class="input-group">
+          <label style="color:#b71c1c; font-size:11px;">🔻 備抵折讓期初</label>
+          <input id="initbal-allow" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
+        </div>
+        <!-- 財產 -->
+        <div class="input-group">
+          <label style="color:#37474f; font-size:11px;">🏚️ 什項設備（原始成本）</label>
+          <input id="initbal-prop-equip" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
+        </div>
+        <div class="input-group">
+          <label style="color:#37474f; font-size:11px;">📉 累積折舊-什項設備</label>
+          <input id="initbal-prop-depr" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
+        </div>
+        <!-- 淨值 -->
+        <div class="input-group">
+          <label style="color:#1b5e20; font-size:11px;">🏦 330101 累積賸餘</label>
+          <input id="initbal-surplus" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
+        </div>
+        <!-- 銀行 -->
+        <div class="input-group">
+          <label style="color:#0d47a1; font-size:11px;">🏧 保管款專戶</label>
+          <input id="initbal-bank-custody" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
+        </div>
+        <div class="input-group">
+          <label style="color:#0d47a1; font-size:11px;">🏧 醫療基金專戶</label>
+          <input id="initbal-bank-medical" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
+        </div>
+        <div class="input-group">
+          <label style="color:#0d47a1; font-size:11px;">🏧 健保款專戶</label>
+          <input id="initbal-bank-health" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
+        </div>
       </div>
     </div>
   </div>
@@ -2120,7 +2177,7 @@ function confirmDelAllow(btn){
     onConfirm: ()=>{ btn.closest('tr').remove(); recalcAllowLedger(); }
   });
 }
-function getAllowInit(){ const v=localStorage.getItem('acc_allow_init'); return v!==null?+v:65754; }
+function getAllowInit(){ const v=localStorage.getItem('acc_allow_init'); return v!==null?+v:76244; }   /* 115年度期初 */
 function saveAllowInit(raw){ const v=+(String(raw).replace(/,/g,'')); if(!isNaN(v)) accSave('acc_allow_init',String(v)); }
 function initAllowInitInp(){
   const inp=document.getElementById('al-initial-inp');
@@ -2200,10 +2257,80 @@ async function accInitSync(){
 const INV_DIR = { '期初':0, '進貨':1, '盤盈':1, '領用':-1, '報廢':-1, '盤損':-1 };
 const INV_TYPES = ['期初','進貨','領用','報廢','盤盈','盤損'];
 
+/* ════════════════════════════════════════════
+   115年度期初餘額 — 種子資料 & 卡片管理
+════════════════════════════════════════════ */
+const INIT_SEED = [
+  { key:'acc_inv_drug_init',    id:'initbal-drug',         val:'100970' },
+  { key:'acc_inv_supply_init',  id:'initbal-supply',       val:'2472'   },
+  { key:'acc_allow_init',       id:'initbal-allow',        val:'76244'  },
+  { key:'acc_prop_equip_init',  id:'initbal-prop-equip',   val:'87205'  },
+  { key:'acc_prop_depr_init',   id:'initbal-prop-depr',    val:'233352' },
+  { key:'acc_surplus_init',     id:'initbal-surplus',      val:'3432043'},
+  { key:'acc_bank_custody_init',id:'initbal-bank-custody', val:'382230' },
+  { key:'acc_bank_medical_init',id:'initbal-bank-medical', val:'4897987'},
+  { key:'acc_bank_health_init', id:'initbal-bank-health',  val:'0'      },
+];
+async function seedInitData(){
+  /* 只播種 localStorage（已被 accInitSync 從 D1 填入）尚未存在的 key */
+  const toSeed = INIT_SEED.filter(({key})=>localStorage.getItem(key)===null);
+  if(!toSeed.length) return;
+  toSeed.forEach(({key,val})=>localStorage.setItem(key,val));
+  /* 批次寫入 D1 */
+  const pass = sessionStorage.getItem('adminPass')||'';
+  fetch('/api/acc',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Admin-Pass':pass},
+    body: JSON.stringify(toSeed.map(({key,val})=>({key,value:val})))
+  }).catch(e=>console.warn('[seed] D1 write failed:',e));
+  console.log('[seed] 已寫入',toSeed.length,'筆115年期初餘額至 D1');
+}
+function initInitBalCard(){
+  INIT_SEED.forEach(({key,id,val})=>{
+    const inp=document.getElementById(id); if(!inp) return;
+    const stored=localStorage.getItem(key);
+    const num = stored!==null ? +stored : +val;
+    inp.value = fmt(num);
+    inp.readOnly=true;
+    inp.style.background='#f5f5f5'; inp.style.color='#546e7a';
+  });
+}
+let _initBalLocked = true;
+function toggleInitBalLock(){
+  _initBalLocked = !_initBalLocked;
+  const btn=document.getElementById('initbal-lock-btn');
+  document.querySelectorAll('.initbal-inp').forEach(inp=>{
+    inp.readOnly=_initBalLocked;
+    inp.style.background=_initBalLocked?'#f5f5f5':'';
+    inp.style.color=_initBalLocked?'#546e7a':'';
+  });
+  if(_initBalLocked){
+    btn.textContent='🔒 鎖定'; btn.classList.add('locked');
+    saveAllInitBal();
+  } else {
+    btn.textContent='🔓 解鎖中'; btn.classList.remove('locked');
+  }
+}
+function saveAllInitBal(){
+  INIT_SEED.forEach(({key,id})=>{
+    const inp=document.getElementById(id); if(!inp) return;
+    const v=pnum(inp.value.replace(/,/g,''));
+    if(!isNaN(v)) accSave(key,String(v));
+  });
+  /* 同步到各個明細帳的期初輸入框 */
+  initInvInitInps();
+  initAllowInitInp();
+  recalcInvLedger('drug');
+  recalcInvLedger('supply');
+  recalcAllowLedger();
+  const ts=document.getElementById('initbal-saved-ts');
+  if(ts) ts.textContent='已儲存 '+new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
+}
+
 /* ── 年度期初結存（各類型獨立） ── */
 function getInvInit(type){
   const v = localStorage.getItem('acc_inv_'+type+'_init');
-  return v !== null ? +v : 0;
+  return v !== null ? +v : (type==='drug'?100970:2472);   /* 115年度預設 */
 }
 function saveInvInit(type, raw){
   const v = +(String(raw).replace(/,/g,''));
@@ -2772,7 +2899,9 @@ function logout(){ window.location.href = '/admin.html'; }
 (async function init(){
   // ① 先從 D1 同步（以雲端資料覆寫 localStorage，確保換裝置或清 Cookie 後資料不遺失）
   await accInitSync();
-  // ② 同步完成後，重新讀取 medPostedIds / medExcludedIds（確保拿到 D1 最新資料）
+  // ② 首次載入時播種 115年度期初餘額（D1 沒有才寫）
+  await seedInitData();
+  // ③ 同步完成後，重新讀取 medPostedIds / medExcludedIds（確保拿到 D1 最新資料）
   medPostedIds   = new Set(JSON.parse(localStorage.getItem(MED_POSTED_KEY)||'[]'));
   medExcludedIds = new Set(JSON.parse(localStorage.getItem(MED_EXCLUDED_KEY)||'[]'));
   // 讀設定
@@ -2803,6 +2932,8 @@ function logout(){ window.location.href = '/admin.html'; }
   // 備抵折讓：期初餘額 input 初始化 + 重算
   initAllowInitInp();
   recalcAllowLedger();
+  // 115年度期初餘額卡片初始化
+  initInitBalCard();
   // 醫療用品明細帳（先設期初結存，再渲染）
   initInvInitInps();
   renderInvLedger('drug');
