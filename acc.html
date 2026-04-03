@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.8.5</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.8.6</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -2105,7 +2105,14 @@ const INV_TYPES = ['期初','進貨','領用','報廢','盤盈','盤損'];
 
 function loadInvLedger(type){
   const v = localStorage.getItem('acc_inv_'+type);
-  return v ? JSON.parse(v) : [];
+  if(!v) return [];
+  const rows = JSON.parse(v);
+  // 修正舊格式：「115年1」→「11501」，「115年3」→「11503」
+  rows.forEach(r=>{
+    const m = String(r.ym||'').match(/^(\d+)年(\d+)$/);
+    if(m) r.ym = `${parseInt(m[1])}${String(parseInt(m[2])).padStart(2,'0')}`;
+  });
+  return rows;
 }
 function saveInvLedger(type){
   const rows = [...document.querySelectorAll('#'+type+'-tbody tr')].map(tr=>({
