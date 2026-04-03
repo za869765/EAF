@@ -212,6 +212,19 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 .table-wrap { overflow-x: auto; }
 .section-title { font-size: 12px; font-weight: 700; color: #37474f; margin: 12px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #e0e0e0; display: flex; align-items: center; gap: 6px; }
 .empty-msg { text-align: center; color: #90a4ae; padding: 20px; font-size: 12px; }
+
+/* ── 卡片鎖定態 ── */
+.card.sec-locked .num-in:not(.auto):not(.locked) {
+  background: #f5f5f5 !important; color: #546e7a !important; cursor: not-allowed;
+}
+.lock-sec-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;
+  border: 1.5px solid #90a4ae; background: #455a64; color: #cfd8dc; font-family: inherit;
+}
+.lock-sec-btn.locked { background: #1b5e20; border-color: #2e7d32; color: #a5d6a7; }
+.lock-sec-btn:hover  { border-color: #fff; }
+.sec-saved-ts { font-size: 10px; color: #a5d6a7; }
 </style>
 </head>
 <body>
@@ -244,8 +257,6 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   </select>
   <span class="ym-title" id="ym-title">115 年 4 月</span>
   <button class="ym-action gen" onclick="generateVouchers()">⚡ 產生傳票</button>
-  <button class="ym-action" style="background:#2e7d32;color:#fff;" onclick="saveMonthData()">💾 儲存本月</button>
-  <span id="save-msg"></span>
 </div>
 
 <!-- ── Tab Nav ── -->
@@ -362,8 +373,14 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   </div>
 
   <!-- ── 收入輸入 ── -->
-  <div class="card">
-    <div class="card-hd hd-dark">💰 收入端輸入 <span style="font-size:10px; font-weight:400; color:#90a4ae; margin-left:6px;">掛帳金額將自動加總</span></div>
+  <div class="card" id="card-income">
+    <div class="card-hd hd-dark" style="display:flex; align-items:center;">
+      💰 收入端輸入 <span style="font-size:10px; font-weight:400; color:#90a4ae; margin-left:6px;">掛帳金額將自動加總</span>
+      <span style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+        <span class="sec-saved-ts" id="income-saved-ts"></span>
+        <button class="lock-sec-btn" id="income-lock-btn" onclick="toggleSectionLock('income')">🔓 解鎖中</button>
+      </span>
+    </div>
     <div class="card-bd">
       <div class="section-title">🏥 門診健保 &amp; NIIS疫苗接種</div>
       <div class="input-grid">
@@ -413,17 +430,23 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   </div>
 
   <!-- ── 支出輸入 ── -->
-  <div class="card">
-    <div class="card-hd hd-green">💸 支出端輸入（醫療基金 510601 門診醫療成本）</div>
+  <div class="card" id="card-expense">
+    <div class="card-hd hd-green" style="display:flex; align-items:center;">
+      💸 支出端輸入（醫療基金 510601 門診醫療成本）
+      <span style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+        <span class="sec-saved-ts" id="expense-saved-ts"></span>
+        <button class="lock-sec-btn" id="expense-lock-btn" onclick="toggleSectionLock('expense')">🔓 解鎖中</button>
+      </span>
+    </div>
     <div class="card-bd">
 
       <!-- 未出帳動支單 -->
-      <div class="section-title">📋 未出帳動支單（近兩個月，掛 210205 應付費用）</div>
+      <div class="section-title">📋 未出帳動支單（當年度，掛 210205 應付費用）</div>
       <div class="picker-trigger" onclick="openPicker()">
         <span style="font-size:18px;">🔍</span>
         <div class="ptxt">
           <div style="font-weight:600; font-size:13px;">選擇未出帳動支單…</div>
-          <div style="font-size:11px; color:#90a4ae;">僅顯示「醫療基金 &gt; 510601 門診醫療成本」近兩個月申請</div>
+          <div style="font-size:11px; color:#90a4ae;">僅顯示「醫療基金 &gt; 510601 門診醫療成本」當年度申請</div>
         </div>
         <div class="pamt" id="picker-total">-</div>
       </div>
@@ -441,23 +464,27 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
           <div class="hint" id="depr-hint">11503雜項設備折舊（預設鎖定）</div>
         </div>
         <div class="input-group">
-          <label style="color:#546e7a;">財產帳面淨值（扣後）</label>
+          <label style="color:#1565c0;">財產帳面淨值 <span id="depr-balance-label" style="font-weight:400; font-size:10px; color:#90a4ae;">（本月期末）</span></label>
           <input class="num-in auto" id="exp-depr-balance" type="text" readonly>
+          <div class="hint" id="depr-balance-hint" style="color:#1565c0; font-weight:600;"></div>
         </div>
       </div>
 
       <!-- 藥品領用 -->
-      <div class="section-title" style="margin-top:14px;">💊 藥品領用</div>
+      <div class="section-title" style="margin-top:14px;">
+        💊 藥品領用
+        <span id="drug-not-entered-badge" style="display:none; font-size:10px; background:#fff3e0; color:#e65100; border-radius:3px; padding:1px 8px; margin-left:8px; font-weight:600;">⚠️ 本月尚未輸入</span>
+      </div>
       <div class="input-grid">
         <div class="input-group">
           <label>藥品領用金額</label>
-          <input class="num-in" id="exp-drug" type="text" placeholder="0" oninput="calcDrug()">
-          <div class="hint">11503藥品領用（藥品帳減少）</div>
+          <input class="num-in" id="exp-drug" type="text" placeholder="0" oninput="calcDrug(); checkDrugEntered()">
+          <div class="hint" id="drug-hint">上月期末：<span id="inv-drug-book">98,733</span></div>
         </div>
         <div class="input-group">
           <label>衛材領用金額</label>
-          <input class="num-in" id="exp-supply" type="text" placeholder="0" oninput="calcDrug()">
-          <div class="hint">11503藥品領用（衛材帳減少）</div>
+          <input class="num-in" id="exp-supply" type="text" placeholder="0" oninput="calcDrug(); checkDrugEntered()">
+          <div class="hint" id="supply-hint">上月期末：<span id="inv-supply-book">2,472</span></div>
         </div>
         <div class="input-group">
           <label style="color:#1565c0;">領用合計</label>
@@ -492,9 +519,15 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     </div>
   </div>
 
-  <!-- ── 保險補付/追扣 ── -->
-  <div class="card">
-    <div class="card-hd hd-amber">🏛️ 健保款補付 / 追扣 登錄</div>
+  <!-- ── 健保款補付/追扣 ── -->
+  <div class="card" id="card-adj">
+    <div class="card-hd hd-amber" style="display:flex; align-items:center;">
+      🏛️ 健保款補付 / 追扣 登錄
+      <span style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+        <span class="sec-saved-ts" id="adj-saved-ts"></span>
+        <button class="lock-sec-btn" id="adj-lock-btn" onclick="toggleSectionLock('adj')">🔓 解鎖中</button>
+      </span>
+    </div>
     <div class="card-bd">
       <div class="table-wrap">
       <table class="adj-table">
@@ -946,6 +979,9 @@ function onYmChange(){
   document.getElementById('ym-title').textContent = label;
   document.getElementById('voucher-ym-title').textContent = label + ' 轉帳傳票';
   loadMonthData();
+  updateDeprBalance();
+  updatePrevMonthLabels();
+  checkDrugEntered();
 }
 
 /* ════════════════════════════════════════════
@@ -1540,6 +1576,91 @@ function addInvEntry(type){
 }
 
 /* ════════════════════════════════════════════
+   卡片獨立鎖定存檔
+   sections: income / expense / adj
+════════════════════════════════════════════ */
+const SEC_INPUTS = {
+  income:  ['inc-hi','inc-covid','inc-flu','inc-routine','inc-lab','inc-copay','inc-noncov'],
+  expense: ['exp-drug','exp-supply','inv-drug-real','inv-supply-real'],
+  adj:     [], // 動態列，另行處理
+};
+
+function toggleSectionLock(name){
+  const card = document.getElementById('card-'+name);
+  const btn  = document.getElementById(name+'-lock-btn');
+  const ts   = document.getElementById(name+'-saved-ts');
+  const isLocked = card.classList.contains('sec-locked');
+
+  if(isLocked){
+    // 解鎖
+    card.classList.remove('sec-locked');
+    SEC_INPUTS[name].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el && !el.classList.contains('auto') && !el.classList.contains('locked')){
+        el.readOnly = false;
+      }
+    });
+    if(name==='adj') setAdjTableReadonly(false);
+    btn.textContent = '🔓 解鎖中';
+    btn.classList.remove('locked');
+    if(ts) ts.textContent = '';
+  } else {
+    // 鎖定 + 存檔
+    card.classList.add('sec-locked');
+    SEC_INPUTS[name].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el && !el.classList.contains('auto') && !el.classList.contains('locked')){
+        el.readOnly = true;
+      }
+    });
+    if(name==='adj') setAdjTableReadonly(true);
+    btn.textContent = '🔒 已鎖定';
+    btn.classList.add('locked');
+    const now = new Date();
+    const ts2 = `已存 ${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}`;
+    if(ts) ts.textContent = ts2;
+    saveMonthData(); // 鎖定即存檔
+  }
+}
+
+function setAdjTableReadonly(readonly){
+  document.querySelectorAll('#adj-tbody .num-in, #adj-tbody .fi, #adj-tbody select').forEach(el=>{
+    el.disabled = readonly;
+    el.style.opacity = readonly ? '0.6' : '1';
+  });
+  document.querySelectorAll('#adj-tbody .del-btn').forEach(el=>{ el.style.display=readonly?'none':''; });
+  const addBtns = document.querySelectorAll('#card-adj .add-adj-btn');
+  addBtns.forEach(el=>{ el.style.display=readonly?'none':''; });
+}
+
+/* 藥品/衛材未輸入提醒 */
+function checkDrugEntered(){
+  const drug   = pnum(document.getElementById('exp-drug').value);
+  const supply = pnum(document.getElementById('exp-supply').value);
+  const badge  = document.getElementById('drug-not-entered-badge');
+  if(badge) badge.style.display = (drug===0 && supply===0) ? '' : 'none';
+}
+
+/* 財產帳面淨值 + 月份標籤 自動填入 */
+function updateDeprBalance(){
+  const {y, m} = getYm();
+  const depr = pnum(document.getElementById('exp-depr').value);
+  const balance = STATE.property.currentBalance - depr;
+  document.getElementById('exp-depr-balance').value = fmt(balance);
+  document.getElementById('depr-balance-label').textContent = `（${y}年${m}月期末）`;
+  document.getElementById('depr-balance-hint').textContent  = `帳面淨值：${fmt(balance)} 元`;
+}
+
+/* 上月期末標籤 */
+function updatePrevMonthLabels(){
+  const {y, m} = getYm();
+  const pm = parseInt(m) - 1;
+  const pmLabel = pm <= 0 ? `${parseInt(y)-1}年12月` : `${y}年${pm}月`;
+  document.getElementById('drug-hint').innerHTML   = `${pmLabel}期末：<span id="inv-drug-book">${fmt(STATE.inventory.drug.balance)}</span>`;
+  document.getElementById('supply-hint').innerHTML = `${pmLabel}期末：<span id="inv-supply-book">${fmt(STATE.inventory.supply.balance)}</span>`;
+}
+
+/* ════════════════════════════════════════════
    儲存/讀取月份資料（LocalStorage）
 ════════════════════════════════════════════ */
 function saveMonthData(){
@@ -1633,6 +1754,11 @@ function logout(){ window.location.href = '/admin.html'; }
   recalcYearTotals();
   // 醫療用品合計
   updateInvTotal();
+  // 財產帳面淨值自動計算 + 月份標籤
+  updateDeprBalance();
+  updatePrevMonthLabels();
+  // 藥品/衛材未輸入提醒
+  checkDrugEntered();
 })();
 
 function updateInvTotal(){
