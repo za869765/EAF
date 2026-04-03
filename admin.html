@@ -2136,6 +2136,8 @@ async function renderSysStatPane() {
 function getIncomeType(r) {
   const at = r.acctType || '';
   const pc = r.purposeCode || '';
+  /* 代收款（基金負擔）：acctName 以「代收」開頭者排除出納列計 */
+  if ((r.acctName||'').startsWith('代收')) return '';
   if (at === '財/社團法人') return '列計92所得';
   if (at === '醫療門診診所/檢驗所' || at === '診所/檢驗所' || at === 'HPV') return '列計9A所得';
   if (at === '個人' || ['1501','2713','7103'].includes(pc) || r.income50Type) return '列計50所得';
