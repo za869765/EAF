@@ -2860,44 +2860,36 @@ const CUSTODIAL_SEED = {
         ]}
       ]
     },
-    { code:'21020321', name:'代收款（薪資相關）', subtotal:69739, note:'依員工別整理 — 代扣各項保費及退休金，按期繳回各主管機關', color:'hd-amber',
+    { code:'21020321', name:'代收款（薪資相關）', subtotal:69739, note:'依保險別分卡片，標示各員工之代收金額', color:'hd-amber',
       subs:[
-        { name:'👤 楊建芳（公保人員）', subtotal:21031, entries:[
-          { ym:'11412', day:3,  ref:'100136 序7', desc:'01 公保費｜115.1-6月 自付公保 3,247×3', amt:9741 },
-          { ym:'11412', day:3,  ref:'100136 序6', desc:'02 健保費｜115.1-6月 自付健保 2,258×5', amt:11290 }
+        { name:'🔵 公保（公務人員保險）', subtotal:9741, entries:[
+          { ym:'11412', day:3, ref:'100136 序7', desc:'👤 楊建芳｜115.1-6月 自付公保 3,247×3', amt:9741 }
         ]},
-        { name:'👤 王聖捷（眷屬健保加保）', subtotal:1792, entries:[
-          { ym:'11502', day:26, ref:'100009 序5', desc:'02 健保費眷屬差額｜114.12～115.03 眷屬加保自付差額 896×2', amt:1792 }
+        { name:'🟤 退撫（退休撫卹基金）', subtotal:300, entries:[
+          { ym:'11501', day:7, ref:'100001 序2', desc:'🏛️ 機構｜115年新制退撫儲金手續費', amt:300 }
         ]},
-        { name:'👥 全體職員（公保人員月繳健保）', subtotal:21872, entries:[
-          { ym:'11501', day:30, ref:'100005 序4', desc:'02 健保費｜115.2 職員健保自付 10,936', amt:10936 },
-          { ym:'11502', day:26, ref:'100009 序8', desc:'02 健保費｜115.3 職員健保自付 10,936', amt:10936 }
+        { name:'🟢 公健（公保人員健保費）', subtotal:34954, entries:[
+          { ym:'11412', day:3,  ref:'100136 序6', desc:'👤 楊建芳｜115.1-6月 自付健保 2,258×5', amt:11290 },
+          { ym:'11501', day:30, ref:'100005 序4', desc:'👥 全體職員｜115.2 職員健保自付 10,936', amt:10936 },
+          { ym:'11502', day:26, ref:'100009 序8', desc:'👥 全體職員｜115.3 職員健保自付 10,936', amt:10936 },
+          { ym:'11502', day:26, ref:'100009 序5', desc:'👤 王聖捷｜114.12～115.03 眷屬加保自付差額 896×2', amt:1792 }
         ]},
-        { name:'👥 全體職員 — 03 健保費（勞保人員）', subtotal:2488, entries:[
-          { ym:'11501', day:30, ref:'100005 序7', desc:'115.2 勞工健保自付', amt:1244 },
-          { ym:'11502', day:26, ref:'100009 序9', desc:'115.3 勞工健保自付', amt:1244 }
+        { name:'🟡 勞健（勞保人員健保費）', subtotal:7176, entries:[
+          { ym:'11501', day:30, ref:'100005 序7', desc:'👥 全體職員｜115.2 勞工健保自付', amt:1244 },
+          { ym:'11502', day:26, ref:'100009 序9', desc:'👥 全體職員｜115.3 勞工健保自付', amt:1244 },
+          { ym:'11503', day:10, ref:'100011 序7', desc:'👤 黎欣妮＋方雪雲｜11402 健保補助 2,856＋健保代扣 1,832', amt:4688 }
         ]},
-        { name:'👥 全體職員 — 04 勞保費', subtotal:4008, entries:[
-          { ym:'11501', day:30, ref:'100005 序5', desc:'115.2 勞保費自付 3,006', amt:2004 },
-          { ym:'11502', day:26, ref:'100009 序10', desc:'115.3 勞保費自付', amt:2004 }
+        { name:'🔴 勞保（勞工保險費）', subtotal:6742, entries:[
+          { ym:'11501', day:30, ref:'100005 序5', desc:'👥 全體職員｜115.2 勞保費自付 3,006', amt:2004 },
+          { ym:'11502', day:26, ref:'100009 序10', desc:'👥 全體職員｜115.3 勞保費自付', amt:2004 },
+          { ym:'11502', day:10, ref:'100007 序5', desc:'👤 黎欣妮＋方雪雲｜11501 工資墊償 黎(1,132+313)、方(872+240)', amt:41 },
+          { ym:'11503', day:10, ref:'100011 序8', desc:'👤 黎欣妮＋方雪雲｜11402 勞保補助 2,111＋勞保代扣 582', amt:2693 }
         ]},
-        { name:'👥 全體職員 — 06 勞退金', subtotal:9624, entries:[
-          { ym:'11501', day:30, ref:'100005 序6', desc:'115.2 勞退金自付 7,218', amt:4812 },
-          { ym:'11502', day:26, ref:'100009 序11', desc:'115.3 勞退費自付', amt:4812 }
-        ]},
-        { name:'👤 黎欣妮 ＋ 方雪雲 — 03 健保費', subtotal:4688, entries:[
-          { ym:'11503', day:10, ref:'100011 序7', desc:'11402 健保補助 2,856＋健保代扣 1,832', amt:4688 }
-        ]},
-        { name:'👤 黎欣妮 ＋ 方雪雲 — 04 勞保費', subtotal:2734, entries:[
-          { ym:'11502', day:10, ref:'100007 序5', desc:'11501 工資墊償 黎欣妮(1,132+313)、方雪雲(872+240)', amt:41 },
-          { ym:'11503', day:10, ref:'100011 序8', desc:'11402 勞保補助 2,111＋勞保代扣 582', amt:2693 }
-        ]},
-        { name:'👤 黎欣妮 ＋ 方雪雲 — 06 勞退金', subtotal:1202, entries:[
-          { ym:'11502', day:10, ref:'100007 序7', desc:'11501 機關負擔 黎欣妮752、方雪雲390（差額）', amt:15 },
-          { ym:'11503', day:10, ref:'100011 序9', desc:'11402 雇主負擔 黎欣妮752＋方雪雲435', amt:1187 }
-        ]},
-        { name:'🏛️ 退撫基金（機構繳費）', subtotal:300, entries:[
-          { ym:'11501', day:7, ref:'100001 序2', desc:'05 退撫基金｜115年新制退撫儲金手續費', amt:300 }
+        { name:'🟠 勞退（勞工退休準備金）', subtotal:10826, entries:[
+          { ym:'11501', day:30, ref:'100005 序6', desc:'👥 全體職員｜115.2 勞退金自付 7,218', amt:4812 },
+          { ym:'11502', day:26, ref:'100009 序11', desc:'👥 全體職員｜115.3 勞退費自付', amt:4812 },
+          { ym:'11502', day:10, ref:'100007 序7', desc:'👤 黎欣妮＋方雪雲｜11501 機關負擔 黎752、方390（差額）', amt:15 },
+          { ym:'11503', day:10, ref:'100011 序9', desc:'👤 黎欣妮＋方雪雲｜11402 雇主負擔 黎752＋方435', amt:1187 }
         ]}
       ]
     }
@@ -2929,10 +2921,8 @@ function seedYearQ1Data(){
   console.log('[seedYearQ1Data] Q1 三個月資料已帶入');
 }
 async function seedCustodial(){
-  if(localStorage.getItem('acc_custodial_v4')) return;
-  localStorage.removeItem('acc_custodial');
-  localStorage.removeItem('acc_custodial_v2');
-  localStorage.removeItem('acc_custodial_v3');
+  if(localStorage.getItem('acc_custodial_v5')) return;
+  ['acc_custodial','acc_custodial_v2','acc_custodial_v3','acc_custodial_v4'].forEach(k=>localStorage.removeItem(k));
   const val = JSON.stringify(CUSTODIAL_SEED);
   localStorage.setItem('acc_custodial', val);
   const pass = sessionStorage.getItem('adminPass')||'';
@@ -2941,7 +2931,7 @@ async function seedCustodial(){
     headers:{'Content-Type':'application/json','X-Admin-Pass':pass},
     body: JSON.stringify([{key:'acc_custodial', value:val}])
   }).catch(e=>console.warn('[seedCustodial] D1 write failed:',e));
-  localStorage.setItem('acc_custodial_v4','1');
+  localStorage.setItem('acc_custodial_v5','1');
   console.log('[seedCustodial] 應付代收款完整明細已寫入 D1');
 }
 function loadCustodial(){
