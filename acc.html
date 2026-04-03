@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.0</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -314,7 +314,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v2.9.0</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v2.9.1</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -545,12 +545,12 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
         <div class="input-group">
           <label>藥品領用金額</label>
           <input class="num-in" id="exp-drug" type="text" placeholder="0" oninput="calcDrug(); checkDrugEntered()">
-          <div class="hint" id="drug-hint">上月期末：<span id="inv-drug-book">98,733</span></div>
+          <div class="hint" id="drug-hint">上月期末：<span id="inv-drug-prevbal">—</span></div>
         </div>
         <div class="input-group">
           <label>衛材領用金額</label>
           <input class="num-in" id="exp-supply" type="text" placeholder="0" oninput="calcDrug(); checkDrugEntered()">
-          <div class="hint" id="supply-hint">上月期末：<span id="inv-supply-book">2,472</span></div>
+          <div class="hint" id="supply-hint">上月期末：<span id="inv-supply-prevbal">—</span></div>
         </div>
         <div class="input-group">
           <label style="color:#1565c0;">領用合計</label>
@@ -564,12 +564,12 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
         <div class="input-group">
           <label>報表藥品實際金額</label>
           <input class="num-in" id="inv-drug-real" type="text" placeholder="輸入藥庫報表數" oninput="calcInv()">
-          <div class="hint">帳面：<span id="inv-drug-book">98,733</span></div>
+          <div class="hint">當月帳面：<span id="inv-drug-curbal">—</span></div>
         </div>
         <div class="input-group">
           <label>報表衛材實際金額</label>
           <input class="num-in" id="inv-supply-real" type="text" placeholder="輸入藥庫報表數" oninput="calcInv()">
-          <div class="hint">帳面：<span id="inv-supply-book">2,472</span></div>
+          <div class="hint">當月帳面：<span id="inv-supply-curbal">—</span></div>
         </div>
         <div class="input-group">
           <label style="color:#1565c0;">系統計算校正量</label>
@@ -710,6 +710,15 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <div class="card">
       <div class="card-hd hd-purple">💊 藥品 明細帳</div>
       <div class="card-bd" style="padding:0;">
+        <!-- 年度期初 -->
+        <div style="padding:6px 14px 6px; border-bottom:1px solid #ede7f6; background:#f9f5ff; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span style="font-size:11px; color:#6a1b9a; font-weight:700;">年度期初結存</span>
+          <input id="drug-init-inp" class="fi num-in" type="text" inputmode="numeric" placeholder="0"
+            style="width:110px; text-align:right; font-size:13px; font-weight:700; color:#4a148c;"
+            onblur="saveInvInit('drug',this.value)"
+            onkeydown="if(event.key==='Enter')this.blur()">
+          <span style="font-size:10px; color:#9e9e9e;">前年度結轉至本年度1月1日帳面庫存</span>
+        </div>
         <div class="table-wrap">
         <table class="ledger-table" id="drug-ledger">
           <thead>
@@ -748,6 +757,15 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <div class="card">
       <div class="card-hd hd-teal">🩹 衛材 明細帳</div>
       <div class="card-bd" style="padding:0;">
+        <!-- 年度期初 -->
+        <div style="padding:6px 14px 6px; border-bottom:1px solid #e0f2f1; background:#f4fffe; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span style="font-size:11px; color:#00695c; font-weight:700;">年度期初結存</span>
+          <input id="supply-init-inp" class="fi num-in" type="text" inputmode="numeric" placeholder="0"
+            style="width:110px; text-align:right; font-size:13px; font-weight:700; color:#004d40;"
+            onblur="saveInvInit('supply',this.value)"
+            onkeydown="if(event.key==='Enter')this.blur()">
+          <span style="font-size:10px; color:#9e9e9e;">前年度結轉至本年度1月1日帳面庫存</span>
+        </div>
         <div class="table-wrap">
         <table class="ledger-table" id="supply-ledger">
           <thead>
@@ -1329,8 +1347,10 @@ function calcDrug(){
 function calcInv(){
   const drugRealRaw   = document.getElementById('inv-drug-real').value;
   const supplyRealRaw = document.getElementById('inv-supply-real').value;
-  const drugBook   = STATE.inventory.drug.balance;
-  const supplyBook = STATE.inventory.supply.balance;
+  /* 使用當月帳面結存（由 updatePrevMonthLabels 計算並存入 STATE._invCurBal） */
+  const curBal     = STATE._invCurBal || {};
+  const drugBook   = curBal.drug   !== undefined ? curBal.drug   : STATE.inventory.drug.balance;
+  const supplyBook = curBal.supply !== undefined ? curBal.supply : STATE.inventory.supply.balance;
   // 若兩欄都空白，校正量顯示 0，不計算
   if(!drugRealRaw.trim() && !supplyRealRaw.trim()){
     document.getElementById('inv-diff').value = fmt(0);
@@ -2180,6 +2200,25 @@ async function accInitSync(){
 const INV_DIR = { '期初':0, '進貨':1, '盤盈':1, '領用':-1, '報廢':-1, '盤損':-1 };
 const INV_TYPES = ['期初','進貨','領用','報廢','盤盈','盤損'];
 
+/* ── 年度期初結存（各類型獨立） ── */
+function getInvInit(type){
+  const v = localStorage.getItem('acc_inv_'+type+'_init');
+  return v !== null ? +v : 0;
+}
+function saveInvInit(type, raw){
+  const v = +(String(raw).replace(/,/g,''));
+  if(!isNaN(v)){
+    accSave('acc_inv_'+type+'_init', String(v));
+    recalcInvLedger(type);
+  }
+}
+function initInvInitInps(){
+  ['drug','supply'].forEach(type=>{
+    const inp = document.getElementById(type+'-init-inp');
+    if(inp){ const v=getInvInit(type); inp.value = v ? fmt(v) : ''; }
+  });
+}
+
 function loadInvLedger(type){
   const v = localStorage.getItem('acc_inv_'+type);
   if(!v) return [];
@@ -2204,7 +2243,7 @@ function saveInvLedger(type){
 }
 function recalcInvLedger(type){
   const tbody = document.getElementById(type+'-tbody');
-  let bal = 0;
+  let bal = getInvInit(type);   /* 從年度期初結存開始 */
   tbody.querySelectorAll('tr').forEach(tr=>{
     const voided = tr.dataset.voided==='1';
     const t=tr.dataset.type||'進貨', aEl=tr.querySelector('.inv-amt'), bEl=tr.querySelector('.inv-bal');
@@ -2221,6 +2260,8 @@ function recalcInvLedger(type){
   else             { STATE.inventory.supply.balance=bal; const e=document.getElementById('inv-supply-bal'); if(e) e.textContent=fmt(bal); }
   updateInvTotal();
   renderMonthlyClose(type);
+  /* 每次明細帳重算後，同步更新月度作業的上月期末 / 當月帳面 */
+  if(typeof updatePrevMonthLabels === 'function') updatePrevMonthLabels();
 }
 function renderMonthlyClose(type){
   const tbody = document.getElementById(type+'-monthly-close');
@@ -2613,12 +2654,44 @@ function updateDeprBalance(){
 }
 
 /* 上月期末標籤 */
+/* 計算庫存明細帳到指定 ym（含）的期末結存 */
+function getInvMonthBal(type, ym){
+  const rows = loadInvLedger(type);
+  let bal = getInvInit(type);
+  rows.forEach(r => {
+    if(r.voided) return;
+    if(String(r.ym) > String(ym)) return;   /* 只算到 ym 為止 */
+    const t = r.type || '進貨';
+    if(t === '期初') bal = +r.amt;
+    else bal += (INV_DIR[t] ?? 1) * (+r.amt);
+  });
+  return bal;
+}
 function updatePrevMonthLabels(){
   const {y, m} = getYm();
   const pm = parseInt(m) - 1;
-  const pmLabel = pm <= 0 ? `${parseInt(y)-1}年12月` : `${y}年${pm}月`;
-  document.getElementById('drug-hint').innerHTML   = `${pmLabel}期末：<span id="inv-drug-book">${fmt(STATE.inventory.drug.balance)}</span>`;
-  document.getElementById('supply-hint').innerHTML = `${pmLabel}期末：<span id="inv-supply-book">${fmt(STATE.inventory.supply.balance)}</span>`;
+  const pmY = pm <= 0 ? String(parseInt(y)-1) : y;
+  const pmM = pm <= 0 ? 12 : pm;
+  const pmYm    = `${pmY}${String(pmM).padStart(2,'0')}`;
+  const curYmStr = `${y}${String(parseInt(m)).padStart(2,'0')}`;
+  const pmLabel = `${pmY}年${pmM}月`;
+  const cmLabel = `${y}年${parseInt(m)}月`;
+
+  const drugPrev   = getInvMonthBal('drug',   pmYm);
+  const supplyPrev = getInvMonthBal('supply',  pmYm);
+  const drugCur    = getInvMonthBal('drug',   curYmStr);
+  const supplyCur  = getInvMonthBal('supply',  curYmStr);
+
+  document.getElementById('drug-hint').innerHTML   = `${pmLabel}期末：<span id="inv-drug-prevbal" style="font-weight:700;color:#1565c0;">${fmt(drugPrev)}</span>`;
+  document.getElementById('supply-hint').innerHTML = `${pmLabel}期末：<span id="inv-supply-prevbal" style="font-weight:700;color:#00695c;">${fmt(supplyPrev)}</span>`;
+
+  const dCurEl = document.getElementById('inv-drug-curbal');
+  const sCurEl = document.getElementById('inv-supply-curbal');
+  if(dCurEl) dCurEl.textContent = fmt(drugCur);
+  if(sCurEl) sCurEl.textContent = fmt(supplyCur);
+
+  /* 同步給 calcInv 使用 */
+  STATE._invCurBal = { drug: drugCur, supply: supplyCur };
 }
 
 /* ════════════════════════════════════════════
@@ -2707,9 +2780,7 @@ function logout(){ window.location.href = '/admin.html'; }
   if(raw) try{ Object.assign(STATE.settings, JSON.parse(raw)); } catch(e){}
   // 折舊淨值顯示
   document.getElementById('exp-depr-balance').value = fmt(STATE.property.currentBalance - STATE.property.monthlyDepr);
-  // 帳面庫存顯示
-  document.getElementById('inv-drug-book').textContent   = fmt(STATE.inventory.drug.balance);
-  document.getElementById('inv-supply-book').textContent = fmt(STATE.inventory.supply.balance);
+  /* 帳面庫存顯示 — 改由 updatePrevMonthLabels 在 renderInvLedger 後處理 */
   // 讀年度分配資料（localStorage）
   const {y} = getYm();
   const yrRaw = localStorage.getItem('acc_yeardata_'+y);
@@ -2732,7 +2803,8 @@ function logout(){ window.location.href = '/admin.html'; }
   // 備抵折讓：期初餘額 input 初始化 + 重算
   initAllowInitInp();
   recalcAllowLedger();
-  // 醫療用品明細帳
+  // 醫療用品明細帳（先設期初結存，再渲染）
+  initInvInitInps();
   renderInvLedger('drug');
   renderInvLedger('supply');
   // 動支單進貨核對（EAF API）
