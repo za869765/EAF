@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.3</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.4</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -314,7 +314,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v2.9.3</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v2.9.4</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1043,22 +1043,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
           </tr>
         </thead>
         <tbody id="allow-tbody">
-          <tr>
-            <td>期初</td>
-            <td><span class="badge-type bt-sup">期初餘額</span></td>
-            <td class="credit-cell" style="text-align:right;">+65,754</td>
-            <td class="balance-cell" style="text-align:right;">65,754</td>
-            <td style="font-size:11px; color:#546e7a;">115年1月1日期初備抵醫療折讓</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>11503</td>
-            <td><span class="badge-type bt-ded">核銷</span></td>
-            <td class="debit-cell" style="text-align:right;">-8,215</td>
-            <td class="balance-cell" style="text-align:right;">57,539</td>
-            <td style="font-size:11px; color:#546e7a;">11503備抵醫療折讓核銷（114年追扣4,463+核減176+流感追扣100=4,739+...）</td>
-            <td></td>
-          </tr>
+          <!-- 由 renderAllowLedger() 動態產生 -->
         </tbody>
       </table>
       </div>
@@ -2181,63 +2166,91 @@ async function renderPublicTab(){
 }
 
 /* ════════════════════════════════════════════
-   備抵折讓
+   備抵折讓 — 資料驅動（與庫存帳相同架構）
 ════════════════════════════════════════════ */
-function addAllowEntry(){
-  const tbody = document.getElementById('allow-tbody');
-  const lastBal = STATE.allowance.currentBalance;
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td><input class="fi" type="text" placeholder="年月" style="width:54px; font-size:11px;"></td>
-    <td>
-      <select class="fi" style="font-size:11px;" onchange="recalcAllowLedger()">
-        <option value="sup">提列（貸方增）</option>
-        <option value="ded">核銷（借方減）</option>
-        <option value="offset">追扣抵用（借方減）</option>
-      </select>
-    </td>
-    <td><input class="num-in" type="text" placeholder="0" style="max-width:80px;" oninput="recalcAllowLedger()"></td>
-    <td class="balance-cell" style="text-align:right;">${fmt(lastBal)}</td>
-    <td><input class="fi" type="text" placeholder="摘要" style="width:100%; font-size:11px;"></td>
-    <td><button class="del-btn" onclick="confirmDelAllow(this)">✕</button></td>`;
-  tbody.appendChild(tr);
-}
-function delAllowRow(btn){ btn.closest('tr').remove(); recalcAllowLedger(); }
-function confirmDelAllow(btn){
-  showModal({ title:'刪除確認', icon:'🗑️',
-    body:'確定要刪除這筆備抵折讓記錄？<br><span style="color:#e53935;font-size:12px;">此動作無法復原</span>',
-    confirmText:'刪除', danger:true,
-    onConfirm: ()=>{ btn.closest('tr').remove(); recalcAllowLedger(); }
-  });
-}
-function getAllowInit(){ const v=localStorage.getItem('acc_allow_init'); return v!==null?+v:76244; }   /* 115年度期初 */
+function getAllowInit(){ const v=localStorage.getItem('acc_allow_init'); return v!==null?+v:76244; }
 function saveAllowInit(raw){ const v=+(String(raw).replace(/,/g,'')); if(!isNaN(v)) accSave('acc_allow_init',String(v)); }
 function initAllowInitInp(){
   const inp=document.getElementById('al-initial-inp');
-  if(inp){ const v=getAllowInit(); inp.value=fmt(v); }
+  if(inp){ inp.value=fmt(getAllowInit()); }
 }
-
-function recalcAllowLedger(){
+function loadAllowLedger(){
+  const raw=localStorage.getItem('acc_allow_ledger');
+  if(!raw) return [];
+  try{ return JSON.parse(raw); }catch(_){ return []; }
+}
+function saveAllowLedger(rows){
+  accSave('acc_allow_ledger', rows);
+}
+function renderAllowLedger(){
+  const rows = loadAllowLedger();
   const initBal = getAllowInit();
-  let bal = initBal;
-  let provision = 0, settled = 0;
-  document.querySelectorAll('#allow-tbody tr').forEach(tr => {
-    const sel = tr.querySelector('select');
-    const inp = tr.querySelector('.num-in');
-    const balCell = tr.querySelector('.balance-cell');
-    if(!sel || !inp) return;
-    const amt = pnum(inp.value);
-    if(sel.value === 'sup'){ bal += amt; provision += amt; }
-    else { bal -= amt; settled += amt; }
-    if(balCell) balCell.textContent = fmt(bal);
+  let bal = initBal, provision = 0, settled = 0;
+
+  const TYPE_LABEL = { sup:'提列（貸方增）', ded:'核銷（借方減）', offset:'追扣抵用（借方減）' };
+  let html = `<tr>
+    <td style="color:#546e7a;font-size:11px;">期初</td>
+    <td><span class="badge-type bt-sup">期初餘額</span></td>
+    <td class="credit-cell" style="text-align:right;">+${fmt(initBal)}</td>
+    <td class="balance-cell" style="text-align:right;">${fmt(initBal)}</td>
+    <td style="font-size:11px;color:#546e7a;">115年1月1日期初備抵醫療折讓</td>
+    <td></td></tr>`;
+
+  rows.forEach((r, i) => {
+    const amt = +r.amt || 0;
+    const isInc = r.type === 'sup';
+    if(isInc){ bal += amt; provision += amt; }
+    else     { bal -= amt; settled  += amt; }
+    const amtClass = isInc ? 'credit-cell' : 'debit-cell';
+    const amtSign  = isInc ? '+' : '-';
+    const opts = ['sup','ded','offset'].map(v=>
+      `<option value="${v}"${r.type===v?' selected':''}>${TYPE_LABEL[v]}</option>`).join('');
+    html += `<tr>
+      <td><input class="fi" type="text" value="${r.ym||''}" placeholder="年月" style="width:54px;font-size:11px;"
+          onchange="updateAllowRow(${i},'ym',this.value)"></td>
+      <td><select class="fi" style="font-size:11px;" onchange="updateAllowRow(${i},'type',this.value)">${opts}</select></td>
+      <td class="${amtClass}" style="text-align:right;">${amtSign}${fmt(amt)}<br>
+        <input class="num-in" type="text" value="${fmt(amt)}" placeholder="0"
+          style="max-width:75px;font-size:11px;" oninput="updateAllowRow(${i},'amt',this.value)"></td>
+      <td class="balance-cell" style="text-align:right;">${fmt(bal)}</td>
+      <td><input class="fi" type="text" value="${r.note||''}" placeholder="摘要"
+          style="width:100%;font-size:11px;" onchange="updateAllowRow(${i},'note',this.value)"></td>
+      <td><button class="del-btn" onclick="confirmDelAllow(${i})">✕</button></td></tr>`;
   });
+
+  document.getElementById('allow-tbody').innerHTML = html;
   STATE.allowance.currentBalance = bal;
-  document.getElementById('al-balance').textContent = fmt(bal);
-  document.getElementById('rc-allowance').textContent = fmt(bal);
-  const pEl = document.getElementById('al-provision');
-  const sEl = document.getElementById('al-settled');
-  if(pEl) pEl.textContent = fmt(provision);
-  if(sEl) sEl.textContent = fmt(settled);
+  const el = id => document.getElementById(id);
+  if(el('al-balance'))   el('al-balance').textContent   = fmt(bal);
+  if(el('rc-allowance')) el('rc-allowance').textContent = fmt(bal);
+  if(el('al-provision')) el('al-provision').textContent = fmt(provision);
+  if(el('al-settled'))   el('al-settled').textContent   = fmt(settled);
+}
+function recalcAllowLedger(){ renderAllowLedger(); }   /* 向後相容 */
+
+function updateAllowRow(idx, field, value){
+  const rows = loadAllowLedger();
+  if(!rows[idx]) return;
+  if(field === 'amt') rows[idx].amt = +(String(value).replace(/,/g,''))||0;
+  else rows[idx][field] = value;
+  saveAllowLedger(rows);
+  renderAllowLedger();
+}
+function addAllowEntry(){
+  const rows = loadAllowLedger();
+  rows.push({ ym:'', type:'ded', amt:0, note:'' });
+  saveAllowLedger(rows);
+  renderAllowLedger();
+}
+function confirmDelAllow(idx){
+  showModal({ title:'刪除確認', icon:'🗑️',
+    body:'確定要刪除這筆備抵折讓記錄？<br><span style="color:#e53935;font-size:12px;">此動作無法復原</span>',
+    confirmText:'刪除', danger:true,
+    onConfirm:()=>{
+      const rows=loadAllowLedger(); rows.splice(idx,1);
+      saveAllowLedger(rows); renderAllowLedger();
+    }
+  });
 }
 
 /* ════════════════════════════════════════════
@@ -2352,6 +2365,12 @@ const Q1_REF = [
   { key:'acc_paydate_11503_exp', val: JSON.stringify({
       voucherNo:'115200026', items:'115-0107~0109', paidYm:'11503', paidDay:25
   })},
+  /* 備抵折讓明細帳 — Q1三個月核銷（來源：轉帳傳票115300002~115300004） */
+  { key:'acc_allow_ledger', val: JSON.stringify([
+    { ym:'11501', type:'ded', amt:5751, note:'11501備抵醫療折讓核銷' },
+    { ym:'11502', type:'ded', amt:4739, note:'11502備抵醫療折讓核銷' },
+    { ym:'11503', type:'ded', amt:8215, note:'11503備抵醫療折讓核銷' }
+  ])},
 ];
 async function seedQ1Ref(){
   const toSeed = Q1_REF.filter(({key})=>localStorage.getItem(key)===null);
@@ -2364,6 +2383,27 @@ async function seedQ1Ref(){
     body: JSON.stringify(toSeed.map(({key,val})=>({key,value:val})))
   }).catch(e=>console.warn('[seedQ1] D1 write failed:',e));
   console.log('[seedQ1] 已寫入',toSeed.length,'筆Q1傳票參考數字至 D1');
+}
+
+/* ──────────────────────────────────────────────
+   Q1 藥品庫存明細帳補種 — 領用 / 盤盈 / 盤損
+   (只在首次執行，避免覆蓋已有資料)
+   ────────────────────────────────────────────── */
+async function seedQ1DrugEntries(){
+  if(localStorage.getItem('acc_q1drug_seeded')) return;   /* 已補種過，跳過 */
+  const rows = loadInvLedger('drug');
+  /* 補入Q1領用與盤盈損（來源：轉帳傳票115300002~115300004） */
+  rows.push(
+    { ym:'11501', type:'領用', amt:8028, desc:'115300002藥品領用', medId:'', voided:false },
+    { ym:'11501', type:'盤盈', amt:1,    desc:'115300002藥品盤盈', medId:'', voided:false },
+    { ym:'11502', type:'領用', amt:6623, desc:'115300003藥品領用', medId:'', voided:false },
+    { ym:'11502', type:'盤損', amt:3,    desc:'115300003藥品盤損', medId:'', voided:false },
+    { ym:'11503', type:'領用', amt:7800, desc:'115300004藥品領用', medId:'', voided:false },
+    { ym:'11503', type:'盤盈', amt:2,    desc:'115300004藥品盤盈', medId:'', voided:false }
+  );
+  accSave('acc_inv_drug', rows);
+  accSave('acc_q1drug_seeded', '1');
+  console.log('[seedQ1Drug] 已補入Q1藥品領用/盤盈損至 D1');
 }
 function initInitBalCard(){
   INIT_SEED.forEach(({key,id,val})=>{
@@ -2983,6 +3023,8 @@ function logout(){ window.location.href = '/admin.html'; }
   await seedInitData();
   // ③-a 播種 Q1 轉帳傳票關鍵數字（藥品領用、折舊、備折、付款日）
   await seedQ1Ref();
+  // ③-b 補種 Q1 藥品庫存領用/盤盈損（僅首次，避免覆蓋）
+  await seedQ1DrugEntries();
   // ③-b 同步完成後，重新讀取 medPostedIds / medExcludedIds（確保拿到 D1 最新資料）
   medPostedIds   = new Set(JSON.parse(localStorage.getItem(MED_POSTED_KEY)||'[]'));
   medExcludedIds = new Set(JSON.parse(localStorage.getItem(MED_EXCLUDED_KEY)||'[]'));
@@ -3011,15 +3053,17 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // 備抵折讓：期初餘額 input 初始化 + 重算
+  // 備抵折讓：期初餘額 input 初始化 + 動態渲染
   initAllowInitInp();
-  recalcAllowLedger();
+  renderAllowLedger();
   // 115年度期初餘額卡片初始化
   initInitBalCard();
   // 醫療用品明細帳（先設期初結存，再渲染）
   initInvInitInps();
   renderInvLedger('drug');
   renderInvLedger('supply');
+  /* Q1 補種完成後重新渲染藥品帳（確保領用/盤盈損顯示） */
+  renderInvLedger('drug');
   // 動支單進貨核對（EAF API）
   loadEafMedical();
 })().catch(e=>console.error('[init] 初始化發生錯誤:', e));
