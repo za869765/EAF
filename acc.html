@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.7</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v2.9.8</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -328,6 +328,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   <button class="tab-btn" onclick="switchTab('property',this)">🏚️ 財產管理</button>
   <button class="tab-btn" onclick="switchTab('allowance',this)">🔻 備抵醫療折讓</button>
   <button class="tab-btn" onclick="switchTab('public',this)">💼 公務預算</button>
+  <button class="tab-btn" onclick="switchTab('payable',this)">💰 應付費用</button>
 </div>
 
 <div id="content">
@@ -1098,6 +1099,37 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   </div>
   <div id="pub-sections"></div>
 </div><!-- /tab-public -->
+
+<!-- ══════════════════════════════════════════
+     應付費用 210205
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-payable">
+  <div class="balance-banner">
+    <div class="bb-item">
+      <div class="bb-num" id="pay-total">115,323</div>
+      <div class="bb-label">210205 應付費用（合計）</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" id="pay-cat01">25,862</div>
+      <div class="bb-label">01 繳局統籌款</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" id="pay-cat02">67,577</div>
+      <div class="bb-label">02 員工獎勵金</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" id="pay-cat03">21,884</div>
+      <div class="bb-label">03 員工款</div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:#78909c;padding:0 2px 10px;">
+    💡 本年度應付但尚未支付之款項（還需要給人的 $$）｜截至 115年3月31日
+  </div>
+  <div id="payable-sections"></div>
+</div><!-- /tab-payable -->
 
 </div><!-- /content -->
 
@@ -2416,10 +2448,10 @@ const Q1_REF = [
     { ym:'11502', type:'ded', amt:4739, note:'11502備抵醫療折讓核銷（借110306/貸110305）' },
     { ym:'11503', type:'ded', amt:8215, note:'11503備抵醫療折讓核銷（借110306/貸110305）' }
   ])},
-  /* 藥品庫存月底實際盤點（與帳面相符，因已做盤盈損調整） */
-  { key:'acc_inv_drug_close_11501', val:'96857' },
-  { key:'acc_inv_drug_close_11502', val:'90231' },
-  { key:'acc_inv_drug_close_11503', val:'95275' },
+  /* 藥品庫存月底實際盤點（官方 110404 月底 - 衛材 2,472） */
+  { key:'acc_inv_drug_close_11501', val:'100313' },
+  { key:'acc_inv_drug_close_11502', val:'93693' },
+  { key:'acc_inv_drug_close_11503', val:'98733' },
   /* Q1 轉帳傳票明細（來源：115300002~115300004，供4月起產製參考） */
   { key:'acc_vouchers_11501', val: JSON.stringify([
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用', dr:8028, cr:0 },
@@ -2485,6 +2517,115 @@ async function seedQ1DrugEntries(){
   accSave('acc_q1drug_seeded', '1');
   console.log('[seedQ1Drug] 已補入Q1藥品領用/盤盈損至 D1');
 }
+/* ════════════════════════════════════════════
+   應付費用 210205 — 種子資料 + 渲染
+   ════════════════════════════════════════════ */
+const PAYABLE_SEED = {
+  asOf:'11503', account:'210205', name:'應付費用', total:115323,
+  categories:[
+    { code:'01', name:'繳局統籌款', subtotal:25862, entries:[
+      { ym:'11501', day:30, ref:'300002 序27', desc:'114年度雜項收入：繳局統籌款(66123×0.95×0.1=6,281)+11409醫師獎勵金(3300×0.95×0.9×0.7=1,975)', amt:8256 },
+      { ym:'11501', day:30, ref:'300003 序2',  desc:'11501當月繳局統籌款525+3,310+1,418=5,253', amt:5253 },
+      { ym:'11502', day:26, ref:'300004 序17', desc:'114年度雜項收入：繳局統籌款(900×0.95×0.1=86)+11409醫師獎勵金(900×0.95×0.9×0.7=538)', amt:624 },
+      { ym:'11502', day:26, ref:'300004 序31', desc:'11502當月繳局統籌款378+719+4,527=7,186', amt:7186 },
+      { ym:'11503', day:31, ref:'300005 序15', desc:'114年度雜項收入：繳局統籌款(6224×0.1=622)+11412醫師獎勵金(6,224×0.9×0.7=3,921)', amt:4543 }
+    ]},
+    { code:'02', name:'員工獎勵金', subtotal:67577, entries:[
+      { ym:'11412', day:31, ref:'300114 序2',  desc:'114.12員工獎勵金', amt:11104 },
+      { ym:'11501', day:30, ref:'300002 序26', desc:'11404醫師獎勵金(62823×0.95×0.9×0.7=37,600)+114年度員工獎勵金(66123×0.95×0.9×0.3=16,961)', amt:54561 },
+      { ym:'11502', day:26, ref:'300004 序16', desc:'114012員工獎勵金(900×0.95×0.9×0.3=231)', amt:231 },
+      { ym:'11503', day:31, ref:'300005 序14', desc:'11412員工獎勵金(6,224×0.9×0.3=1,681)', amt:1681 }
+    ]},
+    { code:'03', name:'員工款', subtotal:21884, entries:[
+      { ym:'11503', day:31, ref:'300005 序11', desc:'11503臨時人員實領13,258元：黎欣妮6,937+方雪雲6,321', amt:13258 },
+      { ym:'11503', day:31, ref:'300005 序12', desc:'115.3臨時人員補助代扣款8,626元（勞保2,736+健保4,685+勞退1,202）', amt:8626 }
+    ]}
+  ]
+};
+async function seedPayable(){
+  if(localStorage.getItem('acc_payable')) return;
+  const val = JSON.stringify(PAYABLE_SEED);
+  localStorage.setItem('acc_payable', val);
+  const pass = sessionStorage.getItem('adminPass')||'';
+  fetch('/api/acc',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Admin-Pass':pass},
+    body: JSON.stringify([{key:'acc_payable', value:val}])
+  }).catch(e=>console.warn('[seedPayable] D1 write failed:',e));
+  console.log('[seedPayable] 應付費用資料已寫入 D1');
+}
+async function fixDrugCloseValues(){
+  if(localStorage.getItem('acc_fix_dclose_298')) return;
+  const updates = [
+    {key:'acc_inv_drug_close_11501', value:'100313'},
+    {key:'acc_inv_drug_close_11502', value:'93693'},
+    {key:'acc_inv_drug_close_11503', value:'98733'}
+  ];
+  updates.forEach(({key,value})=>localStorage.setItem(key,value));
+  const pass = sessionStorage.getItem('adminPass')||'';
+  fetch('/api/acc',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Admin-Pass':pass},
+    body: JSON.stringify(updates)
+  }).catch(e=>console.warn('[fixDrugClose] D1 write failed:',e));
+  localStorage.setItem('acc_fix_dclose_298','1');
+  console.log('[fixDrugClose] 藥品月底盤點已更正為官方數字');
+}
+function loadPayable(){
+  const raw = localStorage.getItem('acc_payable');
+  if(!raw) return PAYABLE_SEED;
+  try{ return JSON.parse(raw); }catch(e){ return PAYABLE_SEED; }
+}
+function fmtPayDate(ym, day){
+  if(!ym) return '';
+  const s = String(ym);
+  const y = s.slice(0,3);
+  const m = (s.slice(3,5)||'').replace(/^0/,'');
+  return `${y}/${m}/${String(day||'').padStart(2,'0')}`;
+}
+function renderPayable(){
+  const data = loadPayable();
+  const totalEl = document.getElementById('pay-total');
+  if(totalEl) totalEl.textContent = fmt(data.total||0);
+  (data.categories||[]).forEach(cat=>{
+    const el = document.getElementById('pay-cat'+cat.code);
+    if(el) el.textContent = fmt(cat.subtotal||0);
+  });
+  const sec = document.getElementById('payable-sections');
+  if(!sec) return;
+  const CAT_HDR = {'01':'hd-teal','02':'hd-purple','03':'hd-amber'};
+  const CAT_ICN = {'01':'🏦','02':'🏅','03':'👥'};
+  sec.innerHTML = (data.categories||[]).map(cat=>`
+    <div class="card">
+      <div class="card-hd ${CAT_HDR[cat.code]||'hd-dark'}">
+        ${CAT_ICN[cat.code]||''} ${cat.code}　${cat.name}
+        <span style="margin-left:auto;font-size:13px;font-weight:700;">小計 ${fmt(cat.subtotal)}</span>
+      </div>
+      <div class="card-bd" style="padding:0;">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr style="background:#f5f5f5;color:#546e7a;">
+            <th style="padding:6px 10px;text-align:left;width:72px;">日期</th>
+            <th style="padding:6px 10px;text-align:left;width:100px;">傳票/序號</th>
+            <th style="padding:6px 10px;text-align:left;">摘要</th>
+            <th style="padding:6px 10px;text-align:right;width:90px;">金額</th>
+          </tr></thead>
+          <tbody>
+            ${(cat.entries||[]).map((e,i)=>`<tr style="${i%2?'background:#fafafa':''}">
+              <td style="padding:6px 10px;color:#546e7a;white-space:nowrap;">${fmtPayDate(e.ym,e.day)}</td>
+              <td style="padding:6px 10px;color:#1565c0;font-size:11px;white-space:nowrap;">${(e.ref||'').replace(/</g,'&lt;')}</td>
+              <td style="padding:6px 10px;color:#333;font-size:11px;">${(e.desc||'').replace(/</g,'&lt;')}</td>
+              <td style="padding:6px 10px;text-align:right;font-weight:600;color:#b71c1c;">${fmt(e.amt)}</td>
+            </tr>`).join('')}
+            <tr style="background:#fff8e1;border-top:2px solid #e0e0e0;">
+              <td colspan="3" style="padding:6px 10px;text-align:right;font-size:11px;color:#546e7a;font-weight:600;">小計</td>
+              <td style="padding:6px 10px;text-align:right;font-weight:700;color:#b71c1c;">${fmt(cat.subtotal)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`).join('');
+}
+
 function initInitBalCard(){
   INIT_SEED.forEach(({key,id,val})=>{
     const inp=document.getElementById(id); if(!inp) return;
@@ -2562,7 +2703,7 @@ function saveInvLedger(type){
     ym:    (tr.querySelector('.inv-ym')  ||{}).value||'',
     type:  tr.dataset.type || '進貨',
     amt:   pnum((tr.querySelector('.inv-amt')||{}).value||'0'),
-    desc:  (tr.querySelector('.inv-desc')||{}).value||'',
+    desc:  (el=>el?(el.value!==undefined&&el.tagName==='INPUT'?el.value:el.textContent):'')(tr.querySelector('.inv-desc')),
     medId: tr.dataset.medId||'',
     voided: tr.dataset.voided==='1'
   }));
@@ -2674,7 +2815,7 @@ function renderInvLedger(type){
       <td><input class="fi inv-ym" type="text" value="${r.ym||''}" style="width:75px;font-size:11px;" oninput="recalcInvLedger('${type}')"></td>
       <td><input class="num-in inv-amt" type="text" value="${r.amt||''}" style="max-width:80px;" oninput="recalcInvLedger('${type}')"></td>
       <td class="inv-bal" style="text-align:right;font-weight:700;color:#1565c0;"></td>
-      <td>${typeTag}<input class="fi inv-desc" type="text" value="${r.desc||''}" style="width:${descW};font-size:11px;" oninput="saveInvLedger('${type}')"></td>
+      <td><span class="inv-desc" style="font-size:11px;color:#546e7a;">${typeTag ? typeTag+' ' : ''}${(r.desc||'').replace(/</g,'&lt;')}</span></td>
       <td>${actionBtn}</td>
     </tr>`;
   }).join('');
@@ -3161,6 +3302,10 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
+  // 應付費用分頁
+  await seedPayable();
+  await fixDrugCloseValues();
+  renderPayable();
   // 備抵折讓：期初餘額 input 初始化 + 動態渲染
   initAllowInitInp();
   renderAllowLedger();
