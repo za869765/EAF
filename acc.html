@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.0.8</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.0.9</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -44,6 +44,8 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 .tab-btn { padding: 9px 16px; background: transparent; color: #90a4ae; border: none; font-size: 12px; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; }
 .tab-btn:hover { color: #cfd8dc; }
 .tab-btn.active { color: #fff; border-bottom-color: #42a5f5; font-weight: 600; }
+@keyframes tab-pulse { 0%,100%{color:#ff8f00;text-shadow:0 0 6px #ff8f00;} 50%{color:#fff176;text-shadow:0 0 12px #ffca28;} }
+.tab-btn.tab-alert { animation: tab-pulse 1.2s ease-in-out infinite; font-weight:700; }
 
 /* ── Content ── */
 #content { padding: 14px 20px; max-width: 1400px; }
@@ -315,7 +317,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.0.8</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.0.9</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -3566,6 +3568,10 @@ async function loadEafMedical(){
           </table>
         </div>`; }
     }
+    /* 更新 tab 動畫提醒 */
+    const _invTab = document.querySelector('#tab-nav .tab-btn[onclick*="inventory"]');
+    if(_invTab) _invTab.classList.toggle('tab-alert', unposted.length > 0);
+
     if(!unposted.length){
       tbody.innerHTML='<tr><td colspan="9" class="empty-msg" style="color:#2e7d32;">✓ 所有動支單已入帳，請至上方明細帳查閱</td></tr>';
       updateMedBtn(); return;
