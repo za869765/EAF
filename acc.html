@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.2.2</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.2.3</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -317,7 +317,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.2.2</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.2.3</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1210,8 +1210,13 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     </div>
     <div class="bb-divider"></div>
     <div class="bb-item">
-      <div class="bb-num" id="pay-cat02">67,577</div>
-      <div class="bb-label">02 員工獎勵金</div>
+      <div class="bb-num" id="pay-cat02a">37,600</div>
+      <div class="bb-label">02a 醫師獎勵金</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" id="pay-cat02b">29,977</div>
+      <div class="bb-label">02b 員工獎勵金</div>
     </div>
     <div class="bb-divider"></div>
     <div class="bb-item">
@@ -3811,9 +3816,12 @@ const PAYABLE_SEED = {
       { ym:'11502', day:26, ref:'300004 序31', desc:'11502當月繳局統籌款378+719+4,527=7,186', amt:7186 },
       { ym:'11503', day:31, ref:'300005 序15', desc:'114年度雜項收入：繳局統籌款(6224×0.1=622)+11412醫師獎勵金(6,224×0.9×0.7=3,921)', amt:4543 }
     ]},
-    { code:'02', name:'員工獎勵金', subtotal:67577, note:'實際分發給員工的獎勵金（含醫師績效獎金）', entries:[
+    { code:'02a', name:'醫師獎勵金', subtotal:37600, note:'醫師診療績效獎金（雜項收入×0.95×0.9×0.7）', entries:[
+      { ym:'11501', day:30, ref:'300002 序26', desc:'11404醫師獎勵金(62823×0.95×0.9×0.7=37,600)', amt:37600 },
+    ]},
+    { code:'02b', name:'員工獎勵金', subtotal:29977, note:'員工績效獎勵金（雜項收入×0.95×0.9×0.3）', entries:[
       { ym:'11412', day:31, ref:'300114 序2',  desc:'114.12員工獎勵金', amt:11104 },
-      { ym:'11501', day:30, ref:'300002 序26', desc:'11404醫師獎勵金(62823×0.95×0.9×0.7=37,600)+114年度員工獎勵金(66123×0.95×0.9×0.3=16,961)', amt:54561 },
+      { ym:'11501', day:30, ref:'300002 序26', desc:'114年度員工獎勵金(66123×0.95×0.9×0.3=16,961)', amt:16961 },
       { ym:'11502', day:26, ref:'300004 序16', desc:'114012員工獎勵金(900×0.95×0.9×0.3=231)', amt:231 },
       { ym:'11503', day:31, ref:'300005 序14', desc:'11412員工獎勵金(6,224×0.9×0.3=1,681)', amt:1681 }
     ]},
@@ -3840,6 +3848,12 @@ async function seedMissingJanDrug(){
     console.log('[seedMissingJanDrug] 補入', toAdd.length, '筆1月進貨');
   }
   localStorage.setItem('acc_fix_jan_drug_299','1');
+}
+function migratePayableSplit02(){
+  // 將舊版 02 員工獎勵金 拆分為 02a 醫師 + 02b 員工
+  if(localStorage.getItem('acc_payable_split02')) return;
+  localStorage.removeItem('acc_payable'); // 強制重新寫入新結構
+  localStorage.setItem('acc_payable_split02','1');
 }
 async function seedPayable(){
   if(localStorage.getItem('acc_payable')) return;
@@ -3913,8 +3927,8 @@ function renderPayable(){
   });
   const sec = document.getElementById('payable-sections');
   if(!sec) return;
-  const CAT_HDR = {'01':'hd-teal','02':'hd-purple','03':'hd-amber'};
-  const CAT_ICN = {'01':'🏦','02':'🏅','03':'👥'};
+  const CAT_HDR = {'01':'hd-teal','02a':'hd-purple','02b':'hd-purple','03':'hd-amber'};
+  const CAT_ICN = {'01':'🏦','02a':'👨‍⚕️','02b':'🏅','03':'👥'};
   sec.innerHTML = (data.categories||[]).map(cat=>`
     <div class="card">
       <div class="card-hd ${CAT_HDR[cat.code]||'hd-dark'}">
@@ -4933,6 +4947,7 @@ function logout(){ window.location.href = '/admin.html'; }
   await fixCorruptedDesc();
   renderInvLedger('drug');
   // 應付費用分頁
+  migratePayableSplit02(); // 02→02a醫師+02b員工
   await seedPayable();
   await fixDrugCloseValues();
   renderPayable();
