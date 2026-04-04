@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.9.4</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.9.5</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -365,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.9.4</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.9.5</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -416,30 +416,6 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <span style="font-weight:700; font-size:15px; color:#1e2a38;">📊 醫療基金會計帳務　各分頁總覽</span>
   </div>
 
-  <!-- 年度收支 -->
-  <div style="font-size:11px; font-weight:700; color:#546e7a; margin:12px 0 4px; letter-spacing:1px;">▌ <span id="rc-year-title">115</span>年度收支累積</div>
-  <div class="reminder-grid">
-    <div class="r-card rc-blue">
-      <div class="r-num" id="rc-income">—</div>
-      <div class="r-label">💰 掛帳金額合計</div>
-      <div class="r-sub" id="rc-income-sub">門診健保 + NIIS</div>
-    </div>
-    <div class="r-card rc-teal">
-      <div class="r-num" id="rc-other-inc">—</div>
-      <div class="r-label">🏥 不給付/部分負擔</div>
-      <div class="r-sub">檢驗＋部分負擔＋健保不給付</div>
-    </div>
-    <div class="r-card rc-green">
-      <div class="r-num" id="rc-expense-total">—</div>
-      <div class="r-label">📊 510601 年度成本</div>
-      <div class="r-sub" id="rc-expense-sub">年度支出合計</div>
-    </div>
-    <div class="r-card rc-orange" style="border-left-color:#1b5e20;">
-      <div class="r-num" id="rc-net" style="color:#1b5e20;">—</div>
-      <div class="r-label">📈 獎前收支淨餘</div>
-      <div class="r-sub">掛帳 + 不給付 − 折讓 − 支出</div>
-    </div>
-  </div>
 
   <!-- 負債科目 -->
   <div style="font-size:11px; font-weight:700; color:#546e7a; margin:12px 0 4px; letter-spacing:1px;">▌ 負債科目</div>
@@ -1883,54 +1859,6 @@ function updateCalcTable(){
 /* 首頁 dashboard 更新 */
 function updateHomeDashboard(){
   const {y} = getYm();
-
-  // ── 年度收支累積（從各月 localStorage 加總） ──
-  const rcYearTitle = document.getElementById('rc-year-title');
-  if(rcYearTitle) rcYearTitle.textContent = y;
-  let yInc=0, yOther=0, yExp=0, yDisc=0, mCount=0;
-  for(let mo=1; mo<=12; mo++){
-    const ymKey = y + String(mo).padStart(2,'0');
-    const raw = localStorage.getItem('acc_monthly_'+ymKey);
-    if(!raw) continue;
-    try{
-      const d = JSON.parse(raw);
-      if(d.income){
-        yInc += pnum(d.income.hi) + pnum(d.income.covid) + pnum(d.income.flu) + pnum(d.income.rout);
-        yOther += pnum(d.income.lab) + pnum(d.income.copay) + pnum(d.income.nc);
-      }
-      if(d.discount?.needed) yDisc += pnum(d.discount.amount);
-      if(d.expense){
-        // 從傳票取支出合計更準確，但月度資料也可用
-        const vRaw = localStorage.getItem('acc_vouchers_'+ymKey);
-        if(vRaw){
-          const vs = JSON.parse(vRaw);
-          // 510601 支出 = 所有 debit 且 subject 含 510601 的合計（排除績效獎金）
-          let curG = '';
-          vs.forEach(v=>{
-            if(v.group) curG = v.group;
-            if(v.type==='debit' && (v.subject||'').includes('510601') && !curG.includes('績效獎金')){
-              yExp += v.dr||0;
-            }
-          });
-        }
-      }
-      mCount++;
-    }catch(e){}
-  }
-  const rcInc = document.getElementById('rc-income');
-  if(rcInc) rcInc.textContent = yInc > 0 ? fmt(yInc) : '—';
-  const rcIncSub = document.getElementById('rc-income-sub');
-  if(rcIncSub) rcIncSub.textContent = `${mCount} 個月資料`;
-
-  const rcOther = document.getElementById('rc-other-inc');
-  if(rcOther) rcOther.textContent = yOther > 0 ? fmt(yOther) : '—';
-
-  const rcExp = document.getElementById('rc-expense-total');
-  if(rcExp) rcExp.textContent = yExp > 0 ? fmt(yExp) : '—';
-
-  const yNet = yInc + yOther - yDisc - yExp;
-  const rcNet = document.getElementById('rc-net');
-  if(rcNet) rcNet.textContent = (yInc > 0 || yExp > 0) ? fmt(yNet) : '—';
 
   // ── 負債科目（從各分頁資料取） ──
   const payData = loadPayable();
