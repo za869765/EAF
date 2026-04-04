@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.9.9</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.0.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -365,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.9.9</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.0.0</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -477,6 +477,19 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
       <div class="r-label">💰 醫療作業基金 5%</div>
       <div class="r-sub">年度累積</div>
     </div>
+  </div>
+
+  <!-- 支出傳票上傳（沖銷應付費用 / 代收款） -->
+  <div style="margin:16px 0 0;">
+    <div style="font-size:11px; font-weight:700; color:#546e7a; margin:0 0 6px; letter-spacing:1px;">▌ 支出傳票沖銷</div>
+    <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+      <label style="display:inline-flex; align-items:center; gap:6px; background:#e3f2fd; border:2px dashed #64b5f6; border-radius:8px; padding:8px 16px; cursor:pointer; font-size:13px; font-weight:600; color:#1565c0;">
+        📎 上傳支出傳票 Excel
+        <input type="file" accept=".xlsx,.xls" id="expense-upload" onchange="onExpenseUpload(this)" style="display:none;">
+      </label>
+      <span id="expense-upload-status" style="font-size:11px; color:#90a4ae;"></span>
+    </div>
+    <div id="expense-preview" style="display:none; margin-top:10px;"></div>
   </div>
 </div>
 
@@ -4861,16 +4874,238 @@ function renderPayable(){
               <td style="padding:6px 10px;color:#546e7a;white-space:nowrap;">${fmtPayDate(e.ym,e.day)}</td>
               <td style="padding:6px 10px;color:#1565c0;font-size:11px;white-space:nowrap;">${(e.ref||'').replace(/</g,'&lt;')}</td>
               <td style="padding:6px 10px;color:#333;font-size:11px;">${(e.desc||'').replace(/</g,'&lt;')}</td>
-              <td style="padding:6px 10px;text-align:right;font-weight:600;color:#b71c1c;">${fmt(e.amt)}</td>
+              <td style="padding:6px 10px;text-align:right;font-weight:600;color:${e.amt<0?'#1b5e20':'#b71c1c'};">${fmt(Math.abs(e.amt))}${e.amt<0?' ✓':''}</td>
             </tr>`).join('')}
             <tr style="background:#b0bec5;border-top:2px solid #90a4ae;">
-              <td colspan="3" style="padding:6px 10px;text-align:right;font-size:13px;color:#1a237e;font-weight:800;letter-spacing:.5px;">小計</td>
-              <td style="padding:6px 10px;text-align:right;font-weight:800;font-size:15px;color:#b71c1c;">${fmt(cat.subtotal)}</td>
+              <td colspan="3" style="padding:6px 10px;text-align:right;font-size:13px;color:#1a237e;font-weight:800;letter-spacing:.5px;">餘額</td>
+              <td style="padding:6px 10px;text-align:right;font-weight:800;font-size:15px;color:${cat.subtotal<0?'#1b5e20':'#b71c1c'};">${fmt(cat.subtotal)}</td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>`).join('');
+}
+
+/* ════ 支出傳票上傳 → 沖銷應付費用 / 代收款 ════ */
+function onExpenseUpload(inp){
+  const f = inp.files[0]; if(!f) return;
+  const st = document.getElementById('expense-upload-status');
+  if(st) st.textContent = '解析中…';
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const wb = XLSX.read(e.target.result, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+      const result = parseExpenseRows(rows);
+      showExpensePreview(result);
+      if(st) st.textContent = `✅ ${f.name}（${result._totalRows} 筆分錄）`;
+    }catch(err){
+      console.error(err);
+      if(st) st.textContent = '❌ 解析失敗：' + err.message;
+    }
+    inp.value = '';
+  };
+  reader.readAsArrayBuffer(f);
+}
+
+/* 智慧解析：依會計科目分類 */
+function parseExpenseRows(rows){
+  const payable = [];   // 210205 應付費用
+  const custodial = {}; // 21020311, 21020312, 21020321 等
+  let surplusAmt = 0;   // 330101 累積賸餘
+  const others = [];    // 其他（510601、110404 等不需沖銷）
+  let totalRows = 0;
+  let voucherNums = new Set();
+
+  rows.forEach(r => {
+    const acct = String(r[3]||'').trim();
+    const sub  = String(r[4]||'').trim();
+    const purp = String(r[5]||'').trim();
+    const desc = String(r[6]||'').trim();
+    const dr   = +(r[7]||0);
+    const cr   = +(r[8]||0);
+    const vnum = String(r[2]||'').trim();
+    const date = String(r[0]||'').trim();
+
+    if(!acct || dr===0 && cr===0) return;
+    if(acct.startsWith('1101')) return; // 專戶轉出（貸方），跳過
+    if(vnum && /^\d+$/.test(vnum)) voucherNums.add(vnum);
+    if(dr===0) return; // 只看借方（=實際付款）
+
+    totalRows++;
+
+    // 210205 應付費用
+    if(acct.includes('210205')){
+      let catCode = '03';
+      if(sub.includes('01')) catCode = '01';
+      else if(sub.match(/02\b/) && !sub.includes('02a') && !sub.includes('02b')) catCode = '02b';
+      else if(sub.includes('99')) catCode = '03';
+      else if(sub.includes('03')) catCode = '03';
+      payable.push({ catCode, sub, desc, amt:dr, date, vnum });
+      return;
+    }
+
+    // 330101 累積賸餘
+    if(acct.includes('330101')){
+      surplusAmt += dr;
+      return;
+    }
+
+    // 210203xx 代收款
+    const custMatch = acct.match(/(2102\d{4})/);
+    if(custMatch){
+      const code = custMatch[1];
+      if(!custodial[code]) custodial[code] = [];
+      custodial[code].push({ sub, purp, desc, amt:dr, date, vnum });
+      return;
+    }
+
+    others.push({ acct, sub, purp, desc, amt:dr });
+  });
+
+  return { payable, custodial, surplus:surplusAmt, others, _totalRows:totalRows, _vouchers:[...voucherNums] };
+}
+
+/* 代收款子目對應 CUSTODIAL_SEED subs 名稱 */
+const CUST321_MAP = {
+  '01':'公保', '02':'公健', '03':'勞健', '04':'勞保',
+  '05':'退撫', '06':'勞退', '07':'所得稅'
+};
+
+function showExpensePreview(result){
+  const box = document.getElementById('expense-preview');
+  if(!box) return;
+
+  // 應付費用彙總
+  const payCats = {};
+  result.payable.forEach(p=>{
+    if(!payCats[p.catCode]) payCats[p.catCode] = {items:[], total:0};
+    payCats[p.catCode].items.push(p);
+    payCats[p.catCode].total += p.amt;
+  });
+  const CAT_NAME = {'01':'繳局統籌款','02a':'醫師獎勵金','02b':'員工獎勵金','03':'員工款'};
+
+  let payHtml = '';
+  for(const [code, cat] of Object.entries(payCats)){
+    payHtml += `<div style="margin:4px 0;"><b style="color:#1565c0;">${code} ${CAT_NAME[code]||code}</b>：<span style="color:#b71c1c;font-weight:700;">${fmt(cat.total)}</span></div>`;
+    cat.items.forEach(p => {
+      payHtml += `<div style="font-size:11px;color:#546e7a;margin-left:16px;">- ${p.desc.slice(0,60)}… ${fmt(p.amt)}</div>`;
+    });
+  }
+
+  // 代收款彙總
+  let custHtml = '';
+  for(const [code, items] of Object.entries(result.custodial)){
+    const groupTotal = items.reduce((s,i)=>s+i.amt,0);
+    const groupName = code==='21020311'?'國健科':code==='21020312'?'疾管科':code==='21020321'?'代收款（薪資相關）':code;
+    custHtml += `<div style="margin:6px 0 2px;"><b style="color:#0d47a1;">${code} ${groupName}</b>：<span style="color:#b71c1c;font-weight:700;">${fmt(groupTotal)}</span></div>`;
+    items.forEach(i => {
+      const subName = code==='21020321' ? (CUST321_MAP[i.sub.split(' ')[0]]||i.sub) : i.sub;
+      custHtml += `<div style="font-size:11px;color:#546e7a;margin-left:16px;">- ${subName}：${fmt(i.amt)}　${i.desc.slice(0,50)}</div>`;
+    });
+  }
+
+  const surpHtml = result.surplus > 0 ? `<div style="margin:6px 0;"><b style="color:#6a1b9a;">330101 累積賸餘 解繳</b>：<span style="color:#b71c1c;font-weight:700;">${fmt(result.surplus)}</span></div>` : '';
+
+  box.style.display = '';
+  box.innerHTML = `
+    <div style="background:#fff;border:1px solid #cfd8dc;border-radius:8px;padding:12px;max-height:400px;overflow-y:auto;">
+      <div style="font-weight:700;font-size:13px;color:#1e2a38;margin-bottom:8px;">📋 解析結果（傳票 ${result._vouchers.join(', ')}）</div>
+      ${payHtml ? `<div style="background:#fff3e0;border-radius:6px;padding:8px 10px;margin:6px 0;">
+        <div style="font-weight:700;color:#e65100;margin-bottom:4px;">💰 沖銷 210205 應付費用</div>${payHtml}</div>` : ''}
+      ${custHtml ? `<div style="background:#e3f2fd;border-radius:6px;padding:8px 10px;margin:6px 0;">
+        <div style="font-weight:700;color:#0d47a1;margin-bottom:4px;">🏦 沖銷 210203 代收款</div>${custHtml}</div>` : ''}
+      ${surpHtml ? `<div style="background:#f3e5f5;border-radius:6px;padding:8px 10px;margin:6px 0;">${surpHtml}</div>` : ''}
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button onclick="applyExpenseWriteoff()" style="background:#1b5e20;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-weight:700;cursor:pointer;font-size:13px;">✅ 確認沖銷</button>
+        <button onclick="document.getElementById('expense-preview').style.display='none'" style="background:#90a4ae;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;">取消</button>
+      </div>
+    </div>`;
+
+  // 暫存解析結果
+  STATE._expenseParsed = result;
+}
+
+function applyExpenseWriteoff(){
+  const result = STATE._expenseParsed;
+  if(!result) return;
+  const {ym} = getYm();
+
+  // ── 沖銷應付費用 ──
+  if(result.payable.length){
+    const data = loadPayable();
+    result.payable.forEach(p => {
+      const cat = (data.categories||[]).find(c=>c.code===p.catCode);
+      if(cat){
+        cat.entries.push({
+          ym, day:'', ref:`支出 ${p.vnum||''}`, desc:`🔻沖銷 ${p.desc}`, amt: -(p.amt), _wo:true
+        });
+      }
+    });
+    // 重算小計
+    (data.categories||[]).forEach(cat=>{ cat.subtotal = (cat.entries||[]).reduce((s,e)=>s+(e.amt||0),0); });
+    data.total = (data.categories||[]).reduce((s,c)=>s+(c.subtotal||0),0);
+    accSave('acc_payable', data);
+  }
+
+  // ── 沖銷代收款 ──
+  if(Object.keys(result.custodial).length){
+    const data = loadCustodial();
+    for(const [code, items] of Object.entries(result.custodial)){
+      const group = (data.groups||[]).find(g=>g.code===code);
+      if(!group) continue;
+
+      if(code==='21020321'){
+        // 薪資相關：依子目對應 subs
+        const SUB_MAP = {'01':0,'02':2,'03':3,'04':4,'05':1,'06':5,'07':-1};
+        items.forEach(item => {
+          const subCode = (item.sub||'').split(' ')[0];
+          const idx = SUB_MAP[subCode];
+          if(idx!==undefined && idx>=0 && group.subs[idx]){
+            group.subs[idx].entries.push({
+              ym, day:'', ref:`支出 ${item.vnum||''}`, desc:`🔻沖銷 ${item.desc.slice(0,80)}`, amt:-(item.amt), _wo:true
+            });
+            group.subs[idx].subtotal = group.subs[idx].entries.reduce((s,e)=>s+(e.amt||0),0);
+          }
+        });
+      } else {
+        // 其他群組（國健科、疾管科等）：直接加到第一個 sub 或新建
+        items.forEach(item => {
+          const sub = group.subs[0] || (group.subs[0] = {name:'沖銷',subtotal:0,entries:[]});
+          sub.entries.push({
+            ym, day:'', ref:`支出 ${item.vnum||''}`, desc:`🔻沖銷 ${item.desc.slice(0,80)}`, amt:-(item.amt), _wo:true
+          });
+          sub.subtotal = sub.entries.reduce((s,e)=>s+(e.amt||0),0);
+        });
+      }
+      group.subtotal = (group.subs||[]).reduce((s,sub)=>s+(sub.subtotal||0),0);
+    }
+    data.total = (data.groups||[]).reduce((s,g)=>s+(g.subtotal||0),0);
+    accSave('acc_custodial', data);
+  }
+
+  // ── 沖銷累積賸餘 ──
+  if(result.surplus > 0){
+    const {y} = getYm();
+    if(!STATE.yearData) STATE.yearData = {};
+    if(!STATE.yearData[ym]) STATE.yearData[ym] = {};
+    STATE.yearData[ym].surplusDeduct = (STATE.yearData[ym].surplusDeduct||0) + result.surplus;
+    accSave('acc_yeardata_'+y, STATE.yearData);
+  }
+
+  // 刷新所有分頁
+  renderPayable();
+  renderCustodial();
+  renderSurplusTab();
+  updateHomeDashboard();
+
+  // 關閉預覽
+  const box = document.getElementById('expense-preview');
+  if(box) box.innerHTML = '<div style="background:#e8f5e9;border-radius:8px;padding:12px;color:#1b5e20;font-weight:700;">✅ 沖銷完成！應付費用及代收款已更新。</div>';
+  delete STATE._expenseParsed;
+
+  showSaveMsg('✅ 支出傳票沖銷已套用');
 }
 
 /* ════ 應付代收款 210203 ════ */
@@ -5041,11 +5276,11 @@ function renderCustodial(){
                 <td style="padding:5px 10px;color:#546e7a;white-space:nowrap;width:70px;">${e.ym?fmtPayDate(e.ym,e.day):''}</td>
                 <td style="padding:5px 10px;color:#1565c0;font-size:11px;white-space:nowrap;width:95px;">${(e.ref||'').replace(/</g,'&lt;')}</td>
                 <td style="padding:5px 10px;color:#333;font-size:11px;">${(e.desc||'').replace(/</g,'&lt;')}</td>
-                <td style="padding:5px 10px;text-align:right;font-weight:600;color:#1b5e20;width:85px;">${fmt(e.amt)}</td>
+                <td style="padding:5px 10px;text-align:right;font-weight:600;color:${e.amt<0?'#b71c1c':'#1b5e20'};width:85px;">${e.amt<0?'-'+fmt(Math.abs(e.amt))+' ✓':fmt(e.amt)}</td>
               </tr>`).join('')}
               <tr style="background:#b0bec5;border-top:2px solid #90a4ae;">
-                <td colspan="3" style="padding:6px 10px;text-align:right;font-size:13px;color:#1a237e;font-weight:800;letter-spacing:.5px;">小計</td>
-                <td style="padding:6px 10px;text-align:right;font-weight:800;font-size:15px;color:#b71c1c;">${fmt(sub.subtotal)}</td>
+                <td colspan="3" style="padding:6px 10px;text-align:right;font-size:13px;color:#1a237e;font-weight:800;letter-spacing:.5px;">餘額</td>
+                <td style="padding:6px 10px;text-align:right;font-weight:800;font-size:15px;color:${sub.subtotal<0?'#b71c1c':'#1b5e20'};">${fmt(sub.subtotal)}</td>
               </tr>
             </tbody>
           </table>
@@ -5084,6 +5319,18 @@ function renderSurplusTab(){
       <td style="padding:6px 10px;text-align:right;font-weight:600;color:${amt>0?'#1b5e20':'#bdbdbd'};">${amt>0?fmt(amt):'—'}</td>
       <td style="padding:6px 10px;text-align:right;font-weight:700;color:#1565c0;">${fmt(bal)}</td>
     </tr>`;
+    // 解繳市庫（支出傳票沖銷）
+    const ded = d && d.surplusDeduct ? +d.surplusDeduct : 0;
+    if(ded > 0){
+      bal -= ded;
+      totalAdd -= ded;
+      rows += `<tr style="background:#fce4ec;">
+        <td style="padding:6px 10px;color:#b71c1c;">${y}/${String(mo).padStart(2,'0')}</td>
+        <td style="padding:6px 10px;color:#b71c1c;font-size:11px;">🔻 解繳市庫（支出傳票沖銷）</td>
+        <td style="padding:6px 10px;text-align:right;font-weight:600;color:#b71c1c;">-${fmt(ded)}</td>
+        <td style="padding:6px 10px;text-align:right;font-weight:700;color:#1565c0;">${fmt(bal)}</td>
+      </tr>`;
+    }
   }
   tbody.innerHTML = rows;
   const initEl = document.getElementById('surp-init');
