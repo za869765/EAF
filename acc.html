@@ -6,8 +6,9 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.7.5</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.7.6</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px; background: #f0f2f5; color: #1a1a2e; }
@@ -364,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.7.5</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.7.6</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -799,6 +800,13 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     </div>
   </div>
 
+  <!-- 月底結算底部：直接產製傳票 -->
+  <div style="text-align:center; padding:16px 0 24px;">
+    <button onclick="preCheckVoucher()" style="background:#1e88e5; color:#fff; font-size:15px; font-weight:700; padding:12px 36px; border:none; border-radius:8px; cursor:pointer; letter-spacing:1px; box-shadow:0 2px 8px #1e88e566;">
+      ⚡ 製作轉帳傳票 &amp; 匯出 XLSX
+    </button>
+  </div>
+
 </div><!-- /tab-work -->
 
 
@@ -811,7 +819,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <span style="font-size:13px; font-weight:700; color:#fff;" id="voucher-ym-title">115 年 3 月 轉帳傳票</span>
     <span style="font-size:10px; color:#e65100; background:#fff3e0; border-radius:4px; padding:2px 7px; display:none;" id="voucher-src-badge"></span>
     <button class="lock-sec-btn" id="voucher-lock-btn" onclick="toggleVoucherLock()">🔒 鎖定中</button>
-    <button class="btn btn-green" onclick="exportExcel()">📥 匯出 CSV</button>
+    <button class="btn btn-green" onclick="exportExcel()">📥 匯出 XLSX</button>
     <button class="btn btn-gray" style="font-size:11px;" onclick="addManualVoucherRow()">＋ 手工新增列</button>
     <button class="ym-action gen" style="padding:5px 14px; font-size:12px;" onclick="preCheckVoucher()">⚡ 製作轉帳傳票</button>
     <span style="font-size:11px; color:#78909c;" id="voucher-count"></span>
@@ -2583,44 +2591,47 @@ function exportSurplusCsv(){
 function exportExcel(){
   const {y,m,label} = getYm();
   const dateStr = `${y}/${pad(m)}/30`;
+  const printDate = new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
 
-  // CSV 欄位轉義（含逗號/引號時加引號）
-  const esc = v => {
-    const s = String(v??'');
-    return (s.includes(',') || s.includes('"') || s.includes('\n'))
-      ? '"' + s.replace(/"/g,'""') + '"' : s;
-  };
-  const row = (...cols) => cols.map(esc).join(',') + '\r\n';
+  const COLS = ['製  票  日  期','入  帳  日  期','會     計     科     目','沖     銷     科     目     子     目','用     途     別     科     目','摘                                 要','借方金額','貸方金額'];
 
-  let csv = '\uFEFF'; // UTF-8 BOM
-  // 標題行（轉帳傳票共8欄，傳票編號由官方系統填入）
-  csv += esc(`佳里區衛生所傳票明細表`) + ',,,,,,' + esc(`列印日期：${new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'})}`) + '\r\n';
+  const aoa = [];
+  // 標題列（合併 A1:G1 + H1）
+  aoa.push([`佳里區衛生所傳票明細表`,'','','','','',`列印日期：${printDate}`,'']);
   // 欄頭
-  csv += row('製  票  日  期','入  帳  日  期','會     計     科     目','沖     銷     科     目     子     目','用     途     別     科     目','摘                                 要','借方金額','貸方金額');
+  aoa.push(COLS);
 
   let totalDr=0, totalCr=0;
   STATE.vouchers.forEach(v => {
-    csv += row(
-      dateStr, dateStr,
-      v.subject,
-      v.subAccount||'',
-      v.purpose||'',
-      v.desc,
-      v.dr || 0,
-      v.cr || 0
-    );
+    aoa.push([dateStr, dateStr, v.subject, v.subAccount||'', v.purpose||'', v.desc, v.dr||0, v.cr||0]);
     totalDr += v.dr; totalCr += v.cr;
   });
   // 合計行
-  csv += row('','','','','', '', totalDr, totalCr);
+  aoa.push(['','','','','','合　計', totalDr, totalCr]);
 
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url;
-  a.download = `轉帳傳票_${y}${pad(m)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // 欄寬
+  ws['!cols'] = [
+    {wch:14},{wch:14},{wch:20},{wch:20},{wch:20},{wch:40},{wch:12},{wch:12}
+  ];
+  // 合併標題列前7格
+  ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:5} }];
+
+  // 數字格式（借貸方欄）
+  const numFmt = '#,##0';
+  const dataStart = 2; // row index 2 = 第3列（欄頭之後）
+  aoa.forEach((_, ri) => {
+    if(ri < dataStart) return;
+    ['G','H'].forEach(col => {
+      const ref = col + (ri+1);
+      if(ws[ref] && typeof ws[ref].v === 'number') ws[ref].z = numFmt;
+    });
+  });
+
+  XLSX.utils.book_append_sheet(wb, ws, `${y}年${pad(m)}月傳票`);
+  XLSX.writeFile(wb, `轉帳傳票_${y}${pad(m)}.xlsx`);
 }
 function exportInvExcel(type){ showModal({icon:'📥',title:'功能建置中',body:'匯出 Excel 功能即將推出',noCancel:true,confirmText:'了解'}); }
 function exportPropExcel(){ showModal({icon:'📥',title:'功能建置中',body:'匯出財產折舊存摺 Excel 功能即將推出',noCancel:true,confirmText:'了解'}); }
@@ -3125,7 +3136,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.7.5已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.7.6已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3166,7 +3177,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.7.5已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.7.6已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4214,7 +4225,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.7.5 全面重置 Q1 庫存明細帳 ──
+/* ── v3.7.6 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -5518,11 +5529,11 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.7.5: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.7.6: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.7.5: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.7.6: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
-  // v3.7.5: 補入缺漏的11503藥品進貨/領用/盤損
+  // v3.7.6: 補入缺漏的11503藥品進貨/領用/盤損
   await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
