@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.8.5</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.8.6</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -365,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.8.5</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.8.6</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -554,17 +554,17 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
           <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#2e7d32; font-weight:700;" id="ct-staff">—</td>
         </tr>
         <tr>
-          <td style="border:1px solid #cfd8dc; padding:4px 6px; background:#eceff1; font-weight:700; color:#90a4ae;">衛生保健</td>
-          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#b0bec5;">-</td>
-          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#b0bec5;">-</td>
-          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right;"></td>
-          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right;"></td>
-          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right;"></td>
-          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#b0bec5;">0</td>
-          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#b0bec5;">0</td>
-          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#b0bec5;">0</td>
-          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#b0bec5;">0</td>
-          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#b0bec5;">0</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 6px; background:#eceff1; font-weight:700; color:#37474f;">衛生保健</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#1565c0; font-weight:700;" id="ct-h-inc">-</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#78909c;" id="ct-h-disc">-</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right;" id="ct-h-noncov">-</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right;" id="ct-h-reject">-</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#c62828; font-weight:700;" id="ct-h-exp">-</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#1b5e20; font-weight:900; font-size:14px;" id="ct-h-net">-</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#e65100; font-weight:700;" id="ct-h-fund5">-</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#4527a0; font-weight:700;" id="ct-h-bureau">-</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#0d47a1; font-weight:700;" id="ct-h-doctor">-</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#2e7d32; font-weight:700;" id="ct-h-staff">-</td>
         </tr>
         <tr style="background:#b0bec5;">
           <td style="border:1px solid #90a4ae; padding:5px 6px; font-weight:800; color:#1a237e;">小　計</td>
@@ -582,7 +582,39 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
       </tbody>
     </table>
     <div style="padding:4px 14px 6px; font-size:10px; color:#78909c; line-height:1.6;">
-      📌 獎前淨餘 = 掛帳 + 不給付 − 折讓 − 剔除 − 支出　｜　基金5% = 淨餘×5%　｜　獎勵金 = 淨餘×95%（繳局10%：醫師63%：員工27%）
+      📌 獎前淨餘 = 掛帳 + 不給付 − 折讓 − 剔除 − 支出　｜　基金5% = 淨餘×5%　｜　門診醫療：繳局10%／醫師63%／員工27%　｜　衛生保健：繳局10%／醫師27%／員工63%（−加班費）
+    </div>
+  </div>
+
+  <!-- ── 衛生保健拆分（行動醫院）── -->
+  <div id="health-outreach-box" style="margin:8px 0 10px; border:2px solid #26a69a; border-radius:8px; overflow:hidden;">
+    <div style="background:#00695c; color:#fff; padding:6px 14px; font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px;">
+      <span>🏥 衛生保健拆分（行動醫院）</span>
+      <span style="font-size:10px; font-weight:400; background:#e0f2f1; color:#004d40; border-radius:4px; padding:1px 8px;">5月起使用，從門診醫療拆出</span>
+    </div>
+    <div style="padding:10px 14px;">
+      <div class="input-grid" style="grid-template-columns:repeat(4,1fr);">
+        <div class="input-group">
+          <label>衛生保健掛帳金額</label>
+          <input class="num-in" id="h-inc" type="text" placeholder="0" oninput="calcHealthSplit()">
+          <div class="hint">從門診健保掛帳拆出</div>
+        </div>
+        <div class="input-group">
+          <label>衛生保健支出金額</label>
+          <input class="num-in" id="h-exp" type="text" placeholder="0" oninput="calcHealthSplit()">
+          <div class="hint">從 510601 支出拆出</div>
+        </div>
+        <div class="input-group">
+          <label>衛生局加班費 <span style="font-size:10px;color:#e65100;">（自動偵測）</span></label>
+          <input class="num-in" id="h-overtime" type="text" placeholder="0" oninput="calcHealthSplit()">
+          <div class="hint" id="h-overtime-hint">行動醫院動支單自動帶入</div>
+        </div>
+        <div class="input-group">
+          <label style="color:#00695c;">衛生保健淨餘（自動）</label>
+          <input class="num-in auto" id="h-net" type="text" readonly>
+          <div class="hint">掛帳 − 支出</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1758,6 +1790,14 @@ function onDiscountAmtChange(){
 /* 收入/折讓變動時呼叫 */
 function calcReminders(){ updateHomeDashboard(); updateCalcTable(); }
 
+/* 衛生保健拆分欄位變動 */
+function calcHealthSplit(){
+  const hNet = pnum(document.getElementById('h-inc')?.value) - pnum(document.getElementById('h-exp')?.value);
+  const el = document.getElementById('h-net');
+  if(el) el.value = hNet ? fmt(hNet) : '';
+  updateCalcTable();
+}
+
 /* ════════════════════════════════════════════
    獎勵金計算表預覽（自動從各卡片帶入）
 ════════════════════════════════════════════ */
@@ -1766,34 +1806,63 @@ function updateCalcTable(){
   const badge = document.getElementById('calc-ym-badge');
   if(badge) badge.textContent = `${y}年${m}月`;
 
-  const inc     = pnum(document.getElementById('inc-total')?.value);
-  const disc    = document.getElementById('discount-needed')?.checked
-                ? pnum(document.getElementById('discount-amount-input')?.value) : 0;
-  const noncov  = pnum(document.getElementById('inc-lab')?.value)
-                + pnum(document.getElementById('inc-copay')?.value)
-                + pnum(document.getElementById('inc-noncov')?.value);
-  const reject  = 0;
-  const exp     = pnum(document.getElementById('expense-510601-total')?.textContent);
+  // ── 全部合計（掛帳 + 不給付 − 折讓 − 支出）──
+  const totalInc  = pnum(document.getElementById('inc-total')?.value);
+  const disc      = document.getElementById('discount-needed')?.checked
+                  ? pnum(document.getElementById('discount-amount-input')?.value) : 0;
+  const noncov    = pnum(document.getElementById('inc-lab')?.value)
+                  + pnum(document.getElementById('inc-copay')?.value)
+                  + pnum(document.getElementById('inc-noncov')?.value);
+  const reject    = 0;
+  const totalExp  = pnum(document.getElementById('expense-510601-total')?.textContent);
 
-  const net   = inc + noncov - disc - reject - exp;
-  const fund5  = Math.round(net * 0.05);
-  const bureau = Math.round(net * 0.95 * 0.1);
-  const staff  = Math.round(net * 0.95 * 0.9 * 0.3);
-  const doctor = net - fund5 - bureau - staff;
+  // ── 衛生保健拆分 ──
+  const hInc      = pnum(document.getElementById('h-inc')?.value);
+  const hExp      = pnum(document.getElementById('h-exp')?.value);
+  const hOvertime = pnum(document.getElementById('h-overtime')?.value);
+
+  // ── 門診醫療 = 總額 − 衛生保健 ──
+  const mInc = totalInc - hInc;
+  const mExp = totalExp - hExp;
+  const mNet = mInc + noncov - disc - reject - mExp;
+  const mFund5  = Math.round(mNet * 0.05);
+  const mBureau = Math.round(mNet * 0.95 * 0.1);
+  const mStaff  = Math.round(mNet * 0.95 * 0.9 * 0.3);
+  const mDoctor = mNet - mFund5 - mBureau - mStaff;
+
+  // ── 衛生保健（員工比例 0.7，繳局/醫師扣加班費）──
+  const hNet2   = hInc - hExp;
+  const hFund5  = Math.round(hNet2 * 0.05);
+  const hBureau = Math.round(hNet2 * 0.95 * 0.1 - hOvertime);
+  const hStaff  = Math.round(hNet2 * 0.95 * 0.9 * 0.7);
+  const hDoctor = hNet2 - hFund5 - (Math.round(hNet2 * 0.95 * 0.1)) - hStaff - hOvertime;
 
   const s = (id, v) => { const el=document.getElementById(id); if(el) el.textContent = v ? fmt(v) : '-'; };
+
   // 門診醫療 row
-  s('ct-inc',inc); s('ct-disc',disc); s('ct-noncov',noncov); s('ct-reject',reject);
-  s('ct-exp',exp); s('ct-net',net); s('ct-fund5',fund5);
-  s('ct-bureau',bureau); s('ct-doctor',doctor); s('ct-staff',staff);
-  // 小計 row（衛生保健暫 0，小計 = 門診醫療）
-  s('ct-inc-s',inc); s('ct-disc-s',disc); s('ct-noncov-s',noncov); s('ct-reject-s',reject);
-  s('ct-exp-s',exp); s('ct-net-s',net); s('ct-fund5-s',fund5);
-  s('ct-bureau-s',bureau); s('ct-doctor-s',doctor); s('ct-staff-s',staff);
-  // 自動回填績效獎金輸入欄（供 saveMonthData 存入年度累積）
-  const eb=document.getElementById('exp-bonus-bureau'); if(eb) eb.value=bureau>0?fmt(bureau):'';
-  const ed=document.getElementById('exp-bonus-doctor'); if(ed) ed.value=doctor>0?fmt(doctor):'';
-  const es=document.getElementById('exp-bonus-staff');  if(es) es.value=staff>0?fmt(staff):'';
+  s('ct-inc',mInc); s('ct-disc',disc); s('ct-noncov',noncov); s('ct-reject',reject);
+  s('ct-exp',mExp); s('ct-net',mNet); s('ct-fund5',mFund5);
+  s('ct-bureau',mBureau); s('ct-doctor',mDoctor); s('ct-staff',mStaff);
+
+  // 衛生保健 row
+  s('ct-h-inc',hInc); s('ct-h-disc',0); s('ct-h-noncov',0); s('ct-h-reject',0);
+  s('ct-h-exp',hExp); s('ct-h-net',hNet2); s('ct-h-fund5',hFund5);
+  s('ct-h-bureau',hBureau); s('ct-h-doctor',hDoctor); s('ct-h-staff',hStaff);
+
+  // 小計 row
+  const sNet = mNet + hNet2;
+  const sFund5 = mFund5 + hFund5;
+  const sBureau = mBureau + hBureau;
+  const sDoctor = mDoctor + hDoctor;
+  const sStaff  = mStaff  + hStaff;
+  s('ct-inc-s',totalInc); s('ct-disc-s',disc); s('ct-noncov-s',noncov); s('ct-reject-s',reject);
+  s('ct-exp-s',totalExp); s('ct-net-s',sNet); s('ct-fund5-s',sFund5);
+  s('ct-bureau-s',sBureau); s('ct-doctor-s',sDoctor); s('ct-staff-s',sStaff);
+
+  // 自動回填績效獎金輸入欄（門診+衛保合計，供 saveMonthData 存入）
+  const eb=document.getElementById('exp-bonus-bureau'); if(eb) eb.value=sBureau>0?fmt(sBureau):'';
+  const ed=document.getElementById('exp-bonus-doctor'); if(ed) ed.value=sDoctor>0?fmt(sDoctor):'';
+  const es=document.getElementById('exp-bonus-staff');  if(es) es.value=sStaff>0?fmt(sStaff):'';
 }
 
 /* 首頁 dashboard 更新 */
@@ -2245,10 +2314,23 @@ function confirmPicker(){
   document.getElementById('picker-total').textContent = sum>0 ? `$${fmt(sum)}` : '-';
   const pl = document.getElementById('picked-list');
   pl.innerHTML = items.map(r=>`<span>${r.yearMonth} ${r.purposeDesc} $${fmt(r.amount)}</span>`).join('');
-  // 更新折舊後淨值
+  // 更新折���後淨值
   const depr = pnum(document.getElementById('exp-depr').value);
   document.getElementById('exp-depr-balance').value = fmt(STATE.property.currentBalance - depr);
   closePicker();
+  // 自動偵測行動醫院動支單 → 衛生局加班費
+  let otSum = 0;
+  items.forEach(r => {
+    if((r.desc + r.purposeDesc).includes('行動醫院') || (r.desc + r.purposeDesc).includes('行醫')){
+      otSum += r.amount;
+    }
+  });
+  const otEl = document.getElementById('h-overtime');
+  const otHint = document.getElementById('h-overtime-hint');
+  if(otSum > 0){
+    otEl.value = fmt(otSum);
+    if(otHint) otHint.textContent = `自動偵測到行動醫院動支單 ${fmt(otSum)} 元`;
+  }
   // 同步更新應付費用明細
   renderPayable();
   calcExpenseTotal();
@@ -2489,24 +2571,47 @@ function generateVouchers(){
     }
   });
 
-  // 9. 績效獎金（當月獎勵金分配：獎前淨餘×0.95 → 全掛繳局統籌款）
-  const _inc  = pnum(document.getElementById('inc-total')?.value);
+  // 9. 績效獎金（門診醫療 + 衛生保健 分開計算，各自掛繳局統籌款）
+  const _totalInc = pnum(document.getElementById('inc-total')?.value);
   const _oth  = pnum(document.getElementById('inc-lab')?.value)
               + pnum(document.getElementById('inc-copay')?.value)
               + pnum(document.getElementById('inc-noncov')?.value);
   const _disc = document.getElementById('discount-needed')?.checked
               ? pnum(document.getElementById('discount-amount-input')?.value) : 0;
-  const _exp  = pnum(document.getElementById('expense-510601-total')?.textContent);
-  const _net  = _inc + _oth - _disc - _exp;
-  const _fund5 = Math.round(_net * 0.05);
-  const bureau95 = Math.round(_net * 0.95 * 0.1);
-  const staff95  = Math.round(_net * 0.95 * 0.9 * 0.3);
-  const doctor95 = _net - _fund5 - bureau95 - staff95;
-  const bonusAmt = bureau95 + doctor95 + staff95;
-  if(bonusAmt > 0){
-    const descBonus = `${yymm}當月繳局統籌款 繳局${fmt(bureau95)}+醫師${fmt(doctor95)}+員工${fmt(staff95)}=${fmt(bonusAmt)}`;
-    vouchers.push({ group:'績效獎金（當月獎勵金×0.95）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'1501 績效獎金', desc:descBonus, dr:bonusAmt, cr:0 });
-    vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款', purpose:'', desc:descBonus, dr:0, cr:bonusAmt });
+  const _totalExp = pnum(document.getElementById('expense-510601-total')?.textContent);
+  const _hInc = pnum(document.getElementById('h-inc')?.value);
+  const _hExp = pnum(document.getElementById('h-exp')?.value);
+  const _hOT  = pnum(document.getElementById('h-overtime')?.value);
+
+  // 9a. 門診醫療
+  const _mInc = _totalInc - _hInc;
+  const _mExp = _totalExp - _hExp;
+  const _mNet = _mInc + _oth - _disc - _mExp;
+  const _mFund5  = Math.round(_mNet * 0.05);
+  const _mBureau = Math.round(_mNet * 0.95 * 0.1);
+  const _mStaff  = Math.round(_mNet * 0.95 * 0.9 * 0.3);
+  const _mDoctor = _mNet - _mFund5 - _mBureau - _mStaff;
+  const _mBonus  = _mBureau + _mDoctor + _mStaff;
+  if(_mBonus > 0){
+    const descM = `${yymm}門診醫療 繳局${fmt(_mBureau)}+醫師${fmt(_mDoctor)}+員工${fmt(_mStaff)}=${fmt(_mBonus)}`;
+    vouchers.push({ group:'績效獎金－門診醫療（×0.95）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'1501 績效獎金', desc:descM, dr:_mBonus, cr:0 });
+    vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款', purpose:'', desc:descM, dr:0, cr:_mBonus });
+  }
+
+  // 9b. 衛生保健（員工比例 0.7，繳局/醫師扣加班費）
+  const _hNet = _hInc - _hExp;
+  if(_hNet > 0){
+    const _hFund5     = Math.round(_hNet * 0.05);
+    const _hBureauRaw = Math.round(_hNet * 0.95 * 0.1);
+    const _hBureau    = Math.round(_hNet * 0.95 * 0.1 - _hOT);
+    const _hStaff     = Math.round(_hNet * 0.95 * 0.9 * 0.7);
+    const _hDoctor    = _hNet - _hFund5 - _hBureauRaw - _hStaff - _hOT;
+    const _hBonus     = _hBureau + _hDoctor + _hStaff;
+    if(_hBonus > 0){
+      const descH = `${yymm}衛生保健 繳局${fmt(_hBureau)}+醫師${fmt(_hDoctor)}+員工${fmt(_hStaff)}=${fmt(_hBonus)}` + (_hOT>0?`(加班費${fmt(_hOT)}已扣)`:``);
+      vouchers.push({ group:'績效獎金－衛生保健（×0.95）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'1501 績效獎金', desc:descH, dr:_hBonus, cr:0 });
+      vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款', purpose:'', desc:descH, dr:0, cr:_hBonus });
+    }
   }
 
   STATE.vouchers = vouchers;
@@ -3440,7 +3545,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.8.5已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.8.6已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3481,7 +3586,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.8.5已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.8.6已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4529,7 +4634,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.8.5 全面重置 Q1 庫存明細帳 ──
+/* ── v3.8.6 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -5612,6 +5717,11 @@ function saveMonthData(){
       doctor: document.getElementById('exp-bonus-doctor').value,
       staff:  document.getElementById('exp-bonus-staff').value,
     },
+    health: {
+      inc:      document.getElementById('h-inc').value,
+      exp:      document.getElementById('h-exp').value,
+      overtime: document.getElementById('h-overtime').value,
+    },
     pickerIds: [...pickerSelected],
     adjRows: (()=>{
       const rows = [];
@@ -5639,7 +5749,8 @@ function loadMonthData(){
    'inc-drug-revenue','inc-health-check',
    'exp-temp-salary','exp-temp-deduct','exp-drug','exp-supply',
    'inv-drug-real','inv-supply-real',
-   'exp-bonus-bureau','exp-bonus-doctor','exp-bonus-staff'].forEach(id=>{
+   'exp-bonus-bureau','exp-bonus-doctor','exp-bonus-staff',
+   'h-inc','h-exp','h-overtime'].forEach(id=>{
     const el = document.getElementById(id);
     if(el && !el.readOnly) el.value = '';
   });
@@ -5688,6 +5799,12 @@ function loadMonthData(){
         document.getElementById('exp-bonus-bureau').value = d.bonus.bureau||'';
         document.getElementById('exp-bonus-doctor').value = d.bonus.doctor||'';
         document.getElementById('exp-bonus-staff').value  = d.bonus.staff||'';
+      }
+      if(d.health){
+        document.getElementById('h-inc').value      = d.health.inc||'';
+        document.getElementById('h-exp').value      = d.health.exp||'';
+        document.getElementById('h-overtime').value = d.health.overtime||'';
+        calcHealthSplit();
       }
       if(d.pickerIds){
         pickerSelected = new Set(d.pickerIds);
@@ -5847,11 +5964,11 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.8.5: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.8.6: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.8.5: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.8.6: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
-  // v3.8.5: 補入缺漏的11503藥品進貨/領用/盤損
+  // v3.8.6: 補入缺漏的11503藥品進貨/領用/盤損
   await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
