@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.3.2</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.3.3</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -362,7 +362,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.3.2</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.3.3</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -2985,7 +2985,7 @@ const Q1_REF = [
     /* ── 健保掛帳 ── */
     { group:'健保掛帳（115300005）',     type:'debit',  subject:'110305 應收醫療帳款',         subAccount:'',          purpose:'',              desc:'115.3門診健保掛帳75,489元,115.3NIIS疫苗接種處置費:新冠10,950元,流感2,700元,常規61,150元,疫苗小計74,800元,掛帳總計150,289元', dr:150289, cr:0 },
     { group:'',                          type:'credit', subject:'41060101 藥品收入',           subAccount:'',          purpose:'',              desc:'115.3藥品收入11,574元', dr:0, cr:11574 },
-    { group:'',                          type:'credit', subject:'41060102 門診收入',           subAccount:'',          purpose:'',              desc:'115.3-NIIS疫苗接種處置費掛帳74,800元', dr:0, cr:74800 },
+    { group:'',                          type:'credit', subject:'41060102 門診收入',           subAccount:'',          purpose:'',              desc:'115.3NIIS疫苗接種處置費:新冠10,950元,流感2,700元,常規61,150元,小計74,800元', dr:0, cr:74800 },
     { group:'',                          type:'credit', subject:'41060102 門診收入',           subAccount:'',          purpose:'',              desc:'11503門診收入(總額75,489-預防保健16,500-藥品收入11,574=47,415)', dr:0, cr:47415 },
     { group:'',                          type:'credit', subject:'41060104 健康檢查收入',       subAccount:'',          purpose:'',              desc:'1150預防保健16,500元', dr:0, cr:16500 },
     /* ── 醫事服務費掛帳 ── */
@@ -3930,14 +3930,14 @@ function migratePayableSplit02(){
   localStorage.setItem('acc_payable_split02','1');
 }
 async function migrateVoucher11503Full(){
-  // v3：desc 加入 NIIS 明細（新冠/流感/常規），同步 D1
-  if(localStorage.getItem('acc_mig_v11503_d1v3')) return;
+  // v4：credit desc 也加 NIIS 明細，同步 D1
+  if(localStorage.getItem('acc_mig_v11503_d1v4')) return;
   const targets = Q1_REF.filter(({key})=>key==='acc_vouchers_11503'||key==='acc_q1ref_11503');
   for(const {key,val} of targets){
     try{ accSave(key, JSON.parse(val)); } catch(e){ accSave(key, val); }
   }
-  localStorage.setItem('acc_mig_v11503_d1v3','1');
-  console.log('[mig11503v3] D1+localStorage 已補種 11503 含NIIS明細');
+  localStorage.setItem('acc_mig_v11503_d1v4','1');
+  console.log('[mig11503v4] D1+localStorage 已補種 11503 含NIIS明細(debit+credit)');
 }
 async function seedPayable(){
   if(localStorage.getItem('acc_payable')) return;
