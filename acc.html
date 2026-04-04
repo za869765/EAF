@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.6.6</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.6.7</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -363,7 +363,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.6.6</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.6.7</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1908,20 +1908,24 @@ function addAdj(type){
             <input class="num-in auto" type="text" readonly style="max-width:90px; background:#e3f2fd; color:#1565c0; font-weight:700;" id="adj-net-${idx}">
           </div>
           <div style="display:flex; align-items:center; gap:4px;">
-            <span style="font-size:10px; color:#546e7a; min-width:64px;">員工獎勵金</span>
-            <input class="num-in" type="text" placeholder="0" style="max-width:90px;" id="adj-staff-${idx}" oninput="updatePysupHint(${idx})">
-          </div>
-          <div style="display:flex; align-items:center; gap:4px;">
             <span style="font-size:10px; color:#546e7a; min-width:64px;">繳局統籌款</span>
             <input class="num-in" type="text" placeholder="0" style="max-width:90px;" id="adj-bureau-${idx}" oninput="updatePysupHint(${idx})">
           </div>
           <div style="display:flex; align-items:center; gap:4px;">
-            <span style="font-size:10px; color:#1565c0; min-width:64px; font-weight:600;">醫師獎勵金（自動）</span>
-            <input class="num-in auto" type="text" readonly style="max-width:90px; background:#e3f2fd; color:#1565c0; font-weight:700;" id="adj-doctor-${idx}">
+            <span style="font-size:10px; color:#546e7a; min-width:64px;">醫師獎勵金</span>
+            <input class="num-in" type="text" placeholder="0" style="max-width:90px;" id="adj-doctor-${idx}" oninput="updatePysupHint(${idx})">
+          </div>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span style="font-size:10px; color:#1565c0; min-width:64px; font-weight:600;">員工獎勵金（剩餘）</span>
+            <input class="num-in auto" type="text" readonly style="max-width:90px; background:#e3f2fd; color:#1565c0; font-weight:700;" id="adj-staff-${idx}">
+            <span style="font-size:10px; color:#90a4ae; margin:0 2px;">= 淨收入×</span>
+            <input class="fi" type="text" value="0.9" style="width:32px; font-size:10px; text-align:center;" id="adj-r1-${idx}" oninput="updatePysupHint(${idx})" title="業務費率（預設0.9）">
+            <span style="font-size:10px; color:#90a4ae;">×</span>
+            <input class="fi" type="text" value="0.3" style="width:32px; font-size:10px; text-align:center;" id="adj-r2-${idx}" oninput="updatePysupHint(${idx})" title="員工分配率（預設0.3）">
           </div>
         </div>
       </td>
-      <td style="font-size:10px; color:#546e7a; line-height:1.8;" id="adj-hint-${idx}">貸 210205/02b 員工獎勵金 0<br>貸 210205/01 繳局0+(醫師0)=0</td>
+      <td style="font-size:10px; color:#546e7a; line-height:1.8;" id="adj-hint-${idx}">貸 210205/02b 員工（剩餘）0<br>貸 210205/01 繳局0+(醫師0)=0</td>
       <td><button class="del-btn" onclick="document.getElementById('adj-${idx}').remove()">✕</button></td>`;
   } else {
     row.innerHTML = `
@@ -1945,16 +1949,19 @@ function addAdj(type){
 function updatePysupHint(idx){
   const gross  = pnum(document.getElementById('adj-amt-'+idx)?.value);
   const net    = Math.floor(gross * 0.95);
-  const staff  = pnum(document.getElementById('adj-staff-'+idx)?.value);
   const bureau = pnum(document.getElementById('adj-bureau-'+idx)?.value);
-  const doctor = net - staff - bureau;
-  const netEl  = document.getElementById('adj-net-'+idx);
+  const doctor = pnum(document.getElementById('adj-doctor-'+idx)?.value);
+  const r1     = document.getElementById('adj-r1-'+idx)?.value || '0.9';
+  const r2     = document.getElementById('adj-r2-'+idx)?.value || '0.3';
+  // 員工 = 淨收入 − 繳局 − 醫師（剩餘，吸收進位差）
+  const staff  = net - bureau - doctor;
+  const bureauTotal = bureau + doctor;
+  const netEl = document.getElementById('adj-net-'+idx);
   if(netEl) netEl.value = gross > 0 ? fmt(net) : '';
-  const doctorEl = document.getElementById('adj-doctor-'+idx);
-  if(doctorEl) doctorEl.value = net > 0 ? fmt(Math.max(0, doctor)) : '';
+  const staffEl = document.getElementById('adj-staff-'+idx);
+  if(staffEl) staffEl.value = net > 0 ? fmt(Math.max(0, staff)) : '';
   const el = document.getElementById('adj-hint-'+idx);
-  const bureauTotal = net - staff;
-  if(el) el.innerHTML = `借 420298 ${fmt(net)}<br>貸 /02b 員工 ${fmt(staff)}<br>貸 /01 繳局${fmt(bureau)}+醫師${fmt(Math.max(0,doctor))}=${fmt(bureauTotal)}`;
+  if(el) el.innerHTML = `借 420298 ${fmt(net)}<br>貸 /02b 員工 ${fmt(net)}×${r1}×${r2}=${fmt(Math.max(0,staff))}<br>貸 /01 繳局${fmt(bureau)}+醫師${fmt(doctor)}=${fmt(bureauTotal)}`;
 }
 function updateAdjHint(idx, type){
   const cat = document.getElementById('adj-cat-'+idx)?.value;
@@ -2335,22 +2342,27 @@ function generateVouchers(){
       vouchers.push({ group:'', type:'credit', subject:'110305 應收醫療帳款', purpose:'', desc:`${ym2}當年追扣${fmt(amt)}`, dr:0, cr:amt });
     } else if(typeTxt.includes('以前年度補付')){
       // 以前年度保險補付：amt=原始金額，net=floor(amt×0.95)→借420298；貸210205/02b+01
-      const net        = Math.floor(amt * 0.95);
-      const staffEl    = tr.querySelector('[id^="adj-staff-"]');
-      const bureauEl   = tr.querySelector('[id^="adj-bureau-"]');
-      const staffAmt   = staffEl  ? pnum(staffEl.value)  : 0;
-      const bureauAmt  = bureauEl ? pnum(bureauEl.value) : 0;
-      const doctorAmt  = net - staffAmt - bureauAmt;
-      const bureauTotal = net - staffAmt;  // 繳局+醫師合計
+      const net       = Math.floor(amt * 0.95);
+      const bureauEl  = tr.querySelector('[id^="adj-bureau-"]');
+      const doctorEl  = tr.querySelector('[id^="adj-doctor-"]');
+      const r1El      = tr.querySelector('[id^="adj-r1-"]');
+      const r2El      = tr.querySelector('[id^="adj-r2-"]');
+      const bureauAmt = bureauEl ? pnum(bureauEl.value) : 0;
+      const doctorAmt = doctorEl ? pnum(doctorEl.value) : 0;
+      const r1        = r1El?.value || '0.9';
+      const r2        = r2El?.value || '0.3';
+      // 員工 = 淨收入 − 繳局 − 醫師（剩餘，吸收進位差）
+      const staffAmt  = net - bureauAmt - doctorAmt;
+      const bureauTotal = bureauAmt + doctorAmt;  // 210205/01 合計
       // 從年月推算年度，如 11412 → 114年度
       const yr = ym2 ? String(ym2).substring(0,3)+'年度' : '';
       const descBorrow = `${ym2}補付(${fmt(amt)}×0.95=${fmt(net)}元)`;
-      const descStaff  = `${ym2}員工獎勵金(${fmt(staffAmt)}元)`;
+      const descStaff  = `${ym2}員工獎勵金(${fmt(net)}×${r1}×${r2}=${fmt(Math.max(0,staffAmt))}元)`;
       const descBureau = bureauAmt > 0
-        ? `${yr}雜項收入繳局${fmt(bureauAmt)}+(醫師獎勵金${fmt(Math.max(0,doctorAmt))})=${fmt(bureauTotal)}元`
+        ? `${yr}雜項收入繳局${fmt(bureauAmt)}+(醫師獎勵金${fmt(doctorAmt)})=${fmt(bureauTotal)}元`
         : `${ym2}繳局+醫師統籌款${fmt(bureauTotal)}元`;
       vouchers.push({ group:`以前年度補付（${ym2}）`, type:'debit', subject:'420298 雜項收入', subAccount:'', purpose:'', desc:descBorrow, dr:net, cr:0 });
-      if(staffAmt > 0)    vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'02b 員工獎勵金', purpose:'', desc:descStaff,  dr:0, cr:staffAmt });
+      if(staffAmt > 0)    vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'02b 員工獎勵金', purpose:'', desc:descStaff,  dr:0, cr:Math.max(0,staffAmt) });
       if(bureauTotal > 0) vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款',  purpose:'', desc:descBureau, dr:0, cr:bureauTotal });
     } else if(typeTxt.includes('當年補付')){
       const crSub = cat==='doctor'?'02 醫師獎勵金':cat==='staff'?'03 員工獎勵金':'01 繳局統籌款';
@@ -3203,7 +3215,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.6.6已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.6.7已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3244,7 +3256,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.6.6已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.6.7已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4286,7 +4298,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.6.6 全面重置 Q1 庫存明細帳 ──
+/* ── v3.6.7 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -5376,9 +5388,11 @@ function saveMonthData(){
           type,
           ym:    document.getElementById('adj-ym-'+idx)?.value   || '',
           amt:   document.getElementById('adj-amt-'+idx)?.value  || '',
-          cat:    document.getElementById('adj-cat-'+idx)?.value   || '',
-          staff:  document.getElementById('adj-staff-'+idx)?.value || '',
-          bureau: document.getElementById('adj-bureau-'+idx)?.value|| '',
+          cat:    document.getElementById('adj-cat-'+idx)?.value    || '',
+          bureau: document.getElementById('adj-bureau-'+idx)?.value || '',
+          doctor: document.getElementById('adj-doctor-'+idx)?.value || '',
+          r1:     document.getElementById('adj-r1-'+idx)?.value     || '',
+          r2:     document.getElementById('adj-r2-'+idx)?.value     || '',
         });
       });
       return rows;
@@ -5448,10 +5462,14 @@ function loadMonthData(){
           if(ymEl)  ymEl.value  = r.ym  || '';
           if(amtEl) amtEl.value = r.amt || '';
           if(r.type==='pysup'){
-            const staffEl  = document.getElementById('adj-staff-'+i);
             const bureauEl = document.getElementById('adj-bureau-'+i);
-            if(staffEl)  staffEl.value  = r.staff  || '';
+            const doctorEl = document.getElementById('adj-doctor-'+i);
+            const r1El     = document.getElementById('adj-r1-'+i);
+            const r2El     = document.getElementById('adj-r2-'+i);
             if(bureauEl) bureauEl.value = r.bureau || '';
+            if(doctorEl) doctorEl.value = r.doctor || '';
+            if(r1El && r.r1) r1El.value = r.r1;
+            if(r2El && r.r2) r2El.value = r.r2;
             updatePysupHint(i);
           } else {
             const catEl = document.getElementById('adj-cat-'+i);
@@ -5595,11 +5613,11 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.6.6: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.6.7: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.6.6: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.6.7: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
-  // v3.6.6: 補入缺漏的11503藥品進貨/領用/盤損
+  // v3.6.7: 補入缺漏的11503藥品進貨/領用/盤損
   await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
