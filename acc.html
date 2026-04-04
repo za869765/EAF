@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.4.0</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.4.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -362,7 +362,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.4.0</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.4.1</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -370,7 +370,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 
 <!-- ── Tab Nav ── -->
 <div id="tab-nav">
-  <button class="tab-btn active" onclick="switchTab('work',this)">🔔 月度作業</button>
+  <button class="tab-btn active" onclick="switchTab('work',this)">🔔 月底結算</button>
   <button class="tab-btn" onclick="switchTab('voucher',this)">📄 轉帳傳票</button>
   <button class="tab-btn" onclick="switchTab('inventory',this)">📦 醫療用品庫存</button>
   <button class="tab-btn" onclick="switchTab('property',this)">🏚️ 財產管理</button>
@@ -405,11 +405,11 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="content">
 
 <!-- ══════════════════════════════════════════
-     TAB 1：月度作業
+     TAB 1：月底結算
 ══════════════════════════════════════════ -->
 <div class="tab-pane active" id="tab-work">
   <div style="padding:6px 0 2px;">
-    <span id="work-month-title" style="font-weight:700; font-size:14px; color:#1e2a38;">115 年 3 月 月度作業</span>
+    <span id="work-month-title" style="font-weight:700; font-size:14px; color:#1e2a38;">115 年 3 月 月底結算</span>
   </div>
 
   <!-- 提醒 Dashboard -->
@@ -878,7 +878,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
           </tr>
         </thead>
         <tbody id="voucher-tbody">
-          <tr><td colspan="9" class="empty-msg">請先在「月度作業」輸入資料，再按「🔄 從月度作業產生」，或手工新增列</td></tr>
+          <tr><td colspan="9" class="empty-msg">請先在「月底結算」輸入資料，再按「🔄 從月底結算產生」，或手工新增列</td></tr>
         </tbody>
       </table>
       </div>
@@ -1451,7 +1451,7 @@ async function loadPickerData(){
     PICKER_DATA = all.filter(r=>{
       if(r.archived||r.voided) return false;
       /* 只取當月申請 */
-      const rym = (r.applyDateRoc||'').replace(/\//g,'').slice(0,5);
+      const rym = recYm(r);
       if(rym !== ym) return false;
       /* 只留醫療基金 510601 */
       const an = r.acctName||'';
@@ -1461,7 +1461,7 @@ async function loadPickerData(){
       return true;
     }).map(r=>({
       id: String(r.id),
-      yearMonth: (r.applyDateRoc||'').replace(/\//g,'').slice(0,5),
+      yearMonth: recYm(r),
       voucher: r.voucherNo||'',
       subject: '510601 門診醫療成本',
       purposeCode: r.purposeCode||'',
@@ -1506,6 +1506,15 @@ let pickerSelected = new Set();
 ════════════════════════════════════════════ */
 function pnum(v){ const s=String(v||'').replace(/,/g,'').trim(); return parseFloat(s)||0; }
 function fmt(n){ return Math.round(n).toLocaleString('zh-TW'); }
+/* 從 applyDateRoc「115年3月31日」或 applyDateRaw「2026-03-31」解析出 YYYМM（如 11503） */
+function recYm(r){
+  const roc = r.applyDateRoc||'';
+  const m = roc.match(/(\d+)年(\d+)月/);
+  if(m) return m[1] + m[2].padStart(2,'0');
+  const raw = r.applyDateRaw||'';
+  if(raw){ const d=new Date(raw+'T00:00:00'); if(!isNaN(d)) return String(d.getFullYear()-1911)+String(d.getMonth()+1).padStart(2,'0'); }
+  return '';
+}
 function curYm(){ return document.getElementById('sel-year').value + pad(document.getElementById('sel-month').value); }
 function pad(n){ return String(n).padStart(2,'0'); }
 function getYm(){ const y=document.getElementById('sel-year').value; const m=document.getElementById('sel-month').value; return {y,m,ym:`${y}${pad(m)}`,label:`${y} 年 ${m} 月`}; }
@@ -1534,7 +1543,7 @@ function onYmChange(){
   const globalLabel = document.getElementById('ym-global-label');
   if(globalLabel) globalLabel.textContent = `${label}`;
   const workTitle = document.getElementById('work-month-title');
-  if(workTitle) workTitle.textContent = `${label} 月度作業`;
+  if(workTitle) workTitle.textContent = `${label} 月底結算`;
   loadMonthData();
   updateDeprBalance();
   updatePrevMonthLabels();
@@ -1938,7 +1947,7 @@ async function preCheckVoucher(){
   const tempWarn = (tempSalary === 0 && tempDeduct === 0)
     ? `<div style="background:#fce4ec;border:1px solid #e57373;border-radius:6px;padding:8px 10px;margin-bottom:10px;">
         <div style="font-size:11px;font-weight:700;color:#b71c1c;">⚠️ 臨時人員薪資及代扣款尚未填入</div>
-        <div style="font-size:11px;color:#c62828;margin-top:3px;">請返回月度作業，填入「薪資實領合計」與「補助代扣款合計」後再產製傳票。</div>
+        <div style="font-size:11px;color:#c62828;margin-top:3px;">請返回月底結算，填入「薪資實領合計」與「補助代扣款合計」後再產製傳票。</div>
        </div>`
     : ``;
 
@@ -1952,7 +1961,7 @@ async function preCheckVoucher(){
       missing = all.filter(r=>{
         if(r.archived||r.voided) return false;
         /* 只看當月申請（以前的早已付款，未來的下月再處理） */
-        const rym = (r.applyDateRoc||'').replace(/\//g,'').slice(0,5);
+        const rym = recYm(r);
         if(!rym || rym !== ym) return false;
         /* 排除已出帳 / 已選 */
         if(postedIds.has(String(r.id))) return false;
@@ -1970,7 +1979,7 @@ async function preCheckVoucher(){
         return true;
       }).map(r=>({
         id: r.id,
-        ym: (r.applyDateRoc||'').replace(/\//g,'').slice(0,5),
+        ym: recYm(r),
         voucherNo: r.voucherNo||'',
         name: r.acctName||r.purposeName||'',
         purposeDesc: r.purposeDesc||r.purposeName||'',
@@ -2006,7 +2015,7 @@ async function preCheckVoucher(){
         ${missing.map(r=>`<div style="font-size:11px;padding:2px 6px;color:#333;">
           <b>${r.voucherNo||r.id}</b>　${r.ym} ${r.purposeDesc||r.name}　<span style="color:#c62828;font-weight:700;">$${fmt(r.amount)}</span>
         </div>`).join('')}
-        <div style="font-size:10px;color:#78909c;margin-top:6px;">如需納入，請關閉此視窗，回月度作業在動支 Picker 勾選後再製作傳票。</div>
+        <div style="font-size:10px;color:#78909c;margin-top:6px;">如需納入，請關閉此視窗，回月底結算在動支 Picker 勾選後再製作傳票。</div>
        </div>`
     : `<div style="font-size:11px;color:#2e7d32;margin-top:6px;">✅ 無遺漏的待付動支單</div>`;
 
@@ -2296,7 +2305,7 @@ function renderVouchers(){
   if(!STATE.vouchers.length){
     tbody.innerHTML=`<tr><td colspan="${cols}" class="empty-msg">${
       voucherLocked
-        ? '無傳票記錄。點「🔒 鎖定中」解鎖後可手工新增，或切回月度作業產生。'
+        ? '無傳票記錄。點「🔒 鎖定中」解鎖後可手工新增，或切回月底結算產生。'
         : '解鎖中，點「＋ 手工新增列」新增資料列。'
     }</td></tr>`;
     document.getElementById('total-debit').textContent  = '0';
@@ -2543,7 +2552,7 @@ async function loadPubRecords(y){
       !r.voided
     ).map(r => ({
       id:          r.id,
-      ym:          (r.applyDateRoc||'').replace(/\//g,'').slice(0,5) || '?',
+      ym:          recYm(r) || '?',
       date:        r.applyDateRoc || '',
       voucherNo:   r.voucherNo || '',
       purposeName: r.purposeName || '',
@@ -4369,7 +4378,7 @@ function recalcInvLedger(type){
   }
   updateInvTotal();
   renderMonthlyClose(type);
-  /* 每次明細帳重算後，同步更新月度作業的上月期末 / 當月帳面 */
+  /* 每次明細帳重算後，同步更新月底結算的上月期末 / 當月帳面 */
   if(typeof updatePrevMonthLabels === 'function') updatePrevMonthLabels();
   /* 儀表板庫存截止月份（取明細帳最後一筆有效年月） */
   const _rows = loadInvLedger(type).filter(r=>!r.voided&&r.ym);
@@ -4983,7 +4992,7 @@ function loadMonthData(){
 }
 
 /* ════════════════════════════════════════════
-   傳票 → 月度作業同步（補填空欄位）
+   傳票 → 月底結算同步（補填空欄位）
 ════════════════════════════════════════════ */
 function syncVoucherToWork(ym){
   const vRaw = localStorage.getItem('acc_vouchers_'+ym);
