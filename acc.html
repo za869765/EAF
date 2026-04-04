@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.7.7</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.7.8</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -365,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.7.7</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.7.8</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -580,11 +580,21 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 
       <!-- 510601 合計（置頂） -->
       <div style="background:linear-gradient(135deg,#e8f5e9,#f1f8e9); border:2px solid #4caf50; border-radius:10px; padding:10px 16px; margin-bottom:14px;">
-        <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
           <div style="font-size:13px; color:#1b5e20; font-weight:700;">📊 510601 門診醫療成本 本月合計</div>
           <div style="font-size:26px; font-weight:900; color:#2e7d32; letter-spacing:1px;" id="expense-510601-total">0</div>
+          <!-- 支出傳票補充（右側） -->
+          <div style="margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span style="font-size:10px; background:#fce4ec; color:#c62828; border-radius:3px; padding:1px 7px; font-weight:600;">已付支出傳票（補充）</span>
+            <button onclick="importVoucherXlsx()" style="background:#1565c0; color:#fff; font-size:11px; font-weight:700; padding:4px 12px; border:none; border-radius:5px; cursor:pointer; white-space:nowrap;">📂 匯入 XLSX</button>
+            <input id="exp-other-voucher" type="text" placeholder="或手動輸入" style="width:100px; font-size:11px; border:1px solid #a5d6a7; border-radius:4px; padding:3px 6px; text-align:right;" oninput="calcExpenseTotal()">
+          </div>
         </div>
-        <div style="font-size:10px; color:#558b2f; margin-top:4px; line-height:1.8;" id="expense-510601-breakdown">—</div>
+        <!-- 金額結構組成 -->
+        <div style="font-size:11px; color:#2e7d32; margin-top:6px; line-height:2;" id="expense-510601-breakdown">—</div>
+        <!-- 支出傳票匯入明細 -->
+        <div id="voucher-import-result" style="display:none; margin-top:6px; background:#e3f2fd; border:1px solid #90caf9; border-radius:6px; padding:7px 12px; font-size:11px; line-height:1.9;"></div>
+        <input type="hidden" id="exp-other-voucher-desc">
       </div>
 
       <!-- 未出帳動支單 -->
@@ -682,21 +692,6 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
         </div>
       </div>
 
-      <!-- 支出傳票 XLSX 匯入 -->
-      <div class="section-title" style="margin-top:14px;">
-        💳 支出傳票（已付）— 510601 門診醫療成本
-        <span style="font-size:10px; background:#fce4ec; color:#c62828; border-radius:3px; padding:1px 8px; margin-left:8px; font-weight:400;">已付款項，計入本月成本合計（不進轉帳傳票）</span>
-      </div>
-      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
-        <button onclick="importVoucherXlsx()" style="background:#1565c0; color:#fff; font-size:13px; font-weight:700; padding:8px 20px; border:none; border-radius:6px; cursor:pointer;">📂 匯入支出傳票 XLSX</button>
-        <span style="font-size:12px; color:#90a4ae;">或</span>
-        <input class="num-in" id="exp-other-voucher" type="text" placeholder="手動輸入金額" style="width:140px;" oninput="calcExpenseTotal()">
-        <span style="font-size:11px; color:#78909c;">（手動填入 510601 合計）</span>
-      </div>
-      <!-- 匯入結果明細 -->
-      <div id="voucher-import-result" style="display:none; background:#e3f2fd; border:1px solid #90caf9; border-radius:8px; padding:10px 14px; font-size:12px; line-height:1.9;">
-      </div>
-      <input type="hidden" id="exp-other-voucher-desc">
 
     </div>
   </div>
@@ -3233,7 +3228,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.7.7已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.7.8已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3274,7 +3269,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.7.7已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.7.8已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4322,7 +4317,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.7.7 全面重置 Q1 庫存明細帳 ──
+/* ── v3.7.8 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -5640,11 +5635,11 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.7.7: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.7.8: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.7.7: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.7.8: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
-  // v3.7.7: 補入缺漏的11503藥品進貨/領用/盤損
+  // v3.7.8: 補入缺漏的11503藥品進貨/領用/盤損
   await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
