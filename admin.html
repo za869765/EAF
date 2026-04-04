@@ -1531,7 +1531,7 @@ function renderReports() {
   /* 動支單報表（僅有效） */
   document.getElementById('rpt-all-body').innerHTML = active.length === 0
     ? '<tr><td colspan="9" class="no-data">尚無有效紀錄</td></tr>'
-    : [...active].reverse().map(r => `
+    : [...active].sort((a,b)=>(b.id||0)-(a.id||0)).map(r => `
         <tr>
           <td>${esc(r.voucherNo||'—')}</td>
           <td>${r.formType==='expense'?'動支單':'請購單'}</td>
@@ -1547,7 +1547,7 @@ function renderReports() {
   /* 作廢報表 */
   document.getElementById('rpt-voided-body').innerHTML = voided.length === 0
     ? '<tr><td colspan="9" class="no-data">無作廢紀錄</td></tr>'
-    : [...voided].reverse().map(r => `
+    : [...voided].sort((a,b)=>(b.id||0)-(a.id||0)).map(r => `
         <tr>
           <td>${esc(r.voucherNo||'—')}</td>
           <td>${r.formType==='expense'?'動支單':'請購單'}</td>
