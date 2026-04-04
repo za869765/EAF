@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.4.4</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.5.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -115,11 +115,12 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 
 /* ── 未出帳動支單選取 ── */
 .picker-trigger {
-  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
-  border: 1.5px dashed #90a4ae; border-radius: 8px; cursor: pointer;
-  transition: border-color .15s, background .15s; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+  border: 2px solid #1976d2; border-radius: 8px; cursor: pointer;
+  background: #e8f4fd; transition: border-color .15s, background .15s; margin-bottom: 8px;
+  box-shadow: 0 1px 4px rgba(25,118,210,.15);
 }
-.picker-trigger:hover { border-color: #1976d2; background: #f5f9ff; }
+.picker-trigger:hover { border-color: #0d47a1; background: #d0eafc; }
 .picker-trigger .ptxt  { flex: 1; font-size: 12px; color: #546e7a; }
 .picker-trigger .pamt  { font-size: 14px; font-weight: 700; color: #1565c0; }
 .picked-list { font-size: 11px; color: #546e7a; margin-top: 4px; line-height: 1.8; }
@@ -362,7 +363,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.4.4</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.5.0</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1470,6 +1471,25 @@ async function loadPickerData(){
       amount: r.total||0
     }));
   } catch(_){ PICKER_DATA=[]; }
+  // 2713 臨時人員：自動帶入薪資欄位（若尚未填入）
+  const temp2713 = PICKER_DATA.filter(r=>r.purposeCode==='2713');
+  if(temp2713.length){
+    const salEl  = document.getElementById('exp-temp-salary');
+    const dedEl  = document.getElementById('exp-temp-deduct');
+    const curSal = pnum(salEl?.value);
+    const curDed = pnum(dedEl?.value);
+    if(curSal===0 && curDed===0){
+      // 依 desc 判斷：含「代扣」→ 代扣款；其餘 → 薪資實領
+      let autoSal=0, autoDed=0;
+      temp2713.forEach(r=>{
+        const d=(r.desc+r.purposeDesc).toLowerCase();
+        if(d.includes('代扣')||d.includes('扣')) autoDed+=r.amount;
+        else autoSal+=r.amount;
+      });
+      if(autoSal>0 && salEl) salEl.value=fmt(autoSal);
+      if(autoDed>0 && dedEl) dedEl.value=fmt(autoDed);
+    }
+  }
 }
 
 // 已出帳紀錄（localStorage 持久化）
@@ -1879,14 +1899,37 @@ function closePickerBg(e){ if(e.target===document.getElementById('picker-overlay
 function renderPicker(kw){
   const list = document.getElementById('pk-list');
   list.innerHTML = '';
+  // 臨時人員(2713) → 系統自動帶入顯示列，不可手選
+  // 績效獎金(1501) → 有專屬欄位，完全隱藏
+  const autoRows = PICKER_DATA.filter(r => r.purposeCode==='2713');
   const filtered = PICKER_DATA.filter(r => {
-    if(r.purposeCode==='1501') return false; // 績效獎金有專屬欄位
-    if(r.purposeCode==='2713') return false; // 臨時人員有專屬欄位
+    if(r.purposeCode==='1501') return false;
+    if(r.purposeCode==='2713') return false;
     return (r.desc+r.subject+r.purposeDesc).toLowerCase().includes((kw||'').toLowerCase());
   });
-  if(!filtered.length){
+  // 先渲染「系統自動帶入」臨時人員列
+  autoRows.forEach(r => {
+    const div = document.createElement('div');
+    div.className = 'pk-rec';
+    div.style.cssText = 'opacity:.65; background:#f1f8e9; border-left:3px solid #43a047;';
+    div.innerHTML = `
+      <input type="checkbox" checked disabled>
+      <div class="pk-info">
+        <div class="pk-title">${r.voucher||r.id}
+          <span style="font-size:10px;color:#90a4ae;">${r.purposeDesc} ${r.purposeCode}</span>
+          <span style="font-size:10px;background:#c8e6c9;color:#1b5e20;border-radius:3px;padding:1px 5px;margin-left:4px;">🤖 系統自動帶入</span>
+        </div>
+        <div class="pk-sub">${r.desc}（由臨時人員薪資欄位自動產生分錄）</div>
+      </div>
+      <div class="pk-amt" style="color:#2e7d32;">$${fmt(r.amount)}</div>`;
+    list.appendChild(div);
+  });
+  if(!filtered.length && !autoRows.length){
     list.innerHTML=`<p class="empty-msg">本月無動支單</p>`;
     return;
+  }
+  if(!filtered.length){
+    updatePkFoot(); return;
   }
   filtered.forEach(r => {
     const isPosted = postedIds.has(r.id);
@@ -1933,7 +1976,7 @@ function updatePkFoot(){
   document.getElementById('pk-sel-info').textContent=`已選 ${cnt} 項，合計 $${fmt(sum)}`;
 }
 function filterPicker(kw){ renderPicker(kw); }
-function selectAllPk(){ PICKER_DATA.filter(r=>r.purposeCode!=='1501'&&r.purposeCode!=='2713').forEach(r=>pickerSelected.add(r.id)); renderPicker(''); }
+function selectAllPk(){ PICKER_DATA.filter(r=>r.purposeCode!=='1501'&&r.purposeCode!=='2713').forEach(r=>{ if(!postedIds.has(r.id)) pickerSelected.add(r.id); }); renderPicker(''); }
 function deselectAllPk(){ pickerSelected.clear(); renderPicker(''); }
 
 function confirmPicker(){
@@ -1947,6 +1990,8 @@ function confirmPicker(){
   const depr = pnum(document.getElementById('exp-depr').value);
   document.getElementById('exp-depr-balance').value = fmt(STATE.property.currentBalance - depr);
   closePicker();
+  // 同步更新應付費用明細
+  renderPayable();
 }
 
 /* ════════════════════════════════════════════
@@ -3048,7 +3093,7 @@ async function seedQ1DrugEntries(){
     { ym:'11502', type:'領用', amt:6623, desc:'115300003藥品領用', medId:'', voided:false },
     { ym:'11502', type:'盤損', amt:3,    desc:'115300003藥品盤損', medId:'', voided:false },
     { ym:'11503', type:'領用', amt:7800, desc:'115300004藥品領用', medId:'', voided:false },
-    { ym:'11503', type:'盤盈', amt:2,    desc:'115300004藥品盤盈', medId:'', voided:false }
+    { ym:'11503', type:'盤損', amt:2,    desc:'115300004藥品盤損', medId:'', voided:false }
   );
   accSave('acc_inv_drug', rows);
   accSave('acc_q1drug_seeded', '1');
@@ -3934,6 +3979,18 @@ async function seedMissingJanDrug(){
   }
   localStorage.setItem('acc_fix_jan_drug_299','1');
 }
+function fixMar盤損(){
+  if(localStorage.getItem('acc_fix_mar_panduan_350')) return;
+  const data = loadInvLedger('drug');
+  let fixed = false;
+  data.forEach(r => {
+    if(r.ym==='11503' && r.type==='盤盈' && r.amt===2){
+      r.type='盤損'; r.desc=(r.desc||'').replace('盤盈','盤損'); fixed=true;
+    }
+  });
+  if(fixed) accSave('acc_inv_drug', data);
+  localStorage.setItem('acc_fix_mar_panduan_350','1');
+}
 function migratePayableSplit02(){
   // 將舊版 02 員工獎勵金 拆分為 02a 醫師 + 02b 員工
   if(localStorage.getItem('acc_payable_split02')) return;
@@ -4014,6 +4071,19 @@ function fmtPayDate(ym, day){
 }
 function renderPayable(){
   const data = loadPayable();
+  // 動態將 Picker 已選項目合併至 '03 員工款'（同步顯示）
+  const dynItems = (STATE.month.pickerItems||[]).filter(r=>r.purposeCode!=='1501'&&r.purposeCode!=='2713');
+  if(dynItems.length){
+    const cat03 = (data.categories||[]).find(c=>c.code==='03');
+    if(cat03){
+      cat03.entries = [...(cat03.entries||[]).filter(e=>!e._dyn), ...dynItems.map(r=>({
+        ym: r.yearMonth||curYm(), day:31, ref:r.voucher||r.id,
+        desc: r.desc||r.purposeDesc, amt: r.amount, _dyn:true
+      }))];
+      cat03.subtotal = cat03.entries.reduce((s,e)=>s+(e.amt||0),0);
+      data.total = (data.categories||[]).reduce((s,c)=>s+(c.subtotal||0),0);
+    }
+  }
   const totalEl = document.getElementById('pay-total');
   if(totalEl) totalEl.textContent = fmt(data.total||0);
   (data.categories||[]).forEach(cat=>{
@@ -5122,6 +5192,7 @@ function logout(){ window.location.href = '/admin.html'; }
   await fixCorruptedDesc();
   renderInvLedger('drug');
   // 應付費用分頁
+  fixMar盤損(); // 修正11503盤盈→盤損
   migratePayableSplit02(); // 02→02a醫師+02b員工
   await migrateVoucher11503Full(); // 11503補齊完整22筆分錄（同步更新D1）
   await seedPayable();
