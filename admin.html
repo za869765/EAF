@@ -2437,9 +2437,11 @@ function renderNhiSection(yr) {
     </div>`;
 
   const tblRows = entries.map(([name, total]) => {
-    const nhi = Math.round(total * NHI_RATE);
+    const nhi     = Math.round(total * NHI_RATE);
+    const short   = name.length > 12 ? name.slice(0,12) + '…' : name;
+    const needTip = name.length > 12;
     return `<tr>
-      <td>${esc(name)}</td>
+      <td style="max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"${needTip ? ` title="${esc(name)}"` : ''}>${esc(short)}</td>
       <td class="td-r-admin">$${fmtN(total)}</td>
       <td class="td-r-admin" style="color:#b71c1c;">$${fmtN(nhi)}</td>
     </tr>`;
@@ -2460,7 +2462,7 @@ function renderNhiSection(yr) {
       <div class="export-table-wrap">
         <table class="export-table">
           <thead><tr>
-            <th>動支說明（人名）</th>
+            <th style="min-width:120px;">人名／說明</th>
             <th style="text-align:right;">金額合計</th>
             <th style="text-align:right;">補充保費（×2.11%）</th>
           </tr></thead>
