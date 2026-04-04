@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.5.6</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.5.7</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -363,7 +363,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.5.6</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.5.7</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -3091,7 +3091,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.5.6已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.5.7已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3132,7 +3132,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.5.6已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.5.7已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4174,7 +4174,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.5.6 全面重置 Q1 庫存明細帳 ──
+/* ── v3.5.7 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -5159,6 +5159,25 @@ function getInvMonthBal(type, ym){
   });
   return bal;
 }
+/* 帳面結存（不含盤損/盈）= 前月期末 + 進貨 - 領用/報廢
+   目的：讓月度作業盤點區能正確算出盤損/盈 = 帳面 - 實際盤點 */
+function getInvBookBal(type, ym){
+  const ymStr = String(ym);
+  const yr = parseInt(ymStr.slice(0,3));
+  const mo = parseInt(ymStr.slice(3));
+  const pmYr = mo<=1 ? yr-1 : yr;
+  const pmMo = mo<=1 ? 12 : mo-1;
+  const pmYm = `${pmYr}${String(pmMo).padStart(2,'0')}`;
+  const prevBal = getInvMonthBal(type, pmYm);
+  const rows = loadInvLedger(type).filter(r=>String(r.ym)===ymStr && !r.voided);
+  let bal = prevBal;
+  rows.forEach(r=>{
+    if(r.type==='進貨') bal += r.amt;
+    else if(r.type==='領用'||r.type==='報廢') bal -= r.amt;
+    // 盤損/盤盈 不計入（讓 calcInv 算出差距）
+  });
+  return bal;
+}
 function updatePrevMonthLabels(){
   const {y, m} = getYm();
   const pm = parseInt(m) - 1;
@@ -5171,8 +5190,9 @@ function updatePrevMonthLabels(){
 
   const drugPrev   = getInvMonthBal('drug',   pmYm);
   const supplyPrev = getInvMonthBal('supply',  pmYm);
-  const drugCur    = getInvMonthBal('drug',   curYmStr);
-  const supplyCur  = getInvMonthBal('supply',  curYmStr);
+  /* 帳面（盤前）= 前月期末 + 進貨 - 領用，不含盤損/盈，才能算出正確差距 */
+  const drugCur    = getInvBookBal('drug',   curYmStr);
+  const supplyCur  = getInvBookBal('supply',  curYmStr);
 
   document.getElementById('drug-hint').innerHTML   = `${pmLabel}期末：<span id="inv-drug-prevbal" style="font-weight:700;color:#1565c0;">${fmt(drugPrev)}</span>`;
   document.getElementById('supply-hint').innerHTML = `${pmLabel}期末：<span id="inv-supply-prevbal" style="font-weight:700;color:#00695c;">${fmt(supplyPrev)}</span>`;
@@ -5411,9 +5431,9 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.5.6: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.5.7: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.5.6: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.5.7: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
