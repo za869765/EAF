@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.3.7</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.3.8</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -362,7 +362,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.3.7</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.3.8</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1394,9 +1394,9 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <div id="pk-foot">
       <div style="display:flex;align-items:center;gap:8px;flex:1;">
         <span class="pk-sel-info" id="pk-sel-info">已選 0 項，合計 $0</span>
-        <button style="padding:4px 12px;border:1px solid #e65100;border-radius:5px;font-size:11px;cursor:pointer;background:#fff3e0;color:#e65100;font-weight:600;white-space:nowrap;" onclick="confirmMarkPosted()" id="btn-mark-posted" title="將打勾「已出帳」的項目標記為已付款（不可還原）">✓ 確定已出帳</button>
+        <button style="padding:4px 12px;border:1px solid #e65100;border-radius:5px;font-size:11px;cursor:pointer;background:#fff3e0;color:#e65100;font-weight:600;white-space:nowrap;" onclick="confirmMarkPosted()" id="btn-mark-posted" title="將右側打勾「已出帳」的項目標記為已付款（不可還原）">🔒 標記已出帳</button>
       </div>
-      <button class="pk-confirm" onclick="confirmPicker()">✓ 確認帶入</button>
+      <button class="pk-confirm" onclick="confirmPicker()">✅ 選好了，帶入傳票</button>
     </div>
   </div>
 </div>
@@ -1490,7 +1490,7 @@ function togglePostMark(id, checked){
   else postMarkSet.delete(id);
   // 更新按鈕提示計數
   const btn = document.getElementById('btn-mark-posted');
-  if(btn) btn.textContent = postMarkSet.size > 0 ? `✓ 確定已出帳（${postMarkSet.size}）` : '✓ 確定已出帳';
+  if(btn) btn.textContent = postMarkSet.size > 0 ? `🔒 標記已出帳（${postMarkSet.size}）` : '🔒 標記已出帳';
 }
 
 function confirmMarkPosted(){
@@ -1503,7 +1503,7 @@ function confirmMarkPosted(){
       postMarkSet.clear();
       localStorage.setItem(POSTED_KEY, JSON.stringify([...postedIds]));
       const btn = document.getElementById('btn-mark-posted');
-      if(btn) btn.textContent = '✓ 確定已出帳';
+      if(btn) btn.textContent = '🔒 標記已出帳';
       renderPicker(document.querySelector('#pk-filter input[type=text]')?.value || '');
     }
   });
@@ -1908,7 +1908,7 @@ function renderPicker(kw){
       </div>
       <div style="display:flex; align-items:center; gap:8px;">
         <div class="pk-amt" ${(isPosted||isAutoBooked)?'style="color:#90a4ae;"':''}>$${fmt(r.amount)}</div>
-        ${!isPosted && !isAutoBooked ? `<label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#e65100;cursor:pointer;white-space:nowrap;" title="勾選後按「確定已出帳」才會標記">
+        ${!isPosted && !isAutoBooked ? `<label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#e65100;cursor:pointer;white-space:nowrap;" title="勾選後按「🔒 標記已出帳」才會標記">
           <input type="checkbox" ${postMarkSet.has(r.id)?'checked':''} onchange="togglePostMark('${r.id}',this.checked)" onclick="event.stopPropagation()">已出帳
         </label>` : ''}
       </div>`;
@@ -1997,6 +1997,21 @@ async function preCheckVoucher(){
       }));
     }
   } catch(_){}
+
+  /* 也檢查 Picker（MOCK_UNPOSTED）中當月未選未出帳的項目 */
+  const pickedIds2 = new Set(selected.map(r=>String(r.id)));
+  MOCK_UNPOSTED.forEach(r=>{
+    if(r.yearMonth !== ym) return;
+    if(postedIds.has(r.id)) return;
+    if(pickedIds2.has(r.id)) return;
+    if(r.purposeCode==='1501') return; // 績效獎金排除
+    // 檢查是否已在傳票中（如臨時人員自動掛帳）
+    const vRaw = localStorage.getItem('acc_vouchers_'+ym);
+    if(vRaw){ try{ const vs=JSON.parse(vRaw); let cg=''; const booked=vs.some(v=>{ if(v.group)cg=v.group; return (cg.includes('臨時人員')||cg.includes('績效獎金'))&&(v.purpose||'').startsWith(r.purposeCode); }); if(booked) return; }catch(_){} }
+    if(!missing.find(m=>String(m.id)===r.id)){
+      missing.push({ id:r.id, ym:r.yearMonth, voucherNo:r.voucher||r.id, name:r.purposeDesc, purposeDesc:r.purposeDesc, amount:r.amount });
+    }
+  });
 
   /* 績效獎金確認 */
   const bBureau = pnum(document.getElementById('exp-bonus-bureau')?.value);
