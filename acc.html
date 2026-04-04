@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.4.1</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.4.2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -362,7 +362,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.4.1</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.4.2</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1901,7 +1901,10 @@ function renderPicker(kw){
         </div>
         <div class="pk-sub">${r.desc}</div>
       </div>
-      <div class="pk-amt" ${isPosted?'style="color:#bdbdbd;"':''}>$${fmt(r.amount)}</div>`;
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="pk-amt" ${isPosted?'style="color:#bdbdbd;"':''}>$${fmt(r.amount)}</div>
+        <button onclick="togglePosted('${r.id}')" style="font-size:10px;padding:2px 8px;border-radius:4px;cursor:pointer;white-space:nowrap;border:1px solid ${isPosted?'#e57373':'#bdbdbd'};background:${isPosted?'#ffebee':'#fafafa'};color:${isPosted?'#c62828':'#616161'};">${isPosted?'取消出帳':'標記已出帳'}</button>
+      </div>`;
     list.appendChild(div);
   });
   updatePkFoot();
@@ -1910,6 +1913,11 @@ function togglePk(id, cb){
   if(cb.checked) pickerSelected.add(id); else pickerSelected.delete(id);
   cb.closest('.pk-rec').classList.toggle('picked', cb.checked);
   updatePkFoot();
+}
+function togglePosted(id){
+  if(postedIds.has(id)){ postedIds.delete(id); } else { postedIds.add(id); pickerSelected.delete(id); }
+  localStorage.setItem(POSTED_KEY, JSON.stringify([...postedIds]));
+  renderPicker('');
 }
 function updatePkFoot(){
   let sum=0, cnt=0;
