@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.5.0</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.5.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -363,7 +363,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.5.0</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.5.1</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1725,7 +1725,7 @@ function renderYearTable(){
   document.getElementById('rc-staff').textContent  = sumStaff>0  ? fmt(sumStaff)  : '-';
 
   // 儲存
-  localStorage.setItem('acc_yeardata_'+y, JSON.stringify(STATE.yearData));
+  accSave('acc_yeardata_'+y, STATE.yearData);
 }
 
 function onYearFieldChange(inp){
@@ -1753,7 +1753,7 @@ function recalcYearTotals(){
   document.getElementById('rc-fund5').textContent  = sumFund5>0  ? fmt(sumFund5)  : '-';
   document.getElementById('rc-bureau').textContent = sumBureau>0 ? fmt(sumBureau) : '-';
   document.getElementById('rc-staff').textContent  = sumStaff>0  ? fmt(sumStaff)  : '-';
-  localStorage.setItem('acc_yeardata_'+y, JSON.stringify(STATE.yearData));
+  accSave('acc_yeardata_'+y, STATE.yearData);
 }
 
 function toggleYearPanel(){
@@ -1967,7 +1967,7 @@ function togglePk(id, cb){
 }
 function togglePosted(id){
   if(postedIds.has(id)){ postedIds.delete(id); } else { postedIds.add(id); pickerSelected.delete(id); }
-  localStorage.setItem(POSTED_KEY, JSON.stringify([...postedIds]));
+  accSave(POSTED_KEY, [...postedIds]);
   renderPicker('');
 }
 function updatePkFoot(){
@@ -2287,7 +2287,7 @@ function saveVouchers(){
   accSave(`acc_vouchers_${ym}`, STATE.vouchers);
   const now = new Date();
   const ts = `${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
-  localStorage.setItem(`acc_vouchers_${ym}_ts`, ts);
+  accSave(`acc_vouchers_${ym}_ts`, ts);
   const badge = document.getElementById('voucher-src-badge');
   if(badge){ badge.textContent=`已儲存 ${ts}`; badge.style.display=''; }
 }
@@ -2550,12 +2550,12 @@ const PUB_ACCT = '21020301';
 const PUB_BUDGET_KEY = y => `acc_pub_budget_${y}`;
 
 function getPubBudget(y){ const v=localStorage.getItem(PUB_BUDGET_KEY(y)); return v!==null?+v:0; }
-function setPubBudget(y,val){ localStorage.setItem(PUB_BUDGET_KEY(y),String(val)); }
+function setPubBudget(y,val){ accSave(PUB_BUDGET_KEY(y),String(val)); }
 
 // 核銷狀態（完全獨立，與 locked / 傳票無關）
 const PUB_SETTLED_KEY = y => `acc_pub_settled_${y}`;
 function getPubSettled(y){ const v=localStorage.getItem(PUB_SETTLED_KEY(y)); return new Set(v?JSON.parse(v):[]); }
-function savePubSettled(y,set){ localStorage.setItem(PUB_SETTLED_KEY(y),JSON.stringify([...set])); }
+function savePubSettled(y,set){ accSave(PUB_SETTLED_KEY(y),[...set]); }
 
 let _pubRecords = [];  // 快取，供 updatePubTotals 使用
 
@@ -5011,8 +5011,8 @@ function saveMonthData(){
     },
     pickerIds: [...pickerSelected],
   };
-  localStorage.setItem(LS.monthly(ym), JSON.stringify(data));
-  localStorage.setItem(LS.settings, JSON.stringify(STATE.settings));
+  accSave(LS.monthly(ym), data);
+  accSave(LS.settings, STATE.settings);
   showSaveMsg('✓ 已儲存');
 }
 function loadMonthData(){
