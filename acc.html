@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.6.4</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.6.5</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -363,7 +363,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.6.4</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.6.5</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1896,20 +1896,24 @@ function addAdj(type){
     row.innerHTML = `
       <td><span class="badge-type ${t.badge}">${t.label}</span></td>
       <td><input class="fi" type="text" placeholder="年月" style="width:70px; font-size:11px;" id="adj-ym-${idx}"></td>
-      <td style="font-size:10px; color:#6a1b9a; font-weight:600;">借 420298 雜項收入</td>
+      <td style="font-size:10px; color:#6a1b9a; font-weight:600;">借 420298 雜項收入<br><span style="font-weight:400; color:#9c27b0;">×0.95 自動計算</span></td>
       <td>
         <div style="display:flex; flex-direction:column; gap:4px;">
           <div style="display:flex; align-items:center; gap:4px;">
-            <span style="font-size:10px; color:#546e7a; min-width:52px;">淨收入</span>
+            <span style="font-size:10px; color:#546e7a; min-width:64px;">補付原始金額</span>
             <input class="num-in" type="text" placeholder="0" style="max-width:90px;" id="adj-amt-${idx}" oninput="updatePysupHint(${idx})">
           </div>
           <div style="display:flex; align-items:center; gap:4px;">
-            <span style="font-size:10px; color:#546e7a; min-width:52px;">員工獎勵金</span>
+            <span style="font-size:10px; color:#1565c0; min-width:64px; font-weight:600;">淨收入（×0.95）</span>
+            <input class="num-in auto" type="text" readonly style="max-width:90px; background:#e3f2fd; color:#1565c0; font-weight:700;" id="adj-net-${idx}">
+          </div>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span style="font-size:10px; color:#546e7a; min-width:64px;">員工獎勵金</span>
             <input class="num-in" type="text" placeholder="0" style="max-width:90px;" id="adj-staff-${idx}" oninput="updatePysupHint(${idx})">
           </div>
         </div>
       </td>
-      <td style="font-size:10px; color:#546e7a; line-height:1.6;" id="adj-hint-${idx}">貸 210205/02b 員工獎勵金 0<br>貸 210205/01 繳局+醫師 0</td>
+      <td style="font-size:10px; color:#546e7a; line-height:1.8;" id="adj-hint-${idx}">貸 210205/02b 員工獎勵金 0<br>貸 210205/01 繳局+醫師 0</td>
       <td><button class="del-btn" onclick="document.getElementById('adj-${idx}').remove()">✕</button></td>`;
   } else {
     row.innerHTML = `
@@ -1931,11 +1935,14 @@ function addAdj(type){
   document.getElementById('adj-tbody').appendChild(row);
 }
 function updatePysupHint(idx){
-  const amt   = pnum(document.getElementById('adj-amt-'+idx)?.value);
+  const gross = pnum(document.getElementById('adj-amt-'+idx)?.value);
+  const net   = Math.floor(gross * 0.95);
   const staff = pnum(document.getElementById('adj-staff-'+idx)?.value);
-  const bureau = amt - staff;
+  const bureau = net - staff;
+  const netEl = document.getElementById('adj-net-'+idx);
+  if(netEl) netEl.value = gross > 0 ? fmt(net) : '';
   const el = document.getElementById('adj-hint-'+idx);
-  if(el) el.innerHTML = `貸 210205/02b 員工獎勵金 ${fmt(staff)}<br>貸 210205/01 繳局+醫師 ${fmt(bureau)}`;
+  if(el) el.innerHTML = `借 420298 雜項收入 ${fmt(net)}<br>貸 210205/02b 員工獎勵金 ${fmt(staff)}<br>貸 210205/01 繳局+醫師 ${fmt(bureau)}`;
 }
 function updateAdjHint(idx, type){
   const cat = document.getElementById('adj-cat-'+idx)?.value;
@@ -2315,11 +2322,13 @@ function generateVouchers(){
       if(fromCost>0)  vouchers.push({ group:'', type:'debit', subject:'510601 門診醫療成本', purpose:'', desc:`${ym2}當年追扣超額${fmt(fromCost)}`, dr:fromCost, cr:0 });
       vouchers.push({ group:'', type:'credit', subject:'110305 應收醫療帳款', purpose:'', desc:`${ym2}當年追扣${fmt(amt)}`, dr:0, cr:amt });
     } else if(typeTxt.includes('以前年度補付')){
-      // 以前年度保險補付：借 420298 雜項收入 / 貸 210205/02b 員工獎勵金 + 210205/01 繳局統籌款
-      const staffEl  = tr.querySelector('[id^="adj-staff-"]');
-      const staffAmt = staffEl ? pnum(staffEl.value) : 0;
-      const bureauAmt = amt - staffAmt;
-      vouchers.push({ group:`以前年度補付（${ym2}）`, type:'debit', subject:'420298 雜項收入', subAccount:'', purpose:'', desc:`${ym2}保險補付淨收入${fmt(amt)}元`, dr:amt, cr:0 });
+      // 以前年度保險補付：amt=原始金額，net=floor(amt×0.95)→借420298；貸210205/02b+01
+      const net       = Math.floor(amt * 0.95);
+      const staffEl   = tr.querySelector('[id^="adj-staff-"]');
+      const staffAmt  = staffEl ? pnum(staffEl.value) : 0;
+      const bureauAmt = net - staffAmt;
+      const grossYm   = ym2 ? `${ym2}補付(${fmt(amt)}×0.95=${fmt(net)}元)` : `補付${fmt(net)}元`;
+      vouchers.push({ group:`以前年度補付（${ym2}）`, type:'debit', subject:'420298 雜項收入', subAccount:'', purpose:'', desc:grossYm, dr:net, cr:0 });
       if(staffAmt > 0)  vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'02b 員工獎勵金', purpose:'', desc:`${ym2}員工獎勵金${fmt(staffAmt)}元`, dr:0, cr:staffAmt });
       if(bureauAmt > 0) vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款',  purpose:'', desc:`${ym2}繳局+醫師統籌款${fmt(bureauAmt)}元`, dr:0, cr:bureauAmt });
     } else if(typeTxt.includes('當年補付')){
@@ -3173,7 +3182,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.6.4已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.6.5已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3214,7 +3223,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.6.4已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.6.5已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4256,7 +4265,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.6.4 全面重置 Q1 庫存明細帳 ──
+/* ── v3.6.5 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -5562,11 +5571,11 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.6.4: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.6.5: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.6.4: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.6.5: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
-  // v3.6.4: 補入缺漏的11503藥品進貨/領用/盤損
+  // v3.6.5: 補入缺漏的11503藥品進貨/領用/盤損
   await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
