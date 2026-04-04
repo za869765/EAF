@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.8.1</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.8.2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -365,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.8.1</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.8.2</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -373,8 +373,8 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 
 <!-- ── Tab Nav ── -->
 <div id="tab-nav">
-  <button class="tab-btn" onclick="switchTab('home',this)">🏠 首頁</button>
-  <button class="tab-btn active" onclick="switchTab('work',this)">🔔 月底結算</button>
+  <button class="tab-btn active" onclick="switchTab('home',this)">🏠 首頁</button>
+  <button class="tab-btn" onclick="switchTab('work',this)">🔔 月底結算</button>
   <button class="tab-btn" onclick="switchTab('voucher',this)">📄 轉帳傳票</button>
   <button class="tab-btn" onclick="switchTab('inventory',this)">📦 醫療用品庫存</button>
   <button class="tab-btn" onclick="switchTab('property',this)">🏚️ 財產管理</button>
@@ -411,14 +411,13 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <!-- ══════════════════════════════════════════
      TAB 0：首頁
 ══════════════════════════════════════════ -->
-<div class="tab-pane" id="tab-home">
+<div class="tab-pane active" id="tab-home">
   <div style="padding:8px 0 4px;">
     <span style="font-weight:700; font-size:15px; color:#1e2a38;">📊 醫療基金會計帳務　各分頁總覽</span>
-    <span id="home-ym-label" style="font-size:12px; color:#78909c; margin-left:10px;"></span>
   </div>
 
-  <!-- 收支總覽 -->
-  <div style="font-size:11px; font-weight:700; color:#546e7a; margin:12px 0 4px; letter-spacing:1px;">▌ 本月收支</div>
+  <!-- 本月收支 -->
+  <div style="font-size:11px; font-weight:700; color:#546e7a; margin:12px 0 4px; letter-spacing:1px;">▌ 本月收支（月底結算）</div>
   <div class="reminder-grid">
     <div class="r-card rc-blue">
       <div class="r-num" id="rc-income">—</div>
@@ -442,17 +441,37 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     </div>
   </div>
 
-  <!-- 資產負債 -->
-  <div style="font-size:11px; font-weight:700; color:#546e7a; margin:12px 0 4px; letter-spacing:1px;">▌ 資產負債</div>
-  <div class="reminder-grid" id="reminder-grid">
+  <!-- 負債科目 -->
+  <div style="font-size:11px; font-weight:700; color:#546e7a; margin:12px 0 4px; letter-spacing:1px;">▌ 負債科目</div>
+  <div class="reminder-grid">
+    <div class="r-card rc-orange">
+      <div class="r-num" id="rc-payable">—</div>
+      <div class="r-label">💰 210205 應付費用</div>
+      <div class="r-sub" id="rc-payable-sub">繳局＋醫師＋員工＋員工款</div>
+    </div>
+    <div class="r-card rc-blue">
+      <div class="r-num" id="rc-custodial">—</div>
+      <div class="r-label">🏦 210203 應付代收款</div>
+      <div class="r-sub" id="rc-custodial-sub">公務＋差旅＋國健＋疾管＋代收</div>
+    </div>
+    <div class="r-card rc-teal">
+      <div class="r-num" id="rc-public">—</div>
+      <div class="r-label">💼 公務預算已核銷</div>
+      <div class="r-sub" id="rc-public-sub">21020301 衛生所公務預算</div>
+    </div>
+  </div>
+
+  <!-- 資產科目 -->
+  <div style="font-size:11px; font-weight:700; color:#546e7a; margin:12px 0 4px; letter-spacing:1px;">▌ 資產科目</div>
+  <div class="reminder-grid">
     <div class="r-card rc-pink">
       <div class="r-num" id="rc-allowance">—</div>
-      <div class="r-label">🔻 備抵折讓餘額</div>
-      <div class="r-sub">110306</div>
+      <div class="r-label">🔻 110306 備抵折讓</div>
+      <div class="r-sub">備抵醫療折讓餘額</div>
     </div>
     <div class="r-card rc-teal">
       <div class="r-num" id="rc-inv-total">—</div>
-      <div class="r-label">📦 醫療用品庫存</div>
+      <div class="r-label">📦 110404 醫療用品</div>
       <div class="r-sub">💊<span id="rc-drug">—</span>＋🩹<span id="rc-supply">—</span></div>
       <div class="r-sub" style="font-size:9px;color:#90a4ae;margin-top:2px;">資料至 <span id="rc-inv-date">—</span></div>
     </div>
@@ -464,12 +483,12 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     </div>
     <div class="r-card rc-green" style="border-left-color:#6a1b9a;">
       <div class="r-num" id="rc-surplus" style="color:#6a1b9a;">—</div>
-      <div class="r-label">💎 累積賸餘</div>
-      <div class="r-sub">330101</div>
+      <div class="r-label">💎 330101 累積賸餘</div>
+      <div class="r-sub" id="rc-surplus-sub">期初 + 本年度增加</div>
     </div>
   </div>
 
-  <!-- 獎勵金分配區 -->
+  <!-- 獎勵金分配 -->
   <div style="font-size:11px; font-weight:700; color:#546e7a; margin:12px 0 4px; letter-spacing:1px;">▌ 115年度獎勵金分配累積</div>
   <div class="reminder-grid">
     <div class="r-card rc-orange">
@@ -493,7 +512,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <!-- ══════════════════════════════════════════
      TAB 1：月底結算
 ══════════════════════════════════════════ -->
-<div class="tab-pane active" id="tab-work">
+<div class="tab-pane" id="tab-work">
   <div style="padding:6px 0 2px;">
     <span id="work-month-title" style="font-weight:700; font-size:14px; color:#1e2a38;">115 年 3 月 月底結算</span>
   </div>
@@ -1769,45 +1788,68 @@ function updateCalcTable(){
   s('ct-inc-s',inc); s('ct-disc-s',disc); s('ct-noncov-s',noncov); s('ct-reject-s',reject);
   s('ct-exp-s',exp); s('ct-net-s',net); s('ct-fund5-s',fund5);
   s('ct-bureau-s',bureau); s('ct-doctor-s',doctor); s('ct-staff-s',staff);
+  // 自動回填績效獎金輸入欄（供 saveMonthData 存入年度累積）
+  const eb=document.getElementById('exp-bonus-bureau'); if(eb) eb.value=bureau>0?fmt(bureau):'';
+  const ed=document.getElementById('exp-bonus-doctor'); if(ed) ed.value=doctor>0?fmt(doctor):'';
+  const es=document.getElementById('exp-bonus-staff');  if(es) es.value=staff>0?fmt(staff):'';
 }
 
 /* 首頁 dashboard 更新 */
 function updateHomeDashboard(){
   const {y} = getYm();
-  // 即時卡片（從 STATE 取）
-  const rcAllow = document.getElementById('rc-allowance');
-  if(rcAllow) rcAllow.textContent = fmt(STATE.allowance?.currentBalance ?? 0);
 
-  // 510601 本月成本
-  const expTotal = pnum(document.getElementById('expense-510601-total')?.textContent);
-  const rcExp = document.getElementById('rc-expense-total');
-  if(rcExp) rcExp.textContent = expTotal > 0 ? fmt(expTotal) : '—';
-
-  // 本月收入
+  // ── 本月收支（從月底結算 DOM 取） ──
   const inc = pnum(document.getElementById('inc-total')?.value);
   const rcInc = document.getElementById('rc-income');
   if(rcInc) rcInc.textContent = inc > 0 ? fmt(inc) : '—';
 
-  // 不給付/部分負擔
   const otherInc = pnum(document.getElementById('inc-lab')?.value)
                  + pnum(document.getElementById('inc-copay')?.value)
                  + pnum(document.getElementById('inc-noncov')?.value);
   const rcOther = document.getElementById('rc-other-inc');
   if(rcOther) rcOther.textContent = otherInc > 0 ? fmt(otherInc) : '—';
 
-  // 獎前收支淨餘
+  const expTotal = pnum(document.getElementById('expense-510601-total')?.textContent);
+  const rcExp = document.getElementById('rc-expense-total');
+  if(rcExp) rcExp.textContent = expTotal > 0 ? fmt(expTotal) : '—';
+
   const disc = document.getElementById('discount-needed')?.checked
              ? pnum(document.getElementById('discount-amount-input')?.value) : 0;
   const net = inc + otherInc - disc - expTotal;
   const rcNet = document.getElementById('rc-net');
   if(rcNet) rcNet.textContent = (inc > 0 || expTotal > 0) ? fmt(net) : '—';
 
-  // 累積賸餘
-  const surplusInit = +(localStorage.getItem('acc_surplus_init') || 3432043);
-  const rcSurplus = document.getElementById('rc-surplus');
-  if(rcSurplus) rcSurplus.textContent = fmt(surplusInit);
+  // ── 負債科目（從各分頁資料取） ──
+  const payData = loadPayable();
+  const rcPay = document.getElementById('rc-payable');
+  if(rcPay) rcPay.textContent = fmt(payData.total || 0);
 
-  // 年度累積：掃所有月份 localStorage
+  const custData = loadCustodial();
+  const rcCust = document.getElementById('rc-custodial');
+  if(rcCust) rcCust.textContent = fmt(custData.total || 0);
+
+  // 公務預算已核銷
+  const settled = getPubSettled(y);
+  const pubSpent = (_pubRecords||[]).filter(r=>settled.has(String(r.id))).reduce((s,r)=>s+(r.amount||0),0);
+  const rcPub = document.getElementById('rc-public');
+  if(rcPub) rcPub.textContent = pubSpent > 0 ? fmt(pubSpent) : '—';
+  const budget = getPubBudget(y);
+  const rcPubSub = document.getElementById('rc-public-sub');
+  if(rcPubSub && budget > 0) rcPubSub.textContent = `預算 ${fmt(budget)}，剩餘 ${fmt(budget - pubSpent)}`;
+
+  // ── 資產科目 ──
+  const rcAllow = document.getElementById('rc-allowance');
+  if(rcAllow) rcAllow.textContent = fmt(STATE.allowance?.currentBalance ?? 0);
+
+  // 累積賸餘（期初 + 本年度增加）
+  const surplusInit = +(localStorage.getItem('acc_surplus_init') || 3432043);
+  const surpAdd = pnum(document.getElementById('surp-add')?.textContent);
+  const rcSurplus = document.getElementById('rc-surplus');
+  if(rcSurplus) rcSurplus.textContent = fmt(surplusInit + surpAdd);
+  const rcSurpSub = document.getElementById('rc-surplus-sub');
+  if(rcSurpSub) rcSurpSub.textContent = `期初 ${fmt(surplusInit)}` + (surpAdd > 0 ? ` + 增加 ${fmt(surpAdd)}` : '');
+
+  // ── 年度獎勵金累積 ──
   let sumBureau=0, sumStaff=0, sumFund5=0;
   for(let mo=1; mo<=12; mo++){
     const ymKey = y + String(mo).padStart(2,'0');
@@ -1817,12 +1859,9 @@ function updateHomeDashboard(){
       const d = JSON.parse(raw);
       sumBureau += (pnum(d.bonus?.bureau)||0) + (pnum(d.bonus?.doctor)||0);
       sumStaff  += (pnum(d.bonus?.staff)||0);
-      // 業務外5%：pysup adj rows
       (d.adjRows||[]).forEach(r=>{
         if(r.type==='pysup' && r.amt){
-          const gross = pnum(r.amt);
-          sumFund5 += Math.floor(gross * 0.05);
-          // adj 的 bureau/doctor 已含在 bureau 中（上方 generateVouchers 貸 210205/01）
+          sumFund5 += Math.floor(pnum(r.amt) * 0.05);
         }
       });
     } catch(e){}
@@ -1833,11 +1872,6 @@ function updateHomeDashboard(){
   if(rcBureau) rcBureau.textContent = sumBureau > 0 ? fmt(sumBureau) : '—';
   if(rcStaff)  rcStaff.textContent  = sumStaff  > 0 ? fmt(sumStaff)  : '—';
   if(rcFund5)  rcFund5.textContent  = sumFund5  > 0 ? fmt(sumFund5)  : '—';
-
-  // 首頁年月標籤
-  const {y: yy, m} = getYm();
-  const lbl = document.getElementById('home-ym-label');
-  if(lbl) lbl.textContent = `${yy} 年 ${m} 月`;
 }
 
 let _invCloseLocked  = true;
@@ -2452,6 +2486,26 @@ function generateVouchers(){
       }
     }
   });
+
+  // 9. 績效獎金（當月獎勵金分配：獎前淨餘×0.95 → 全掛繳局統籌款）
+  const _inc  = pnum(document.getElementById('inc-total')?.value);
+  const _oth  = pnum(document.getElementById('inc-lab')?.value)
+              + pnum(document.getElementById('inc-copay')?.value)
+              + pnum(document.getElementById('inc-noncov')?.value);
+  const _disc = document.getElementById('discount-needed')?.checked
+              ? pnum(document.getElementById('discount-amount-input')?.value) : 0;
+  const _exp  = pnum(document.getElementById('expense-510601-total')?.textContent);
+  const _net  = _inc + _oth - _disc - _exp;
+  const bonusAmt = Math.floor(_net * 0.95);
+  if(bonusAmt > 0){
+    const fund5 = _net - bonusAmt;
+    const bureau95 = Math.floor(bonusAmt * 0.1);
+    const doctor95 = Math.floor(bonusAmt * 0.63);
+    const staff95  = bonusAmt - bureau95 - doctor95;
+    const descBonus = `${yymm}當月繳局統籌款 繳局${fmt(bureau95)}+醫師${fmt(doctor95)}+員工${fmt(staff95)}=${fmt(bonusAmt)}`;
+    vouchers.push({ group:'績效獎金（當月獎勵金×0.95）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'1501 績效獎金', desc:descBonus, dr:bonusAmt, cr:0 });
+    vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款', purpose:'', desc:descBonus, dr:0, cr:bonusAmt });
+  }
 
   STATE.vouchers = vouchers;
   saveVouchers();        // 自動存入 localStorage（按月份 key）
@@ -3382,7 +3436,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.8.1已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.8.2已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3423,7 +3477,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.8.1已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.8.2已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4471,7 +4525,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.8.1 全面重置 Q1 庫存明細帳 ──
+/* ── v3.8.2 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -5789,11 +5843,11 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.8.1: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.8.2: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.8.1: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.8.2: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
-  // v3.8.1: 補入缺漏的11503藥品進貨/領用/盤損
+  // v3.8.2: 補入缺漏的11503藥品進貨/領用/盤損
   await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
