@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.2.10</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.3.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -362,7 +362,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.2.10</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.3.0</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -4936,47 +4936,110 @@ function saveMonthData(){
 }
 function loadMonthData(){
   const ym = curYm();
+  // 先清空所有輸入欄
+  ['inc-hi','inc-covid','inc-flu','inc-routine','inc-lab','inc-copay','inc-noncov',
+   'inc-drug-revenue','inc-health-check',
+   'exp-temp-salary','exp-temp-deduct','exp-drug','exp-supply',
+   'inv-drug-real','inv-supply-real',
+   'exp-bonus-bureau','exp-bonus-doctor','exp-bonus-staff'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el && !el.readOnly) el.value = '';
+  });
   const raw = localStorage.getItem(LS.monthly(ym));
-  if(!raw) return;
-  try {
-    const d = JSON.parse(raw);
-    if(d.income){
-      document.getElementById('inc-hi').value    = d.income.hi||'';
-      document.getElementById('inc-covid').value = d.income.covid||'';
-      document.getElementById('inc-flu').value   = d.income.flu||'';
-      document.getElementById('inc-routine').value = d.income.rout||'';
-      document.getElementById('inc-lab').value   = d.income.lab||'';
-      document.getElementById('inc-copay').value = d.income.copay||'';
-      document.getElementById('inc-noncov').value= d.income.nc||'';
-      document.getElementById('inc-drug-revenue').value = d.income.drugRev||'';
-      document.getElementById('inc-health-check').value = d.income.hcRev||'';
-    }
-    if(d.discount){
-      document.getElementById('discount-needed').checked = d.discount.needed;
-      const dai = document.getElementById('discount-amount-input');
-      if(dai) dai.value = d.discount.amount||'';
-      onDiscountToggle();
-    }
-    if(d.expense){
-      document.getElementById('exp-temp-salary').value = d.expense.tempSalary||'';
-      document.getElementById('exp-temp-deduct').value = d.expense.tempDeduct||'';
-      document.getElementById('exp-drug').value   = d.expense.drug||'';
-      document.getElementById('exp-supply').value = d.expense.supply||'';
-      document.getElementById('inv-drug-real').value   = d.expense.drugReal||'';
-      document.getElementById('inv-supply-real').value = d.expense.supplyReal||'';
-    }
-    if(d.bonus){
-      document.getElementById('exp-bonus-bureau').value = d.bonus.bureau||'';
-      document.getElementById('exp-bonus-doctor').value = d.bonus.doctor||'';
-      document.getElementById('exp-bonus-staff').value  = d.bonus.staff||'';
-    }
-    if(d.pickerIds){
-      pickerSelected = new Set(d.pickerIds);
-      confirmPicker(); // 更新顯示但不關 popup
-    }
-  } catch(e){ console.warn('loadMonthData error', e); }
-  // 無論有無存檔，自動欄位一律重算
+  if(raw){
+    try {
+      const d = JSON.parse(raw);
+      if(d.income){
+        document.getElementById('inc-hi').value    = d.income.hi||'';
+        document.getElementById('inc-covid').value = d.income.covid||'';
+        document.getElementById('inc-flu').value   = d.income.flu||'';
+        document.getElementById('inc-routine').value = d.income.rout||'';
+        document.getElementById('inc-lab').value   = d.income.lab||'';
+        document.getElementById('inc-copay').value = d.income.copay||'';
+        document.getElementById('inc-noncov').value= d.income.nc||'';
+        document.getElementById('inc-drug-revenue').value = d.income.drugRev||'';
+        document.getElementById('inc-health-check').value = d.income.hcRev||'';
+      }
+      if(d.discount){
+        document.getElementById('discount-needed').checked = d.discount.needed;
+        const dai = document.getElementById('discount-amount-input');
+        if(dai) dai.value = d.discount.amount||'';
+        onDiscountToggle();
+      }
+      if(d.expense){
+        document.getElementById('exp-temp-salary').value = d.expense.tempSalary||'';
+        document.getElementById('exp-temp-deduct').value = d.expense.tempDeduct||'';
+        document.getElementById('exp-drug').value   = d.expense.drug||'';
+        document.getElementById('exp-supply').value = d.expense.supply||'';
+        document.getElementById('inv-drug-real').value   = d.expense.drugReal||'';
+        document.getElementById('inv-supply-real').value = d.expense.supplyReal||'';
+      }
+      if(d.bonus){
+        document.getElementById('exp-bonus-bureau').value = d.bonus.bureau||'';
+        document.getElementById('exp-bonus-doctor').value = d.bonus.doctor||'';
+        document.getElementById('exp-bonus-staff').value  = d.bonus.staff||'';
+      }
+      if(d.pickerIds){
+        pickerSelected = new Set(d.pickerIds);
+        confirmPicker();
+      }
+    } catch(e){ console.warn('loadMonthData error', e); }
+  } else {
+    // 無存檔 → 嘗試從傳票反推帶入
+    syncVoucherToWork(ym);
+  }
+  // 自動欄位重算
   calcIncome(); calcOther(); calcDrug(); calcInv(); calcBonus(); calcIncomeBreakdown();
+}
+
+/* ════════════════════════════════════════════
+   傳票 → 月度作業同步（反推帶入，僅無存檔時）
+════════════════════════════════════════════ */
+function syncVoucherToWork(ym){
+  const vRaw = localStorage.getItem('acc_vouchers_'+ym);
+  if(!vRaw) return;
+  try {
+    const vs = JSON.parse(vRaw);
+    if(!Array.isArray(vs)||!vs.length) return;
+    const set = (id,v)=>{ if(v){ const el=document.getElementById(id); if(el) el.value=fmt(v); }};
+    vs.forEach(v=>{
+      const g = v.group||'', d = v.desc||'', t = v.type;
+      // ── 收入端 ──
+      // 健保掛帳 debit → 解析門診健保 + NIIS
+      if(g.includes('健保掛帳') && t==='debit'){
+        const mHi = d.match(/門診健保掛帳([\d,]+)/);
+        if(mHi) set('inc-hi', pnum(mHi[1]));
+        const mN  = d.match(/NIIS.*?([\d,]+)/);
+        if(mN) set('inc-routine', pnum(mN[1])); // NIIS合計暫放常規疫苗欄
+      }
+      // 藥品收入
+      if(v.subject.includes('41060101') && t==='credit') set('inc-drug-revenue', v.cr);
+      // 預防保健收入
+      if(v.subject.includes('41060104') && t==='credit') set('inc-health-check', v.cr);
+      // 醫事服務費→檢驗收入
+      if(g.includes('醫事服務費') && t==='debit') set('inc-lab', v.dr);
+      // ── 支出端 ──
+      // 藥品領用
+      if(g.includes('藥品領用') && t==='debit') set('exp-drug', v.dr);
+      // 臨時人員
+      if(g.includes('臨時人員') && t==='credit'){
+        if(d.includes('實領')) set('exp-temp-salary', v.cr);
+        if(d.includes('代扣')||d.includes('補助')) set('exp-temp-deduct', v.cr);
+      }
+      // 折舊
+      if(g.includes('折舊') && t==='debit') set('exp-depr', v.dr);
+      // 績效獎金（從 desc 解析）
+      if(g.includes('績效獎金') && t==='debit'){
+        const mb = d.match(/繳局.*?([\d,]+)/);
+        const md = d.match(/醫師([\d,]+)/);
+        const ms = d.match(/員工([\d,]+)/);
+        if(mb) set('exp-bonus-bureau', pnum(mb[1]));
+        if(md) set('exp-bonus-doctor', pnum(md[1]));
+        if(ms) set('exp-bonus-staff',  pnum(ms[1]));
+      }
+    });
+    console.log('[syncVoucherToWork] 已從傳票反推帶入', ym);
+  } catch(e){ console.warn('syncVoucherToWork error', e); }
 }
 
 /* ════════════════════════════════════════════
