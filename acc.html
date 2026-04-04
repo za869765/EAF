@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.2.6</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.2.7</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -362,7 +362,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.2.6</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.2.7</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1553,6 +1553,13 @@ function onYmChange(){
   loadVoucherView();
   // 公務預算分頁（年度切換時重新渲染）
   renderPublicTab();
+  // 其他顯示分頁同步（截至選定月份的累計資料）
+  renderInvLedger('drug');
+  renderInvLedger('supply');
+  renderAllowLedger();
+  renderPayable();
+  renderCustodial();
+  renderSurplusTab();
 }
 
 /* ════════════════════════════════════════════
@@ -2693,7 +2700,8 @@ function saveAllowLedger(rows){
   accSave('acc_allow_ledger', rows);
 }
 function renderAllowLedger(){
-  const rows = loadAllowLedger();
+  const filterYm = curYm();
+  const rows = loadAllowLedger().filter(r => !r.ym || r.ym <= filterYm);
   const initBal = getAllowInit();
   let bal = initBal, provision = 0, settled = 0;
 
@@ -4018,7 +4026,7 @@ function renderPayable(){
             <th style="padding:6px 10px;text-align:right;width:90px;">金額</th>
           </tr></thead>
           <tbody>
-            ${(cat.entries||[]).map((e,i)=>`<tr style="${i%2?'background:#fafafa':''}">
+            ${[...(cat.entries||[])].sort((a,b)=>((b.ym||'')+(b.day||0)).localeCompare((a.ym||'')+(String(a.day||0).padStart(2,'0')))).map((e,i)=>`<tr style="${i%2?'background:#fafafa':''}">
               <td style="padding:6px 10px;color:#546e7a;white-space:nowrap;">${fmtPayDate(e.ym,e.day)}</td>
               <td style="padding:6px 10px;color:#1565c0;font-size:11px;white-space:nowrap;">${(e.ref||'').replace(/</g,'&lt;')}</td>
               <td style="padding:6px 10px;color:#333;font-size:11px;">${(e.desc||'').replace(/</g,'&lt;')}</td>
@@ -4197,7 +4205,7 @@ function renderCustodial(){
           </div>
           <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <tbody>
-              ${(sub.entries||[]).map((e,i)=>`<tr style="${i%2?'background:#fafafa':''}">
+              ${[...(sub.entries||[])].sort((a,b)=>((b.ym||'')+(String(b.day||0).padStart(2,'0'))).localeCompare((a.ym||'')+(String(a.day||0).padStart(2,'0')))).map((e,i)=>`<tr style="${i%2?'background:#fafafa':''}">
                 <td style="padding:5px 10px;color:#546e7a;white-space:nowrap;width:70px;">${e.ym?fmtPayDate(e.ym,e.day):''}</td>
                 <td style="padding:5px 10px;color:#1565c0;font-size:11px;white-space:nowrap;width:95px;">${(e.ref||'').replace(/</g,'&lt;')}</td>
                 <td style="padding:5px 10px;color:#333;font-size:11px;">${(e.desc||'').replace(/</g,'&lt;')}</td>
@@ -4439,13 +4447,16 @@ const INV_TYPE_STYLE = {
   '盤損':'background:#fff3e0;color:#e65100',
 };
 function renderInvLedger(type){
-  const data = loadInvLedger(type);
+  const filterYm = curYm();
+  const allData = loadInvLedger(type);
   const TYPE_ORD = {'期初':0,'進貨':1,'領用':2,'報廢':2,'盤盈':3,'盤損':3};
-  data.sort((a,b)=>{
+  allData.sort((a,b)=>{
     const ya=String(a.ym||''), yb=String(b.ym||'');
     if(ya!==yb) return ya.localeCompare(yb);
     return (TYPE_ORD[a.type||'進貨']??1)-(TYPE_ORD[b.type||'進貨']??1);
   });
+  // 只顯示截至選定月份的資料（ym≤filterYm 或 type=期初）
+  const data = allData.filter(r => !r.ym || r.ym <= filterYm);
   const tbody = document.getElementById(type+'-tbody');
   let bal = getInvInit(type);
   tbody.innerHTML = data.map(r=>{
