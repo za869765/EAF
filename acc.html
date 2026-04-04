@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.3.4</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.3.5</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -362,7 +362,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.3.4</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.3.5</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1872,6 +1872,14 @@ function renderPicker(kw){
   const list = document.getElementById('pk-list');
   list.innerHTML = '';
   const showPosted = document.getElementById('pk-show-posted')?.checked;
+  /* 檢查當月傳票中已存在的用途別（自動掛帳項目如臨時人員） */
+  const ym = curYm();
+  const voucherPurposes = new Set();
+  try {
+    const vs = JSON.parse(localStorage.getItem('acc_vouchers_'+ym)||'[]');
+    let curG = '';
+    vs.forEach(v=>{ if(v.group) curG=v.group; if(curG.includes('臨時人員')||curG.includes('績效獎金')) voucherPurposes.add((v.purpose||'').split(' ')[0]); });
+  } catch(_){}
   const filtered = MOCK_UNPOSTED.filter(r => {
     if(!showPosted && postedIds.has(r.id)) return false;
     if(r.purposeCode==='1501') return false;
@@ -1883,23 +1891,24 @@ function renderPicker(kw){
   }
   filtered.forEach(r => {
     const isPosted = postedIds.has(r.id);
+    const isAutoBooked = !isPosted && voucherPurposes.has(r.purposeCode) && r.yearMonth===ym;
     const div = document.createElement('div');
     div.className = 'pk-rec' + (pickerSelected.has(r.id)?' picked':'') + (isPosted?' posted-item':'');
-    if(isPosted) div.style.cssText = 'opacity:.5; background:#f5f5f5;';
+    if(isPosted || isAutoBooked) div.style.cssText = 'opacity:.55; background:#e8f5e9;';
     div.innerHTML = `
-      <input type="checkbox" ${pickerSelected.has(r.id)?'checked':''} ${isPosted?'disabled':''} onchange="togglePk('${r.id}',this)">
+      <input type="checkbox" ${(pickerSelected.has(r.id)||isAutoBooked)?'checked':''} ${isPosted?'disabled':''} onchange="togglePk('${r.id}',this)">
       <div class="pk-info">
         <div class="pk-title">${r.subject}
           <span style="font-size:10px;color:#90a4ae;">${r.purposeDesc} ${r.purposeCode}</span>
-          <span style="font-size:10px;background:${isPosted?'#e8f5e9':'#f3e5f5'};color:${isPosted?'#2e7d32':'#8e24aa'};border-radius:3px;padding:1px 5px;margin-left:4px;">
-            ${isPosted?'✓ 已出帳':'未出帳'} ${r.yearMonth}
+          <span style="font-size:10px;background:${isPosted?'#e8f5e9':isAutoBooked?'#c8e6c9':'#f3e5f5'};color:${isPosted?'#2e7d32':isAutoBooked?'#1b5e20':'#8e24aa'};border-radius:3px;padding:1px 5px;margin-left:4px;">
+            ${isPosted?'✓ 已出帳':isAutoBooked?'✓ 已自動選取（傳票已掛帳）':'未出帳'} ${r.yearMonth}
           </span>
         </div>
         <div class="pk-sub">${r.desc}</div>
       </div>
       <div style="display:flex; align-items:center; gap:8px;">
-        <div class="pk-amt" ${isPosted?'style="color:#90a4ae;"':''}>$${fmt(r.amount)}</div>
-        ${!isPosted ? `<label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#e65100;cursor:pointer;white-space:nowrap;" title="勾選後按「確定已出帳」才會標記">
+        <div class="pk-amt" ${(isPosted||isAutoBooked)?'style="color:#90a4ae;"':''}>$${fmt(r.amount)}</div>
+        ${!isPosted && !isAutoBooked ? `<label style="display:flex;align-items:center;gap:3px;font-size:10px;color:#e65100;cursor:pointer;white-space:nowrap;" title="勾選後按「確定已出帳」才會標記">
           <input type="checkbox" ${postMarkSet.has(r.id)?'checked':''} onchange="togglePostMark('${r.id}',this.checked)" onclick="event.stopPropagation()">已出帳
         </label>` : ''}
       </div>`;
@@ -1967,15 +1976,16 @@ async function preCheckVoucher(){
         /* 排除已出帳 / 已選 */
         if(postedIds.has(String(r.id))) return false;
         if(pickedIds.has(String(r.id))) return false;
-        /* 排除代收款、基金負擔、公務預算 */
+        /* 只留醫療基金（510601 門診醫療成本）*/
         const an = r.acctName||'';
+        if(!an.includes('醫療基金')) return false;
+        /* 排除代收款、基金負擔、公務預算 */
         if(an.startsWith('代收')||an.includes('基金負擔')) return false;
         if((r.bpCode||'')==='21020301') return false;
         /* 排除績效獎金（屬轉帳傳票，非支出傳票） */
         const pn = r.purposeName||'';
         if(pn.includes('績效')) return false;
         if(pn.includes('計時')) return false;
-        /* 只留醫療基金成本類 */
         return true;
       }).map(r=>({
         id: r.id,
