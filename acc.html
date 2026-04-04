@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.9.0</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.9.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -365,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.9.0</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.9.1</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -489,22 +489,17 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   </div>
 
   <!-- 獎勵金分配 -->
-  <div style="font-size:11px; font-weight:700; color:#546e7a; margin:12px 0 4px; letter-spacing:1px;">▌ 115年度獎勵金分配累積</div>
+  <div style="font-size:11px; font-weight:700; color:#546e7a; margin:12px 0 4px; letter-spacing:1px;">▌ <span id="rc-bonus-year">115</span>年度獎勵金分配累積</div>
   <div class="reminder-grid">
     <div class="r-card rc-orange">
       <div class="r-num" id="rc-bureau">—</div>
       <div class="r-label">🏛️ 繳局統籌款</div>
-      <div class="r-sub">含醫師獎勵金，115年累積</div>
-    </div>
-    <div class="r-card rc-red">
-      <div class="r-num" id="rc-staff">—</div>
-      <div class="r-label">👥 員工獎勵金</div>
-      <div class="r-sub">115年累積</div>
+      <div class="r-sub" id="rc-bureau-sub">繳局＋醫師＋員工，全掛繳局</div>
     </div>
     <div class="r-card rc-blue">
       <div class="r-num" id="rc-fund5">—</div>
-      <div class="r-label">💰 業務外累積賸餘</div>
-      <div class="r-sub">5%，115年累積</div>
+      <div class="r-label">💰 醫療作業基金 5%</div>
+      <div class="r-sub">年度累積</div>
     </div>
   </div>
 </div>
@@ -1850,12 +1845,12 @@ function updateCalcTable(){
   const mStaff  = Math.round(mNet * 0.95 * 0.9 * 0.3);
   const mDoctor = mNet - mFund5 - mBureau - mStaff;
 
-  // ── 衛生保健（員工比例 0.7，繳局/醫師扣加班費）──
+  // ── 衛生保健（員工比例 0.7，加班費只減繳局，醫師不受影響）──
   const hNet2   = hInc - hExp;
   const hFund5  = Math.round(hNet2 * 0.05);
   const hBureau = Math.round(hNet2 * 0.95 * 0.1 - hOvertime);
   const hStaff  = Math.round(hNet2 * 0.95 * 0.9 * 0.7);
-  const hDoctor = hNet2 - hFund5 - (Math.round(hNet2 * 0.95 * 0.1)) - hStaff - hOvertime;
+  const hDoctor = hNet2 - hFund5 - hBureau - hOvertime - hStaff;
 
   const s = (id, v) => { const el=document.getElementById(id); if(el) el.textContent = v ? fmt(v) : '-'; };
 
@@ -1967,8 +1962,10 @@ function updateHomeDashboard(){
   const rcSurpSub = document.getElementById('rc-surplus-sub');
   if(rcSurpSub) rcSurpSub.textContent = `期初 ${fmt(surplusInit)}` + (surpAdd > 0 ? ` + 增加 ${fmt(surpAdd)}` : '');
 
-  // ── 年度獎勵金累積（從各月傳票讀取） ──
-  let sumBureau=0, sumStaff=0, sumFund5=0;
+  // ── 年度獎勵金累積（從各月傳票讀取，115年全掛繳局統籌款） ──
+  const rcBonusYear = document.getElementById('rc-bonus-year');
+  if(rcBonusYear) rcBonusYear.textContent = y;
+  let sumBonus=0, sumFund5=0;
   for(let mo=1; mo<=12; mo++){
     const ymKey = y + String(mo).padStart(2,'0');
     const vRaw = localStorage.getItem('acc_vouchers_'+ymKey);
@@ -1979,25 +1976,22 @@ function updateHomeDashboard(){
         vs.forEach(v=>{
           if(v.group) curG = v.group;
           if(curG.includes('績效獎金') && v.type==='debit'){
-            const mb = v.desc?.match(/繳局\D*?([\d,]+)/);
-            const md = v.desc?.match(/醫師([\d,]+)/);
-            const ms = v.desc?.match(/員工([\d,]+)/);
-            sumBureau += (mb?pnum(mb[1]):0) + (md?pnum(md[1]):0);
-            sumStaff  += ms?pnum(ms[1]):0;
-            const bonusAmt = v.dr;
-            const netApprox = Math.round(bonusAmt / 0.95);
-            sumFund5 += netApprox - bonusAmt;
+            sumBonus += v.dr||0;
+            const netApprox = Math.round((v.dr||0) / 0.95);
+            sumFund5 += netApprox - (v.dr||0);
           }
         });
       }catch(e){}
     }
   }
   const rcBureau = document.getElementById('rc-bureau');
-  const rcStaff  = document.getElementById('rc-staff');
   const rcFund5  = document.getElementById('rc-fund5');
-  if(rcBureau) rcBureau.textContent = sumBureau > 0 ? fmt(sumBureau) : '—';
-  if(rcStaff)  rcStaff.textContent  = sumStaff  > 0 ? fmt(sumStaff)  : '—';
-  if(rcFund5)  rcFund5.textContent  = sumFund5  > 0 ? fmt(sumFund5)  : '—';
+  if(rcBureau){
+    rcBureau.textContent = sumBonus > 0 ? fmt(sumBonus) : '—';
+    const rcBSub = document.getElementById('rc-bureau-sub');
+    if(rcBSub && sumBonus > 0) rcBSub.textContent = `繳局＋醫師＋員工，全掛繳局統籌款`;
+  }
+  if(rcFund5) rcFund5.textContent = sumFund5 > 0 ? fmt(sumFund5) : '—';
 }
 
 let _invCloseLocked  = true;
@@ -2652,14 +2646,13 @@ function generateVouchers(){
     vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款', purpose:'', desc:descM, dr:0, cr:_mBonus });
   }
 
-  // 9b. 衛生保健（員工比例 0.7，繳局/醫師扣加班費）
+  // 9b. 衛生保健（員工比例 0.7，加班費只減繳局，醫師不受影響）
   const _hNet = _hInc - _hExp;
   if(_hNet > 0){
     const _hFund5     = Math.round(_hNet * 0.05);
-    const _hBureauRaw = Math.round(_hNet * 0.95 * 0.1);
     const _hBureau    = Math.round(_hNet * 0.95 * 0.1 - _hOT);
     const _hStaff     = Math.round(_hNet * 0.95 * 0.9 * 0.7);
-    const _hDoctor    = _hNet - _hFund5 - _hBureauRaw - _hStaff - _hOT;
+    const _hDoctor    = _hNet - _hFund5 - _hBureau - _hOT - _hStaff;
     const _hBonus     = _hBureau + _hDoctor + _hStaff;
     if(_hBonus > 0){
       const descH = `${yymm}衛生保健 繳局${fmt(_hBureau)}+醫師${fmt(_hDoctor)}+員工${fmt(_hStaff)}=${fmt(_hBonus)}` + (_hOT>0?`(加班費${fmt(_hOT)}已扣)`:``);
@@ -3599,7 +3592,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.9.0已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.9.1已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3640,7 +3633,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.9.0已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.9.1已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4688,7 +4681,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.9.0 全面重置 Q1 庫存明細帳 ──
+/* ── v3.9.1 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -6018,11 +6011,11 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.9.0: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.9.1: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.9.0: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.9.1: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
-  // v3.9.0: 補入缺漏的11503藥品進貨/領用/盤損
+  // v3.9.1: 補入缺漏的11503藥品進貨/領用/盤損
   await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
