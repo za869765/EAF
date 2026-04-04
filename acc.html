@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.4.3</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.4.4</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -362,7 +362,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.4.3</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.4.4</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1450,9 +1450,12 @@ async function loadPickerData(){
     const all = await resp.json();
     PICKER_DATA = all.filter(r=>{
       if(r.archived||r.voided) return false;
-      /* 只取當月申請 */
+      /* 申請日期 or 交貨日期 or 用途說明含當月 → 顯示 */
       const rym = recYm(r);
-      if(rym !== ym) return false;
+      const dym = deliveryYm(r);
+      const mNum = String(+ym.slice(3)); // '3'
+      const descHasMonth = (r.purposeDesc||r.notes||'').includes(mNum+'月');
+      if(rym !== ym && dym !== ym && !descHasMonth) return false;
       /* 只留 510601 門診醫療成本 */
       if((r.bpCode||'') !== '510601') return false;
       return true;
@@ -1511,6 +1514,14 @@ function recYm(r){
   const raw = r.applyDateRaw||'';
   if(raw){ const d=new Date(raw+'T00:00:00'); if(!isNaN(d)) return String(d.getFullYear()-1911)+String(d.getMonth()+1).padStart(2,'0'); }
   return '';
+}
+/* 從 deliveryDate（ISO 格式 2026-03-25）解析出 YYYМM */
+function deliveryYm(r){
+  const raw = r.deliveryDate||'';
+  if(!raw) return '';
+  const d = new Date(raw+'T00:00:00');
+  if(isNaN(d)) return '';
+  return String(d.getFullYear()-1911) + String(d.getMonth()+1).padStart(2,'0');
 }
 function curYm(){ return document.getElementById('sel-year').value + pad(document.getElementById('sel-month').value); }
 function pad(n){ return String(n).padStart(2,'0'); }
