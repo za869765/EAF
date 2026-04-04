@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.9.2</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.9.3</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -365,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.9.2</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.9.3</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -2717,10 +2717,15 @@ async function saveVouchers(){
       badge.style.cssText = 'display:inline-block;background:#fce4ec;color:#b71c1c;border-radius:4px;padding:2px 8px;font-size:11px;';
     }
   }
-  /* 傳票 → 庫存明細帳自動同步 */
+  /* 傳票 → 各分頁同步（每次產製都全部刷新） */
   syncInvFromVoucher(ym, STATE.vouchers);
   renderInvLedger('drug');
   renderInvLedger('supply');
+  renderPayable();
+  renderCustodial();
+  renderSurplusTab();
+  renderAllowLedger();
+  updateHomeDashboard();
 }
 
 /* ════════════════════════════════════════════
@@ -3605,7 +3610,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.9.2已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.9.3已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3646,7 +3651,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.9.2已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.9.3已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4694,7 +4699,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.9.2 全面重置 Q1 庫存明細帳 ──
+/* ── v3.9.3 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -4817,19 +4822,50 @@ function fmtPayDate(ym, day){
 }
 function renderPayable(){
   const data = loadPayable();
-  // 動態將 Picker 已選項目合併至 '03 員工款'（同步顯示）
+  const ym = curYm();
+  // 清除舊的動態項目
+  (data.categories||[]).forEach(cat=>{ cat.entries = (cat.entries||[]).filter(e=>!e._dyn); });
+
+  // 從最新傳票讀取當月分錄 → 動態合併至對應類別
+  const vRaw = localStorage.getItem('acc_vouchers_'+ym);
+  if(vRaw){
+    try{
+      const vs = JSON.parse(vRaw);
+      let curG = '';
+      vs.forEach(v=>{
+        if(v.group) curG = v.group;
+        // 貸方 210205 應付費用 → 依 subAccount 歸類
+        if(v.type==='credit' && (v.subject||'').includes('210205')){
+          const sub = v.subAccount||'';
+          let catCode = '03';  // 預設員工款
+          if(sub.includes('01')) catCode = '01';       // 繳局統籌款
+          else if(sub.includes('02a')) catCode = '02a'; // 醫師獎勵金
+          else if(sub.includes('02b')) catCode = '02b'; // 員工獎勵金
+          else if(sub.includes('99')) catCode = '03';   // 其他→員工款
+          const cat = (data.categories||[]).find(c=>c.code===catCode);
+          if(cat){
+            cat.entries.push({ ym, day:'', ref:curG||'轉帳傳票', desc:v.desc||'', amt:v.cr||0, _dyn:true });
+          }
+        }
+      });
+    }catch(e){}
+  }
+
+  // 也合併 Picker 已選但尚未產製傳票的項目
   const dynItems = (STATE.month.pickerItems||[]).filter(r=>r.purposeCode!=='1501'&&r.purposeCode!=='2713');
-  if(dynItems.length){
+  // 若傳票已有資料，picker items 已包含在傳票中，不重複加
+  if(dynItems.length && !vRaw){
     const cat03 = (data.categories||[]).find(c=>c.code==='03');
     if(cat03){
-      cat03.entries = [...(cat03.entries||[]).filter(e=>!e._dyn), ...dynItems.map(r=>({
-        ym: r.yearMonth||curYm(), day:31, ref:r.voucher||r.id,
-        desc: r.desc||r.purposeDesc, amt: r.amount, _dyn:true
-      }))];
-      cat03.subtotal = cat03.entries.reduce((s,e)=>s+(e.amt||0),0);
-      data.total = (data.categories||[]).reduce((s,c)=>s+(c.subtotal||0),0);
+      dynItems.forEach(r=>{
+        cat03.entries.push({ ym: r.yearMonth||ym, day:31, ref:r.voucher||r.id, desc:r.desc||r.purposeDesc, amt:r.amount, _dyn:true });
+      });
     }
   }
+
+  // 重算小計
+  (data.categories||[]).forEach(cat=>{ cat.subtotal = (cat.entries||[]).reduce((s,e)=>s+(e.amt||0),0); });
+  data.total = (data.categories||[]).reduce((s,c)=>s+(c.subtotal||0),0);
   const totalEl = document.getElementById('pay-total');
   if(totalEl) totalEl.textContent = fmt(data.total||0);
   (data.categories||[]).forEach(cat=>{
@@ -6024,11 +6060,11 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.9.2: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.9.3: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.9.2: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.9.3: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
-  // v3.9.2: 補入缺漏的11503藥品進貨/領用/盤損
+  // v3.9.3: 補入缺漏的11503藥品進貨/領用/盤損
   await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
