@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.0.0</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.0.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -365,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.0.0</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.0.1</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -4587,10 +4587,11 @@ const PAYABLE_SEED = {
       { ym:'11502', day:26, ref:'300004 序16', desc:'114012員工獎勵金(900×0.95×0.9×0.3=231)', amt:231 },
       { ym:'11503', day:31, ref:'300005 序14', desc:'11412員工獎勵金(6,224×0.9×0.3=1,681)', amt:1681 }
     ]},
-    { code:'03', name:'員工款', subtotal:21884, note:'臨時人員實領 13,258＋代扣款 8,626（勞保/健保/勞退）→ 代扣部分性質同代收款，待繳各主管機關', entries:[
+    { code:'03', name:'員工款', subtotal:21884, note:'臨時人員實領＋代扣款（勞保/健保/勞退）→ 代扣部分性質同代收款，待繳各主管機關', entries:[
       { ym:'11503', day:31, ref:'300005 序11', desc:'11503臨時人員實領13,258元：黎欣妮6,937+方雪雲6,321', amt:13258 },
       { ym:'11503', day:31, ref:'300005 序12', desc:'115.3臨時人員補助代扣款8,626元（勞保2,736+健保4,685+勞退1,202）', amt:8626 }
-    ]}
+    ]},
+    { code:'99', name:'其他', subtotal:0, note:'動支單付款（全勤禮品、電信費等）', entries:[] }
   ]
 };
 /* 補種 115-0013/0014/0015 一月進貨（picker 過濾不到，直接寫入明細帳） */
@@ -4819,7 +4820,7 @@ function renderPayable(){
           if(sub.includes('01')) catCode = '01';       // 繳局統籌款
           else if(sub.includes('02a')) catCode = '02a'; // 醫師獎勵金
           else if(sub.includes('02b')) catCode = '02b'; // 員工獎勵金
-          else if(sub.includes('99')) catCode = '03';   // 其他→員工款
+          else if(sub.includes('99')) catCode = '99';   // 其他（獨立分類）
           const cat = (data.categories||[]).find(c=>c.code===catCode);
           if(cat){
             cat.entries.push({ ym, day:'', ref:curG||'轉帳傳票', desc:v.desc||'', amt:v.cr||0, _dyn:true });
@@ -4852,8 +4853,8 @@ function renderPayable(){
   });
   const sec = document.getElementById('payable-sections');
   if(!sec) return;
-  const CAT_HDR = {'01':'hd-teal','02a':'hd-purple','02b':'hd-purple','03':'hd-amber'};
-  const CAT_ICN = {'01':'🏦','02a':'👨‍⚕️','02b':'🏅','03':'👥'};
+  const CAT_HDR = {'01':'hd-teal','02a':'hd-purple','02b':'hd-purple','03':'hd-amber','99':'hd-dark'};
+  const CAT_ICN = {'01':'🏦','02a':'👨‍⚕️','02b':'🏅','03':'👥','99':'📋'};
   sec.innerHTML = (data.categories||[]).map(cat=>`
     <div class="card">
       <div class="card-hd ${CAT_HDR[cat.code]||'hd-dark'}">
@@ -4910,12 +4911,11 @@ function onExpenseUpload(inp){
 }
 
 /* 智慧解析：依會計科目分類 */
+const PAY_CAT_OPTS = {'01':'繳局統籌款','02a':'醫師獎勵金','02b':'員工獎勵金','03':'員工款','99':'其他'};
+const CUST321_MAP = {'01':'公保','02':'公健','03':'勞健','04':'勞保','05':'退撫','06':'勞退','07':'所得稅'};
+
 function parseExpenseRows(rows){
-  const payable = [];   // 210205 應付費用
-  const custodial = {}; // 21020311, 21020312, 21020321 等
-  let surplusAmt = 0;   // 330101 累積賸餘
-  const others = [];    // 其他（510601、110404 等不需沖銷）
-  let totalRows = 0;
+  const items = [];
   let voucherNums = new Set();
 
   rows.forEach(r => {
@@ -4924,187 +4924,192 @@ function parseExpenseRows(rows){
     const purp = String(r[5]||'').trim();
     const desc = String(r[6]||'').trim();
     const dr   = +(r[7]||0);
-    const cr   = +(r[8]||0);
     const vnum = String(r[2]||'').trim();
     const date = String(r[0]||'').trim();
 
-    if(!acct || dr===0 && cr===0) return;
-    if(acct.startsWith('1101')) return; // 專戶轉出（貸方），跳過
+    if(!acct || dr===0) return;
+    if(acct.startsWith('1101')) return;
     if(vnum && /^\d+$/.test(vnum)) voucherNums.add(vnum);
-    if(dr===0) return; // 只看借方（=實際付款）
-
-    totalRows++;
 
     // 210205 應付費用
     if(acct.includes('210205')){
-      let catCode = '03';
-      if(sub.includes('01')) catCode = '01';
-      else if(sub.match(/02\b/) && !sub.includes('02a') && !sub.includes('02b')) catCode = '02b';
-      else if(sub.includes('99')) catCode = '03';
-      else if(sub.includes('03')) catCode = '03';
-      payable.push({ catCode, sub, desc, amt:dr, date, vnum });
+      const subCode = (sub.match(/^(\d+)/)||[])[1]||'';
+      let catCode = '99';
+      if(subCode==='01') catCode = '01';
+      else if(subCode==='02'){
+        catCode = desc.includes('醫師') ? '02a' : '02b';
+      }
+      else if(subCode==='03') catCode = '03';
+      else if(subCode==='99') catCode = '99';
+      items.push({ type:'payable', catCode, acct:'210205', sub, desc, amt:dr, date, vnum, skip:false });
       return;
     }
-
     // 330101 累積賸餘
     if(acct.includes('330101')){
-      surplusAmt += dr;
+      items.push({ type:'surplus', catCode:'', acct:'330101', sub:'', desc, amt:dr, date, vnum, skip:false });
       return;
     }
-
     // 210203xx 代收款
     const custMatch = acct.match(/(2102\d{4})/);
     if(custMatch){
       const code = custMatch[1];
-      if(!custodial[code]) custodial[code] = [];
-      custodial[code].push({ sub, purp, desc, amt:dr, date, vnum });
+      const subCode = (sub.match(/^(\d+)/)||[])[1]||'';
+      // 21020321/07 所得稅 → 自動略過
+      if(code==='21020321' && subCode==='07'){
+        items.push({ type:'custodial', catCode:code, sub, desc, amt:dr, date, vnum, skip:true, subCode });
+        return;
+      }
+      items.push({ type:'custodial', catCode:code, sub, desc, amt:dr, date, vnum, skip:false, subCode });
       return;
     }
-
-    others.push({ acct, sub, purp, desc, amt:dr });
+    // 其他（510601、110404 等不需沖帳）→ 自動略過
+    items.push({ type:'other', catCode:'', acct, sub, desc, amt:dr, date, vnum, skip:true });
   });
 
-  return { payable, custodial, surplus:surplusAmt, others, _totalRows:totalRows, _vouchers:[...voucherNums] };
+  return { items, _vouchers:[...voucherNums] };
 }
-
-/* 代收款子目對應 CUSTODIAL_SEED subs 名稱 */
-const CUST321_MAP = {
-  '01':'公保', '02':'公健', '03':'勞健', '04':'勞保',
-  '05':'退撫', '06':'勞退', '07':'所得稅'
-};
 
 function showExpensePreview(result){
   const box = document.getElementById('expense-preview');
   if(!box) return;
+  STATE._expenseParsed = result;
 
-  // 應付費用彙總
-  const payCats = {};
-  result.payable.forEach(p=>{
-    if(!payCats[p.catCode]) payCats[p.catCode] = {items:[], total:0};
-    payCats[p.catCode].items.push(p);
-    payCats[p.catCode].total += p.amt;
+  const activeItems = result.items.filter(i=>!i.skip);
+  const skippedItems = result.items.filter(i=>i.skip);
+
+  let html = `<div style="background:#fff;border:1px solid #cfd8dc;border-radius:8px;padding:12px;max-height:500px;overflow-y:auto;">
+    <div style="font-weight:700;font-size:13px;color:#1e2a38;margin-bottom:8px;">📋 解析結果（傳票 ${result._vouchers.join(', ')}）— 請確認後再沖銷</div>
+    <table style="width:100%;border-collapse:collapse;font-size:11.5px;">
+      <thead><tr style="background:#37474f;color:#fff;">
+        <th style="padding:5px 6px;width:30px;">沖</th>
+        <th style="padding:5px 6px;text-align:left;width:90px;">科目</th>
+        <th style="padding:5px 6px;text-align:left;width:110px;">分類</th>
+        <th style="padding:5px 6px;text-align:left;">摘要</th>
+        <th style="padding:5px 6px;text-align:right;width:80px;">金額</th>
+      </tr></thead><tbody>`;
+
+  result.items.forEach((item, idx) => {
+    const bg = item.skip ? 'background:#f5f5f5;opacity:0.6;' : (idx%2 ? 'background:#fafafa;' : '');
+    const checked = item.skip ? '' : 'checked';
+
+    // 分類選單
+    let catSelect = '';
+    if(item.type==='payable'){
+      catSelect = `<select onchange="STATE._expenseParsed.items[${idx}].catCode=this.value" style="font-size:11px;padding:2px;border:1px solid #ccc;border-radius:3px;">`;
+      for(const [k,v] of Object.entries(PAY_CAT_OPTS)){
+        catSelect += `<option value="${k}" ${item.catCode===k?'selected':''}>${k} ${v}</option>`;
+      }
+      catSelect += `</select>`;
+    } else if(item.type==='custodial'){
+      const code = item.catCode;
+      const subName = code==='21020321' ? (CUST321_MAP[item.subCode]||item.sub) : item.sub;
+      catSelect = `<span style="color:#0d47a1;font-size:10px;">${code}/${subName}</span>`;
+    } else if(item.type==='surplus'){
+      catSelect = `<span style="color:#6a1b9a;">解繳市庫</span>`;
+    } else {
+      catSelect = `<span style="color:#90a4ae;">不沖帳</span>`;
+    }
+
+    const acctLabel = item.type==='payable' ? '應付費用' :
+                      item.type==='custodial' ? '代收款' :
+                      item.type==='surplus' ? '累積賸餘' : item.acct||'';
+
+    html += `<tr style="${bg}" id="exp-row-${idx}">
+      <td style="padding:4px 6px;text-align:center;"><input type="checkbox" ${checked} onchange="STATE._expenseParsed.items[${idx}].skip=!this.checked;document.getElementById('exp-row-${idx}').style.opacity=this.checked?1:0.4;"></td>
+      <td style="padding:4px 6px;font-size:10px;color:#546e7a;">${acctLabel}</td>
+      <td style="padding:4px 6px;">${catSelect}</td>
+      <td style="padding:4px 6px;color:#333;">${(item.desc||'').slice(0,65)}</td>
+      <td style="padding:4px 6px;text-align:right;font-weight:600;color:#b71c1c;">${fmt(item.amt)}</td>
+    </tr>`;
   });
-  const CAT_NAME = {'01':'繳局統籌款','02a':'醫師獎勵金','02b':'員工獎勵金','03':'員工款'};
 
-  let payHtml = '';
-  for(const [code, cat] of Object.entries(payCats)){
-    payHtml += `<div style="margin:4px 0;"><b style="color:#1565c0;">${code} ${CAT_NAME[code]||code}</b>：<span style="color:#b71c1c;font-weight:700;">${fmt(cat.total)}</span></div>`;
-    cat.items.forEach(p => {
-      payHtml += `<div style="font-size:11px;color:#546e7a;margin-left:16px;">- ${p.desc.slice(0,60)}… ${fmt(p.amt)}</div>`;
-    });
+  html += `</tbody></table>`;
+
+  if(skippedItems.length){
+    html += `<div style="margin-top:6px;font-size:10px;color:#90a4ae;">自動略過 ${skippedItems.length} 筆（510601成本、110404醫療用品、所得稅等不需沖帳）</div>`;
   }
 
-  // 代收款彙總
-  let custHtml = '';
-  for(const [code, items] of Object.entries(result.custodial)){
-    const groupTotal = items.reduce((s,i)=>s+i.amt,0);
-    const groupName = code==='21020311'?'國健科':code==='21020312'?'疾管科':code==='21020321'?'代收款（薪資相關）':code;
-    custHtml += `<div style="margin:6px 0 2px;"><b style="color:#0d47a1;">${code} ${groupName}</b>：<span style="color:#b71c1c;font-weight:700;">${fmt(groupTotal)}</span></div>`;
-    items.forEach(i => {
-      const subName = code==='21020321' ? (CUST321_MAP[i.sub.split(' ')[0]]||i.sub) : i.sub;
-      custHtml += `<div style="font-size:11px;color:#546e7a;margin-left:16px;">- ${subName}：${fmt(i.amt)}　${i.desc.slice(0,50)}</div>`;
-    });
-  }
-
-  const surpHtml = result.surplus > 0 ? `<div style="margin:6px 0;"><b style="color:#6a1b9a;">330101 累積賸餘 解繳</b>：<span style="color:#b71c1c;font-weight:700;">${fmt(result.surplus)}</span></div>` : '';
+  html += `<div style="margin-top:10px;display:flex;gap:8px;">
+    <button onclick="applyExpenseWriteoff()" style="background:#1b5e20;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-weight:700;cursor:pointer;font-size:13px;">✅ 確認沖銷</button>
+    <button onclick="document.getElementById('expense-preview').style.display='none'" style="background:#90a4ae;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;">取消</button>
+  </div></div>`;
 
   box.style.display = '';
-  box.innerHTML = `
-    <div style="background:#fff;border:1px solid #cfd8dc;border-radius:8px;padding:12px;max-height:400px;overflow-y:auto;">
-      <div style="font-weight:700;font-size:13px;color:#1e2a38;margin-bottom:8px;">📋 解析結果（傳票 ${result._vouchers.join(', ')}）</div>
-      ${payHtml ? `<div style="background:#fff3e0;border-radius:6px;padding:8px 10px;margin:6px 0;">
-        <div style="font-weight:700;color:#e65100;margin-bottom:4px;">💰 沖銷 210205 應付費用</div>${payHtml}</div>` : ''}
-      ${custHtml ? `<div style="background:#e3f2fd;border-radius:6px;padding:8px 10px;margin:6px 0;">
-        <div style="font-weight:700;color:#0d47a1;margin-bottom:4px;">🏦 沖銷 210203 代收款</div>${custHtml}</div>` : ''}
-      ${surpHtml ? `<div style="background:#f3e5f5;border-radius:6px;padding:8px 10px;margin:6px 0;">${surpHtml}</div>` : ''}
-      <div style="margin-top:10px;display:flex;gap:8px;">
-        <button onclick="applyExpenseWriteoff()" style="background:#1b5e20;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-weight:700;cursor:pointer;font-size:13px;">✅ 確認沖銷</button>
-        <button onclick="document.getElementById('expense-preview').style.display='none'" style="background:#90a4ae;color:#fff;border:none;border-radius:6px;padding:8px 16px;cursor:pointer;font-size:13px;">取消</button>
-      </div>
-    </div>`;
-
-  // 暫存解析結果
-  STATE._expenseParsed = result;
+  box.innerHTML = html;
 }
 
 function applyExpenseWriteoff(){
   const result = STATE._expenseParsed;
   if(!result) return;
-  const {ym} = getYm();
+  const {ym, y} = getYm();
+  const active = result.items.filter(i=>!i.skip);
+  if(!active.length){ alert('沒有勾選任何項目'); return; }
 
   // ── 沖銷應付費用 ──
-  if(result.payable.length){
+  const payItems = active.filter(i=>i.type==='payable');
+  if(payItems.length){
     const data = loadPayable();
-    result.payable.forEach(p => {
+    // 確保 99 分類存在
+    if(!(data.categories||[]).find(c=>c.code==='99')){
+      data.categories.push({ code:'99', name:'其他', subtotal:0, note:'動支單付款（全勤禮品、電信費等）', entries:[] });
+    }
+    payItems.forEach(p => {
       const cat = (data.categories||[]).find(c=>c.code===p.catCode);
       if(cat){
         cat.entries.push({
-          ym, day:'', ref:`支出 ${p.vnum||''}`, desc:`🔻沖銷 ${p.desc}`, amt: -(p.amt), _wo:true
+          ym, day:'', ref:`支出 ${p.vnum||''}`, desc:`🔻沖銷 ${p.desc}`, amt:-(p.amt), _wo:true
         });
       }
     });
-    // 重算小計
     (data.categories||[]).forEach(cat=>{ cat.subtotal = (cat.entries||[]).reduce((s,e)=>s+(e.amt||0),0); });
     data.total = (data.categories||[]).reduce((s,c)=>s+(c.subtotal||0),0);
     accSave('acc_payable', data);
   }
 
   // ── 沖銷代收款 ──
-  if(Object.keys(result.custodial).length){
+  const custItems = active.filter(i=>i.type==='custodial');
+  if(custItems.length){
     const data = loadCustodial();
-    for(const [code, items] of Object.entries(result.custodial)){
-      const group = (data.groups||[]).find(g=>g.code===code);
-      if(!group) continue;
-
-      if(code==='21020321'){
-        // 薪資相關：依子目對應 subs
-        const SUB_MAP = {'01':0,'02':2,'03':3,'04':4,'05':1,'06':5,'07':-1};
-        items.forEach(item => {
-          const subCode = (item.sub||'').split(' ')[0];
-          const idx = SUB_MAP[subCode];
-          if(idx!==undefined && idx>=0 && group.subs[idx]){
-            group.subs[idx].entries.push({
-              ym, day:'', ref:`支出 ${item.vnum||''}`, desc:`🔻沖銷 ${item.desc.slice(0,80)}`, amt:-(item.amt), _wo:true
-            });
-            group.subs[idx].subtotal = group.subs[idx].entries.reduce((s,e)=>s+(e.amt||0),0);
-          }
-        });
-      } else {
-        // 其他群組（國健科、疾管科等）：直接加到第一個 sub 或新建
-        items.forEach(item => {
-          const sub = group.subs[0] || (group.subs[0] = {name:'沖銷',subtotal:0,entries:[]});
-          sub.entries.push({
+    const SUB_MAP = {'01':0,'02':2,'03':3,'04':4,'05':1,'06':5};
+    custItems.forEach(item => {
+      const group = (data.groups||[]).find(g=>g.code===item.catCode);
+      if(!group) return;
+      if(item.catCode==='21020321'){
+        const idx = SUB_MAP[item.subCode];
+        if(idx!==undefined && idx>=0 && group.subs[idx]){
+          group.subs[idx].entries.push({
             ym, day:'', ref:`支出 ${item.vnum||''}`, desc:`🔻沖銷 ${item.desc.slice(0,80)}`, amt:-(item.amt), _wo:true
           });
-          sub.subtotal = sub.entries.reduce((s,e)=>s+(e.amt||0),0);
+          group.subs[idx].subtotal = group.subs[idx].entries.reduce((s,e)=>s+(e.amt||0),0);
+        }
+      } else {
+        const sub = group.subs[0] || (group.subs[0] = {name:'支出沖銷',subtotal:0,entries:[]});
+        sub.entries.push({
+          ym, day:'', ref:`支出 ${item.vnum||''}`, desc:`🔻沖銷 ${item.desc.slice(0,80)}`, amt:-(item.amt), _wo:true
         });
+        sub.subtotal = sub.entries.reduce((s,e)=>s+(e.amt||0),0);
       }
       group.subtotal = (group.subs||[]).reduce((s,sub)=>s+(sub.subtotal||0),0);
-    }
+    });
     data.total = (data.groups||[]).reduce((s,g)=>s+(g.subtotal||0),0);
     accSave('acc_custodial', data);
   }
 
   // ── 沖銷累積賸餘 ──
-  if(result.surplus > 0){
-    const {y} = getYm();
+  const surpItems = active.filter(i=>i.type==='surplus');
+  const surpTotal = surpItems.reduce((s,i)=>s+i.amt,0);
+  if(surpTotal > 0){
     if(!STATE.yearData) STATE.yearData = {};
     if(!STATE.yearData[ym]) STATE.yearData[ym] = {};
-    STATE.yearData[ym].surplusDeduct = (STATE.yearData[ym].surplusDeduct||0) + result.surplus;
+    STATE.yearData[ym].surplusDeduct = (STATE.yearData[ym].surplusDeduct||0) + surpTotal;
     accSave('acc_yeardata_'+y, STATE.yearData);
   }
 
-  // 刷新所有分頁
-  renderPayable();
-  renderCustodial();
-  renderSurplusTab();
-  updateHomeDashboard();
+  renderPayable(); renderCustodial(); renderSurplusTab(); updateHomeDashboard();
 
-  // 關閉預覽
   const box = document.getElementById('expense-preview');
-  if(box) box.innerHTML = '<div style="background:#e8f5e9;border-radius:8px;padding:12px;color:#1b5e20;font-weight:700;">✅ 沖銷完成！應付費用及代收款已更新。</div>';
+  if(box) box.innerHTML = `<div style="background:#e8f5e9;border-radius:8px;padding:12px;color:#1b5e20;font-weight:700;">✅ 沖銷完成！已沖 ${active.length} 筆（略過 ${result.items.length-active.length} 筆）</div>`;
   delete STATE._expenseParsed;
-
   showSaveMsg('✅ 支出傳票沖銷已套用');
 }
 
