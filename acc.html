@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.2.0</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.2.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -317,7 +317,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.2.0</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.2.1</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1817,6 +1817,7 @@ function renderPicker(kw){
   const showPosted = document.getElementById('pk-show-posted')?.checked;
   const filtered = MOCK_UNPOSTED.filter(r => {
     if(!showPosted && postedIds.has(r.id)) return false;
+    if(r.purposeCode==='1501') return false;
     return (r.desc+r.subject+r.purposeDesc).toLowerCase().includes((kw||'').toLowerCase());
   });
   if(!filtered.length){
@@ -1916,6 +1917,7 @@ async function preCheckVoucher(){
         /* 排除績效獎金（屬轉帳傳票，非支出傳票） */
         const pn = r.purposeName||'';
         if(pn.includes('績效')) return false;
+        if(pn.includes('計時')) return false;
         /* 只留醫療基金成本類 */
         return true;
       }).map(r=>({
@@ -2024,15 +2026,17 @@ function generateVouchers(){
     }
   }
 
+  // 4b. 臨時人員薪資＋補助代扣款（掛應付費用）— 先讀取，供下方防重複
+  const tempSalary = pnum(document.getElementById('exp-temp-salary')?.value);
+  const tempDeduct = pnum(document.getElementById('exp-temp-deduct')?.value);
+
   // 4. 未出帳動支單 → 掛應付費用
   STATE.month.pickerItems.forEach(r => {
+    // 若手動欄位已填臨時人員，跳過 Picker 選入的同月 2713 避免重複
+    if(r.purposeCode==='2713' && (tempSalary>0||tempDeduct>0)) return;
     vouchers.push({ group:`動支掛應付（${r.yearMonth}）`, type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:`${r.purposeCode} ${r.purposeDesc}`, desc:r.desc, dr:r.amount, cr:0 });
     vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'03 員工款', purpose:'', desc:r.desc, dr:0, cr:r.amount });
   });
-
-  // 4b. 臨時人員薪資＋補助代扣款（掛應付費用）
-  const tempSalary = pnum(document.getElementById('exp-temp-salary')?.value);
-  const tempDeduct = pnum(document.getElementById('exp-temp-deduct')?.value);
   if(tempSalary > 0){
     vouchers.push({ group:'臨時人員應付費用', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'2713 計時與計件人員酬金', desc:`${yymm}臨時人員薪資實領${fmt(tempSalary)}元`, dr:tempSalary, cr:0 });
     vouchers.push({ group:'',                 type:'credit', subject:'210205 應付費用',      subAccount:'03 員工款', purpose:'', desc:`${yymm}臨時人員薪資實領${fmt(tempSalary)}元`, dr:0, cr:tempSalary });
@@ -2960,6 +2964,79 @@ async function seedQ1DrugEntries(){
   accSave('acc_q1drug_seeded', '1');
   console.log('[seedQ1Drug] 已補入Q1藥品領用/盤盈損至 D1');
 }
+
+/* ── Q1 完整轉帳傳票種子 ── */
+function seedQ1FullVouchers(){
+  if(localStorage.getItem('acc_q1vouchers_full')) return;
+  const V=(g,t,s,sa,p,d,dr,cr)=>({group:g,type:t,subject:s,subAccount:sa||'',purpose:p||'',desc:d,dr:dr||0,cr:cr||0});
+  const v1=[
+    V('固定成本','debit','510601 門診醫療成本','','5151 什項設備折舊','11501雜項設備折舊2,193元',2193),
+    V('','credit','130603 累計折舊－什項設備','','','11501雜項設備折舊2,193元',0,2193),
+    V('藥品領用','debit','510601 門診醫療成本','','3303 藥品','11501藥品領用8,028元',8028),
+    V('','credit','110404 醫療用品','','','11501藥品領用8,028元',0,8028),
+    V('藥品盤盈','debit','110404 醫療用品','','','11501藥品盤盈1元',1),
+    V('','credit','510607 存貨盤盈盈虧','','','11501藥品盤盈1元',0,1),
+    V('備抵折讓核銷','debit','110306 備抵醫療折讓','','','11501備抵折讓核銷5,751元',5751),
+    V('','credit','110305 應收醫療帳款','','','11501備抵折讓核銷5,751元',0,5751),
+    V('臨時人員應付費用','debit','510601 門診醫療成本','','2713 計時與計件人員酬金','11501臨時人員薪資+補助代扣20,512元',20512),
+    V('','credit','210205 應付費用','03 員工款','','11501臨時人員薪資實領12,119元',0,12119),
+    V('','credit','210205 應付費用','03 員工款','','11501臨時人員補助代扣款8,393元',0,8393),
+    V('動支掛應付（11501）','debit','510601 門診醫療成本','','2810 電腦軟體服務費','115年度門診醫療管理系統維護費37,800',37800),
+    V('','credit','210205 應付費用','99 其他','','115年度門診醫療管理系統維護費37,800',0,37800),
+    V('動支掛應付（11501）','debit','510601 門診醫療成本','','7103 職業團體會費','115年大臺南護理師公會團體會費8,000',8000),
+    V('','credit','210205 應付費用','99 其他','','115年大臺南護理師公會團體會費8,000',0,8000),
+    V('動支掛應付（11501）','debit','510601 門診醫療成本','','2707 委託(辦)費','115年衛生福利部第21屆藥品聯合招標第一期工本費425',425),
+    V('','debit','510601 門診醫療成本','','2706 郵電費','115年衛生福利部第21屆藥品聯合招標第一期郵費30',30),
+    V('','credit','210205 應付費用','99 其他','','115年藥品聯合招標工本費425+郵費30=455',0,455),
+    V('健保掛帳','debit','110305 應收醫療帳款','','','11501門診健保掛帳106,585+NIIS10,000=116,585',116585),
+    V('','debit','110305 應收醫療帳款','','','11501醫事服務費收入（檢驗）9,561',9561),
+    V('','credit','41060101 藥品收入','','','11501藥品收入11,687',0,11687),
+    V('','credit','41060102 門診收入','','','11501NIIS新冠疫苗接種處置費10,000',0,10000),
+    V('','credit','41060103 檢驗收入','','','11501醫事服務費收入（檢驗）9,561',0,9561),
+    V('','credit','41060102 門診收入','','','11501門診收入(總額106,585-健檢38,150-藥品11,687=56,748)',0,56748),
+    V('','credit','41060104 健康檢查收入','','','11501預防保健38,150',0,38150),
+    V('以前年度補付','debit','420298 雜項收入','','','11404醫師獎勵金+11409COVID+門診獎勵金補付62,817',62817),
+    V('','credit','210205 應付費用','02 員工獎勵金','','11404醫師+114年度員工獎勵金54,561',0,54561),
+    V('','credit','210205 應付費用','01 繳局統籌款','','114年雜項收入繳局統籌款+11409醫師獎勵金8,256',0,8256),
+    V('績效獎金（當月獎勵金分配）','debit','510601 門診醫療成本','','1501 績效獎金','11501當月繳局統籌款525+醫師3,310+員工1,418=5,253',5253),
+    V('','credit','210205 應付費用','01 繳局統籌款','','11501當月繳局統籌款525+醫師3,310+員工1,418=5,253',0,5253),
+  ];
+  const v2=[
+    V('備抵折讓核銷','debit','110306 備抵醫療折讓','','','11502備抵折讓核銷4,739元(114年剔退4,463+滯納176+113年流感剔退100)',4739),
+    V('','credit','110305 應收醫療帳款','','','11502備抵折讓核銷4,739元',0,4739),
+    V('健保掛帳','debit','110305 應收醫療帳款','','','11502門診健保掛帳85,789+NIIS6,800=92,589',92589),
+    V('','debit','110305 應收醫療帳款','','','11502醫事服務費收入（檢驗）6,543',6543),
+    V('','credit','41060101 藥品收入','','','11502藥品收入8,790',0,8790),
+    V('','credit','41060102 門診收入','','','11502NIIS含COVID疫苗接種處置費6,800',0,6800),
+    V('','credit','41060103 檢驗收入','','','11502醫事服務費收入（檢驗）6,543',0,6543),
+    V('','credit','41060102 門診收入','','','11502門診收入(總額85,789-健檢34,400-藥品8,790=42,599)',0,42599),
+    V('','credit','41060104 健康檢查收入','','','11502預防保健34,400',0,34400),
+    V('臨時人員應付費用','debit','510601 門診醫療成本','','2713 計時與計件人員酬金','11502臨時人員(黎欣妮3,801+方萱萱3,977=7,778+補助代扣8,568=16,346)',16346),
+    V('','credit','210205 應付費用','03 員工款','','11502臨時人員薪資實領7,778元',0,7778),
+    V('','credit','210205 應付費用','03 員工款','','11502臨時人員補助代扣款8,568元',0,8568),
+    V('以前年度補付','debit','420298 雜項收入','','','11412COVID補付855',855),
+    V('','credit','210205 應付費用','02 員工獎勵金','','114012員工獎勵金231',0,231),
+    V('','credit','210205 應付費用','01 繳局統籌款','','114年雜項收入繳局統籌款+11409醫師獎勵金624',0,624),
+    V('藥品領用','debit','510601 門診醫療成本','','3303 藥品','11502藥品領用6,623元',6623),
+    V('','credit','110404 醫療用品','','','11502藥品領用6,623元',0,6623),
+    V('藥品盤盈','debit','110404 醫療用品','','','11502藥品盤盈3元',3),
+    V('','credit','510607 存貨盤盈盈虧','','','11502藥品盤盈3元',0,3),
+    V('固定成本','debit','510601 門診醫療成本','','5151 什項設備折舊','11502雜項設備折舊2,193元',2193),
+    V('','credit','130603 累計折舊－什項設備','','','11502雜項設備折舊2,193元',0,2193),
+    V('動支掛應付（11502）','debit','510601 門診醫療成本','','2711 電(蒸)工服務費','115年度員工全勤禮品(超商禮券50份10,500+同仁獎勵品50份1,350=11,850)',11850),
+    V('','credit','210205 應付費用','99 其他','','115年度員工全勤禮品11,850',0,11850),
+    V('動支掛應付（11502）','debit','510601 門診醫療成本','','2202 電話費','11502中華電信電話費998+4,212+172=5,382',5382),
+    V('','debit','510601 門診醫療成本','','2204 數據通信費','11502中華電信數據通信費175+1,691=1,866',1866),
+    V('','credit','210205 應付費用','99 其他','','11502中華電信電話費5,382+數據通信費1,866=7,248',0,7248),
+    V('績效獎金（當月獎勵金分配）','debit','510601 門診醫療成本','','1501 績效獎金','11502當月繳局統籌款378+醫師719+員工4,527=7,186',7186),
+    V('','credit','210205 應付費用','01 繳局統籌款','','11502當月繳局統籌款378+醫師719+員工4,527=7,186',0,7186),
+  ];
+  accSave('acc_vouchers_11501', v1);
+  accSave('acc_vouchers_11502', v2);
+  localStorage.setItem('acc_q1vouchers_full', '1');
+  console.log('[seedQ1Full] 已寫入1月30筆+2月28筆完整轉帳傳票');
+}
+
 /* ════════════════════════════════════════════
    應付費用 210205 — 種子資料 + 渲染
    ════════════════════════════════════════════ */
@@ -4057,6 +4134,8 @@ function logout(){ window.location.href = '/admin.html'; }
   await seedQ1Ref();
   // ③-b 補種 Q1 藥品庫存領用/盤盈損（僅首次，避免覆蓋）
   await seedQ1DrugEntries();
+  // ③-c 補種 Q1 完整轉帳傳票（含臨時人員、動支單、績效獎金、收入掛帳）
+  seedQ1FullVouchers();
   // ③-b 同步完成後，重新讀取 medPostedIds / medExcludedIds（確保拿到 D1 最新資料）
   medPostedIds   = new Set(JSON.parse(localStorage.getItem(MED_POSTED_KEY)||'[]'));
   medExcludedIds = new Set(JSON.parse(localStorage.getItem(MED_EXCLUDED_KEY)||'[]'));
