@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.7.3</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.7.4</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -364,7 +364,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.7.3</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.7.4</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -685,41 +685,6 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     </div>
   </div>
 
-  <!-- ── 績效獎金分配（從 Excel 獎勵金計算表帶入） ── -->
-  <div class="card" id="card-bonus">
-    <div class="card-hd" style="background:#fff8e1; color:#e65100; display:flex; align-items:center;">
-      🏆 績效獎金分配（從獎勵金計算表帶入）
-      <span style="font-size:10px; font-weight:400; color:#bf360c; margin-left:6px;">全掛 借510601/1501 / 貸210205/01 繳局統籌款</span>
-      <span style="margin-left:auto; display:flex; align-items:center; gap:6px;">
-        <span class="sec-saved-ts" id="bonus-saved-ts"></span>
-        <button class="lock-sec-btn" id="bonus-lock-btn" onclick="toggleSectionLock('bonus')">🔓 解鎖中</button>
-      </span>
-    </div>
-    <div class="card-bd">
-      <div class="input-grid">
-        <div class="input-group">
-          <label>繳局統籌款</label>
-          <input class="num-in" id="exp-bonus-bureau" type="text" placeholder="0" oninput="calcBonus()">
-          <div class="hint">獎勵金計算表：繳局統籌款</div>
-        </div>
-        <div class="input-group">
-          <label>醫師獎勵金</label>
-          <input class="num-in" id="exp-bonus-doctor" type="text" placeholder="0" oninput="calcBonus()">
-          <div class="hint">獎勵金計算表：醫師獎勵金（併入繳局統籌款）</div>
-        </div>
-        <div class="input-group">
-          <label>員工獎勵金</label>
-          <input class="num-in" id="exp-bonus-staff" type="text" placeholder="0" oninput="calcBonus()">
-          <div class="hint">獎勵金計算表：員工獎勵金（併入繳局統籌款）</div>
-        </div>
-        <div class="input-group">
-          <label style="color:#e65100;">合計（自動）→ 全掛繳局統籌款</label>
-          <input class="num-in auto" id="exp-bonus-total" type="text" readonly style="color:#e65100; font-weight:700;">
-          <div class="hint">115年起當月：三項合併掛 210205/01 繳局統籌款</div>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- ── 健保款補付/追扣 ── -->
   <div class="card" id="card-adj">
@@ -1609,10 +1574,6 @@ function calcIncomeBreakdown(){
    績效獎金合計
 ════════════════════════════════════════════ */
 function calcBonus(){
-  const b=pnum(document.getElementById('exp-bonus-bureau')?.value);
-  const d=pnum(document.getElementById('exp-bonus-doctor')?.value);
-  const s=pnum(document.getElementById('exp-bonus-staff')?.value);
-  document.getElementById('exp-bonus-total').value = fmt(b+d+s);
   calcExpenseTotal();
 }
 
@@ -1826,7 +1787,27 @@ function addAdj(type){
   const row = document.createElement('tr');
   row.id = 'adj-'+idx;
   row.dataset.adjType = type;
-  if(type === 'pysup'){
+  if(type === 'sup'){
+    row.innerHTML = `
+      <td><span class="badge-type ${t.badge}">${t.label}</span></td>
+      <td><input class="fi" type="text" placeholder="年月" style="width:70px; font-size:11px;" id="adj-ym-${idx}" oninput="updateSupHint(${idx})"></td>
+      <td style="font-size:10px; color:#2e7d32; font-weight:600;">借 510601 門診醫療成本<br><span style="font-weight:400; color:#546e7a;">×0.95 → 全掛繳局統籌款</span></td>
+      <td>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span style="font-size:10px; color:#546e7a; min-width:64px;">補付原始金額</span>
+            <input class="num-in" type="text" placeholder="0" style="max-width:90px;" id="adj-amt-${idx}" oninput="updateSupHint(${idx})">
+          </div>
+          <div style="display:flex; align-items:center; gap:4px;">
+            <span style="font-size:10px; color:#2e7d32; min-width:64px; font-weight:600;">淨額（×0.95）</span>
+            <input class="num-in auto" type="text" readonly style="max-width:90px; background:#e8f5e9; color:#2e7d32; font-weight:700;" id="adj-net-${idx}">
+            <span style="font-size:9px; color:#78909c; margin-left:4px;">→ 全掛繳局統籌款</span>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:10px; color:#546e7a; line-height:1.8;" id="adj-hint-${idx}"></td>
+      <td><button class="del-btn" onclick="document.getElementById('adj-${idx}').remove()">✕</button></td>`;
+  } else if(type === 'pysup'){
     row.innerHTML = `
       <td><span class="badge-type ${t.badge}">${t.label}</span></td>
       <td><input class="fi" type="text" placeholder="年月" style="width:70px; font-size:11px;" id="adj-ym-${idx}"></td>
@@ -1857,16 +1838,16 @@ function addAdj(type){
       <td style="font-size:10px; color:#546e7a; line-height:1.8;" id="adj-hint-${idx}">貸 210205/02b 員工（剩餘）0<br>貸 210205/01 繳局0+(醫師0)=0</td>
       <td><button class="del-btn" onclick="document.getElementById('adj-${idx}').remove()">✕</button></td>`;
   } else {
+    const catOpts = (type==='ded'||type==='pyded')
+      ? `<option value="allow">借 備抵醫療折讓（110306）</option>
+         <option value="cost">借 門診醫療成本（510601）</option>`
+      : `<option value="misc">雜項支出</option>`;
     row.innerHTML = `
       <td><span class="badge-type ${t.badge}">${t.label}</span></td>
       <td><input class="fi" type="text" placeholder="年月" style="width:70px; font-size:11px;" id="adj-ym-${idx}"></td>
       <td>
-        <select class="fi" style="font-size:11px; width:120px;" id="adj-cat-${idx}" onchange="updateAdjHint(${idx},'${type}')">
-          ${type==='sup'?`
-            <option value="bureau">繳局統籌款</option>
-            <option value="doctor">醫師獎勵金</option>
-            <option value="staff">員工獎勵金</option>
-          `:`<option value="misc">雜項支出/追扣</option>`}
+        <select class="fi" style="font-size:11px; width:180px;" id="adj-cat-${idx}" onchange="updateAdjHint(${idx},'${type}')">
+          ${catOpts}
         </select>
       </td>
       <td><input class="num-in" type="text" placeholder="0" style="max-width:100px;" id="adj-amt-${idx}" oninput="updateAdjHint(${idx},'${type}')"></td>
@@ -1902,23 +1883,35 @@ function updatePysupHint(idx){
     ? `借 門診醫療成本 ${fmt(net)}　${ym2txt}補付<br>貸  員工獎勵金 ${fmt(net)}×0.9×0.3=${fmt(Math.max(0,staff))}<br>貸  繳局統籌款(${fmt(net)}×0.1=${fmt(bureau)})+醫師獎勵金(${fmt(net)}×0.9×0.7=${fmt(doctor)})=${fmt(bureauTotal)}`
     : '';
 }
+/* 當年補付 hint（動態，有金額時顯示分錄） */
+function updateSupHint(idx){
+  const gross = pnum(document.getElementById('adj-amt-'+idx)?.value);
+  const net   = Math.floor(gross * 0.95);
+  const ym2   = document.getElementById('adj-ym-'+idx)?.value || '';
+  const netEl = document.getElementById('adj-net-'+idx);
+  if(netEl) netEl.value = net > 0 ? fmt(net) : '';
+  const el = document.getElementById('adj-hint-'+idx);
+  if(el) el.innerHTML = net > 0
+    ? `借 510601 門診醫療成本 ${fmt(net)}　${ym2}當年補付<br>貸 210205/01 繳局統籌款 ${fmt(net)}`
+    : '';
+}
+
 function updateAdjHint(idx, type){
   const cat = document.getElementById('adj-cat-'+idx)?.value;
   const amt = pnum(document.getElementById('adj-amt-'+idx)?.value);
+  const ym2 = document.getElementById('adj-ym-'+idx)?.value || '';
   const el  = document.getElementById('adj-hint-'+idx);
   if(!el) return;
-  const hints = {
-    sup:   { bureau:`貸 210205/01繳局統籌款`, doctor:`貸 210205/02醫師獎勵金`, staff:`貸 210205/03員工獎勵金` },
-    ded:   { misc: `借 110306備抵折讓（餘額${fmt(STATE.allowance.currentBalance)}）→不足借510601門診醫療成本` },
-    pysup: {
-      bureau:`借 110305應收醫療帳款 / 貸 420298雜項收入 + 210205/01繳局統籌`,
-      doctor:`借 110305應收醫療帳款 / 貸 210205/02績效獎金-員工款（醫師，114/6前）`,
-      staff: `借 110305應收醫療帳款 / 貸 210205/03績效獎金-員工款（員工，114年前）`,
-      fund5: `借 110305應收醫療帳款 / 貸 420298雜項收入`
-    },
-    pyded: { misc:`借 110306備抵折讓（優先）→不足借510601門診醫療成本 / 貸 110305應收醫療帳款` },
-  };
-  el.textContent = (hints[type]||{})[cat] || '';
+  if(!amt){ el.innerHTML=''; return; }
+  if(type==='ded'){
+    const drSub  = cat==='cost' ? '510601 門診醫療成本' : '110306 備抵醫療折讓';
+    el.innerHTML = `借 ${drSub} ${fmt(amt)}　${ym2}當年追扣<br>貸 110305 應收醫療帳款 ${fmt(amt)}`;
+  } else if(type==='pyded'){
+    const drSub  = cat==='cost' ? '510601 門診醫療成本' : '110306 備抵醫療折讓';
+    el.innerHTML = `借 ${drSub} ${fmt(amt)}　${ym2}以前年度追扣<br>貸 110305 應收醫療帳款 ${fmt(amt)}`;
+  } else {
+    el.innerHTML = '';
+  }
 }
 
 /* ════════════════════════════════════════════
@@ -2081,19 +2074,6 @@ async function preCheckVoucher(){
     }
   } catch(_){}
 
-  /* 績效獎金確認 */
-  const bBureau = pnum(document.getElementById('exp-bonus-bureau')?.value);
-  const bDoctor = pnum(document.getElementById('exp-bonus-doctor')?.value);
-  const bStaff  = pnum(document.getElementById('exp-bonus-staff')?.value);
-  const bTotal  = bBureau + bDoctor + bStaff;
-  const bonusHtml = bTotal > 0
-    ? `<div style="background:#fff8e1;border:1px solid #ffb300;border-radius:6px;padding:8px 10px;margin-bottom:10px;">
-        <div style="font-size:11px;font-weight:700;color:#e65100;margin-bottom:4px;">🏆 績效獎金分配（全掛 210205/01 繳局統籌款）</div>
-        <div style="font-size:11px;color:#333;padding:2px 6px;">繳局統籌款 <b>$${fmt(bBureau)}</b>　醫師 <b>$${fmt(bDoctor)}</b>　員工 <b>$${fmt(bStaff)}</b></div>
-        <div style="font-size:12px;font-weight:700;color:#e65100;padding:2px 6px;margin-top:3px;">→ 借 510601/1501　貸 210205/01　合計 $${fmt(bTotal)}</div>
-       </div>`
-    : '';
-
   /* 建立 modal 內容 */
   const selHtml = selected.length
     ? `<div style="margin-bottom:10px;">
@@ -2115,7 +2095,7 @@ async function preCheckVoucher(){
   showModal({
     icon: (missing.length || (tempSalary===0 && tempDeduct===0)) ? '⚠️' : '⚡',
     title:`製作 ${label} 轉帳傳票 — 應付費用確認`,
-    body: tempWarn + bonusHtml + selHtml + missHtml,
+    body: tempWarn + selHtml + missHtml,
     confirmText:'確認產製',
     cancelText:'返回確認',
     danger: false,
@@ -2196,16 +2176,6 @@ function generateVouchers(){
     vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'03 員工款', purpose:'', desc:`${yymm}臨時人員補助代扣款${fmt(tempDeduct)}元`, dr:0, cr:tempDeduct });
   }
 
-  // 4c. 績效獎金/繳局統籌款（當月獎勵金分配 → 全掛繳局統籌款）
-  const bonusBureau = pnum(document.getElementById('exp-bonus-bureau')?.value);
-  const bonusDoctor = pnum(document.getElementById('exp-bonus-doctor')?.value);
-  const bonusStaff  = pnum(document.getElementById('exp-bonus-staff')?.value);
-  const bonusTotal  = bonusBureau + bonusDoctor + bonusStaff;
-  if(bonusTotal > 0){
-    const bDesc = `${yymm}當月繳局統籌款${fmt(bonusBureau)}+醫師${fmt(bonusDoctor)}+員工${fmt(bonusStaff)}=${fmt(bonusTotal)}`;
-    vouchers.push({ group:'績效獎金（當月獎勵金分配）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'1501 績效獎金', desc:bDesc, dr:bonusTotal, cr:0 });
-    vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款', purpose:'', desc:bDesc, dr:0, cr:bonusTotal });
-  }
 
   // 5. 醫療折讓（若需提列）
   const discountNeeded = document.getElementById('discount-needed').checked;
@@ -2265,20 +2235,13 @@ function generateVouchers(){
     if(!amt) return;
     const typeTxt = typeEl.textContent;
     if(typeTxt.includes('以前年度追扣')){
-      // 先備抵再門診成本
-      const allowBal = STATE.allowance.currentBalance;
-      const fromAllow = Math.min(allowBal, amt);
-      const fromCost  = amt - fromAllow;
-      if(fromAllow>0) vouchers.push({ group:`以前年度追扣（${ym2}）`, type:'debit', subject:'110306 備抵醫療折讓', purpose:'', desc:`${ym2}以前年度追扣，備抵折讓抵用${fmt(fromAllow)}`, dr:fromAllow, cr:0 });
-      if(fromCost>0)  vouchers.push({ group:'', type:'debit', subject:'510601 門診醫療成本', purpose:'', desc:`${ym2}以前年度追扣超額${fmt(fromCost)}掛門診成本`, dr:fromCost, cr:0 });
-      vouchers.push({ group:'', type:'credit', subject:'110305 應收醫療帳款', purpose:'', desc:`${ym2}以前年度追扣${fmt(amt)}`, dr:0, cr:amt });
+      const drSub = cat==='cost' ? '510601 門診醫療成本' : '110306 備抵醫療折讓';
+      vouchers.push({ group:`以前年度追扣（${ym2}）`, type:'debit', subject:drSub, subAccount:'', purpose:'', desc:`${ym2}以前年度追扣${fmt(amt)}`, dr:amt, cr:0 });
+      vouchers.push({ group:'', type:'credit', subject:'110305 應收醫療帳款', subAccount:'', purpose:'', desc:`${ym2}以前年度追扣${fmt(amt)}`, dr:0, cr:amt });
     } else if(typeTxt.includes('當年追扣')){
-      const allowBal = STATE.allowance.currentBalance;
-      const fromAllow = Math.min(allowBal, amt);
-      const fromCost  = amt - fromAllow;
-      if(fromAllow>0) vouchers.push({ group:`當年追扣（${ym2}）`, type:'debit', subject:'110306 備抵醫療折讓', purpose:'', desc:`${ym2}當年追扣，備抵折讓抵用${fmt(fromAllow)}`, dr:fromAllow, cr:0 });
-      if(fromCost>0)  vouchers.push({ group:'', type:'debit', subject:'510601 門診醫療成本', purpose:'', desc:`${ym2}當年追扣超額${fmt(fromCost)}`, dr:fromCost, cr:0 });
-      vouchers.push({ group:'', type:'credit', subject:'110305 應收醫療帳款', purpose:'', desc:`${ym2}當年追扣${fmt(amt)}`, dr:0, cr:amt });
+      const drSub = cat==='cost' ? '510601 門診醫療成本' : '110306 備抵醫療折讓';
+      vouchers.push({ group:`當年追扣（${ym2}）`, type:'debit', subject:drSub, subAccount:'', purpose:'', desc:`${ym2}當年追扣${fmt(amt)}`, dr:amt, cr:0 });
+      vouchers.push({ group:'', type:'credit', subject:'110305 應收醫療帳款', subAccount:'', purpose:'', desc:`${ym2}當年追扣${fmt(amt)}`, dr:0, cr:amt });
     } else if(typeTxt.includes('以前年度補付')){
       // 以前年度保險補付：amt=原始金額，net=floor(amt×0.95)→借420298；貸210205/02b+01
       const net       = Math.floor(amt * 0.95);
@@ -2295,10 +2258,12 @@ function generateVouchers(){
       if(staffAmt > 0)    vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'02b 員工獎勵金', purpose:'', desc:descStaff,  dr:0, cr:Math.max(0,staffAmt) });
       if(bureauTotal > 0) vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款',  purpose:'', desc:descBureau, dr:0, cr:bureauTotal });
     } else if(typeTxt.includes('當年補付')){
-      const crSub   = cat==='doctor'?'02 醫師獎勵金':cat==='staff'?'03 員工獎勵金':'01 繳局統籌款';
-      const crLabel = cat==='doctor'?'醫師獎勵金':cat==='staff'?'員工獎勵金':'繳局統籌款';
-      vouchers.push({ group:`當年補付（${ym2}）`, type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'', desc:`${ym2}當年補付${fmt(amt)}`, dr:amt, cr:0 });
-      vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:crSub, purpose:'', desc:`${ym2}${crLabel}${fmt(amt)}`, dr:0, cr:amt });
+      const gross = amt;
+      const net   = Math.floor(gross * 0.95);
+      if(net > 0){
+        vouchers.push({ group:`當年補付（${ym2}）`, type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'', desc:`${ym2}當年補付(${fmt(gross)}×0.95=${fmt(net)})`, dr:net, cr:0 });
+        vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款', purpose:'', desc:`${ym2}繳局統籌款${fmt(net)}`, dr:0, cr:net });
+      }
     }
   });
 
@@ -3146,7 +3111,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.7.3已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.7.4已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3187,7 +3152,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.7.3已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.7.4已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4229,7 +4194,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.7.3 全面重置 Q1 庫存明細帳 ──
+/* ── v3.7.4 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -5532,11 +5497,11 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.7.3: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.7.4: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.7.3: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.7.4: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
-  // v3.7.3: 補入缺漏的11503藥品進貨/領用/盤損
+  // v3.7.4: 補入缺漏的11503藥品進貨/領用/盤損
   await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
