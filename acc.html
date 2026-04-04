@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.1.0</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.2.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -317,7 +317,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.1.0</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.2.0</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -500,6 +500,22 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
           <div class="hint">A + B1 + B2 + B3</div>
         </div>
       </div>
+      <div class="section-title" style="margin-top:14px;">📊 門診健保收入分類（轉帳傳票用）</div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>藥品收入 <span style="font-size:10px;color:#90a4ae;">41060101</span></label>
+          <input class="num-in" id="inc-drug-revenue" type="text" placeholder="0" oninput="calcIncomeBreakdown()">
+        </div>
+        <div class="input-group">
+          <label>預防保健收入 <span style="font-size:10px;color:#90a4ae;">41060104</span></label>
+          <input class="num-in" id="inc-health-check" type="text" placeholder="0" oninput="calcIncomeBreakdown()">
+        </div>
+        <div class="input-group">
+          <label style="color:#1565c0;">門診收入（自動）<span style="font-size:10px;color:#90a4ae;">41060102</span></label>
+          <input class="num-in auto" id="inc-clinic-net" type="text" readonly>
+          <div class="hint">= A門診健保掛帳 − 藥品收入 − 預防保健</div>
+        </div>
+      </div>
       <div class="section-title" style="margin-top:14px;">🧾 健保不給付及部分負擔</div>
       <div class="input-grid">
         <div class="input-group">
@@ -629,6 +645,42 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- ── 績效獎金分配（從 Excel 獎勵金計算表帶入） ── -->
+  <div class="card" id="card-bonus">
+    <div class="card-hd" style="background:#fff8e1; color:#e65100; display:flex; align-items:center;">
+      🏆 績效獎金分配（從獎勵金計算表帶入）
+      <span style="font-size:10px; font-weight:400; color:#bf360c; margin-left:6px;">全掛 借510601/1501 / 貸210205/01 繳局統籌款</span>
+      <span style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+        <span class="sec-saved-ts" id="bonus-saved-ts"></span>
+        <button class="lock-sec-btn" id="bonus-lock-btn" onclick="toggleSectionLock('bonus')">🔓 解鎖中</button>
+      </span>
+    </div>
+    <div class="card-bd">
+      <div class="input-grid">
+        <div class="input-group">
+          <label>繳局統籌款</label>
+          <input class="num-in" id="exp-bonus-bureau" type="text" placeholder="0" oninput="calcBonus()">
+          <div class="hint">獎勵金計算表：繳局統籌款</div>
+        </div>
+        <div class="input-group">
+          <label>醫師獎勵金</label>
+          <input class="num-in" id="exp-bonus-doctor" type="text" placeholder="0" oninput="calcBonus()">
+          <div class="hint">獎勵金計算表：醫師獎勵金（併入繳局統籌款）</div>
+        </div>
+        <div class="input-group">
+          <label>員工獎勵金</label>
+          <input class="num-in" id="exp-bonus-staff" type="text" placeholder="0" oninput="calcBonus()">
+          <div class="hint">獎勵金計算表：員工獎勵金（併入繳局統籌款）</div>
+        </div>
+        <div class="input-group">
+          <label style="color:#e65100;">合計（自動）→ 全掛繳局統籌款</label>
+          <input class="num-in auto" id="exp-bonus-total" type="text" readonly style="color:#e65100; font-weight:700;">
+          <div class="hint">115年起當月：三項合併掛 210205/01 繳局統籌款</div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1470,6 +1522,22 @@ function calcOther(){
   const c=pnum(document.getElementById('inc-noncov').value);
   document.getElementById('inc-other-total').value = fmt(a+b+c);
 }
+function calcIncomeBreakdown(){
+  const hi   = pnum(document.getElementById('inc-hi').value);
+  const drug = pnum(document.getElementById('inc-drug-revenue').value);
+  const hc   = pnum(document.getElementById('inc-health-check').value);
+  document.getElementById('inc-clinic-net').value = fmt(hi - drug - hc);
+}
+
+/* ════════════════════════════════════════════
+   績效獎金合計
+════════════════════════════════════════════ */
+function calcBonus(){
+  const b=pnum(document.getElementById('exp-bonus-bureau')?.value);
+  const d=pnum(document.getElementById('exp-bonus-doctor')?.value);
+  const s=pnum(document.getElementById('exp-bonus-staff')?.value);
+  document.getElementById('exp-bonus-total').value = fmt(b+d+s);
+}
 
 /* ════════════════════════════════════════════
    醫療折讓
@@ -1861,6 +1929,19 @@ async function preCheckVoucher(){
     }
   } catch(_){}
 
+  /* 績效獎金確認 */
+  const bBureau = pnum(document.getElementById('exp-bonus-bureau')?.value);
+  const bDoctor = pnum(document.getElementById('exp-bonus-doctor')?.value);
+  const bStaff  = pnum(document.getElementById('exp-bonus-staff')?.value);
+  const bTotal  = bBureau + bDoctor + bStaff;
+  const bonusHtml = bTotal > 0
+    ? `<div style="background:#fff8e1;border:1px solid #ffb300;border-radius:6px;padding:8px 10px;margin-bottom:10px;">
+        <div style="font-size:11px;font-weight:700;color:#e65100;margin-bottom:4px;">🏆 績效獎金分配（全掛 210205/01 繳局統籌款）</div>
+        <div style="font-size:11px;color:#333;padding:2px 6px;">繳局統籌款 <b>$${fmt(bBureau)}</b>　醫師 <b>$${fmt(bDoctor)}</b>　員工 <b>$${fmt(bStaff)}</b></div>
+        <div style="font-size:12px;font-weight:700;color:#e65100;padding:2px 6px;margin-top:3px;">→ 借 510601/1501　貸 210205/01　合計 $${fmt(bTotal)}</div>
+       </div>`
+    : '';
+
   /* 建立 modal 內容 */
   const selHtml = selected.length
     ? `<div style="margin-bottom:10px;">
@@ -1882,7 +1963,7 @@ async function preCheckVoucher(){
   showModal({
     icon: (missing.length || (tempSalary===0 && tempDeduct===0)) ? '⚠️' : '⚡',
     title:`製作 ${label} 轉帳傳票 — 應付費用確認`,
-    body: tempWarn + selHtml + missHtml,
+    body: tempWarn + bonusHtml + selHtml + missHtml,
     confirmText:'確認產製',
     cancelText:'返回確認',
     danger: false,
@@ -1961,6 +2042,17 @@ function generateVouchers(){
     vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'03 員工款', purpose:'', desc:`${yymm}臨時人員補助代扣款${fmt(tempDeduct)}元`, dr:0, cr:tempDeduct });
   }
 
+  // 4c. 績效獎金/繳局統籌款（當月獎勵金分配 → 全掛繳局統籌款）
+  const bonusBureau = pnum(document.getElementById('exp-bonus-bureau')?.value);
+  const bonusDoctor = pnum(document.getElementById('exp-bonus-doctor')?.value);
+  const bonusStaff  = pnum(document.getElementById('exp-bonus-staff')?.value);
+  const bonusTotal  = bonusBureau + bonusDoctor + bonusStaff;
+  if(bonusTotal > 0){
+    const bDesc = `${yymm}當月繳局統籌款${fmt(bonusBureau)}+醫師${fmt(bonusDoctor)}+員工${fmt(bonusStaff)}=${fmt(bonusTotal)}`;
+    vouchers.push({ group:'績效獎金（當月獎勵金分配）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'1501 績效獎金', desc:bDesc, dr:bonusTotal, cr:0 });
+    vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款', purpose:'', desc:bDesc, dr:0, cr:bonusTotal });
+  }
+
   // 5. 醫療折讓（若需提列）
   const discountNeeded = document.getElementById('discount-needed').checked;
   if(discountNeeded){
@@ -1971,15 +2063,22 @@ function generateVouchers(){
     }
   }
 
-  // 6. 健保掛帳（應收醫療帳款）
+  // 6. 健保掛帳（應收醫療帳款）— 收入分類細拆
   const hi    = pnum(document.getElementById('inc-hi').value);
   const covid = pnum(document.getElementById('inc-covid').value);
   const flu   = pnum(document.getElementById('inc-flu').value);
   const rout  = pnum(document.getElementById('inc-routine').value);
+  const drugRev = pnum(document.getElementById('inc-drug-revenue')?.value);
+  const hcRev   = pnum(document.getElementById('inc-health-check')?.value);
+  const clinicNet = hi - drugRev - hcRev;  // 門診收入淨額
   const totalHI = hi + covid + flu + rout;
   if(totalHI > 0){
     vouchers.push({ group:'健保掛帳', type:'debit', subject:'110305 應收醫療帳款', purpose:'', desc:`${yymm}門診健保掛帳${fmt(hi)}+NIIS${fmt(covid+flu+rout)}=${fmt(totalHI)}`, dr:totalHI, cr:0 });
-    if(hi > 0)    vouchers.push({ group:'', type:'credit', subject:'41060102 門診收入', purpose:'', desc:`${yymm}門診健保總額${fmt(hi)}`, dr:0, cr:hi });
+    // 門診健保掛帳拆分：藥品收入 / 預防保健 / 門診收入（淨額）
+    if(drugRev > 0)   vouchers.push({ group:'', type:'credit', subject:'41060101 藥品收入',     purpose:'', desc:`${yymm}藥品收入${fmt(drugRev)}`, dr:0, cr:drugRev });
+    if(hcRev > 0)     vouchers.push({ group:'', type:'credit', subject:'41060104 健康檢查收入', purpose:'', desc:`${yymm}預防保健${fmt(hcRev)}`, dr:0, cr:hcRev });
+    if(clinicNet > 0) vouchers.push({ group:'', type:'credit', subject:'41060102 門診收入',     purpose:'', desc:`${yymm}門診收入(總額${fmt(hi)}-藥品${fmt(drugRev)}-預防保健${fmt(hcRev)}=${fmt(clinicNet)})`, dr:0, cr:clinicNet });
+    // NIIS 疫苗接種處置費（獨立掛門診收入）
     if(covid > 0) vouchers.push({ group:'', type:'credit', subject:'41060102 門診收入', purpose:'', desc:`${yymm}NIIS新冠疫苗接種處置費${fmt(covid)}`, dr:0, cr:covid });
     if(flu > 0)   vouchers.push({ group:'', type:'credit', subject:'41060102 門診收入', purpose:'', desc:`${yymm}NIIS流感疫苗接種處置費${fmt(flu)}`, dr:0, cr:flu });
     if(rout > 0)  vouchers.push({ group:'', type:'credit', subject:'41060102 門診收入', purpose:'', desc:`${yymm}NIIS常規疫苗接種處置費${fmt(rout)}`, dr:0, cr:rout });
@@ -3727,8 +3826,9 @@ function saveMedCat(id, cat){
    sections: income / expense / adj
 ════════════════════════════════════════════ */
 const SEC_INPUTS = {
-  income:  ['inc-hi','inc-covid','inc-flu','inc-routine','inc-lab','inc-copay','inc-noncov'],
+  income:  ['inc-hi','inc-covid','inc-flu','inc-routine','inc-lab','inc-copay','inc-noncov','inc-drug-revenue','inc-health-check'],
   expense: ['exp-temp-salary','exp-temp-deduct','exp-drug','exp-supply','inv-drug-real','inv-supply-real'],
+  bonus:   ['exp-bonus-bureau','exp-bonus-doctor','exp-bonus-staff'],
   adj:     [], // 動態列，另行處理
 };
 
@@ -3868,6 +3968,8 @@ function saveMonthData(){
       lab:   document.getElementById('inc-lab').value,
       copay: document.getElementById('inc-copay').value,
       nc:    document.getElementById('inc-noncov').value,
+      drugRev: document.getElementById('inc-drug-revenue').value,
+      hcRev:   document.getElementById('inc-health-check').value,
     },
     discount: {
       needed: document.getElementById('discount-needed').checked,
@@ -3881,6 +3983,11 @@ function saveMonthData(){
       supply:     document.getElementById('exp-supply').value,
       drugReal:   document.getElementById('inv-drug-real').value,
       supplyReal: document.getElementById('inv-supply-real').value,
+    },
+    bonus: {
+      bureau: document.getElementById('exp-bonus-bureau').value,
+      doctor: document.getElementById('exp-bonus-doctor').value,
+      staff:  document.getElementById('exp-bonus-staff').value,
     },
     pickerIds: [...pickerSelected],
   };
@@ -3902,6 +4009,8 @@ function loadMonthData(){
       document.getElementById('inc-lab').value   = d.income.lab||'';
       document.getElementById('inc-copay').value = d.income.copay||'';
       document.getElementById('inc-noncov').value= d.income.nc||'';
+      document.getElementById('inc-drug-revenue').value = d.income.drugRev||'';
+      document.getElementById('inc-health-check').value = d.income.hcRev||'';
     }
     if(d.discount){
       document.getElementById('discount-needed').checked = d.discount.needed;
@@ -3917,13 +4026,18 @@ function loadMonthData(){
       document.getElementById('inv-drug-real').value   = d.expense.drugReal||'';
       document.getElementById('inv-supply-real').value = d.expense.supplyReal||'';
     }
+    if(d.bonus){
+      document.getElementById('exp-bonus-bureau').value = d.bonus.bureau||'';
+      document.getElementById('exp-bonus-doctor').value = d.bonus.doctor||'';
+      document.getElementById('exp-bonus-staff').value  = d.bonus.staff||'';
+    }
     if(d.pickerIds){
       pickerSelected = new Set(d.pickerIds);
       confirmPicker(); // 更新顯示但不關 popup
     }
   } catch(e){ console.warn('loadMonthData error', e); }
   // 無論有無存檔，自動欄位一律重算
-  calcIncome(); calcOther(); calcDrug(); calcInv();
+  calcIncome(); calcOther(); calcDrug(); calcInv(); calcBonus(); calcIncomeBreakdown();
 }
 
 /* ════════════════════════════════════════════
