@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.2.3</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.2.4</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -301,6 +301,40 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 .lock-sec-btn.locked { background: #1b5e20; border-color: #2e7d32; color: #a5d6a7; }
 .lock-sec-btn:hover  { border-color: #fff; }
 .sec-saved-ts { font-size: 10px; color: #a5d6a7; }
+
+/* ═══ 響應式設計 ═══ */
+@media (max-width: 900px) {
+  #content { padding: 10px 14px; }
+  #tab-nav { padding: 0 14px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  #tab-nav::-webkit-scrollbar { display: none; }
+  .tab-btn { padding: 7px 12px; font-size: 11px; }
+  .balance-banner { gap: 12px; }
+  .bb-divider { display: none; }
+  .bb-num { font-size: 18px; }
+  .input-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+}
+@media (max-width: 600px) {
+  #top-bar { padding: 0 10px; height: 44px; }
+  #ym-bar { padding: 4px 10px; }
+  #content { padding: 8px 10px; }
+  #tab-nav { padding: 0 8px; white-space: nowrap; }
+  .tab-btn { padding: 8px 10px; font-size: 11px; min-height: 44px; }
+  .card-hd { font-size: 13px; padding: 9px 12px; }
+  .card-bd { padding: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .input-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .num-in { padding: 8px; font-size: 14px; }
+  .btn { min-height: 44px; padding: 8px 14px; }
+  .balance-banner { gap: 8px; justify-content: center; }
+  .bb-item { min-width: 80px; }
+  .bb-num { font-size: 16px; }
+  .bb-label { font-size: 9px; }
+  .reminder-grid { gap: 8px; }
+  .r-card { min-width: 100px; }
+  #picker-box { width: 100vw !important; max-width: 100vw !important; border-radius: 16px 16px 0 0;
+    top: auto !important; bottom: 0; left: 0 !important; transform: none !important;
+    position: fixed; max-height: 85vh; }
+  #app-modal-box { min-width: 0 !important; width: 92vw; max-width: 92vw; }
+}
 </style>
 </head>
 <script>
@@ -317,7 +351,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.2.3</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.2.4</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
