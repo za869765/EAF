@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.5.7</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.5.8</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -363,7 +363,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.5.7</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.5.8</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -953,7 +953,6 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
               <th style="width:80px;">月份</th>
               <th style="width:90px;text-align:right;">系統計算</th>
               <th style="width:95px;text-align:right;">實際盤點</th>
-              <th style="width:80px;text-align:right;">差異</th>
             </tr></thead>
             <tbody id="drug-monthly-close"></tbody>
           </table>
@@ -1003,7 +1002,6 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
               <th style="width:80px;">月份</th>
               <th style="width:90px;text-align:right;">系統計算</th>
               <th style="width:95px;text-align:right;">實際盤點</th>
-              <th style="width:80px;text-align:right;">差異</th>
             </tr></thead>
             <tbody id="supply-monthly-close"></tbody>
           </table>
@@ -3091,7 +3089,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.5.7已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.5.8已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3132,7 +3130,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.5.7已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.5.8已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4174,7 +4172,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.5.7 全面重置 Q1 庫存明細帳 ──
+/* ── v3.5.8 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -4268,6 +4266,20 @@ async function fixQ1Vch355(){
   }).catch(e=>console.warn('[fixQ1Vch355] D1 write failed:',e));
   localStorage.setItem('acc_fix_q1vch_355','1');
   console.log('[fixQ1Vch355] 已修正acc_vouchers_11501群組名稱（盤盈→盤損）並清除藥品帳重複盤盈記錄');
+}
+/* 補入缺漏的 11503 藥品明細帳（進貨12842 / 領用7800 / 盤損2）
+   可能因舊版遷移只含11501-11502而遺漏 */
+async function fixDrug11503(){
+  if(localStorage.getItem('acc_fix_drug_11503')) return;
+  const drugData = loadInvLedger('drug');
+  const has=(ym,type)=>drugData.some(r=>String(r.ym)===ym&&r.type===type&&!r.voided);
+  let changed=false;
+  if(!has('11503','進貨')){ drugData.push({ym:'11503',type:'進貨',amt:12842,desc:'115200026醫療用品進貨(藥棉1459+耗材9948+護理1435)',medId:'',voided:false}); changed=true; }
+  if(!has('11503','領用')){ drugData.push({ym:'11503',type:'領用',amt:7800, desc:'115300005藥品領用7,800元',medId:'',voided:false}); changed=true; }
+  if(!has('11503','盤損')){ drugData.push({ym:'11503',type:'盤損',amt:2,    desc:'115300005藥品盤損2元',medId:'',voided:false}); changed=true; }
+  if(changed) accSave('acc_inv_drug', drugData);
+  localStorage.setItem('acc_fix_drug_11503','1');
+  if(changed) console.log('[fixDrug11503] 已補入11503 進貨12842+領用7800+盤損2');
 }
 function loadPayable(){
   const raw = localStorage.getItem('acc_payable');
@@ -4706,15 +4718,13 @@ function renderMonthlyClose(type){
   });
   const months = Object.keys(monthClose).sort();
   if(!months.length){
-    tbody.innerHTML='<tr><td colspan="4" style="color:#b0bec5;font-size:11px;text-align:center;">（無明細）</td></tr>';
+    tbody.innerHTML='<tr><td colspan="3" style="color:#b0bec5;font-size:11px;text-align:center;">（無明細）</td></tr>';
     return;
   }
   tbody.innerHTML = months.map(ym=>{
     const calc   = monthClose[ym];
     const stored = localStorage.getItem(`acc_inv_${type}_close_${ym}`);
     const actual = stored!==null ? +stored : null;
-    const diff   = actual!==null ? actual-calc : null;
-    const diffColor = diff===null?'#90a4ae':diff<0?'#e53935':diff>0?'#2e7d32':'#90a4ae';
     return `<tr>
       <td style="color:#546e7a;">${ym}</td>
       <td style="text-align:right;font-weight:700;color:#1565c0;">${fmt(calc)}</td>
@@ -4724,7 +4734,6 @@ function renderMonthlyClose(type){
            ${_invCloseLocked?'readonly':''}
            onblur="saveMonthlyClose('${type}','${ym}',this.value)"
            onkeydown="if(event.key==='Enter')this.blur()"></td>
-      <td style="text-align:right;font-weight:700;color:${diffColor};">${diff!==null?(diff>=0?'+':'')+fmt(diff):'-'}</td>
     </tr>`;
   }).join('');
 }
@@ -4765,8 +4774,10 @@ function renderInvLedger(type){
       actionBtn = `<button class="rest-inv-btn" title="還原此列" onclick="invVoidToggle(this,'${type}')">↩</button>`;
     } else if(r.medId){
       actionBtn = `<button class="rest-inv-btn" title="還原為未入帳" onclick="medRestore('${r.medId}')">↩</button>`;
-    } else {
+    } else if(!_invCloseLocked){
       actionBtn = `<button class="del-btn" title="刪除" onclick="invRowDelete(this,'${type}')">✕</button>`;
+    } else {
+      actionBtn = '';
     }
     return `<tr data-type="${t}" data-ym="${r.ym||''}" data-amt="${r.amt||0}" ${r.medId?`data-med-id="${r.medId}"`:''}  ${voided?'data-voided="1"':''} ${voided?'class="row-voided"':''}>
       <td style="font-size:11px;color:#546e7a;white-space:nowrap;">${r.ym||''}</td>
@@ -5431,10 +5442,12 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.5.7: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.5.8: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.5.7: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.5.8: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
+  // v3.5.8: 補入缺漏的11503藥品進貨/領用/盤損
+  await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
   // 清除舊版 desc 污染
