@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.5.5</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.5.6</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -363,7 +363,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.5.5</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.5.6</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -3091,7 +3091,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.5.5已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.5.6已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3132,7 +3132,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.5.5已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.5.6已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4174,7 +4174,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.5.5 全面重置 Q1 庫存明細帳 ──
+/* ── v3.5.6 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -4226,6 +4226,48 @@ async function resetQ1InvData353(){
   localStorage.setItem('acc_reset_q1inv_353','1');
   localStorage.setItem('acc_reset_q1inv_354','1');
   console.log('[resetQ1Inv354] 藥品：100970+7372-8028-1-6623+3+12842-7800-2=98733；衛材固定2472');
+}
+/* 修正：11501傳票舊版群組名稱為「藥品盤盈」，導致syncInvFromVoucher每次重繪多加一筆盤盈1 */
+async function fixQ1Vch355(){
+  if(localStorage.getItem('acc_fix_q1vch_355')) return;
+  // 1. 移除藥品帳中 ym=11501 被誤加的盤盈1
+  let drugData = loadInvLedger('drug');
+  const before = drugData.length;
+  drugData = drugData.filter(r => !(r.ym==='11501' && r.type==='盤盈' && r.amt===1));
+  if(drugData.length !== before) accSave('acc_inv_drug', drugData);
+  // 2. 強制更新 acc_vouchers_11501（改為正確群組名稱：藥品盤損）
+  const v1 = [
+    { group:'健保掛帳（115300002）', type:'debit',  subject:'110305 應收醫療帳款', subAccount:'', purpose:'', desc:'115.1門診健保掛帳116,585元', dr:116585, cr:0 },
+    { group:'', type:'credit', subject:'41060101 藥品收入',     subAccount:'', purpose:'', desc:'115.1藥品收入11,687元', dr:0, cr:11687 },
+    { group:'', type:'credit', subject:'41060102 門診收入',     subAccount:'', purpose:'', desc:'115.1NIIS門診收入10,000元', dr:0, cr:10000 },
+    { group:'', type:'credit', subject:'41060102 門診收入',     subAccount:'', purpose:'', desc:'115.1門診收入56,748元', dr:0, cr:56748 },
+    { group:'', type:'credit', subject:'41060104 健康檢查收入', subAccount:'', purpose:'', desc:'115.1預防保健收入38,150元', dr:0, cr:38150 },
+    { group:'醫事服務費（115300002）', type:'debit', subject:'110305 應收醫療帳款', subAccount:'', purpose:'', desc:'115.1醫事服務費9,561元', dr:9561, cr:0 },
+    { group:'', type:'credit', subject:'41060103 檢驗收入', subAccount:'', purpose:'', desc:'115.1醫事服務費9,561元', dr:0, cr:9561 },
+    { group:'臨時人員（115300002）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'2713 計時與計件人員酬金', desc:'11501臨時人員成本20,512元：實領12,119+代扣8,393', dr:20512, cr:0 },
+    { group:'', type:'credit', subject:'210205 應付費用', subAccount:'03 員工款', purpose:'', desc:'11501臨時人員實領12,119元（黎欣妮+方雪雲）', dr:0, cr:12119 },
+    { group:'', type:'credit', subject:'210205 應付費用', subAccount:'03 員工款', purpose:'', desc:'115.1臨時人員補助代扣8,393元（勞保+健保+勞退）', dr:0, cr:8393 },
+    { group:'保險補付（115300002）', type:'debit', subject:'420298 雜項收入', subAccount:'', purpose:'', desc:'上年度補付獎勵金(×0.95=62,817元)', dr:62817, cr:0 },
+    { group:'', type:'credit', subject:'210205 應付費用', subAccount:'02b 員工獎勵金', purpose:'', desc:'11412員工獎勵金54,561元', dr:0, cr:54561 },
+    { group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款',  purpose:'', desc:'11412繳局統籌款8,256元', dr:0, cr:8256 },
+    { group:'藥品領用（115300002）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
+    { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
+    { group:'藥品盤損（115300002）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
+    { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
+    { group:'折舊（115300002）', type:'debit', subject:'510610 折舊費用', subAccount:'', purpose:'', desc:'11501雜項設備折舊2,193元', dr:2193, cr:0 },
+    { group:'', type:'credit', subject:'120206 累積折舊-什項設備', subAccount:'', purpose:'', desc:'11501雜項設備折舊2,193元', dr:0, cr:2193 },
+    { group:'備抵折讓核銷（115300002）', type:'debit', subject:'110306 備抵醫療折讓', subAccount:'', purpose:'', desc:'11501備抵折讓核銷5,751元', dr:5751, cr:0 },
+    { group:'', type:'credit', subject:'110305 應收醫療帳款', subAccount:'', purpose:'', desc:'11501備抵折讓核銷5,751元', dr:0, cr:5751 },
+    { group:'績效獎金（115300003）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'1501 績效獎金', desc:'11501當月績效獎金5,253元（全部繳局統籌款）', dr:5253, cr:0 },
+    { group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款', purpose:'', desc:'11501績效獎金→繳局統籌款5,253元', dr:0, cr:5253 }
+  ];
+  localStorage.setItem('acc_vouchers_11501', JSON.stringify(v1));
+  const pass = sessionStorage.getItem('adminPass')||'';
+  fetch('/api/acc',{method:'POST',headers:{'Content-Type':'application/json','X-Admin-Pass':pass},
+    body:JSON.stringify([{key:'acc_vouchers_11501', value:JSON.stringify(v1)}])
+  }).catch(e=>console.warn('[fixQ1Vch355] D1 write failed:',e));
+  localStorage.setItem('acc_fix_q1vch_355','1');
+  console.log('[fixQ1Vch355] 已修正acc_vouchers_11501群組名稱（盤盈→盤損）並清除藥品帳重複盤盈記錄');
 }
 function loadPayable(){
   const raw = localStorage.getItem('acc_payable');
@@ -5369,8 +5411,10 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.5.5: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.5.6: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
+  // v3.5.6: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  await fixQ1Vch355();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
   // 清除舊版 desc 污染
