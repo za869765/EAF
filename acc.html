@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.5.1</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.5.2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -363,7 +363,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.5.1</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.5.2</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -2290,6 +2290,59 @@ function saveVouchers(){
   accSave(`acc_vouchers_${ym}_ts`, ts);
   const badge = document.getElementById('voucher-src-badge');
   if(badge){ badge.textContent=`已儲存 ${ts}`; badge.style.display=''; }
+  /* 傳票 → 庫存明細帳自動同步 */
+  syncInvFromVoucher(ym, STATE.vouchers);
+  renderInvLedger('drug');
+  renderInvLedger('supply');
+}
+
+/* ════════════════════════════════════════════
+   傳票 → 庫存明細帳同步
+   讀取傳票分錄，自動補入藥品/衛材的領用、盤盈損記錄
+════════════════════════════════════════════ */
+function syncInvFromVoucher(ym, vouchers){
+  if(!ym||!vouchers||!vouchers.length) return;
+  let curGroup='';
+  let drugUsage=0, drugPanLoss=0, drugPanGain=0;
+  let supplyUsage=0;
+  vouchers.forEach(v=>{
+    if(v.group) curGroup=v.group;
+    const g=curGroup, t=v.type||'';
+    if(g.includes('藥品領用') && t==='debit')  drugUsage  = v.dr||0;
+    if(g.includes('藥品盤損') && t==='debit')  drugPanLoss= v.dr||0;
+    if(g.includes('藥品盤盈') && t==='debit')  drugPanGain= v.dr||0;
+    if(g.includes('衛材領用') && t==='debit')  supplyUsage= v.dr||0;
+  });
+
+  // ── 藥品庫存 ──
+  if(drugUsage>0||drugPanLoss>0||drugPanGain>0){
+    const drugData = loadInvLedger('drug');
+    const hasYm = (type)=>drugData.some(r=>r.ym===ym&&r.type===type&&!r.voided);
+    let changed=false;
+    if(drugUsage>0&&!hasYm('領用')){
+      drugData.push({ym, type:'領用', amt:drugUsage, desc:`${ym}藥品領用（傳票同步）`, medId:'', voided:false});
+      changed=true;
+    }
+    if(drugPanLoss>0&&!hasYm('盤損')){
+      drugData.push({ym, type:'盤損', amt:drugPanLoss, desc:`${ym}藥品盤損（傳票同步）`, medId:'', voided:false});
+      changed=true;
+    }
+    if(drugPanGain>0&&!hasYm('盤盈')){
+      drugData.push({ym, type:'盤盈', amt:drugPanGain, desc:`${ym}藥品盤盈（傳票同步）`, medId:'', voided:false});
+      changed=true;
+    }
+    if(changed) accSave('acc_inv_drug', drugData);
+  }
+
+  // ── 衛材庫存 ──
+  if(supplyUsage>0){
+    const supplyData = loadInvLedger('supply');
+    const hasSupplyUsage = supplyData.some(r=>r.ym===ym&&r.type==='領用'&&!r.voided);
+    if(!hasSupplyUsage){
+      supplyData.push({ym, type:'領用', amt:supplyUsage, desc:`${ym}衛材領用（傳票同步）`, medId:'', voided:false});
+      accSave('acc_inv_supply', supplyData);
+    }
+  }
 }
 
 function toggleVoucherLock(){
@@ -3098,6 +3151,24 @@ async function seedQ1DrugEntries(){
   accSave('acc_inv_drug', rows);
   accSave('acc_q1drug_seeded', '1');
   console.log('[seedQ1Drug] 已補入Q1藥品領用/盤盈損至 D1');
+}
+
+/* ── Q1 衛材進貨種子（來源：115200006＋115200026 動支單 CSV） ── */
+function seedQ1SupplyEntries(){
+  if(localStorage.getItem('acc_q1supply_seeded')) return;
+  const rows = loadInvLedger('supply');
+  const hasYm=(ym,type)=>rows.some(r=>r.ym===ym&&r.type===type&&!r.voided);
+  // 1月進貨：115200006（2058+1400+2254+1660=7372）
+  if(!hasYm('11501','進貨')){
+    rows.push({ym:'11501', type:'進貨', amt:7372, desc:'115200006衛材進貨(藥棉2058+輸液1400+注射2254+業務1660)', medId:'', voided:false});
+  }
+  // 3月進貨：115200026（1459+9948+1435=12842）
+  if(!hasYm('11503','進貨')){
+    rows.push({ym:'11503', type:'進貨', amt:12842, desc:'115200026衛材進貨(藥棉1459+耗材9948+護理1435)', medId:'', voided:false});
+  }
+  accSave('acc_inv_supply', rows);
+  localStorage.setItem('acc_q1supply_seeded','1');
+  console.log('[seedQ1Supply] 已補入Q1衛材進貨至 D1');
 }
 
 /* ── Q1 完整轉帳傳票種子 ── */
@@ -5154,6 +5225,13 @@ function logout(){ window.location.href = '/admin.html'; }
   await seedQ1Ref();
   // ③-b 補種 Q1 藥品庫存領用/盤盈損（僅首次，避免覆蓋）
   await seedQ1DrugEntries();
+  // ③-b2 補種 Q1 衛材進貨（從動支單 CSV 轉入）
+  seedQ1SupplyEntries();
+  // ③-b3 Q1 各月傳票 → 庫存明細帳同步（領用/盤盈損）
+  ['11501','11502','11503'].forEach(ym=>{
+    const raw = localStorage.getItem('acc_vouchers_'+ym);
+    if(raw){ try{ syncInvFromVoucher(ym, JSON.parse(raw)); }catch(e){} }
+  });
   // ③-c 補種 Q1 完整轉帳傳票（含臨時人員、動支單、績效獎金、收入掛帳）
   seedQ1FullVouchers();
   // ③-d 補種 114年全年轉帳傳票（歷史資料）
