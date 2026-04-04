@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.2.7</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.2.9</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -362,7 +362,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.2.7</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.2.9</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -3932,8 +3932,9 @@ function migratePayableSplit02(){
 function migrateVoucher11503Full(){
   // 補齊11503完整22筆分錄（舊版只有8筆且帳戶有誤）
   if(localStorage.getItem('acc_mig_v11503_full')) return;
-  localStorage.removeItem('acc_vouchers_11503');
-  localStorage.removeItem('acc_q1ref_11503');
+  // 清除舊資料並立即補種正確版本（不依賴後續 seedQ1Ref 的執行順序）
+  Q1_REF.filter(({key})=>key==='acc_vouchers_11503'||key==='acc_q1ref_11503')
+        .forEach(({key,val})=>localStorage.setItem(key,val));
   localStorage.setItem('acc_mig_v11503_full','1');
 }
 async function seedPayable(){
