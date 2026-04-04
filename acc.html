@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.7.6</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.7.7</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -365,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.7.6</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.7.7</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -682,6 +682,21 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
         </div>
       </div>
 
+      <!-- 支出傳票 XLSX 匯入 -->
+      <div class="section-title" style="margin-top:14px;">
+        💳 支出傳票（已付）— 510601 門診醫療成本
+        <span style="font-size:10px; background:#fce4ec; color:#c62828; border-radius:3px; padding:1px 8px; margin-left:8px; font-weight:400;">已付款項，計入本月成本合計（不進轉帳傳票）</span>
+      </div>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+        <button onclick="importVoucherXlsx()" style="background:#1565c0; color:#fff; font-size:13px; font-weight:700; padding:8px 20px; border:none; border-radius:6px; cursor:pointer;">📂 匯入支出傳票 XLSX</button>
+        <span style="font-size:12px; color:#90a4ae;">或</span>
+        <input class="num-in" id="exp-other-voucher" type="text" placeholder="手動輸入金額" style="width:140px;" oninput="calcExpenseTotal()">
+        <span style="font-size:11px; color:#78909c;">（手動填入 510601 合計）</span>
+      </div>
+      <!-- 匯入結果明細 -->
+      <div id="voucher-import-result" style="display:none; background:#e3f2fd; border:1px solid #90caf9; border-radius:8px; padding:10px 14px; font-size:12px; line-height:1.9;">
+      </div>
+      <input type="hidden" id="exp-other-voucher-desc">
 
     </div>
   </div>
@@ -1737,10 +1752,11 @@ function calcExpenseTotal(){
   const supply = pnum(document.getElementById('exp-supply')?.value);
   const pandl  = Math.max(0, STATE._invDiff||0);  // 盤損才增加成本（正=盤損）
   const bonus  = pnum(document.getElementById('exp-bonus-total')?.value);
+  const other  = pnum(document.getElementById('exp-other-voucher')?.value);
   const picker = (STATE.month.pickerItems||[])
     .filter(r=>r.purposeCode!=='1501'&&r.purposeCode!=='2713')
     .reduce((s,r)=>s+r.amount, 0);
-  const total = depr + salary + deduct + drug + supply + pandl + bonus + picker;
+  const total = depr + salary + deduct + drug + supply + pandl + bonus + other + picker;
   const el = document.getElementById('expense-510601-total');
   if(el) el.textContent = fmt(total);
   const bk = document.getElementById('expense-510601-breakdown');
@@ -1753,6 +1769,7 @@ function calcExpenseTotal(){
     if(supply) parts.push(`衛材 ${fmt(supply)}`);
     if(pandl)  parts.push(`盤損 ${fmt(pandl)}`);
     if(bonus)  parts.push(`績效 ${fmt(bonus)}`);
+    if(other)  parts.push(`支出傳票 ${fmt(other)}`);
     if(picker) parts.push(`動支 ${fmt(picker)}`);
     bk.textContent = parts.length ? parts.join(' ＋ ') : '—';
   }
@@ -2633,6 +2650,86 @@ function exportExcel(){
   XLSX.utils.book_append_sheet(wb, ws, `${y}年${pad(m)}月傳票`);
   XLSX.writeFile(wb, `轉帳傳票_${y}${pad(m)}.xlsx`);
 }
+/* ════════════════════════════════════════════
+   支出傳票 XLSX 匯入 → 抓 510601 借方合計
+════════════════════════════════════════════ */
+function importVoucherXlsx(){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.xlsx,.xls';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    try {
+      const ab = await file.arrayBuffer();
+      const wb = XLSX.read(ab, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+
+      // 找標題列
+      let hdrIdx=-1, colSubj=-1, colDr=-1, colDesc=-1, colPurp=-1;
+      for(let i=0;i<rows.length;i++){
+        const r = rows[i];
+        const si = r.findIndex(c=>String(c).includes('會計科目'));
+        if(si>=0){
+          hdrIdx=i; colSubj=si;
+          colDr   = r.findIndex(c=>String(c).includes('借方'));
+          colDesc = r.findIndex(c=>String(c).includes('摘要'));
+          colPurp = r.findIndex(c=>String(c).includes('用途別'));
+          break;
+        }
+      }
+      if(hdrIdx<0){ alert('找不到欄位標題，請確認為傳票明細表格式'); return; }
+
+      // 逐列找 510601
+      let total=0;
+      const lines=[];
+      for(let i=hdrIdx+1;i<rows.length;i++){
+        const r=rows[i];
+        const subj=String(r[colSubj]||'');
+        if(!subj.startsWith('510601')) continue;
+        const drRaw=String(r[colDr]||'').replace(/,/g,'');
+        const dr=parseFloat(drRaw)||0;
+        if(dr<=0) continue;
+        total+=dr;
+        const desc=String(r[colDesc]||'').slice(0,40);
+        const purp=String(r[colPurp]||'');
+        lines.push({dr, desc, purp});
+      }
+
+      // 填入欄位
+      document.getElementById('exp-other-voucher').value = total>0 ? String(total) : '';
+      document.getElementById('exp-other-voucher-desc').value =
+        total>0 ? `支出傳票510601(${lines.length}筆)` : '';
+      calcExpenseTotal();
+
+      // 顯示明細
+      const res = document.getElementById('voucher-import-result');
+      if(total>0){
+        const detailHtml = lines.map(l=>
+          `<div style="display:flex;gap:8px;">
+            <span style="color:#1565c0;font-weight:700;min-width:70px;text-align:right;">${fmt(l.dr)}</span>
+            <span style="color:#546e7a;">${l.purp||''}</span>
+            <span style="color:#37474f;">${l.desc}</span>
+          </div>`
+        ).join('');
+        res.innerHTML = `
+          <div style="font-weight:700;color:#1565c0;margin-bottom:6px;">
+            📂 ${file.name} — 510601 門診醫療成本 共 ${lines.length} 筆，合計 <span style="font-size:15px;color:#c62828;">${fmt(total)}</span> 元
+          </div>
+          ${detailHtml}`;
+        res.style.display='block';
+      } else {
+        res.innerHTML='<span style="color:#c62828;">⚠️ 本檔案中找不到 510601 門診醫療成本的借方金額</span>';
+        res.style.display='block';
+      }
+    } catch(err){
+      alert('讀取失敗：'+err.message);
+    }
+  };
+  input.click();
+}
+
 function exportInvExcel(type){ showModal({icon:'📥',title:'功能建置中',body:'匯出 Excel 功能即將推出',noCancel:true,confirmText:'了解'}); }
 function exportPropExcel(){ showModal({icon:'📥',title:'功能建置中',body:'匯出財產折舊存摺 Excel 功能即將推出',noCancel:true,confirmText:'了解'}); }
 function exportAllowExcel(){ showModal({icon:'📥',title:'功能建置中',body:'匯出備抵折讓明細 Excel 功能即將推出',noCancel:true,confirmText:'了解'}); }
@@ -3136,7 +3233,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.7.6已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.7.7已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3177,7 +3274,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.7.6已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.7.7已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4225,7 +4322,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.7.6 全面重置 Q1 庫存明細帳 ──
+/* ── v3.7.7 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -5293,13 +5390,15 @@ function saveMonthData(){
       amount: document.getElementById('discount-amount-input')?.value||'',
     },
     expense: {
-      depr:       document.getElementById('exp-depr').value,
-      tempSalary: document.getElementById('exp-temp-salary').value,
-      tempDeduct: document.getElementById('exp-temp-deduct').value,
-      drug:       document.getElementById('exp-drug').value,
-      supply:     document.getElementById('exp-supply').value,
-      drugReal:   document.getElementById('inv-drug-real').value,
-      supplyReal: document.getElementById('inv-supply-real').value,
+      depr:         document.getElementById('exp-depr').value,
+      tempSalary:   document.getElementById('exp-temp-salary').value,
+      tempDeduct:   document.getElementById('exp-temp-deduct').value,
+      drug:         document.getElementById('exp-drug').value,
+      supply:       document.getElementById('exp-supply').value,
+      drugReal:     document.getElementById('inv-drug-real').value,
+      supplyReal:   document.getElementById('inv-supply-real').value,
+      otherVoucher: document.getElementById('exp-other-voucher').value,
+      otherDesc:    document.getElementById('exp-other-voucher-desc').value,
     },
     bonus: {
       bureau: document.getElementById('exp-bonus-bureau').value,
@@ -5365,6 +5464,18 @@ function loadMonthData(){
         document.getElementById('exp-supply').value = d.expense.supply||'';
         document.getElementById('inv-drug-real').value   = d.expense.drugReal||'';
         document.getElementById('inv-supply-real').value = d.expense.supplyReal||'';
+        const ov = document.getElementById('exp-other-voucher');
+        const od = document.getElementById('exp-other-voucher-desc');
+        if(ov) ov.value = d.expense.otherVoucher||'';
+        if(od) od.value = d.expense.otherDesc||'';
+        // 若有儲存過的匯入金額，顯示提示
+        if(d.expense.otherVoucher && ov?.value){
+          const res = document.getElementById('voucher-import-result');
+          if(res){
+            res.innerHTML = `<span style="color:#1565c0;font-weight:700;">📂 已儲存：支出傳票 510601 合計 ${fmt(pnum(d.expense.otherVoucher))} 元（${d.expense.otherDesc||''}）</span>`;
+            res.style.display='block';
+          }
+        }
       }
       if(d.bonus){
         document.getElementById('exp-bonus-bureau').value = d.bonus.bureau||'';
@@ -5529,11 +5640,11 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.7.6: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.7.7: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.7.6: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.7.7: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
-  // v3.7.6: 補入缺漏的11503藥品進貨/領用/盤損
+  // v3.7.7: 補入缺漏的11503藥品進貨/領用/盤損
   await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
