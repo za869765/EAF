@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.8.4</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.8.5</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -365,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.8.4</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.8.5</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -386,7 +386,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 </div>
 
 <!-- ── 全域年月選單 ── -->
-<div id="ym-global-bar" style="display:flex;align-items:center;gap:8px;padding:5px 20px;background:#1e2a38;border-bottom:1px solid #0d1921;">
+<div id="ym-global-bar" style="display:none;align-items:center;gap:8px;padding:5px 20px;background:#1e2a38;border-bottom:1px solid #0d1921;">
   <span style="font-size:11px;color:#78909c;">年度</span>
   <select class="ym-sel" id="sel-year" onchange="onYmChange()" style="font-size:13px;padding:3px 8px;font-weight:700;">
     <option value="114">114</option>
@@ -1645,6 +1645,9 @@ function switchTab(name, btn){
   document.querySelectorAll('.tab-btn') .forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   btn.classList.add('active');
+  // 首頁不顯示年月選單
+  const ymBar = document.getElementById('ym-global-bar');
+  if(ymBar) ymBar.style.display = name==='home' ? 'none' : '';
   // 切換時重新渲染各分頁（避免 init 尚未完成時空白）
   const TAB_RENDERS = {
     allowance: ()=> renderAllowLedger(),
@@ -1773,11 +1776,10 @@ function updateCalcTable(){
   const exp     = pnum(document.getElementById('expense-510601-total')?.textContent);
 
   const net   = inc + noncov - disc - reject - exp;
-  const fund5 = Math.floor(net * 0.05);
-  const base  = net - fund5;
-  const bureau = Math.floor(base * 0.10);
-  const doctor = Math.floor(base * 0.63);
-  const staff  = base - bureau - doctor;
+  const fund5  = Math.round(net * 0.05);
+  const bureau = Math.round(net * 0.95 * 0.1);
+  const staff  = Math.round(net * 0.95 * 0.9 * 0.3);
+  const doctor = net - fund5 - bureau - staff;
 
   const s = (id, v) => { const el=document.getElementById(id); if(el) el.textContent = v ? fmt(v) : '-'; };
   // 門診醫療 row
@@ -1849,22 +1851,30 @@ function updateHomeDashboard(){
   const rcSurpSub = document.getElementById('rc-surplus-sub');
   if(rcSurpSub) rcSurpSub.textContent = `期初 ${fmt(surplusInit)}` + (surpAdd > 0 ? ` + 增加 ${fmt(surpAdd)}` : '');
 
-  // ── 年度獎勵金累積 ──
+  // ── 年度獎勵金累積（從各月傳票讀取） ──
   let sumBureau=0, sumStaff=0, sumFund5=0;
   for(let mo=1; mo<=12; mo++){
     const ymKey = y + String(mo).padStart(2,'0');
-    const raw = localStorage.getItem('acc_monthly_'+ymKey);
-    if(!raw) continue;
-    try{
-      const d = JSON.parse(raw);
-      sumBureau += (pnum(d.bonus?.bureau)||0) + (pnum(d.bonus?.doctor)||0);
-      sumStaff  += (pnum(d.bonus?.staff)||0);
-      (d.adjRows||[]).forEach(r=>{
-        if(r.type==='pysup' && r.amt){
-          sumFund5 += Math.floor(pnum(r.amt) * 0.05);
-        }
-      });
-    } catch(e){}
+    const vRaw = localStorage.getItem('acc_vouchers_'+ymKey);
+    if(vRaw){
+      try{
+        const vs = JSON.parse(vRaw);
+        let curG = '';
+        vs.forEach(v=>{
+          if(v.group) curG = v.group;
+          if(curG.includes('績效獎金') && v.type==='debit'){
+            const mb = v.desc?.match(/繳局\D*?([\d,]+)/);
+            const md = v.desc?.match(/醫師([\d,]+)/);
+            const ms = v.desc?.match(/員工([\d,]+)/);
+            sumBureau += (mb?pnum(mb[1]):0) + (md?pnum(md[1]):0);
+            sumStaff  += ms?pnum(ms[1]):0;
+            const bonusAmt = v.dr;
+            const netApprox = Math.round(bonusAmt / 0.95);
+            sumFund5 += netApprox - bonusAmt;
+          }
+        });
+      }catch(e){}
+    }
   }
   const rcBureau = document.getElementById('rc-bureau');
   const rcStaff  = document.getElementById('rc-staff');
@@ -2418,7 +2428,8 @@ function generateVouchers(){
   const clinicNet = hi - drugRev - hcRev;  // 門診收入淨額
   const totalHI = hi + covid + flu + rout;
   if(totalHI > 0){
-    vouchers.push({ group:'健保掛帳', type:'debit', subject:'110305 應收醫療帳款', purpose:'', desc:`${yymm}門診健保掛帳${fmt(hi)}+NIIS${fmt(covid+flu+rout)}=${fmt(totalHI)}`, dr:totalHI, cr:0 });
+    const niisDesc = [covid>0?`新冠${fmt(covid)}`:null, flu>0?`流感${fmt(flu)}`:null, rout>0?`常規${fmt(rout)}`:null].filter(Boolean).join('+');
+    vouchers.push({ group:'健保掛帳', type:'debit', subject:'110305 應收醫療帳款', purpose:'', desc:`${yymm}門診健保掛帳${fmt(hi)}+NIIS(${niisDesc})=${fmt(totalHI)}`, dr:totalHI, cr:0 });
     // 門診健保掛帳拆分：藥品收入 / 預防保健 / 門診收入（淨額）
     if(drugRev > 0)   vouchers.push({ group:'', type:'credit', subject:'41060101 藥品收入',     purpose:'', desc:`${yymm}藥品收入${fmt(drugRev)}`, dr:0, cr:drugRev });
     if(hcRev > 0)     vouchers.push({ group:'', type:'credit', subject:'41060104 健康檢查收入', purpose:'', desc:`${yymm}預防保健${fmt(hcRev)}`, dr:0, cr:hcRev });
@@ -2487,12 +2498,12 @@ function generateVouchers(){
               ? pnum(document.getElementById('discount-amount-input')?.value) : 0;
   const _exp  = pnum(document.getElementById('expense-510601-total')?.textContent);
   const _net  = _inc + _oth - _disc - _exp;
-  const bonusAmt = Math.floor(_net * 0.95);
+  const _fund5 = Math.round(_net * 0.05);
+  const bureau95 = Math.round(_net * 0.95 * 0.1);
+  const staff95  = Math.round(_net * 0.95 * 0.9 * 0.3);
+  const doctor95 = _net - _fund5 - bureau95 - staff95;
+  const bonusAmt = bureau95 + doctor95 + staff95;
   if(bonusAmt > 0){
-    const fund5 = _net - bonusAmt;
-    const bureau95 = Math.floor(bonusAmt * 0.1);
-    const doctor95 = Math.floor(bonusAmt * 0.63);
-    const staff95  = bonusAmt - bureau95 - doctor95;
     const descBonus = `${yymm}當月繳局統籌款 繳局${fmt(bureau95)}+醫師${fmt(doctor95)}+員工${fmt(staff95)}=${fmt(bonusAmt)}`;
     vouchers.push({ group:'績效獎金（當月獎勵金×0.95）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'1501 績效獎金', desc:descBonus, dr:bonusAmt, cr:0 });
     vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'01 繳局統籌款', purpose:'', desc:descBonus, dr:0, cr:bonusAmt });
@@ -3429,7 +3440,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.8.4已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.8.5已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3470,7 +3481,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.8.4已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.8.5已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4518,7 +4529,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.8.4 全面重置 Q1 庫存明細帳 ──
+/* ── v3.8.5 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -5836,11 +5847,11 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.8.4: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.8.5: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.8.4: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.8.5: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
-  // v3.8.4: 補入缺漏的11503藥品進貨/領用/盤損
+  // v3.8.5: 補入缺漏的11503藥品進貨/領用/盤損
   await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
