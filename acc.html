@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.8.9</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.9.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -365,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.8.9</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.9.0</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -416,13 +416,13 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <span style="font-weight:700; font-size:15px; color:#1e2a38;">📊 醫療基金會計帳務　各分頁總覽</span>
   </div>
 
-  <!-- 本月收支 -->
-  <div style="font-size:11px; font-weight:700; color:#546e7a; margin:12px 0 4px; letter-spacing:1px;">▌ 本月收支（月底結算）</div>
+  <!-- 年度收支 -->
+  <div style="font-size:11px; font-weight:700; color:#546e7a; margin:12px 0 4px; letter-spacing:1px;">▌ <span id="rc-year-title">115</span>年度收支累積</div>
   <div class="reminder-grid">
     <div class="r-card rc-blue">
       <div class="r-num" id="rc-income">—</div>
       <div class="r-label">💰 掛帳金額合計</div>
-      <div class="r-sub">門診健保 + NIIS</div>
+      <div class="r-sub" id="rc-income-sub">門診健保 + NIIS</div>
     </div>
     <div class="r-card rc-teal">
       <div class="r-num" id="rc-other-inc">—</div>
@@ -431,8 +431,8 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     </div>
     <div class="r-card rc-green">
       <div class="r-num" id="rc-expense-total">—</div>
-      <div class="r-label">📊 510601 本月成本</div>
-      <div class="r-sub" id="rc-expense-sub" style="font-size:9px;">折舊＋人員＋藥品＋動支＋支出傳票</div>
+      <div class="r-label">📊 510601 年度成本</div>
+      <div class="r-sub" id="rc-expense-sub">年度支出合計</div>
     </div>
     <div class="r-card rc-orange" style="border-left-color:#1b5e20;">
       <div class="r-num" id="rc-net" style="color:#1b5e20;">—</div>
@@ -1889,26 +1889,53 @@ function updateCalcTable(){
 function updateHomeDashboard(){
   const {y} = getYm();
 
-  // ── 本月收支（從月底結算 DOM 取） ──
-  const inc = pnum(document.getElementById('inc-total')?.value);
+  // ── 年度收支累積（從各月 localStorage 加總） ──
+  const rcYearTitle = document.getElementById('rc-year-title');
+  if(rcYearTitle) rcYearTitle.textContent = y;
+  let yInc=0, yOther=0, yExp=0, yDisc=0, mCount=0;
+  for(let mo=1; mo<=12; mo++){
+    const ymKey = y + String(mo).padStart(2,'0');
+    const raw = localStorage.getItem('acc_monthly_'+ymKey);
+    if(!raw) continue;
+    try{
+      const d = JSON.parse(raw);
+      if(d.income){
+        yInc += pnum(d.income.hi) + pnum(d.income.covid) + pnum(d.income.flu) + pnum(d.income.rout);
+        yOther += pnum(d.income.lab) + pnum(d.income.copay) + pnum(d.income.nc);
+      }
+      if(d.discount?.needed) yDisc += pnum(d.discount.amount);
+      if(d.expense){
+        // 從傳票取支出合計更準確，但月度資料也可用
+        const vRaw = localStorage.getItem('acc_vouchers_'+ymKey);
+        if(vRaw){
+          const vs = JSON.parse(vRaw);
+          // 510601 支出 = 所有 debit 且 subject 含 510601 的合計（排除績效獎金）
+          let curG = '';
+          vs.forEach(v=>{
+            if(v.group) curG = v.group;
+            if(v.type==='debit' && (v.subject||'').includes('510601') && !curG.includes('績效獎金')){
+              yExp += v.dr||0;
+            }
+          });
+        }
+      }
+      mCount++;
+    }catch(e){}
+  }
   const rcInc = document.getElementById('rc-income');
-  if(rcInc) rcInc.textContent = inc > 0 ? fmt(inc) : '—';
+  if(rcInc) rcInc.textContent = yInc > 0 ? fmt(yInc) : '—';
+  const rcIncSub = document.getElementById('rc-income-sub');
+  if(rcIncSub) rcIncSub.textContent = `${mCount} 個月資料`;
 
-  const otherInc = pnum(document.getElementById('inc-lab')?.value)
-                 + pnum(document.getElementById('inc-copay')?.value)
-                 + pnum(document.getElementById('inc-noncov')?.value);
   const rcOther = document.getElementById('rc-other-inc');
-  if(rcOther) rcOther.textContent = otherInc > 0 ? fmt(otherInc) : '—';
+  if(rcOther) rcOther.textContent = yOther > 0 ? fmt(yOther) : '—';
 
-  const expTotal = pnum(document.getElementById('expense-510601-total')?.textContent);
   const rcExp = document.getElementById('rc-expense-total');
-  if(rcExp) rcExp.textContent = expTotal > 0 ? fmt(expTotal) : '—';
+  if(rcExp) rcExp.textContent = yExp > 0 ? fmt(yExp) : '—';
 
-  const disc = document.getElementById('discount-needed')?.checked
-             ? pnum(document.getElementById('discount-amount-input')?.value) : 0;
-  const net = inc + otherInc - disc - expTotal;
+  const yNet = yInc + yOther - yDisc - yExp;
   const rcNet = document.getElementById('rc-net');
-  if(rcNet) rcNet.textContent = (inc > 0 || expTotal > 0) ? fmt(net) : '—';
+  if(rcNet) rcNet.textContent = (yInc > 0 || yExp > 0) ? fmt(yNet) : '—';
 
   // ── 負債科目（從各分頁資料取） ──
   const payData = loadPayable();
@@ -3572,7 +3599,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.8.9已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.9.0已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3613,7 +3640,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.8.9已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.9.0已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4661,7 +4688,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.8.9 全面重置 Q1 庫存明細帳 ──
+/* ── v3.9.0 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -5991,11 +6018,11 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.8.9: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.9.0: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.8.9: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.9.0: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
-  // v3.8.9: 補入缺漏的11503藥品進貨/領用/盤損
+  // v3.9.0: 補入缺漏的11503藥品進貨/領用/盤損
   await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
