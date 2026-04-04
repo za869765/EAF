@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.7.1</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.7.2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -364,7 +364,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.7.1</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.7.2</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1896,9 +1896,10 @@ function updatePysupHint(idx){
     ck.textContent = net>0 ? (ok ? '✓ 驗算正確' : `⚠ ${fmt(bureau)}+${fmt(doctor)}+${fmt(staff)}≠${fmt(net)}`) : '';
     ck.style.color = ok ? '#2e7d32' : '#c62828';
   }
+  const ym2txt = document.getElementById('adj-ym-'+idx)?.value || '';
   const el = document.getElementById('adj-hint-'+idx);
   if(el) el.innerHTML = net>0
-    ? `借 420298 ${fmt(net)}<br>貸 /02b 員工 ${fmt(net)}×0.9×0.3=${fmt(Math.max(0,staff))}<br>貸 /01 繳局(${fmt(net)}×0.1=${fmt(bureau)})+醫師(${fmt(net)}×0.9×0.7=${fmt(doctor)})=${fmt(bureauTotal)}`
+    ? `借 420298 ${fmt(net)}　${ym2txt}補付<br>貸 / 員工獎勵金 ${fmt(net)}×0.9×0.3=${fmt(Math.max(0,staff))}<br>貸 / 繳局統籌款(${fmt(net)}×0.1=${fmt(bureau)})+醫師獎勵金(${fmt(net)}×0.9×0.7=${fmt(doctor)})=${fmt(bureauTotal)}`
     : '';
 }
 function updateAdjHint(idx, type){
@@ -3144,7 +3145,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品領用8,028元', dr:8028, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品領用8,028元', dr:0, cr:8028 },
-    /* ── 藥品盤損（原為盤盈，v3.7.1已更正） ── */
+    /* ── 藥品盤損（原為盤盈，v3.7.2已更正） ── */
     { group:'藥品盤損（115300002）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11501藥品盤損1元', dr:1, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11501藥品盤損1元', dr:0, cr:1 },
     /* ── 折舊 ── */
@@ -3185,7 +3186,7 @@ const Q1_REF = [
     /* ── 藥品領用 ── */
     { group:'藥品領用（115300004）', type:'debit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品領用6,623元', dr:6623, cr:0 },
     { group:'', type:'credit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品領用6,623元', dr:0, cr:6623 },
-    /* ── 藥品盤盈（原為盤損，v3.7.1已更正） ── */
+    /* ── 藥品盤盈（原為盤損，v3.7.2已更正） ── */
     { group:'藥品盤盈（115300004）', type:'debit', subject:'110404 商品及醫療用品-藥品', subAccount:'', purpose:'', desc:'11502藥品盤盈3元', dr:3, cr:0 },
     { group:'', type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11502藥品盤盈3元', dr:0, cr:3 },
     /* ── 折舊 ── */
@@ -4227,7 +4228,7 @@ async function fixDrugCloseValues(){
   /* 舊版 migration（已被 resetQ1InvData353 覆蓋，保留 flag 避免重跑） */
   localStorage.setItem('acc_fix_dclose_298','1');
 }
-/* ── v3.7.1 全面重置 Q1 庫存明細帳 ──
+/* ── v3.7.2 全面重置 Q1 庫存明細帳 ──
    醫療用品進貨（115200006/115200026）全部歸入藥品帳；衛材固定2472不動
    藥品帳面：1月100313，2月93693，3月98733
    衛材帳面：固定2472（Q1無異動）
@@ -5530,11 +5531,11 @@ function logout(){ window.location.href = '/admin.html'; }
   loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
-  // v3.7.1: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
+  // v3.7.2: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
   await resetQ1InvData353();
-  // v3.7.1: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
+  // v3.7.2: 修正11501傳票群組名稱（盤盈→盤損）並清除藥品帳重複盤盈
   await fixQ1Vch355();
-  // v3.7.1: 補入缺漏的11503藥品進貨/領用/盤損
+  // v3.7.2: 補入缺漏的11503藥品進貨/領用/盤損
   await fixDrug11503();
   // 補種1月進貨（已被 resetQ1InvData353 管理，保留呼叫確保 flag 已設定）
   await seedMissingJanDrug();
