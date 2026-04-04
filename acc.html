@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v3.3.9</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v3.4.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -362,7 +362,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.3.9</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v3.4.0</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1863,29 +1863,36 @@ function renderPicker(kw){
   const list = document.getElementById('pk-list');
   list.innerHTML = '';
   const filtered = PICKER_DATA.filter(r => {
-    if(postedIds.has(r.id)) return false; // 已出帳不顯示
     if(r.purposeCode==='1501') return false; // 績效獎金有專屬欄位
     if(r.purposeCode==='2713') return false; // 臨時人員有專屬欄位
     return (r.desc+r.subject+r.purposeDesc).toLowerCase().includes((kw||'').toLowerCase());
   });
   if(!filtered.length){
-    list.innerHTML=`<p class="empty-msg">本月無待選入動支單（已出帳項目不顯示）</p>`;
+    list.innerHTML=`<p class="empty-msg">本月無動支單</p>`;
     return;
   }
   filtered.forEach(r => {
-    const sel = pickerSelected.has(r.id);
+    const isPosted = postedIds.has(r.id);
+    const isPicked = pickerSelected.has(r.id);
     const div = document.createElement('div');
-    div.className = 'pk-rec' + (sel?' picked':'');
+    div.className = 'pk-rec' + (isPicked?' picked':'');
+    if(isPosted) div.style.cssText = 'opacity:.45; background:#e0e0e0;';
+    else if(isPicked) div.style.cssText = 'background:#e3f2fd;';
+    const badge = isPosted
+      ? `<span style="font-size:10px;background:#bdbdbd;color:#424242;border-radius:3px;padding:1px 5px;margin-left:4px;">🔒 已出帳</span>`
+      : isPicked
+        ? `<span style="font-size:10px;background:#bbdefb;color:#0d47a1;border-radius:3px;padding:1px 5px;margin-left:4px;">✓ 已帶入</span>`
+        : `<span style="font-size:10px;background:#f3e5f5;color:#8e24aa;border-radius:3px;padding:1px 5px;margin-left:4px;">待選入</span>`;
     div.innerHTML = `
-      <input type="checkbox" ${sel?'checked':''} onchange="togglePk('${r.id}',this)">
+      <input type="checkbox" ${(isPicked||isPosted)?'checked':''} ${isPosted?'disabled':''} onchange="togglePk('${r.id}',this)">
       <div class="pk-info">
         <div class="pk-title">${r.voucher||r.id}
           <span style="font-size:10px;color:#90a4ae;">${r.purposeDesc} ${r.purposeCode}</span>
-          <span style="font-size:10px;background:#f3e5f5;color:#8e24aa;border-radius:3px;padding:1px 5px;margin-left:4px;">待選入</span>
+          ${badge}
         </div>
         <div class="pk-sub">${r.desc}</div>
       </div>
-      <div class="pk-amt">$${fmt(r.amount)}</div>`;
+      <div class="pk-amt" ${isPosted?'style="color:#bdbdbd;"':''}>$${fmt(r.amount)}</div>`;
     list.appendChild(div);
   });
   updatePkFoot();
@@ -1911,10 +1918,6 @@ function confirmPicker(){
   document.getElementById('picker-total').textContent = sum>0 ? `$${fmt(sum)}` : '-';
   const pl = document.getElementById('picked-list');
   pl.innerHTML = items.map(r=>`<span>${r.yearMonth} ${r.purposeDesc} $${fmt(r.amount)}</span>`).join('');
-  /* 勾選帶入 = 同時標記已出帳 */
-  pickerSelected.forEach(id => postedIds.add(id));
-  localStorage.setItem(POSTED_KEY, JSON.stringify([...postedIds]));
-  pickerSelected.clear();
   // 更新折舊後淨值
   const depr = pnum(document.getElementById('exp-depr').value);
   document.getElementById('exp-depr-balance').value = fmt(STATE.property.currentBalance - depr);
