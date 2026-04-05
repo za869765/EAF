@@ -374,7 +374,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.1.0</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.1.1</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -689,11 +689,11 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
         </div>
         <div class="input-group">
           <label>B：部分負擔 <span style="font-size:10px;background:#f3e5f5;color:#6a1b9a;border-radius:2px;padding:0 4px;">貸 41060102</span></label>
-          <input class="num-in" id="inc-copay" type="text" placeholder="0" oninput="calcOther()">
+          <input class="num-in" id="inc-copay" type="text" placeholder="0" oninput="calcOther()" onblur="saveMonthData()">
         </div>
         <div class="input-group">
           <label>C：健保不給付 <span style="font-size:10px;background:#f3e5f5;color:#6a1b9a;border-radius:2px;padding:0 4px;">貸 41060102</span></label>
-          <input class="num-in" id="inc-noncov" type="text" placeholder="0" oninput="calcOther()">
+          <input class="num-in" id="inc-noncov" type="text" placeholder="0" oninput="calcOther()" onblur="saveMonthData()">
         </div>
         <div class="input-group">
           <label style="color:#1565c0;">小計（自動）</label>
@@ -997,22 +997,6 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
           <tbody id="drug-tbody"></tbody>
         </table>
         </div>
-        <!-- 月底結存對帳 -->
-        <div style="padding:6px 14px 4px; border-top:1px solid #eceff1;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-            <span style="font-size:10px;color:#90a4ae;font-weight:600;letter-spacing:.5px;">月底結存對帳</span>
-            <button id="inv-close-lock-btn" class="lock-btn locked" onclick="toggleInvCloseLock()" style="font-size:10px;padding:1px 7px;">🔒 鎖定</button>
-          </div>
-          <table class="ledger-table" style="font-size:11px;">
-            <thead><tr>
-              <th style="width:60px;">月份</th>
-              <th style="width:80px;text-align:right;">帳面結存</th>
-              <th style="width:80px;text-align:right;">實際盤點</th>
-              <th style="width:80px;text-align:right;">盤損/盤盈</th>
-            </tr></thead>
-            <tbody id="drug-monthly-close"></tbody>
-          </table>
-        </div>
         <div style="padding:8px 14px; display:flex; gap:8px;">
           <button class="btn btn-gray" style="font-size:11px;" onclick="addInvEntry('drug')">＋ 補登</button>
           <button class="btn btn-green" style="font-size:11px;" onclick="exportInvExcel('drug')">📥 匯出</button>
@@ -1047,21 +1031,6 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
           </thead>
           <tbody id="supply-tbody"></tbody>
         </table>
-        </div>
-        <!-- 月底結存對帳 -->
-        <div style="padding:6px 14px 4px; border-top:1px solid #eceff1;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-            <span style="font-size:10px;color:#90a4ae;font-weight:600;letter-spacing:.5px;">月底結存對帳</span>
-          </div>
-          <table class="ledger-table" style="font-size:11px;">
-            <thead><tr>
-              <th style="width:60px;">月份</th>
-              <th style="width:80px;text-align:right;">帳面結存</th>
-              <th style="width:80px;text-align:right;">實際盤點</th>
-              <th style="width:80px;text-align:right;">盤損/盤盈</th>
-            </tr></thead>
-            <tbody id="supply-monthly-close"></tbody>
-          </table>
         </div>
         <div style="padding:8px 14px; display:flex; gap:8px;">
           <button class="btn btn-gray" style="font-size:11px;" onclick="addInvEntry('supply')">＋ 補登</button>
@@ -1903,10 +1872,16 @@ function calcDrug(){
 function calcInv(){
   const drugRealRaw   = document.getElementById('inv-drug-real').value;
   const supplyRealRaw = document.getElementById('inv-supply-real').value;
-  /* 使用當月帳面結存（由 updatePrevMonthLabels 計算並存入 STATE._invCurBal） */
-  const curBal     = STATE._invCurBal || {};
-  const drugBook   = curBal.drug   !== undefined ? curBal.drug   : STATE.inventory.drug.balance;
-  const supplyBook = curBal.supply !== undefined ? curBal.supply : STATE.inventory.supply.balance;
+  /* 帳面結存 = 前月期末 + 進貨 - 領用/報廢，不含盤損/盈，才能正確算出盤損/盈差距 */
+  const _ym2      = curYm();
+  const drugBook   = getInvBookBal('drug',   _ym2);
+  const supplyBook = getInvBookBal('supply', _ym2);
+  /* 同步更新提示標籤 */
+  const _dCur = document.getElementById('inv-drug-curbal');
+  const _sCur = document.getElementById('inv-supply-curbal');
+  if(_dCur) _dCur.textContent = fmt(drugBook);
+  if(_sCur) _sCur.textContent = fmt(supplyBook);
+  STATE._invCurBal = { drug: drugBook, supply: supplyBook };
   // 若兩欄都空白，校正量顯示 0，不計算
   if(!drugRealRaw.trim() && !supplyRealRaw.trim()){
     document.getElementById('inv-diff').value = fmt(0);
