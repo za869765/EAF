@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.0.1</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.0.2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -290,7 +290,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 .pub-save-btn { padding:3px 12px; border:1px solid #2e7d32; border-radius:4px; background:#e8f5e9; color:#1b5e20; font-size:11px; cursor:pointer; font-family:inherit; }
 .pub-del-btn { background:#ffebee; border:1px solid #ef9a9a; border-radius:3px; cursor:pointer; font-size:10px; padding:1px 5px; color:#c62828; }
 @media print {
-  #top-bar, #ym-bar, #tab-nav, .toolbar, #tab-work, #tab-voucher, #tab-inventory, #tab-property, #tab-allowance { display:none !important; }
+  #top-bar, #ym-bar, #ym-global-bar, #tab-nav, .toolbar, #tab-work, #tab-voucher, #tab-inventory, #tab-property, #tab-allowance { display:none !important; }
   #tab-public { display:block !important; }
   .pub-add-row, .pub-add-btn, .pub-save-btn, .pub-del-btn, .pub-foot button { display:none !important; }
 }
@@ -365,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.0.1</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.0.2</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -1683,7 +1683,7 @@ function switchTab(name, btn){
   btn.classList.add('active');
   // 首頁不顯示年月選單
   const ymBar = document.getElementById('ym-global-bar');
-  if(ymBar) ymBar.style.display = name==='home' ? 'none' : '';
+  if(ymBar) ymBar.style.display = name==='home' ? 'none' : 'flex';
   // 切換時重新渲染各分頁（避免 init 尚未完成時空白）
   const TAB_RENDERS = {
     allowance: ()=> renderAllowLedger(),
@@ -4900,7 +4900,7 @@ function onExpenseUpload(inp){
       const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
       const result = parseExpenseRows(rows);
       showExpensePreview(result);
-      if(st) st.textContent = `✅ ${f.name}（${result._totalRows} 筆分錄）`;
+      if(st) st.textContent = `✅ ${f.name}（${result.items.length} 筆分錄）`;
     }catch(err){
       console.error(err);
       if(st) st.textContent = '❌ 解析失敗：' + err.message;
@@ -6135,6 +6135,8 @@ function loadMonthData(){
           if(amtEl) amtEl.value = r.amt || '';
           if(r.type==='pysup'){
             updatePysupHint(i);
+          } else if(r.type==='sup'){
+            updateSupHint(i);
           } else {
             const catEl = document.getElementById('adj-cat-'+i);
             if(catEl && r.cat) catEl.value = r.cat;
