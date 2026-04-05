@@ -374,7 +374,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.1.6</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.1.7</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -3395,26 +3395,25 @@ async function accInitSync(){
     if(!data || typeof data !== 'object') return;
     let synced=0, skipped=0;
     for(const [k, v] of Object.entries(data)){
-      // 傳票資料：比較時間戳，本機較新就跳過（避免 D1 舊資料覆蓋）
-      if(k.match(/^acc_vouchers_\d+$/) && !k.endsWith('_ts')){
+      /* 有時間戳保護的 key（傳票 + 月份資料）：本機較新則跳過 */
+      const needsTsGuard = (k.match(/^acc_vouchers_\d+$/) || k.match(/^acc_monthly_\d+$/))
+                           && !k.endsWith('_ts');
+      if(needsTsGuard){
         const tsKey = k + '_ts';
         const localTs = localStorage.getItem(tsKey);
         const d1Ts = data[tsKey];
         if(localTs && d1Ts && localTs !== d1Ts){
-          // 兩邊都有但不同 → 比較（格式 M/D H:MM）
-          // 本機有但 D1 沒有或更舊 → 跳過
           console.log(`[accInitSync] 跳過 ${k}：本機 ${localTs} / D1 ${d1Ts}`);
           skipped++;
           continue;
         }
         if(localTs && !d1Ts){
-          // 本機有時間戳但 D1 沒有 → 本機較新，跳過
           skipped++;
           continue;
         }
       }
       // _ts key 跟隨主 key 的判斷
-      if(k.match(/^acc_vouchers_\d+_ts$/)){
+      if(k.match(/^acc_(vouchers|monthly)_\d+_ts$/)){
         const mainKey = k.replace('_ts','');
         const localMain = localStorage.getItem(mainKey);
         if(localMain && !data[mainKey]){ skipped++; continue; }
@@ -6096,6 +6095,11 @@ function saveMonthData(){
       overtime: document.getElementById('h-overtime').value,
     },
     pickerIds: [...pickerSelected],
+    secLocks: {
+      income:  document.getElementById('card-income')?.classList.contains('sec-locked')||false,
+      expense: document.getElementById('card-expense')?.classList.contains('sec-locked')||false,
+      adj:     document.getElementById('card-adj')?.classList.contains('sec-locked')||false,
+    },
     adjRows: (()=>{
       const rows = [];
       document.querySelectorAll('#adj-tbody tr').forEach(tr=>{
@@ -6111,8 +6115,13 @@ function saveMonthData(){
       return rows;
     })(),
   };
+  const _now = new Date();
+  const _ts  = `${_now.getMonth()+1}/${_now.getDate()} ${_now.getHours()}:${String(_now.getMinutes()).padStart(2,'0')}`;
+  /* 先同步寫 localStorage（包含 ts），再非同步寫 D1 */
+  localStorage.setItem(LS.monthly(ym)+'_ts', _ts);
   Promise.all([
     accSave(LS.monthly(ym), data),
+    accSave(LS.monthly(ym)+'_ts', _ts),
     accSave(LS.settings, STATE.settings)
   ]).then(([ok1]) => {
     showSaveMsg(ok1 ? '✅ 已存 D1' : '⚠️ 僅存本機（D1 失敗）', ok1);
@@ -6205,6 +6214,21 @@ function loadMonthData(){
             if(catEl && r.cat) catEl.value = r.cat;
             updateAdjHint(i, r.type);
           }
+        });
+      }
+      /* 還原鎖定狀態 */
+      if(d.secLocks){
+        ['income','expense','adj'].forEach(name=>{
+          if(!d.secLocks[name]) return;
+          const card = document.getElementById('card-'+name);
+          const btn  = document.getElementById(name+'-lock-btn');
+          if(card) card.classList.add('sec-locked');
+          if(btn){ btn.textContent='🔒 已鎖定'; btn.classList.add('locked'); }
+          (SEC_INPUTS[name]||[]).forEach(id=>{
+            const el=document.getElementById(id);
+            if(el && !el.classList.contains('auto') && !el.classList.contains('locked')) el.readOnly=true;
+          });
+          if(name==='adj') setAdjTableReadonly(true);
         });
       }
     } catch(e){ console.warn('loadMonthData error', e); }
@@ -6333,6 +6357,8 @@ function logout(){ window.location.href = '/admin.html'; }
   const {y} = getYm();
   const yrRaw = localStorage.getItem('acc_yeardata_'+y);
   if(yrRaw) try{ STATE.yearData = JSON.parse(yrRaw); } catch(e){}
+  // 動支單資料（需在 loadMonthData 前載入，confirmPicker 才能正確還原選擇）
+  await loadPickerData();
   // 讀本月資料
   loadMonthData();
   // 三格卡片（年度累積）
