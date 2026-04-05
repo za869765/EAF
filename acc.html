@@ -6194,7 +6194,8 @@ function logout(){ window.location.href = '/admin.html'; }
   seedQ1FullVouchers();
   // ③-d 補種 114年全年轉帳傳票（歷史資料）
   seed114Vouchers();
-  // ③-b 同步完成後，重新讀取 medPostedIds / medExcludedIds（確保拿到 D1 最新資料）
+  // ③-b 同步完成後，重新讀取 postedIds / medPostedIds / medExcludedIds（確保拿到 D1 最新資料）
+  postedIds      = new Set(JSON.parse(localStorage.getItem(POSTED_KEY)||'[]'));
   medPostedIds   = new Set(JSON.parse(localStorage.getItem(MED_POSTED_KEY)||'[]'));
   medExcludedIds = new Set(JSON.parse(localStorage.getItem(MED_EXCLUDED_KEY)||'[]'));
   // 讀設定
