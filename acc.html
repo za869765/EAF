@@ -352,9 +352,18 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 </style>
 </head>
 <script>
-/* 登入驗證：與 admin.html 共用 sessionStorage，未登入跳回後台 */
+/* 登入驗證：與 admin.html 共用 sessionStorage，未登入跳回後台
+   v4.1.0: 同步持久化到 localStorage，確保換電腦/新分頁 D1 仍可寫入 */
 (function(){
-  if(!sessionStorage.getItem('adminPass')){
+  const ss = sessionStorage.getItem('adminPass');
+  const ls = localStorage.getItem('acc_admin_pass');
+  if(ss){
+    // 已登入 → 同步寫 localStorage 以備未來新分頁使用
+    localStorage.setItem('acc_admin_pass', ss);
+  } else if(ls){
+    // 新分頁或換電腦：從 localStorage 還原到 sessionStorage
+    sessionStorage.setItem('adminPass', ls);
+  } else {
     window.location.replace('/admin.html');
   }
 })();
@@ -365,7 +374,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.0.9</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.1.0</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -996,9 +1005,10 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
           </div>
           <table class="ledger-table" style="font-size:11px;">
             <thead><tr>
-              <th style="width:80px;">月份</th>
-              <th style="width:90px;text-align:right;">系統計算</th>
-              <th style="width:95px;text-align:right;">實際盤點</th>
+              <th style="width:60px;">月份</th>
+              <th style="width:80px;text-align:right;">帳面結存</th>
+              <th style="width:80px;text-align:right;">實際盤點</th>
+              <th style="width:80px;text-align:right;">盤損/盤盈</th>
             </tr></thead>
             <tbody id="drug-monthly-close"></tbody>
           </table>
@@ -1045,9 +1055,10 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
           </div>
           <table class="ledger-table" style="font-size:11px;">
             <thead><tr>
-              <th style="width:80px;">月份</th>
-              <th style="width:90px;text-align:right;">系統計算</th>
-              <th style="width:95px;text-align:right;">實際盤點</th>
+              <th style="width:60px;">月份</th>
+              <th style="width:80px;text-align:right;">帳面結存</th>
+              <th style="width:80px;text-align:right;">實際盤點</th>
+              <th style="width:80px;text-align:right;">盤損/盤盈</th>
             </tr></thead>
             <tbody id="supply-monthly-close"></tbody>
           </table>
@@ -5514,33 +5525,41 @@ function toggleInvCloseLock(){
 function renderMonthlyClose(type){
   const tbody = document.getElementById(type+'-monthly-close');
   if(!tbody) return;
-  // 從 DOM 讀取各月最後一筆結存（非作廢）
-  const monthClose = {};
-  document.querySelectorAll('#'+type+'-tbody tr').forEach(tr=>{
-    if(tr.dataset.voided==='1') return;
-    const ym = tr.dataset.ym || (tr.querySelector('.inv-ym')||{}).value?.trim()||'';
-    const balEl = tr.querySelector('.inv-bal');
-    if(!ym||!balEl||balEl.textContent==='-') return;
-    monthClose[ym] = pnum(balEl.textContent.replace(/,/g,''));
-  });
-  const months = Object.keys(monthClose).sort();
+  // 收集有明細的月份（從明細帳，非 DOM）
+  const ledger = loadInvLedger(type).filter(r=>!r.voided&&r.ym);
+  const monthSet = new Set(ledger.map(r=>String(r.ym)));
+  const months = [...monthSet].sort();
   if(!months.length){
-    tbody.innerHTML='<tr><td colspan="3" style="color:#b0bec5;font-size:11px;text-align:center;">（無明細）</td></tr>';
+    tbody.innerHTML='<tr><td colspan="4" style="color:#b0bec5;font-size:11px;text-align:center;">（無明細）</td></tr>';
     return;
   }
   tbody.innerHTML = months.map(ym=>{
-    const calc   = monthClose[ym];
+    // 帳面結存 = 前月期末 + 進貨 - 領用/報廢（不含盤損/盈），讓盤點差距可見
+    const calc   = getInvBookBal(type, ym);
     const stored = localStorage.getItem(`acc_inv_${type}_close_${ym}`);
     const actual = stored!==null ? +stored : null;
+    let diffCell = '<td></td>';
+    if(actual !== null){
+      const diff = actual - calc;    // 正 = 盤盈，負 = 盤損
+      const rdiff = Math.round(diff);
+      if(rdiff === 0){
+        diffCell = `<td style="text-align:right;color:#43a047;font-size:11px;">±0</td>`;
+      } else if(rdiff > 0){
+        diffCell = `<td style="text-align:right;color:#6a1b9a;font-size:11px;">盤盈 ${fmt(rdiff)}</td>`;
+      } else {
+        diffCell = `<td style="text-align:right;color:#e65100;font-size:11px;">盤損 ${fmt(Math.abs(rdiff))}</td>`;
+      }
+    }
     return `<tr>
       <td style="color:#546e7a;">${ym}</td>
       <td style="text-align:right;font-weight:700;color:#1565c0;">${fmt(calc)}</td>
       <td><input class="fi num-in" type="text" inputmode="numeric"
            value="${actual!==null?fmt(actual):''}" placeholder="${_invCloseLocked?'—':'手動輸入'}"
-           style="width:85px;text-align:right;font-size:11px;${_invCloseLocked?'background:#f5f5f5;color:#546e7a;cursor:default;':''}"
+           style="width:72px;text-align:right;font-size:11px;${_invCloseLocked?'background:#f5f5f5;color:#546e7a;cursor:default;':''}"
            ${_invCloseLocked?'readonly':''}
            onblur="saveMonthlyClose('${type}','${ym}',this.value)"
            onkeydown="if(event.key==='Enter')this.blur()"></td>
+      ${diffCell}
     </tr>`;
   }).join('');
 }
