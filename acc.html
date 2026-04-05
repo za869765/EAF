@@ -861,62 +861,6 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     </div>
   </div>
 
-  <!-- 115年度期初餘額 -->
-  <div class="card" id="card-initbal">
-    <div class="card-hd hd-dark" style="display:flex; align-items:center;">
-      📋 115年度期初餘額
-      <span style="font-size:10px; font-weight:400; color:#90a4ae; margin-left:8px;">（解鎖後可修改，儲存時同步 D1）</span>
-      <span style="margin-left:auto; display:flex; align-items:center; gap:6px;">
-        <span id="initbal-saved-ts" style="font-size:10px; color:#a5d6a7;"></span>
-        <button class="lock-btn locked" id="initbal-lock-btn" onclick="toggleInitBalLock()" style="font-size:11px;">🔒 鎖定</button>
-      </span>
-    </div>
-    <div class="card-bd">
-      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px;">
-        <!-- 醫療用品 -->
-        <div class="input-group">
-          <label style="color:#6a1b9a; font-size:11px;">💊 藥品庫存期初</label>
-          <input id="initbal-drug" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
-        </div>
-        <div class="input-group">
-          <label style="color:#00695c; font-size:11px;">🩹 衛材庫存期初</label>
-          <input id="initbal-supply" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
-        </div>
-        <!-- 備抵折讓 -->
-        <div class="input-group">
-          <label style="color:#b71c1c; font-size:11px;">🔻 備抵折讓期初</label>
-          <input id="initbal-allow" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
-        </div>
-        <!-- 財產 -->
-        <div class="input-group">
-          <label style="color:#37474f; font-size:11px;">🏚️ 什項設備帳面淨值（原始成本 320,557）</label>
-          <input id="initbal-prop-equip" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
-        </div>
-        <div class="input-group">
-          <label style="color:#37474f; font-size:11px;">📉 累積折舊-什項設備</label>
-          <input id="initbal-prop-depr" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
-        </div>
-        <!-- 淨值 -->
-        <div class="input-group">
-          <label style="color:#1b5e20; font-size:11px;">🏦 330101 累積賸餘</label>
-          <input id="initbal-surplus" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
-        </div>
-        <!-- 銀行 -->
-        <div class="input-group">
-          <label style="color:#0d47a1; font-size:11px;">🏧 保管款專戶</label>
-          <input id="initbal-bank-custody" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
-        </div>
-        <div class="input-group">
-          <label style="color:#0d47a1; font-size:11px;">🏧 醫療基金專戶</label>
-          <input id="initbal-bank-medical" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
-        </div>
-        <div class="input-group">
-          <label style="color:#0d47a1; font-size:11px;">🏧 健保款專戶</label>
-          <input id="initbal-bank-health" class="num-in initbal-inp" type="text" readonly style="background:#f5f5f5;color:#546e7a;">
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- ── 月度自我檢核（來源：115年第一場兼任會計研習 PPT）── -->
   <div class="card" style="margin-top:14px; border-left:4px solid #42a5f5;">
