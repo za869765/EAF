@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.0.6</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.0.7</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -365,7 +365,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.0.6</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.0.7</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
@@ -3502,13 +3502,6 @@ const Q1_REF = [
     { ym:'11502', type:'ded', amt:4739, note:'11502備抵醫療折讓核銷（借110306/貸110305）' },
     { ym:'11503', type:'ded', amt:8215, note:'11503備抵醫療折讓核銷（借110306/貸110305）' }
   ])},
-  /* 藥品月底帳面結存（醫療用品進貨全入藥品帳；衛材固定2472不動）
-     1月底：100970+7372-8028-1=100313（+衛材2472=102785✓）
-     2月底：100313-6623+3=93693（+衛材2472=96165✓）
-     3月底：93693+12842-7800-2=98733（+衛材2472=101205✓） */
-  { key:'acc_inv_drug_close_11501', val:'100313' },
-  { key:'acc_inv_drug_close_11502', val:'93693' },
-  { key:'acc_inv_drug_close_11503', val:'98733' },
   /* Q1 轉帳傳票明細（來源：115300002~115300004，供4月起產製參考） */
   { key:'acc_vouchers_11501', val: JSON.stringify([
     /* ── 健保掛帳 115300002 (115/01/30) ── */
@@ -4650,21 +4643,7 @@ async function resetQ1InvData353(){
   supplyData = supplyData.filter(r => !Q1_YM.includes(String(r.ym)));
   accSave('acc_inv_supply', supplyData);
 
-  /* 3. 更正藥品月底帳面結存 */
-  const closeUpdates = [
-    {key:'acc_inv_drug_close_11501', value:'100313'},
-    {key:'acc_inv_drug_close_11502', value:'93693'},
-    {key:'acc_inv_drug_close_11503', value:'98733'}
-  ];
-  closeUpdates.forEach(({key,value})=>localStorage.setItem(key,value));
-  const pass = sessionStorage.getItem('adminPass')||'';
-  fetch('/api/acc',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Admin-Pass':pass},
-    body: JSON.stringify(closeUpdates)
-  }).catch(e=>console.warn('[resetQ1Inv] D1 write failed:',e));
-
-  /* 4. 標記所有相關 migration 完成 */
+  /* 3. 標記所有相關 migration 完成 */
   localStorage.setItem('acc_fix_dclose_298','1');
   localStorage.setItem('acc_fix_mar_panduan_350','1');
   localStorage.setItem('acc_q1drug_seeded','1');
@@ -4674,7 +4653,7 @@ async function resetQ1InvData353(){
   localStorage.setItem('acc_reset_q1inv_354','1');
   console.log('[resetQ1Inv354] 藥品：100970+7372-8028-1-6623+3+12842-7800-2=98733；衛材固定2472');
 }
-/* ── v4.0.6 綜合修正 ──
+/* ── v4.0.7 綜合修正 ──
    1. 強制藥品期初 100970（D1 曾存 0）
    2. 清除衛材 Q1 錯誤進貨（seedQ1SupplyEntries 誤種）
    3. 修正藥品 Q1 明細帳（移除錯誤盤盈 121419）
@@ -4724,14 +4703,24 @@ async function fixInvInit400(){
     }catch(e){ console.warn('[fixInvInit400] voucher11503 parse error', e); }
   }
 
-  /* 月底結存更正 */
-  ['11501','11502','11503'].forEach(ym=>{
-    const v = {'11501':'100313','11502':'93693','11503':'98733'}[ym];
-    accSave('acc_inv_drug_close_'+ym, v);
-  });
-
   localStorage.setItem('acc_fix_inv_400','1');
   console.log('[fixInvInit400] 藥品期初100970 + 衛材Q1清空 + 藥品Q1修正 + 11503傳票修正');
+}
+
+/* ── v4.0.7：清除月底官方實際欄位（原錯誤填入帳面結存值）── */
+async function fixClearClose401(){
+  if(localStorage.getItem('acc_fix_clear_close_401')) return;
+  const keys = ['acc_inv_drug_close_11501','acc_inv_drug_close_11502','acc_inv_drug_close_11503'];
+  keys.forEach(k=>{ localStorage.removeItem(k); });
+  /* 同步清除 D1（寫 null 哨兵） */
+  const pass = sessionStorage.getItem('adminPass')||'';
+  fetch('/api/acc',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Admin-Pass':pass},
+    body: JSON.stringify(keys.map(k=>({key:k, value:null})))
+  }).catch(e=>console.warn('[fixClearClose401] D1 clear failed:',e));
+  localStorage.setItem('acc_fix_clear_close_401','1');
+  console.log('[fixClearClose401] 已清除 Q1 藥品月底官方實際欄位');
 }
 
 /* 修正：11501傳票舊版群組名稱為「藥品盤盈」，導致syncInvFromVoucher每次重繪多加一筆盤盈1 */
@@ -6243,9 +6232,11 @@ function logout(){ window.location.href = '/admin.html'; }
   await seedQ1Ref();
   // ③-b 補種 Q1 藥品庫存領用/盤盈損（僅首次，避免覆蓋）
   await seedQ1DrugEntries();
-  // ③-b2 v4.0.6：綜合修正（藥品期初/衛材清空/藥品Q1/11503傳票）
+  // ③-b2 v4.0.7：綜合修正（藥品期初/衛材清空/藥品Q1/11503傳票）
   //   必須在 syncInvFromVoucher 之前執行，確保傳票已更正
   await fixInvInit400();
+  // ③-b2b v4.0.7：清除月底官方實際欄位（原錯誤填入帳面結存值）
+  await fixClearClose401();
   // ③-b3 Q1 各月傳票 → 庫存明細帳同步（領用/盤盈損）
   ['11501','11502','11503'].forEach(ym=>{
     const raw = localStorage.getItem('acc_vouchers_'+ym);
