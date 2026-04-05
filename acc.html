@@ -4674,6 +4674,66 @@ async function resetQ1InvData353(){
   localStorage.setItem('acc_reset_q1inv_354','1');
   console.log('[resetQ1Inv354] 藥品：100970+7372-8028-1-6623+3+12842-7800-2=98733；衛材固定2472');
 }
+/* ── v4.0.6 綜合修正 ──
+   1. 強制藥品期初 100970（D1 曾存 0）
+   2. 清除衛材 Q1 錯誤進貨（seedQ1SupplyEntries 誤種）
+   3. 修正藥品 Q1 明細帳（移除錯誤盤盈 121419）
+   4. 修正 acc_vouchers_11503（藥品盤盈 121419→藥品盤損 2）
+*/
+async function fixInvInit400(){
+  if(localStorage.getItem('acc_fix_inv_400')) return;
+
+  /* 1. 藥品期初強制 100970 */
+  accSave('acc_inv_drug_init', '100970');
+
+  /* 2. 衛材 Q1 全部清除（衛材固定2472，整年無進貨） */
+  const Q1_YM = ['11501','11502','11503'];
+  let supplyData = loadInvLedger('supply');
+  supplyData = supplyData.filter(r => !Q1_YM.includes(String(r.ym)));
+  accSave('acc_inv_supply', supplyData);
+
+  /* 3. 藥品 Q1 明細帳重設（移除錯誤盤盈 121419） */
+  let drugData = loadInvLedger('drug');
+  drugData = drugData.filter(r => !Q1_YM.includes(String(r.ym)));
+  drugData.push(
+    { ym:'11501', type:'進貨', amt:7372,  desc:'115200006醫療用品進貨(藥棉2058+輸液1400+注射2254+業務1660)', medId:'', voided:false },
+    { ym:'11501', type:'領用', amt:8028,  desc:'115300002藥品領用8,028元', medId:'', voided:false },
+    { ym:'11501', type:'盤損', amt:1,     desc:'115300002藥品盤損1元',     medId:'', voided:false },
+    { ym:'11502', type:'領用', amt:6623,  desc:'115300004藥品領用6,623元', medId:'', voided:false },
+    { ym:'11502', type:'盤盈', amt:3,     desc:'115300004藥品盤盈3元',     medId:'', voided:false },
+    { ym:'11503', type:'進貨', amt:12842, desc:'115200026醫療用品進貨(藥棉1459+耗材9948+護理1435)',         medId:'', voided:false },
+    { ym:'11503', type:'領用', amt:7800,  desc:'115300005藥品領用7,800元', medId:'', voided:false },
+    { ym:'11503', type:'盤損', amt:2,     desc:'115300005藥品盤損2元',     medId:'', voided:false }
+  );
+  accSave('acc_inv_drug', drugData);
+
+  /* 4. 修正 acc_vouchers_11503：藥品盤盈 121419 → 藥品盤損 2 */
+  const vRaw = localStorage.getItem('acc_vouchers_11503');
+  if(vRaw){
+    try{
+      let vs = JSON.parse(vRaw);
+      vs = vs.filter(v => !(v.group||'').includes('藥品盤盈'));
+      const hasPanLoss = vs.some(v => (v.group||'').includes('藥品盤損'));
+      if(!hasPanLoss){
+        vs.push(
+          { group:'藥品盤損（115300005）', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品', desc:'11503藥品盤損2元', dr:2, cr:0 },
+          { group:'', type:'credit', subject:'110404 醫療用品', subAccount:'', purpose:'', desc:'11503藥品盤損2元', dr:0, cr:2 }
+        );
+      }
+      accSave('acc_vouchers_11503', vs);
+    }catch(e){ console.warn('[fixInvInit400] voucher11503 parse error', e); }
+  }
+
+  /* 月底結存更正 */
+  ['11501','11502','11503'].forEach(ym=>{
+    const v = {'11501':'100313','11502':'93693','11503':'98733'}[ym];
+    accSave('acc_inv_drug_close_'+ym, v);
+  });
+
+  localStorage.setItem('acc_fix_inv_400','1');
+  console.log('[fixInvInit400] 藥品期初100970 + 衛材Q1清空 + 藥品Q1修正 + 11503傳票修正');
+}
+
 /* 修正：11501傳票舊版群組名稱為「藥品盤盈」，導致syncInvFromVoucher每次重繪多加一筆盤盈1 */
 async function fixQ1Vch355(){
   if(localStorage.getItem('acc_fix_q1vch_355')) return;
@@ -6183,8 +6243,9 @@ function logout(){ window.location.href = '/admin.html'; }
   await seedQ1Ref();
   // ③-b 補種 Q1 藥品庫存領用/盤盈損（僅首次，避免覆蓋）
   await seedQ1DrugEntries();
-  // ③-b2 補種 Q1 衛材進貨（從動支單 CSV 轉入）
-  seedQ1SupplyEntries();
+  // ③-b2 v4.0.6：綜合修正（藥品期初/衛材清空/藥品Q1/11503傳票）
+  //   必須在 syncInvFromVoucher 之前執行，確保傳票已更正
+  await fixInvInit400();
   // ③-b3 Q1 各月傳票 → 庫存明細帳同步（領用/盤盈損）
   ['11501','11502','11503'].forEach(ym=>{
     const raw = localStorage.getItem('acc_vouchers_'+ym);
