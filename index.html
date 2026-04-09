@@ -297,10 +297,10 @@ body.sb-resizing * { pointer-events: none !important; }
     #888 calc(50% + .6px), transparent calc(50% + .6px));
 }
 
-/* Cut line */
+/* Cut line（高度、字寬各加倍） */
 .cut-line {
-  text-align: center; font-size: 9.5px; color: #888;
-  margin: 2mm 0; letter-spacing: 4px; user-select: none;
+  text-align: center; font-size: 19px; color: #888;
+  margin: 4mm 0; letter-spacing: 8px; user-select: none;
   white-space: nowrap; overflow: hidden;
 }
 
@@ -642,10 +642,11 @@ body.sb-resizing * { pointer-events: none !important; }
     font-size: 14px !important; font-weight: bold !important;
   }
 
-  /* 切割線：黑色、加粗字型 */
+  /* 切割線：黑色、加粗字型（高度、字寬各加倍） */
   .cut-line {
     color: #000 !important; font-weight: bold !important;
-    font-size: 11px !important; letter-spacing: 5px;
+    font-size: 22px !important; letter-spacing: 10px;
+    margin: 4mm 0 !important;
   }
 
   /* 下拉選單：隱藏框線與背景，純文字黑色 */
@@ -707,7 +708,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.0.6</div>
+      <div id="sb-version">v4.0.7</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -2474,7 +2475,7 @@ function lockForm() {
   page.classList.remove('inactive');
   page.classList.add('locked');
   page.querySelectorAll('input, textarea').forEach(el => el.setAttribute('readonly',''));
-  page.querySelectorAll('select').forEach(el => el.setAttribute('disabled',''));
+  /* select 不加 disabled，改用 CSS pointer-events:none，確保選中值正常顯示 */
   _setBtn('save-btn',    'none');
   _setBtn('cancel-btn',  'none');
   _setBtn('clear-btn',   'none');
@@ -2756,7 +2757,8 @@ function openSaveConfirmModal() {
     const total       = getCurrentTotal();
     const purposeDesc = (document.getElementById('purpose-desc')?.value || '').trim();
     const totalStr    = String(Math.abs(total));
-    const hasAmt      = purposeDesc.includes(totalStr);
+    const totalFmtStr = fmtN(Math.abs(total));            /* 有逗點版，如 14,995 */
+    const hasAmt      = purposeDesc.includes(totalStr) || purposeDesc.includes(totalFmtStr);
     if (total > 0 && purposeDesc && !hasAmt) {
       warnEl.innerHTML =
         `⚠️ 提醒：用途說明中未出現金額 <strong>$${fmtN(total)}</strong>，` +
