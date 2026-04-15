@@ -296,7 +296,7 @@ body.sb-resizing * { pointer-events: none !important; }
     transparent calc(50% - .6px), #888 calc(50% - .6px),
     #888 calc(50% + .6px), transparent calc(50% + .6px));
 }
-/* v4.2.26 承辦/單位主管格：中間淡淡細線，可容上下兩個章 */
+/* v4.2.27 承辦/單位主管格：中間淡淡細線，可容上下兩個章 */
 .sg td#sg-officer {
   background: linear-gradient(to bottom,
     transparent calc(50% - .3px), #d4d4d4 calc(50% - .3px),
@@ -838,6 +838,14 @@ body.sb-resizing * { pointer-events: none !important; }
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+  /* v4.2.27 承辦/單位主管格：列印時強制顯示淡灰中線（覆蓋上方 transparent） */
+  .sg td#sg-officer {
+    background: linear-gradient(to bottom,
+      transparent calc(50% - .3px), #bbb calc(50% - .3px),
+      #bbb calc(50% + .3px), transparent calc(50% + .3px)) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 
   /* 框線全黑加深 */
   .ut td, .sg td, .it th, .it td, .bs td,
@@ -917,7 +925,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.26</div>
+      <div id="sb-version">v4.2.27</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -2930,7 +2938,8 @@ function unlockForm() {
   const page = document.getElementById('form-page');
   page.classList.remove('inactive');
   page.classList.remove('locked');
-  page.querySelectorAll('input, textarea').forEach(el => el.removeAttribute('readonly'));
+  /* v4.2.27 憑證編號永遠 readonly（系統自動指派，禁止手動輸入） */
+  page.querySelectorAll('input:not(#voucher-no), textarea').forEach(el => el.removeAttribute('readonly'));
   page.querySelectorAll('select').forEach(el => el.removeAttribute('disabled'));
   _setBtn('save-btn',    '');
   _setBtn('cancel-btn',  '');
@@ -2945,7 +2954,8 @@ function editSaved() {
   const page = document.getElementById('form-page');
   page.classList.remove('inactive');
   page.classList.remove('locked');
-  page.querySelectorAll('input, textarea').forEach(el => el.removeAttribute('readonly'));
+  /* v4.2.27 憑證編號永遠 readonly（系統自動指派，禁止手動輸入） */
+  page.querySelectorAll('input:not(#voucher-no), textarea').forEach(el => el.removeAttribute('readonly'));
   page.querySelectorAll('select').forEach(el => el.removeAttribute('disabled'));
   _setBtn('save-btn',    '');
   _setBtn('cancel-btn',  '');
