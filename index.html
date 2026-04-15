@@ -394,7 +394,7 @@ body.sb-resizing * { pointer-events: none !important; }
   background: transparent !important;
   border-color: transparent !important;
   box-shadow: none !important;
-  /* v4.2.12: 鎖定時把瀏覽器原生下拉箭頭也拿掉，避免視覺上誤導使用者「還可以拉」 */
+  /* v4.2.13: 鎖定時把瀏覽器原生下拉箭頭也拿掉，避免視覺上誤導使用者「還可以拉」 */
   appearance: none !important;
   -webkit-appearance: none !important;
   -moz-appearance: none !important;
@@ -408,18 +408,32 @@ body.sb-resizing * { pointer-events: none !important; }
   -webkit-text-fill-color: #000 !important;
 }
 #form-page.locked #type-badge { pointer-events: none; }
-/* 未分類紀錄：預算科目區域保持可編輯 */
-#form-page.locked.unclassified #sel-main,
-#form-page.locked.unclassified #sel-bp,
-#form-page.locked.unclassified #sel-purpose {
+/* v4.2.13: 鎖定狀態「預算科目」三格為例外 — 永遠可編輯（作廢紀錄除外） */
+#form-page.locked #sel-main,
+#form-page.locked #sel-bp,
+#form-page.locked #sel-purpose {
   pointer-events: auto !important;
-  opacity: 1;
-  /* v4.2.12: 可編輯狀態要還原下拉箭頭 */
+  opacity: 1 !important;
   appearance: auto !important;
   -webkit-appearance: auto !important;
   -moz-appearance: auto !important;
+  /* 淡黃底 + 橘虛線提示「這三格可調整」 */
+  background: #fff8e1 !important;
+  border: 1px dashed #ff9800 !important;
+  padding-right: 4mm !important;
 }
-#form-page.locked.unclassified .bp-row select { pointer-events: auto !important; }
+#form-page.locked .bp-row select { pointer-events: auto !important; }
+/* 作廢紀錄：預算科目也要鎖死 */
+#form-page.locked.voided #sel-main,
+#form-page.locked.voided #sel-bp,
+#form-page.locked.voided #sel-purpose {
+  pointer-events: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
 .unclassified-banner {
   display: none; background: #b71c1c; color: #fff; text-align: center;
   font-size: 12px; padding: 6px 10px; font-weight: 600; letter-spacing: 1px;
@@ -618,7 +632,7 @@ body.sb-resizing * { pointer-events: none !important; }
    PRINT
    ══════════════════════════════════ */
 @media print {
-  /* v4.2.12: 固定 A4 縱向 + 邊界，防止使用者在列印對話框手動縮放/改紙張 */
+  /* v4.2.13: 固定 A4 縱向 + 邊界，防止使用者在列印對話框手動縮放/改紙張 */
   @page {
     size: A4 portrait;   /* 等同 210mm × 297mm */
     margin: 6mm 8mm;     /* 上下 6mm、左右 8mm */
@@ -761,7 +775,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.12</div>
+      <div id="sb-version">v4.2.13</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -945,7 +959,7 @@ body.sb-resizing * { pointer-events: none !important; }
         <td>承辦/單位主管</td>
         <td id="sg-purchase">採購<div id="purchase-note" style="font-size:9px; color:#c62828; font-weight:bold; margin-top:1px; display:none;">已查非拒絕往來廠商</div></td>
         <td id="sg-financial" style="font-size:10px;">
-          財物或軟體登記<br><span style="font-size:9px;">(備註財物/軟體編)</span>
+          財物或軟體登記
         </td>
         <td rowspan="2" style="vertical-align:top; padding-top:2mm;">主(會)計單位</td>
         <td rowspan="2" style="vertical-align:top; padding-top:2mm;">機關長官</td>
@@ -1164,7 +1178,7 @@ window.addEventListener('afterprint', () => {
     if (rec && !rec.printed) {
       rec.printed = true;
       apiPatch(currentId, { printed: true }).catch(() => {});
-      /* v4.2.12: 若使用者是從「修改」狀態直接按列印，表單仍在 unlocked 狀態，
+      /* v4.2.13: 若使用者是從「修改」狀態直接按列印，表單仍在 unlocked 狀態，
          必須重新呼叫 lockForm() 才會真正把預算科目等 select 鎖住 */
       lockForm();
       _setBtn('edit-btn', 'none');
@@ -2364,6 +2378,21 @@ async function saveRecord() {
     showToast('✓ 已儲存 '+ts);
     showMsg('✓ 已儲存 '+ts);
     lockForm();
+    /* v4.2.13: 存檔後重新套用「鎖定但預算科目可調整」狀態（作廢除外） */
+    {
+      const page = document.getElementById('form-page');
+      const isUnclassified = !data.acctCode && !data.voided;
+      page.classList.toggle('voided', !!data.voided);
+      page.classList.toggle('unclassified', isUnclassified);
+      if (!data.voided) {
+        ['sel-main','sel-bp','sel-purpose'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) { el.removeAttribute('disabled'); el.removeAttribute('readonly'); }
+        });
+        _setBtn('save-btn', '');
+        document.getElementById('save-btn').innerHTML = isUnclassified ? '💾 補登存檔' : '💾 更新科目';
+      }
+    }
     _setBtn('edit-btn', '');   /* 存檔後顯示修改鍵（首次列印前可修改） */
     /* 存檔成功：fold note 已寫入 DB，清除旗標 */
     _foldNoteApplied = false;
@@ -2419,19 +2448,17 @@ async function loadRecord(id) {
     fillForm(rec);
     lockForm();
     const page = document.getElementById('form-page');
-    /* 未分類紀錄：鎖定但預算科目區可編輯 */
     const isUnclassified = !rec.acctCode && !rec.voided;
-    if (isUnclassified) {
-      page.classList.add('unclassified');
-      /* 解鎖預算科目相關欄位 */
+    /* v4.2.13: 鎖定後「預算科目」永遠可調整（作廢除外） */
+    page.classList.toggle('voided', !!rec.voided);
+    page.classList.toggle('unclassified', isUnclassified);
+    if (!rec.voided) {
       ['sel-main','sel-bp','sel-purpose'].forEach(id => {
         const el = document.getElementById(id);
         if (el) { el.removeAttribute('disabled'); el.removeAttribute('readonly'); }
       });
       _setBtn('save-btn', '');
-      document.getElementById('save-btn').innerHTML = '💾 補登存檔';
-    } else {
-      page.classList.remove('unclassified');
+      document.getElementById('save-btn').innerHTML = isUnclassified ? '💾 補登存檔' : '💾 更新科目';
     }
     /* 修改鍵：未列印且未被管理者鎖定才可修改 */
     _setBtn('edit-btn', (!rec.printed && !rec.locked && !isUnclassified) ? '' : 'none');
