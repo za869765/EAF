@@ -288,7 +288,7 @@ body.sb-resizing * { pointer-events: none !important; }
 .sg { width: 100%; border-collapse: collapse; border-top: none; }
 .sg td {
   border: 1px solid #333; text-align: center;
-  vertical-align: top; font-size: 11px; padding: 2mm 1mm; height: 33mm;
+  vertical-align: top; font-size: 11px; padding: 2mm 1mm; height: 44mm;
 }
 /* Slash overlay for cells that are N/A */
 .sg td.slash {
@@ -714,7 +714,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.7</div>
+      <div id="sb-version">v4.2.9</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1117,6 +1117,9 @@ window.addEventListener('afterprint', () => {
     if (rec && !rec.printed) {
       rec.printed = true;
       apiPatch(currentId, { printed: true }).catch(() => {});
+      /* v4.2.9: 若使用者是從「修改」狀態直接按列印，表單仍在 unlocked 狀態，
+         必須重新呼叫 lockForm() 才會真正把預算科目等 select 鎖住 */
+      lockForm();
       _setBtn('edit-btn', 'none');
       showToast('🖨️ 已列印，表單已鎖定，不可再修改');
     }
