@@ -4,7 +4,8 @@
  *   GET  /api/payees               → 公開讀取
  *   POST /api/payees               → 整包覆寫（需 X-Admin-Pass）
  *   PATCH /api/payees              → 單筆新增/更新（body: { name, acctNo, bank, ... }）
- *   DELETE /api/payees?key=xxx     → 依 key 刪除（key 格式: name||acctNo||bank）
+ *
+ * v4.2.25 bug#7：移除未使用的 DELETE endpoint。
  *
  * payees JSON shape (array of):
  *   { name, acctNo, bank, lastTransferDate?, createdAt?, isNew?: bool }
@@ -12,7 +13,7 @@
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, PATCH, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Pass',
 };
 
@@ -61,40 +62,46 @@ export async function onRequest({ request, env }) {
     }
   }
 
-  /* ── PATCH：單筆 upsert（name+acctNo+bank 為 key） ── */
+  /* ── PATCH：單筆 upsert（name+acctNo+bank 為 key）
+     v4.2.25 bug#6：改用 CAS 風格（UPDATE ... WHERE value=舊值）避免 read-modify-write 遺失並發寫入；
+     最多重試 3 次。 */
   if (request.method === 'PATCH') {
     try {
       const incoming = await request.json();
       if (!incoming || !incoming.name) return json({ error: 'missing name' }, 400);
-      const row = await DB.prepare("SELECT value FROM settings WHERE key='payees'").first();
-      const list = row ? JSON.parse(row.value) : [];
-      const k = payeeKey(incoming);
-      const idx = list.findIndex(p => payeeKey(p) === k);
-      if (idx >= 0) list[idx] = { ...list[idx], ...incoming };
-      else list.push({ ...incoming, createdAt: incoming.createdAt || new Date().toISOString().slice(0,10), isNew: true });
-      await DB.prepare(`
-        INSERT INTO settings (key, value) VALUES ('payees', ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value
-      `).bind(JSON.stringify(list)).run();
-      return json({ ok: true, count: list.length });
-    } catch (e) {
-      return json({ ok: false, error: e.message }, 500);
-    }
-  }
 
-  /* ── DELETE：依 key 刪除 ── */
-  if (request.method === 'DELETE') {
-    try {
-      const key = url.searchParams.get('key');
-      if (!key) return json({ error: 'missing key' }, 400);
-      const row = await DB.prepare("SELECT value FROM settings WHERE key='payees'").first();
-      if (!row) return json({ ok: true, count: 0 });
-      const list = JSON.parse(row.value).filter(p => payeeKey(p) !== key);
-      await DB.prepare(`
-        INSERT INTO settings (key, value) VALUES ('payees', ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value
-      `).bind(JSON.stringify(list)).run();
-      return json({ ok: true, count: list.length });
+      const MAX_RETRY = 3;
+      for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
+        const row = await DB.prepare("SELECT value FROM settings WHERE key='payees'").first();
+        const oldVal = row ? row.value : null;
+        const list = oldVal ? JSON.parse(oldVal) : [];
+        const k = payeeKey(incoming);
+        const idx = list.findIndex(p => payeeKey(p) === k);
+        if (idx >= 0) list[idx] = { ...list[idx], ...incoming };
+        else list.push({ ...incoming, createdAt: incoming.createdAt || new Date().toISOString().slice(0,10), isNew: true });
+        const newVal = JSON.stringify(list);
+
+        if (oldVal === null) {
+          /* 第一次寫入：INSERT OR IGNORE，若已有他人搶先則重讀 */
+          const ins = await DB.prepare(
+            "INSERT OR IGNORE INTO settings (key, value) VALUES ('payees', ?)"
+          ).bind(newVal).run();
+          const inserted = ins?.meta?.changes ?? ins?.changes ?? 0;
+          if (inserted > 0) return json({ ok: true, count: list.length });
+          /* 沒寫入表示 key 已存在 → 重讀重試 */
+          continue;
+        } else {
+          /* CAS：只在 value 仍等於舊值時才更新 */
+          const upd = await DB.prepare(
+            "UPDATE settings SET value = ? WHERE key = 'payees' AND value = ?"
+          ).bind(newVal, oldVal).run();
+          const changed = upd?.meta?.changes ?? upd?.changes ?? 0;
+          if (changed > 0) return json({ ok: true, count: list.length });
+          /* 其他人搶先寫入 → 重讀重試 */
+          continue;
+        }
+      }
+      return json({ ok: false, error: 'CAS 重試失敗（並發衝突），請重試' }, 409);
     } catch (e) {
       return json({ ok: false, error: e.message }, 500);
     }

@@ -911,7 +911,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.24</div>
+      <div id="sb-version">v4.2.25</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -2611,6 +2611,14 @@ function validatePayeeBeforeSave(data) {
     showAlert('有受款人缺戶名，請補齊或移除該張卡片', '⚠️');
     return false;
   }
+  /* v4.2.25 bug#5：員工/代墊類別，每張卡 bank 與 acctNo 不能全空（允許任一有值） */
+  if (pType === 'employee') {
+    const noAcct = filled.filter(p => !(p.bank || '').trim() && !(p.acctNo || '').trim());
+    if (noAcct.length) {
+      showAlert('員工/代墊必須補齊銀行或帳號，請移除或補齊不完整的卡片', '⚠️');
+      return false;
+    }
+  }
   return true;
 }
 
@@ -4306,12 +4314,14 @@ async function submitNewPayee() {
       await loadPayees();
       showToast('✓ 已新建受款人');
     } else {
-      /* 權限不足：本地暫加（僅當前 session） */
-      PAYEES.push(newPayee);
+      /* 權限不足：本地暫加（僅當前 session）
+         v4.2.25 bug#8：暫存進 PAYEES 時 isNew=false，避免下次存檔被誤標「★新受款人★」；
+         卡片仍保留 isNew:true（因為這筆確實是新的，只是沒上雲）。 */
+      PAYEES.push({ ...newPayee, isNew: false });
       showToast('⚠ 未連上管理權限，本地暫存');
     }
   } catch(_) {
-    PAYEES.push(newPayee);
+    PAYEES.push({ ...newPayee, isNew: false });
     showToast('⚠ 離線暫存');
   }
   closeNewPayeeModal();
