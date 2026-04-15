@@ -395,6 +395,12 @@ body.sb-resizing * { pointer-events: none !important; }
   border-color: transparent !important;
   box-shadow: none !important;
 }
+/* disabled select 在鎖定狀態下保持正常字色（避免瀏覽器預設灰化） */
+#form-page.locked select:disabled {
+  color: #000 !important;
+  opacity: 1 !important;
+  -webkit-text-fill-color: #000 !important;
+}
 #form-page.locked #type-badge { pointer-events: none; }
 /* 未分類紀錄：預算科目區域保持可編輯 */
 #form-page.locked.unclassified #sel-main,
@@ -708,7 +714,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.6</div>
+      <div id="sb-version">v4.2.7</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -2475,7 +2481,8 @@ function lockForm() {
   page.classList.remove('inactive');
   page.classList.add('locked');
   page.querySelectorAll('input, textarea').forEach(el => el.setAttribute('readonly',''));
-  /* select 不加 disabled，改用 CSS pointer-events:none，確保選中值正常顯示 */
+  /* select 需加 disabled 才能真正禁止點選；未分類例外在 loadRecord 內移除 */
+  page.querySelectorAll('select').forEach(el => el.setAttribute('disabled',''));
   _setBtn('save-btn',    'none');
   _setBtn('cancel-btn',  'none');
   _setBtn('clear-btn',   'none');
