@@ -674,6 +674,50 @@ body.sb-resizing * { pointer-events: none !important; }
 #payee-section .payee-item .pi-meta { color: #888; font-size: 11px; margin-top: 2px; }
 #payee-section .payee-item .pi-new { color: #e65100; font-weight: bold; }
 
+/* v4.2.23 多筆受款人卡片 */
+#payee-section .payee-card {
+  border: 1px solid #cfd8dc; border-radius: 5px; padding: 8px 12px;
+  margin-top: 6px; background: #fafafa;
+}
+#payee-section .payee-card .pc-header {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 12px; color: #607d8b; margin-bottom: 6px;
+}
+#payee-section .payee-card .pc-title { font-weight: bold; }
+#payee-section .payee-card .pc-remove {
+  padding: 2px 10px; background: #fff; color: #d32f2f;
+  border: 1px solid #d32f2f; border-radius: 3px; font-size: 11px; cursor: pointer;
+}
+#payee-section .payee-card .pc-remove:hover { background: #ffebee; }
+#payee-section .payee-card .pc-searchrow {
+  display: flex; gap: 6px; align-items: center;
+}
+#payee-section .payee-card .pc-kw {
+  flex: 1; padding: 5px 10px; border: 1px solid #90a4ae; border-radius: 4px;
+  font-size: 13px;
+}
+#payee-section .payee-card .pc-list {
+  max-height: 180px; overflow-y: auto; border: 1px solid #e0e0e0;
+  border-radius: 4px; margin-top: 4px; background: #fff;
+}
+#payee-section .payee-card .pc-selected {
+  padding: 8px 12px; background: #e8f5e9; border: 1px solid #81c784;
+  border-radius: 4px; font-size: 13px; line-height: 1.5;
+  display: flex; justify-content: space-between; align-items: center;
+}
+#payee-section .payee-card .pc-selected-text { color: #1b5e20; font-weight: bold; }
+#payee-section .payee-card .pc-unpick {
+  padding: 3px 10px; background: #fff; color: #2e7d32;
+  border: 1px solid #2e7d32; border-radius: 3px; font-size: 12px; cursor: pointer;
+  white-space: nowrap;
+}
+
+/* v4.2.23 人數不一致 confirm 動畫（溫和提示，不阻塞） */
+@keyframes payee-mismatch-pulse {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.02); box-shadow: 0 0 0 6px rgba(255,152,0,.15); }
+}
+
 /* 列印專用單行受款人 (v4.2.22) */
 #payee-print-line { display: none; }
 @media print {
@@ -691,8 +735,11 @@ body.sb-resizing * { pointer-events: none !important; }
   #payee-print-line:empty { display: none !important; }
   /* v4.2.22 放大列印字體 + 子標籤 */
   #payee-print-line { font-size: 14px !important; line-height: 1.7; }
-  #payee-print-line .pl-title { font-weight: bold; font-size: 15px; }
+  #payee-print-line .pl-title { font-weight: bold; font-size: 15px; margin-right: 6px; }
   #payee-print-line .pl-lbl   { font-weight: bold; color: #000; }
+  /* v4.2.23 多筆受款人：每筆一列 */
+  #payee-print-line .pl-row   { display: block; margin-top: 1mm; }
+  #payee-print-line .pl-idx   { font-weight: bold; color: #333; margin-right: 4px; }
   /* 新受款人標籤：強制保留黑底白字，避免瀏覽器列印時拿掉背景色 */
   #payee-print-line .payee-new-mark {
     -webkit-print-color-adjust: exact !important;
@@ -856,7 +903,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.22</div>
+      <div id="sb-version">v4.2.23</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1139,7 +1186,7 @@ body.sb-resizing * { pointer-events: none !important; }
       </div>
     </div><!-- /#lower-section -->
 
-    <!-- ══ 受款人資訊 (v4.2.22 改置於 A4 頁尾內；列印時隱藏不多一頁) ══ -->
+    <!-- ══ 受款人資訊 v4.2.23 多筆卡片版 ══ -->
     <section id="payee-section" style="display:none;">
       <div class="payee-title">💳 受款人資訊</div>
       <div class="payee-row">
@@ -1152,25 +1199,11 @@ body.sb-resizing * { pointer-events: none !important; }
           <option value="bill">憑繳費單</option>
         </select>
         <span id="payee-bill-label" style="display:none; margin-left:12px; color:#c62828; font-weight:bold;">憑繳費單</span>
+        <button type="button" id="payee-auto-btn" style="display:none; margin-left:12px; padding:4px 12px; background:#1565c0; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;" onclick="autoFillEmployeePayees()">🪄 從動支說明自動帶入</button>
       </div>
-      <div id="payee-search-wrap" style="display:none;">
-        <div class="payee-row">
-          <label class="payee-lbl">搜尋</label>
-          <input type="text" id="payee-kw" placeholder="🔍 戶名 / 銀行 / 帳號（關鍵字）" oninput="renderPayeeList()" style="flex:1;">
-          <button type="button" onclick="openNewPayeeModal()" class="payee-btn-new">＋ 新建</button>
-        </div>
-        <div id="payee-list" class="payee-list"></div>
-      </div>
-      <div id="payee-fields" style="display:none;">
-        <input type="hidden" id="payee-bank">
-        <input type="hidden" id="payee-acct">
-        <input type="hidden" id="payee-name">
-        <span id="payee-new-flag" style="display:none;"></span>
-      </div>
-      <!-- v4.2.22 選完後的收合摘要列 -->
-      <div id="payee-selected" style="display:none; margin-top:4px; padding:8px 12px; background:#e8f5e9; border:1px solid #81c784; border-radius:4px; font-size:13px; line-height:1.5;">
-        <span id="payee-selected-text" style="color:#1b5e20; font-weight:bold;"></span>
-        <button type="button" onclick="unpickPayee()" style="float:right; padding:3px 10px; background:#fff; color:#2e7d32; border:1px solid #2e7d32; border-radius:3px; font-size:12px; cursor:pointer;">變更受款人</button>
+      <div id="payees-container" style="display:none;"></div>
+      <div id="payees-add-row" style="display:none; margin-top:6px;">
+        <button type="button" onclick="addPayeeCard()" style="padding:5px 14px; background:#fff; color:#1565c0; border:1.5px solid #1565c0; border-radius:4px; cursor:pointer; font-size:13px; font-weight:bold;">＋ 新增受款人</button>
       </div>
     </section>
 
@@ -1428,6 +1461,12 @@ function applyType(type, { regen = true } = {}) {
   const isPurchase = type === 'purchase';
   /* v4.2.17: 僅 動支單 顯示受款人資訊區塊 */
   if (typeof updatePayeeSectionVisibility === 'function') updatePayeeSectionVisibility();
+  /* v4.2.23: 切換單據類型時同步更新「🪄 從動支說明自動帶入」按鈕可見性 */
+  const _autoBtn = document.getElementById('payee-auto-btn');
+  if (_autoBtn) {
+    const _pt = document.getElementById('payee-type')?.value || '';
+    _autoBtn.style.display = (_pt === 'employee' && type === 'expense') ? '' : 'none';
+  }
 
   /* 徽章 */
   const badge = document.getElementById('type-badge');
@@ -2464,7 +2503,9 @@ function getFormData() {
     deliveryDate  : document.getElementById('delivery-date')?.value  || '',
     deliveryPlace : document.getElementById('delivery-place')?.value || '',
     items, total,
-    payee: (typeof getPayeeData === 'function') ? getPayeeData() : null
+    /* v4.2.23 多筆受款人：payees 陣列為主資料；payee 保留第一筆供舊代碼相容讀取 */
+    payees: (typeof getPayeesData === 'function') ? getPayeesData() : [],
+    payee:  (typeof getPayeeData  === 'function') ? getPayeeData()  : null
   };
 }
 
@@ -2529,8 +2570,9 @@ function fillForm(rec) {
   document.getElementById('notes').value = rec.notes || '';
   _foldNoteApplied = false;
   _prevNotesBeforeFold = '';
-  /* v4.2.17: 還原受款人資訊 */
-  if (typeof setPayeeData === 'function') setPayeeData(rec.payee || null);
+  /* v4.2.23: 還原受款人（優先 payees 陣列，退回舊 payee 物件） */
+  if (typeof setPayeesData === 'function') setPayeesData(rec.payees, rec.payee);
+  else if (typeof setPayeeData === 'function') setPayeeData(rec.payee || null);
   if (typeof updatePayeeSectionVisibility === 'function') updatePayeeSectionVisibility();
 }
 
@@ -2544,18 +2586,46 @@ function validatePayeeBeforeSave(data) {
   if (data.voided) return true;
   const pType = document.getElementById('payee-type')?.value || '';
   if (!pType) {
-    alert('請先選擇受款人資料\n\n（類別：匯款廠商 / 農會廠商 / 員工/代墊 / 憑繳費單）');
+    showAlert('請先選擇受款人資料<br><br>（類別：匯款廠商 / 農會廠商 / 員工/代墊 / 憑繳費單）', '⚠️');
     document.getElementById('payee-type')?.focus();
     return false;
   }
-  if (pType === 'bill') return true;               /* 憑繳費單 OK */
-  const pName = (document.getElementById('payee-name')?.value || '').trim();
-  if (!pName) {
-    alert('請先點選或新建受款人（戶名不可為空）');
-    document.getElementById('payee-kw')?.focus();
+  if (pType === 'bill') return true;
+  /* v4.2.23 至少一位受款人且每張卡都有戶名 */
+  const arr = Array.isArray(data.payees) ? data.payees : [];
+  const filled = arr.filter(p => p && p.name);
+  if (!filled.length) {
+    showAlert('請新增至少一位受款人（戶名不可為空）', '⚠️');
+    return false;
+  }
+  const missing = arr.filter(p => p && (p.bank || p.acctNo) && !p.name);
+  if (missing.length) {
+    showAlert('有受款人缺戶名，請補齊或移除該張卡片', '⚠️');
     return false;
   }
   return true;
+}
+
+/* v4.2.23 人數不一致善意提醒（非強制）：僅動支單+員工/代墊
+   計算動支說明中「完全符合 EMPLOYEE_LIST」的人名數，與受款人卡片數比對。*/
+async function _confirmItemPayeeCountMismatch(data) {
+  if (data.voided) return true;
+  if (data.formType !== 'expense') return true;
+  const pType = document.getElementById('payee-type')?.value || '';
+  if (pType !== 'employee') return true;
+  const names = [];
+  (data.items || []).forEach(it => {
+    const v = (it.name || '').trim();
+    if (v && EMPLOYEE_LIST.includes(v) && !names.includes(v)) names.push(v);
+  });
+  const payeeCount = (data.payees || []).filter(p => p && p.name).length;
+  if (!names.length || names.length === payeeCount) return true;
+  return await showConfirm(
+    `動支說明中有 <b>${names.length}</b> 位員工（${names.map(esc).join('、')}），<br>` +
+    `但目前受款人卡片為 <b>${payeeCount}</b> 筆，<br>數量不一致。<br><br>` +
+    `是否仍要繼續存檔？`,
+    { title:'⚠️ 人數不一致', icon:'⚠️', okText:'✓ 繼續存檔', cancelText:'✕ 取消修改' }
+  );
 }
 
 async function saveRecord() {
@@ -2564,6 +2634,9 @@ async function saveRecord() {
     setSyncStatus('● 已連線', 'ok');
     return;
   }
+  /* v4.2.23 人數不一致善意提醒（非強制），確認取消則中止存檔 */
+  const ok = await _confirmItemPayeeCountMismatch(_preData);
+  if (!ok) { setSyncStatus('● 已連線', 'ok'); return; }
   setSyncStatus('⟳ 儲存中…', 'busy');
   const data = _preData;
   const now  = new Date();
@@ -2585,18 +2658,21 @@ async function saveRecord() {
       }
       currentId = Date.now().toString();
     }
-    /* v4.2.22 新受款人僅在「此帳號首次出現在任何未作廢紀錄」時標記；
-       第二筆以後（同帳號）一律不標，且舊單 isNew 不會變動 */
+    /* v4.2.23 多筆受款人 — 逐卡判斷是否「首次入單」；任一卡為首次即提醒 */
     let _firstUseMark = false;
-    if (data.payee && data.payee.isNew && data.payee.acctNo) {
-      const others = (cachedRecords || []).filter(r =>
-        r.id !== currentId && !r.voided &&
-        r.payee && r.payee.acctNo === data.payee.acctNo);
-      if (others.length > 0) {
-        data.payee.isNew = false;   // 已有別單用過 → 這筆不再標記
-      } else {
-        _firstUseMark = true;       // 這是該受款人第一次入單
-      }
+    if (Array.isArray(data.payees)) {
+      data.payees.forEach(p => {
+        if (!p || !p.isNew || !p.acctNo) return;
+        const others = (cachedRecords || []).filter(r => {
+          if (r.id === currentId || r.voided) return false;
+          const list = Array.isArray(r.payees) ? r.payees : (r.payee ? [r.payee] : []);
+          return list.some(op => op && op.acctNo === p.acctNo);
+        });
+        if (others.length > 0) p.isNew = false;
+        else _firstUseMark = true;
+      });
+      /* 同步回 data.payee（第一筆）供舊讀者使用 */
+      data.payee = data.payees[0] || null;
     }
     const record = { ...data, id: currentId, savedAt: ts };
     await apiPost(record);
@@ -3889,124 +3965,228 @@ function _payeeFilteredByType(type) {
   return [];
 }
 
-function onPayeeTypeChange() {
-  const type = document.getElementById('payee-type').value;
-  const searchWrap = document.getElementById('payee-search-wrap');
-  const fields     = document.getElementById('payee-fields');
-  const billLabel  = document.getElementById('payee-bill-label');
-  const newFlag    = document.getElementById('payee-new-flag');
-  const selected   = document.getElementById('payee-selected');
+/* ══════════════════════════════════
+   v4.2.23 多筆受款人：以 _payeeCards 陣列為唯一狀態，DOM 由 renderPayeeCards 重繪
+   ══════════════════════════════════ */
+let _payeeCards = [];           // [{name, bank, acctNo, isNew, expanded, kw}, ...]
+let _npTargetCardIdx = -1;      // 新建 modal 回填目標卡
 
-  /* 清空欄位與新廠商旗標（v4.2.22 拿掉金額） */
-  ['payee-bank','payee-acct','payee-name','payee-kw'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
-  });
-  newFlag.style.display = 'none';
-  if (selected) selected.style.display = 'none';
-  updatePayeePrintLine();
+function _currentFormTypeExp() {
+  /* 依 form-page 的 class 或 window.formType 判斷是否為動支單 */
+  const fp = document.getElementById('form-page');
+  if (fp?.classList.contains('expense')) return true;
+  if (typeof formType !== 'undefined' && formType === 'expense') return true;
+  return false;
+}
+
+function onPayeeTypeChange() {
+  const type      = document.getElementById('payee-type').value;
+  const billLabel = document.getElementById('payee-bill-label');
+  const container = document.getElementById('payees-container');
+  const addRow    = document.getElementById('payees-add-row');
+  const autoBtn   = document.getElementById('payee-auto-btn');
+
+  _payeeCards = [];
 
   if (!type) {
-    searchWrap.style.display = 'none';
-    fields.style.display = 'none';
     billLabel.style.display = 'none';
+    container.style.display = 'none';
+    addRow.style.display    = 'none';
+    autoBtn.style.display   = 'none';
+    renderPayeeCards();
+    updatePayeePrintLine();
     return;
   }
   if (type === 'bill') {
-    searchWrap.style.display = 'none';
-    fields.style.display = 'none';
     billLabel.style.display = '';
+    container.style.display = 'none';
+    addRow.style.display    = 'none';
+    autoBtn.style.display   = 'none';
+    renderPayeeCards();
+    updatePayeePrintLine();
     return;
   }
   billLabel.style.display = 'none';
-  searchWrap.style.display = '';
-  fields.style.display = '';
-  renderPayeeList();
+  container.style.display = '';
+  addRow.style.display    = '';
+  /* 自動帶入：僅 動支單 + 員工/代墊 */
+  autoBtn.style.display = (type === 'employee' && _currentFormTypeExp()) ? '' : 'none';
+  /* 起始一張空卡供挑選 */
+  _payeeCards.push({ name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'' });
+  renderPayeeCards();
+  updatePayeePrintLine();
 }
 
-function renderPayeeList() {
+function renderPayeeCards() {
+  const c = document.getElementById('payees-container');
+  if (!c) return;
+  c.innerHTML = _payeeCards.map((card, i) => {
+    const hasData = card.name || card.bank || card.acctNo;
+    const removable = _payeeCards.length > 1;
+    const removeBtn = removable
+      ? `<button type="button" class="pc-remove" onclick="removePayeeCard(${i})">✕ 移除</button>`
+      : '';
+    if (hasData && !card.expanded) {
+      const newMark = card.isNew ? '　<span style="color:#e65100; font-weight:bold;">★新受款人</span>' : '';
+      return `<div class="payee-card" data-idx="${i}">
+        <div class="pc-header"><span class="pc-title">受款人 #${i+1}</span>${removeBtn}</div>
+        <div class="pc-selected">
+          <span class="pc-selected-text">${esc(card.name)}　<span style="color:#555; font-weight:normal;">${esc(card.bank)}　${esc(card.acctNo)}</span>${newMark}</span>
+          <button type="button" class="pc-unpick" onclick="unpickPayeeCard(${i})">變更</button>
+        </div>
+      </div>`;
+    }
+    return `<div class="payee-card" data-idx="${i}">
+      <div class="pc-header"><span class="pc-title">受款人 #${i+1}</span>${removeBtn}</div>
+      <div class="pc-searchrow">
+        <input type="text" class="pc-kw" placeholder="🔍 戶名 / 銀行 / 帳號（關鍵字）" value="${esc(card.kw||'')}" oninput="_payeeCardKwChange(${i}, this.value)">
+        <button type="button" class="payee-btn-new" onclick="openNewPayeeModalForCard(${i})">＋ 新建</button>
+      </div>
+      <div class="pc-list payee-list" style="display:none;"></div>
+    </div>`;
+  }).join('');
+  /* 展開中的卡片：依現有 kw 重算列表 */
+  _payeeCards.forEach((card, i) => {
+    if (!(card.name || card.bank || card.acctNo) || card.expanded) renderPayeeCardList(i);
+  });
+}
+
+function _payeeCardKwChange(i, val) {
+  if (!_payeeCards[i]) return;
+  _payeeCards[i].kw = val;
+  renderPayeeCardList(i);
+}
+
+function renderPayeeCardList(i) {
   const type = document.getElementById('payee-type').value;
-  const kw = (document.getElementById('payee-kw').value || '').trim().toLowerCase();
+  const card = _payeeCards[i]; if (!card) return;
+  const c = document.getElementById('payees-container');
+  if (!c) return;
+  const cardEl = c.querySelector(`.payee-card[data-idx="${i}"]`);
+  if (!cardEl) return;
+  const box = cardEl.querySelector('.pc-list');
+  if (!box) return;
+  const kw = (card.kw||'').trim().toLowerCase();
+  if (!kw) { box.style.display = 'none'; box.innerHTML = ''; box._filtered = []; return; }
   const list = _payeeFilteredByType(type).filter(p => {
-    if (!kw) return true;
     return (p.name||'').toLowerCase().includes(kw)
         || (p.bank||'').toLowerCase().includes(kw)
         || (p.acctNo||'').toLowerCase().includes(kw);
-  });
-  const box = document.getElementById('payee-list');
+  }).slice(0, 60);
   if (!list.length) {
     box.innerHTML = '<div style="padding:10px; color:#888; text-align:center; font-size:12px;">無符合資料（可按「＋ 新建」加入）</div>';
+    box.style.display = '';
+    box._filtered = [];
     return;
   }
-  box.innerHTML = list.map((p, i) => {
+  box.innerHTML = list.map((p, k) => {
     const meta = p._placeholder
       ? '<span class="pi-new">（員工清單 — 尚無帳號資料，請新建）</span>'
       : (p.isNew
           ? `<span class="pi-new">🆕 新廠商</span> 建立於 ${p.createdAt||'—'}`
-          : `最後匯款：${p.lastTransferDate||'—'}`);
-    return `<div class="payee-item" data-idx="${i}" onclick="selectPayee(${i})">
+          : (p.lastTransferDate ? `最後匯款：${p.lastTransferDate}` : ''));
+    return `<div class="payee-item" data-k="${k}" onclick="_pickPayeeFromBox(${i}, ${k})">
       <div><span class="pi-name">${esc(p.name||'—')}</span><span class="pi-bank">${esc(p.bank||'—')}</span><span class="pi-acct">${esc(p.acctNo||'—')}</span></div>
       <div class="pi-meta">${meta}</div>
     </div>`;
   }).join('');
+  box.style.display = '';
   box._filtered = list;
 }
 
-function selectPayee(idx) {
-  const box = document.getElementById('payee-list');
-  const list = box._filtered || [];
-  const p = list[idx];
+function _pickPayeeFromBox(i, k) {
+  const c = document.getElementById('payees-container');
+  const box = c?.querySelector(`.payee-card[data-idx="${i}"] .pc-list`);
+  const p = box?._filtered?.[k];
   if (!p) return;
-  if (p._placeholder) {
-    /* 員工清單佔位 → 自動開新建 modal，戶名預填 */
-    openNewPayeeModal(p.name);
+  if (p._placeholder) { openNewPayeeModalForCard(i, p.name); return; }
+  _payeeCards[i] = {
+    name: p.name || '', bank: p.bank || '', acctNo: p.acctNo || '',
+    isNew: !!p.isNew, expanded: false, kw: ''
+  };
+  renderPayeeCards();
+  updatePayeePrintLine();
+}
+
+function unpickPayeeCard(i) {
+  if (!_payeeCards[i]) return;
+  _payeeCards[i] = { name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'' };
+  renderPayeeCards();
+  updatePayeePrintLine();
+}
+
+function addPayeeCard() {
+  _payeeCards.push({ name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'' });
+  renderPayeeCards();
+  updatePayeePrintLine();
+}
+
+function removePayeeCard(i) {
+  if (_payeeCards.length <= 1) {
+    /* 最後一張改回空卡，不真的移除 */
+    _payeeCards[0] = { name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'' };
+  } else {
+    _payeeCards.splice(i, 1);
+  }
+  renderPayeeCards();
+  updatePayeePrintLine();
+}
+
+/* 🪄 自動帶入（僅動支單 + 員工/代墊 + 動支說明裡的名字與 EMPLOYEE_LIST 完全相符）
+   員工/代墊類別不允許同名多帳戶，若 PAYEES 中出現同名多筆則警告並不自動帶入該名 */
+function autoFillEmployeePayees() {
+  if (!_currentFormTypeExp()) { showToast('ℹ️ 僅動支單支援此功能'); return; }
+  if (document.getElementById('payee-type').value !== 'employee') return;
+  const names = [];
+  document.querySelectorAll('#items-body tr [data-c="name"]').forEach(el => {
+    const v = (el.value || '').trim();
+    if (!v) return;
+    if (EMPLOYEE_LIST.includes(v) && !names.includes(v)) names.push(v);
+  });
+  if (!names.length) {
+    showToast('ℹ️ 動支說明未發現員工清單中的名字（需完全相符）');
     return;
   }
-  box.querySelectorAll('.payee-item').forEach((el,i) => el.classList.toggle('active', i === idx));
-  document.getElementById('payee-bank').value = p.bank || '';
-  document.getElementById('payee-acct').value = p.acctNo || '';
-  document.getElementById('payee-name').value = p.name || '';
-  document.getElementById('payee-new-flag').style.display = p.isNew ? '' : 'none';
-  /* v4.2.22 選完後收合：隱藏搜尋/列表，顯示摘要列 */
-  _collapsePayeePicker();
+  const active = PAYEES.filter(p => !p.frozen);
+  const cards = [];
+  const ambiguous = [];
+  const missing = [];
+  names.forEach(nm => {
+    const matches = active.filter(x => x.name === nm);
+    if (matches.length === 1) {
+      const p = matches[0];
+      cards.push({ name:p.name, bank:p.bank||'', acctNo:p.acctNo||'', isNew:!!p.isNew, expanded:false, kw:'' });
+    } else if (matches.length > 1) {
+      ambiguous.push(nm);
+      cards.push({ name:nm, bank:'', acctNo:'', isNew:false, expanded:true, kw:nm });
+    } else {
+      missing.push(nm);
+      cards.push({ name:nm, bank:'', acctNo:'', isNew:false, expanded:true, kw:nm });
+    }
+  });
+  _payeeCards = cards;
+  renderPayeeCards();
   updatePayeePrintLine();
+  let msg = `✓ 已自動帶入 ${names.length} 筆受款人`;
+  if (ambiguous.length) msg += `\n⚠️ 同名多帳戶未帶入：${ambiguous.join('、')}（請手動選）`;
+  if (missing.length)   msg += `\nℹ️ 尚無帳號資料：${missing.join('、')}（請新建）`;
+  showToast(msg.split('\n')[0]);
+  if (ambiguous.length || missing.length) {
+    setTimeout(() => showAlert(msg.replace(/\n/g,'<br>'), '⚠️'), 300);
+  }
 }
 
-/* v4.2.22 收合 picker → 顯示一行摘要 */
-function _collapsePayeePicker() {
-  const name = (document.getElementById('payee-name').value || '').trim();
-  const bank = (document.getElementById('payee-bank').value || '').trim();
-  const acct = (document.getElementById('payee-acct').value || '').trim();
-  if (!name && !bank && !acct) return;
-  document.getElementById('payee-search-wrap').style.display = 'none';
-  document.getElementById('payee-fields').style.display = 'none';
-  const sel = document.getElementById('payee-selected');
-  const isNew = document.getElementById('payee-new-flag').style.display !== 'none';
-  document.getElementById('payee-selected-text').innerHTML =
-    `${esc(name)}　<span style="color:#555; font-weight:normal;">${esc(bank)}　${esc(acct)}</span>` +
-    (isNew ? '　<span style="color:#e65100;">★新廠商</span>' : '');
-  sel.style.display = 'block';
+/* v4.2.23 指定由哪張卡呼叫新建 */
+function openNewPayeeModalForCard(i, prefillName) {
+  _npTargetCardIdx = i;
+  openNewPayeeModal(prefillName);
 }
-
-/* v4.2.22 變更受款人：展開 picker，清空目前選擇 */
-function unpickPayee() {
-  document.getElementById('payee-bank').value = '';
-  document.getElementById('payee-acct').value = '';
-  document.getElementById('payee-name').value = '';
-  document.getElementById('payee-new-flag').style.display = 'none';
-  document.getElementById('payee-selected').style.display = 'none';
-  document.getElementById('payee-search-wrap').style.display = '';
-  document.getElementById('payee-fields').style.display = '';
-  document.getElementById('payee-kw').value = '';
-  renderPayeeList();
-  updatePayeePrintLine();
-  document.getElementById('payee-kw').focus();
-}
-
 function openNewPayeeModal(prefillName) {
   document.getElementById('np-name').value = prefillName || '';
   document.getElementById('np-bank').value = '';
   document.getElementById('np-acct').value = '';
   document.getElementById('np-bank-kw').value = '';
+  document.getElementById('np-bank-kw').style.display = '';
   document.getElementById('np-bank-list').style.display = 'none';
   document.getElementById('np-bank-selected').style.display = 'none';
   document.getElementById('np-dup-warn').style.display = 'none';
@@ -4094,6 +4274,15 @@ async function submitNewPayee() {
   const bank = document.getElementById('np-bank').value.trim();
   const acct = document.getElementById('np-acct').value.trim();
   if (!name) { showToast('✗ 請輸入戶名'); return; }
+  /* v4.2.23 員工/代墊類別阻止重複戶名（避免自動帶入時歧義） */
+  const curType = document.getElementById('payee-type').value;
+  if (curType === 'employee' && EMPLOYEE_LIST.includes(name)) {
+    const exists = PAYEES.filter(p => p.name === name && !p.frozen);
+    if (exists.length) {
+      showAlert(`員工「${esc(name)}」已有帳戶資料，不可重複建立。<br>若需修改請到後台「受款人管理」分頁。`, '⚠️');
+      return;
+    }
+  }
   const today = new Date();
   const roc = `${today.getFullYear()-1911}${pad(today.getMonth()+1)}${pad(today.getDate())}`;
   const newPayee = { name, bank, acctNo: acct, createdAt: roc, isNew: true };
@@ -4118,72 +4307,89 @@ async function submitNewPayee() {
     showToast('⚠ 離線暫存');
   }
   closeNewPayeeModal();
-  /* 自動套用到表單 */
-  document.getElementById('payee-bank').value = bank;
-  document.getElementById('payee-acct').value = acct;
-  document.getElementById('payee-name').value = name;
-  document.getElementById('payee-new-flag').style.display = '';
-  renderPayeeList();
-  /* v4.2.22 新建後直接收合顯示摘要 */
-  _collapsePayeePicker();
-  updatePayeePrintLine();
-}
-
-/* 取得目前 payee 區塊資料供存檔用 */
-function getPayeeData() {
-  const type = document.getElementById('payee-type').value;
-  if (!type) return null;
-  if (type === 'bill') return { type: 'bill' };
-  return {
-    type,
-    bank:   document.getElementById('payee-bank').value.trim(),
-    acctNo: document.getElementById('payee-acct').value.trim(),
-    name:   document.getElementById('payee-name').value.trim(),
-    isNew:  document.getElementById('payee-new-flag').style.display !== 'none'
-  };
-}
-/* 載入已存紀錄時還原 payee */
-function setPayeeData(payee) {
-  const sel = document.getElementById('payee-type');
-  if (!payee || !payee.type) {
-    sel.value = ''; onPayeeTypeChange(); return;
+  /* v4.2.23 套用到目標卡（若未指定則套第一張空卡或新增一張） */
+  let i = _npTargetCardIdx;
+  if (i < 0 || !_payeeCards[i]) {
+    i = _payeeCards.findIndex(c => !c.name && !c.bank && !c.acctNo);
+    if (i < 0) { _payeeCards.push({}); i = _payeeCards.length - 1; }
   }
-  sel.value = payee.type;
-  onPayeeTypeChange();
-  if (payee.type === 'bill') return;
-  document.getElementById('payee-bank').value  = payee.bank   || '';
-  document.getElementById('payee-acct').value  = payee.acctNo || '';
-  document.getElementById('payee-name').value  = payee.name   || '';
-  document.getElementById('payee-new-flag').style.display = payee.isNew ? '' : 'none';
-  /* v4.2.22 有資料就收合；沒有就保持展開 */
-  if (payee.name || payee.bank || payee.acctNo) _collapsePayeePicker();
+  _payeeCards[i] = { name, bank, acctNo: acct, isNew: true, expanded: false, kw: '' };
+  _npTargetCardIdx = -1;
+  renderPayeeCards();
   updatePayeePrintLine();
 }
 
-/* v4.2.22 列印用受款人資訊：分段標籤排序（戶名 → 銀行7碼 XX分行 → 帳號） */
+/* v4.2.23 取得目前受款人資料（陣列） */
+function getPayeesData() {
+  const type = document.getElementById('payee-type').value;
+  if (!type) return [];
+  if (type === 'bill') return [{ type: 'bill' }];
+  return _payeeCards
+    .filter(c => c.name || c.bank || c.acctNo)
+    .map(c => ({ type, bank: c.bank||'', acctNo: c.acctNo||'', name: c.name||'', isNew: !!c.isNew }));
+}
+/* 舊版相容 — 取第一筆 */
+function getPayeeData() {
+  const arr = getPayeesData();
+  return arr.length ? arr[0] : null;
+}
+
+/* v4.2.23 還原受款人（優先 payees 陣列，否則退回單筆 payee） */
+function setPayeesData(payees, legacyPayee) {
+  const sel = document.getElementById('payee-type');
+  let list = Array.isArray(payees) ? payees.slice() : null;
+  if ((!list || !list.length) && legacyPayee && legacyPayee.type) list = [legacyPayee];
+  if (!list || !list.length) { sel.value = ''; onPayeeTypeChange(); return; }
+  const t = list[0].type || '';
+  sel.value = t;
+  const billLabel = document.getElementById('payee-bill-label');
+  const container = document.getElementById('payees-container');
+  const addRow    = document.getElementById('payees-add-row');
+  const autoBtn   = document.getElementById('payee-auto-btn');
+  if (t === 'bill') {
+    billLabel.style.display = ''; container.style.display = 'none';
+    addRow.style.display = 'none'; autoBtn.style.display = 'none';
+    _payeeCards = []; renderPayeeCards(); updatePayeePrintLine(); return;
+  }
+  billLabel.style.display = 'none';
+  container.style.display = '';
+  addRow.style.display = '';
+  autoBtn.style.display = (t === 'employee' && _currentFormTypeExp()) ? '' : 'none';
+  _payeeCards = list
+    .filter(p => p && p.type !== 'bill')
+    .map(p => ({
+      name: p.name||'', bank: p.bank||'', acctNo: p.acctNo||'',
+      isNew: !!p.isNew, expanded: !(p.name||p.bank||p.acctNo), kw: ''
+    }));
+  if (!_payeeCards.length) _payeeCards.push({ name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'' });
+  renderPayeeCards();
+  updatePayeePrintLine();
+}
+/* 舊版相容 */
+function setPayeeData(payee) { setPayeesData(null, payee); }
+
+/* v4.2.23 列印用受款人資訊：每張卡一列 */
 function updatePayeePrintLine() {
   const line = document.getElementById('payee-print-line');
   if (!line) return;
   const type = document.getElementById('payee-type')?.value || '';
   if (!type) { line.innerHTML = ''; return; }
-  if (type === 'bill') { line.innerHTML = '<b>受款人資訊：</b>憑繳費單'; return; }
-  const name = (document.getElementById('payee-name')?.value || '').trim();
-  const bankRaw = (document.getElementById('payee-bank')?.value || '').trim();
-  const acct = (document.getElementById('payee-acct')?.value || '').trim();
-  if (!name && !bankRaw && !acct) { line.innerHTML = ''; return; }
-  /* 拆 "6180069-佳里區農會" → 代號 6180069 / 名稱 佳里區農會 */
-  let bankCode = '', bankName = bankRaw;
-  const m = bankRaw.match(/^(\d{7})[\s-]+(.+)$/);
-  if (m) { bankCode = m[1]; bankName = m[2].trim(); }
-  const newFlag = document.getElementById('payee-new-flag')?.style.display !== 'none';
-  const newMark = newFlag
-    ? '　<span class="payee-new-mark">★ 新受款人 ★</span>'
-    : '';
-  const parts = [];
-  if (name)               parts.push(`<span class="pl-lbl">戶名：</span>${esc(name)}`);
-  if (bankCode||bankName) parts.push(`<span class="pl-lbl">銀行：</span>${esc(bankCode)}　${esc(bankName)}`);
-  if (acct)               parts.push(`<span class="pl-lbl">帳號：</span>${esc(acct)}`);
-  line.innerHTML = `<span class="pl-title">受款人資訊：</span>　${parts.join('　　')}${newMark}`;
+  if (type === 'bill') { line.innerHTML = '<span class="pl-title">受款人資訊：</span>　憑繳費單'; return; }
+  const cards = _payeeCards.filter(c => c.name || c.bank || c.acctNo);
+  if (!cards.length) { line.innerHTML = ''; return; }
+  const rows = cards.map((c, i) => {
+    let bankCode = '', bankName = c.bank || '';
+    const m = (c.bank||'').match(/^(\d{7})[\s-]+(.+)$/);
+    if (m) { bankCode = m[1]; bankName = m[2].trim(); }
+    const newMark = c.isNew ? '　<span class="payee-new-mark">★ 新受款人 ★</span>' : '';
+    const parts = [];
+    if (c.name)             parts.push(`<span class="pl-lbl">戶名：</span>${esc(c.name)}`);
+    if (bankCode||bankName) parts.push(`<span class="pl-lbl">銀行：</span>${esc(bankCode)}　${esc(bankName)}`);
+    if (c.acctNo)           parts.push(`<span class="pl-lbl">帳號：</span>${esc(c.acctNo)}`);
+    const idx = cards.length > 1 ? `<span class="pl-idx">#${i+1}</span>　` : '';
+    return `<div class="pl-row">${idx}${parts.join('　　')}${newMark}</div>`;
+  }).join('');
+  line.innerHTML = `<span class="pl-title">受款人資訊：</span>${rows}`;
 }
 
 /* v4.2.22 請購單 / 動支單 皆顯示受款人資訊 */
