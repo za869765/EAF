@@ -826,7 +826,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.17</div>
+      <div id="sb-version">v4.2.18</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1114,7 +1114,7 @@ body.sb-resizing * { pointer-events: none !important; }
 
   </div><!-- /#form-page -->
 
-  <!-- ══════════════════════ 受款人資訊（v4.2.17，螢幕顯示；列印處理留 Phase 2） ══════════════════════ -->
+  <!-- ══════════════════════ 受款人資訊（v4.2.18 請購單 / 動支單同顯示；列印處理留 Phase 2） ══════════════════════ -->
   <section id="payee-section" style="display:none;">
     <div class="payee-title">💳 受款人資訊</div>
     <div class="payee-row">
@@ -2499,8 +2499,8 @@ function fillForm(rec) {
 /* v4.2.17 受款人必填把關：動支單（expense）存檔與修改時，都必須先選受款人；
    作廢紀錄例外。憑繳費單（bill）視為已選定受款人，可存檔。 */
 function validatePayeeBeforeSave(data) {
-  if (data.formType !== 'expense') return true;   /* 請購單無受款人欄位 */
-  if (data.voided) return true;                    /* 作廢紀錄免驗 */
+  /* v4.2.18 請購單 / 動支單 皆需選受款人；作廢紀錄例外 */
+  if (data.voided) return true;
   const pType = document.getElementById('payee-type')?.value || '';
   if (!pType) {
     alert('請先選擇受款人資料\n\n（類別：匯款廠商 / 農會廠商 / 員工/代墊 / 憑繳費單）');
@@ -3994,11 +3994,11 @@ function setPayeeData(payee) {
   document.getElementById('payee-new-flag').style.display = payee.isNew ? '' : 'none';
 }
 
-/* 隨 formType 切換區塊顯示：僅 動支單 顯示 */
+/* v4.2.18 請購單 / 動支單 皆顯示受款人資訊 */
 function updatePayeeSectionVisibility() {
   const sec = document.getElementById('payee-section');
   if (!sec) return;
-  sec.style.display = (formType === 'expense') ? '' : 'none';
+  sec.style.display = '';
 }
 
 /* 啟動時載入 payees */
