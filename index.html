@@ -629,17 +629,16 @@ body.sb-resizing * { pointer-events: none !important; }
 .ci-pur  { color: #6d4c41; }
 
 /* ══════════════════════════════════
-   PAYEE SECTION (v4.2.17)
+   PAYEE SECTION (v4.2.19 置於 A4 #form-page 內頁尾)
    ══════════════════════════════════ */
 #payee-section {
-  max-width: 210mm; margin: 10mm auto 20mm; padding: 14px 18px;
-  background: #fff; border: 1px solid #c0d3e0; border-radius: 6px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  margin-top: 6mm; padding: 10px 12px 8px;
+  background: #fafcff; border: 1px solid #c0d3e0; border-radius: 4px;
   font-family: "Microsoft JhengHei","Segoe UI",sans-serif;
 }
 #payee-section .payee-title {
-  font-size: 15px; font-weight: bold; color: #1e2a38;
-  border-bottom: 2px solid #42a5f5; padding-bottom: 6px; margin-bottom: 12px;
+  font-size: 14px; font-weight: bold; color: #1e2a38;
+  border-bottom: 1.5px solid #42a5f5; padding-bottom: 4px; margin-bottom: 8px;
 }
 #payee-section .payee-row {
   display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
@@ -826,7 +825,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.18</div>
+      <div id="sb-version">v4.2.19</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1109,53 +1108,53 @@ body.sb-resizing * { pointer-events: none !important; }
       </div>
     </div><!-- /#lower-section -->
 
+    <!-- ══ 受款人資訊 (v4.2.19 改置於 A4 頁尾內；列印時隱藏不多一頁) ══ -->
+    <section id="payee-section" style="display:none;">
+      <div class="payee-title">💳 受款人資訊</div>
+      <div class="payee-row">
+        <label class="payee-lbl">類別</label>
+        <select id="payee-type" onchange="onPayeeTypeChange()">
+          <option value="">— 請選擇受款人資料 —</option>
+          <option value="vendor">匯款廠商</option>
+          <option value="nonghui">農會廠商</option>
+          <option value="employee">員工/代墊</option>
+          <option value="bill">憑繳費單</option>
+        </select>
+        <span id="payee-bill-label" style="display:none; margin-left:12px; color:#c62828; font-weight:bold;">憑繳費單</span>
+      </div>
+      <div id="payee-search-wrap" style="display:none;">
+        <div class="payee-row">
+          <label class="payee-lbl">搜尋</label>
+          <input type="text" id="payee-kw" placeholder="🔍 戶名 / 銀行 / 帳號（關鍵字）" oninput="renderPayeeList()" style="flex:1;">
+          <button type="button" onclick="openNewPayeeModal()" class="payee-btn-new">＋ 新建</button>
+        </div>
+        <div id="payee-list" class="payee-list"></div>
+      </div>
+      <div id="payee-fields" style="display:none;">
+        <div class="payee-row">
+          <label class="payee-lbl">存款銀行</label>
+          <input type="text" id="payee-bank" style="flex:1;">
+        </div>
+        <div class="payee-row">
+          <label class="payee-lbl">存款帳號</label>
+          <input type="text" id="payee-acct" style="flex:1;">
+        </div>
+        <div class="payee-row">
+          <label class="payee-lbl">戶名</label>
+          <input type="text" id="payee-name" style="flex:1;">
+        </div>
+        <div class="payee-row">
+          <label class="payee-lbl">金額</label>
+          <input type="text" id="payee-amount" style="flex:1;" placeholder="與動支金額一致或另填">
+          <span id="payee-new-flag" style="display:none; margin-left:8px; padding:2px 8px; background:#ff9800; color:#fff; border-radius:3px; font-size:11px; font-weight:bold;">新廠商</span>
+        </div>
+      </div>
+    </section>
+
     <!-- 頁尾留白（僅列印顯示）：供手寫備註 -->
     <div id="print-footer"></div>
 
   </div><!-- /#form-page -->
-
-  <!-- ══════════════════════ 受款人資訊（v4.2.18 請購單 / 動支單同顯示；列印處理留 Phase 2） ══════════════════════ -->
-  <section id="payee-section" style="display:none;">
-    <div class="payee-title">💳 受款人資訊</div>
-    <div class="payee-row">
-      <label class="payee-lbl">類別</label>
-      <select id="payee-type" onchange="onPayeeTypeChange()">
-        <option value="">— 請選擇受款人資料 —</option>
-        <option value="vendor">匯款廠商</option>
-        <option value="nonghui">農會廠商</option>
-        <option value="employee">員工/代墊</option>
-        <option value="bill">憑繳費單</option>
-      </select>
-      <span id="payee-bill-label" style="display:none; margin-left:12px; color:#c62828; font-weight:bold;">憑繳費單</span>
-    </div>
-    <div id="payee-search-wrap" style="display:none;">
-      <div class="payee-row">
-        <label class="payee-lbl">搜尋</label>
-        <input type="text" id="payee-kw" placeholder="🔍 戶名 / 銀行 / 帳號（關鍵字）" oninput="renderPayeeList()" style="flex:1;">
-        <button type="button" onclick="openNewPayeeModal()" class="payee-btn-new">＋ 新建</button>
-      </div>
-      <div id="payee-list" class="payee-list"></div>
-    </div>
-    <div id="payee-fields" style="display:none;">
-      <div class="payee-row">
-        <label class="payee-lbl">存款銀行</label>
-        <input type="text" id="payee-bank" style="flex:1;">
-      </div>
-      <div class="payee-row">
-        <label class="payee-lbl">存款帳號</label>
-        <input type="text" id="payee-acct" style="flex:1;">
-      </div>
-      <div class="payee-row">
-        <label class="payee-lbl">戶名</label>
-        <input type="text" id="payee-name" style="flex:1;">
-      </div>
-      <div class="payee-row">
-        <label class="payee-lbl">金額</label>
-        <input type="text" id="payee-amount" style="flex:1;" placeholder="與動支金額一致或另填">
-        <span id="payee-new-flag" style="display:none; margin-left:8px; padding:2px 8px; background:#ff9800; color:#fff; border-radius:3px; font-size:11px; font-weight:bold;">新廠商</span>
-      </div>
-    </div>
-  </section>
 
   <!-- 新建受款人 Modal -->
   <div id="new-payee-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9000; align-items:center; justify-content:center;">
@@ -2499,7 +2498,7 @@ function fillForm(rec) {
 /* v4.2.17 受款人必填把關：動支單（expense）存檔與修改時，都必須先選受款人；
    作廢紀錄例外。憑繳費單（bill）視為已選定受款人，可存檔。 */
 function validatePayeeBeforeSave(data) {
-  /* v4.2.18 請購單 / 動支單 皆需選受款人；作廢紀錄例外 */
+  /* v4.2.19 請購單 / 動支單 皆需選受款人；作廢紀錄例外 */
   if (data.voided) return true;
   const pType = document.getElementById('payee-type')?.value || '';
   if (!pType) {
@@ -3994,7 +3993,7 @@ function setPayeeData(payee) {
   document.getElementById('payee-new-flag').style.display = payee.isNew ? '' : 'none';
 }
 
-/* v4.2.18 請購單 / 動支單 皆顯示受款人資訊 */
+/* v4.2.19 請購單 / 動支單 皆顯示受款人資訊 */
 function updatePayeeSectionVisibility() {
   const sec = document.getElementById('payee-section');
   if (!sec) return;
