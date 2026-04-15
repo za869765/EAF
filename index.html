@@ -718,6 +718,14 @@ body.sb-resizing * { pointer-events: none !important; }
   50%     { transform: scale(1.02); box-shadow: 0 0 0 6px rgba(255,152,0,.15); }
 }
 
+/* v4.2.24 列印時：若受款人較多，空行自動縮小留空間給受款人資訊 */
+@media print {
+  #items-body tr.print-compact { min-height: 4mm !important; height: 4mm !important; }
+  #items-body tr.print-compact td { padding: 0.3mm 2mm !important; height: 4mm !important; line-height: 3mm !important; }
+  #items-body tr.print-compact textarea,
+  #items-body tr.print-compact input { min-height: 3mm !important; height: 3mm !important; }
+}
+
 /* 列印專用單行受款人 (v4.2.22) */
 #payee-print-line { display: none; }
 @media print {
@@ -903,7 +911,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.23</div>
+      <div id="sb-version">v4.2.24</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -4401,6 +4409,24 @@ function updatePayeeSectionVisibility() {
 
 /* 啟動時載入 payees */
 loadPayees();
+
+/* v4.2.24 列印前智慧偵測：多筆受款人時 (>=2) 自動縮小空行，空間讓給受款人資訊；
+   afterprint 還原（避免影響螢幕編輯） */
+window.addEventListener('beforeprint', () => {
+  const cnt = (_payeeCards || []).filter(c => c.name || c.bank || c.acctNo).length;
+  if (cnt < 2) return;
+  document.querySelectorAll('#items-body tr').forEach(tr => {
+    const nmEl = tr.querySelector('[data-c="name"]');
+    const prEl = tr.querySelector('[data-c="price"]');
+    const nm = (nmEl && nmEl.value || '').trim();
+    const pr = (prEl && prEl.value || '').trim();
+    if (!nm && !pr) tr.classList.add('print-compact');
+  });
+});
+window.addEventListener('afterprint', () => {
+  document.querySelectorAll('#items-body tr.print-compact')
+    .forEach(tr => tr.classList.remove('print-compact'));
+});
 </script>
 
 <!-- ══ 尚未存檔警示 Modal ══ -->
