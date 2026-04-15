@@ -32,6 +32,25 @@ export async function onRequest(context) {
 
   /* ── GET：讀取紀錄（預設排除已封存；?all=1 含封存） ── */
   if (request.method === 'GET') {
+    /* v4.2.17 取下一個可用的憑證編號：掃全部紀錄（含封存/作廢），避免封存後同號重複 */
+    if (url.searchParams.get('next-voucher') === '1') {
+      try {
+        const year = url.searchParams.get('year') || String(new Date().getFullYear() - 1911);
+        const { results } = await DB.prepare(
+          'SELECT voucher_no FROM records WHERE voucher_no LIKE ?'
+        ).bind(year + '-%').all();
+        let max = 0;
+        for (const r of results) {
+          const parts = (r.voucher_no || '').split('-');
+          const n = parseInt(parts[parts.length - 1], 10);
+          if (!isNaN(n) && n > max) max = n;
+        }
+        const next = year + '-' + String(max + 1).padStart(4, '0');
+        return json({ year, max, next });
+      } catch (e) {
+        return json({ error: e.message }, 500);
+      }
+    }
     try {
       const all = url.searchParams.get('all') === '1';
       const sql = all
@@ -53,6 +72,16 @@ export async function onRequest(context) {
     try {
       const record = await request.json();
       if (!record.id) return json({ ok: false, error: 'missing id' }, 400);
+
+      /* v4.2.17 憑證編號重複防呆：檢查 voucher_no 是否已被「其他 id」使用（掃全部含封存/作廢） */
+      if (record.voucherNo) {
+        const dup = await DB.prepare(
+          'SELECT id FROM records WHERE voucher_no = ? AND id != ? LIMIT 1'
+        ).bind(record.voucherNo, record.id).first();
+        if (dup) {
+          return json({ ok: false, error: `憑證編號 ${record.voucherNo} 已被其他紀錄使用（id=${dup.id}）`, code: 'DUP_VOUCHER_NO' }, 409);
+        }
+      }
 
       await DB.prepare(`
         INSERT INTO records (id, voucher_no, form_type, voided, saved_at, data)
@@ -94,10 +123,20 @@ export async function onRequest(context) {
       Object.entries(patch).forEach(([k, v]) => {
         if (!PROTECTED.has(k)) rec[k] = v;
       });
+      /* v4.2.17 若 PATCH 改到 voucherNo，先驗證不與其他 id 重複 */
+      if (patch.voucherNo && patch.voucherNo !== (JSON.parse(row.data).voucherNo || '')) {
+        const dup = await DB.prepare(
+          'SELECT id FROM records WHERE voucher_no = ? AND id != ? LIMIT 1'
+        ).bind(patch.voucherNo, id).first();
+        if (dup) {
+          return json({ ok: false, error: `憑證編號 ${patch.voucherNo} 已被其他紀錄使用（id=${dup.id}）`, code: 'DUP_VOUCHER_NO' }, 409);
+        }
+      }
       const voidedBit = rec.voided ? 1 : 0;
+      /* v4.2.17 同步更新 voucher_no 欄位（原本只更新 data 欄，導致 voucher_no 資料與 JSON 失同步） */
       await DB.prepare(
-        'UPDATE records SET voided = ?, data = ? WHERE id = ?'
-      ).bind(voidedBit, JSON.stringify(rec), id).run();
+        'UPDATE records SET voided = ?, voucher_no = ?, data = ? WHERE id = ?'
+      ).bind(voidedBit, rec.voucherNo || '', JSON.stringify(rec), id).run();
 
       return json({ ok: true });
     } catch (e) {

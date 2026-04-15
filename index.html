@@ -629,7 +629,7 @@ body.sb-resizing * { pointer-events: none !important; }
 .ci-pur  { color: #6d4c41; }
 
 /* ══════════════════════════════════
-   PAYEE SECTION (v4.2.16)
+   PAYEE SECTION (v4.2.17)
    ══════════════════════════════════ */
 #payee-section {
   max-width: 210mm; margin: 10mm auto 20mm; padding: 14px 18px;
@@ -826,7 +826,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.16</div>
+      <div id="sb-version">v4.2.17</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -903,8 +903,9 @@ body.sb-resizing * { pointer-events: none !important; }
       <tr>
         <td style="text-align:center; vertical-align:middle;">
           <span class="cell-lbl">憑證編號</span>
-          <input class="fi" id="voucher-no" type="text"
-                 style="text-align:center; font-size:13px; font-weight:bold; margin-top:1.5mm;">
+          <input class="fi" id="voucher-no" type="text" readonly
+                 title="憑證編號由系統自動指派，不可手動修改（如需重新指派請聯絡管理者）"
+                 style="text-align:center; font-size:13px; font-weight:bold; margin-top:1.5mm; background:#f5f5f5; cursor:not-allowed;">
           <button id="copy-no-btn"
                   onclick="const v=document.getElementById('voucher-no').value; navigator.clipboard?.writeText(v).then(()=>showCopyPopup(v)).catch(()=>{document.getElementById('voucher-no').select();showToast('請按 Ctrl+C 複製');})"
                   title="複製憑證編號"
@@ -1113,7 +1114,7 @@ body.sb-resizing * { pointer-events: none !important; }
 
   </div><!-- /#form-page -->
 
-  <!-- ══════════════════════ 受款人資訊（v4.2.16，螢幕顯示；列印處理留 Phase 2） ══════════════════════ -->
+  <!-- ══════════════════════ 受款人資訊（v4.2.17，螢幕顯示；列印處理留 Phase 2） ══════════════════════ -->
   <section id="payee-section" style="display:none;">
     <div class="payee-title">💳 受款人資訊</div>
     <div class="payee-row">
@@ -1384,7 +1385,7 @@ function applyType(type, { regen = true } = {}) {
   const changed = formType !== type;
   formType = type;
   const isPurchase = type === 'purchase';
-  /* v4.2.16: 僅 動支單 顯示受款人資訊區塊 */
+  /* v4.2.17: 僅 動支單 顯示受款人資訊區塊 */
   if (typeof updatePayeeSectionVisibility === 'function') updatePayeeSectionVisibility();
 
   /* 徽章 */
@@ -1493,7 +1494,12 @@ async function apiPost(record) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(record),
   });
-  if (!r.ok) throw 0;
+  /* v4.2.17 保留 server 回傳錯誤訊息（例如憑證號重複 409） */
+  if (!r.ok) {
+    let msg = `HTTP ${r.status}`;
+    try { const j = await r.json(); if (j && j.error) msg = j.error; } catch(_) {}
+    const err = new Error(msg); err.status = r.status; throw err;
+  }
   return r.json();
 }
 /* PATCH 作廢旗標 */
@@ -2482,7 +2488,7 @@ function fillForm(rec) {
   document.getElementById('notes').value = rec.notes || '';
   _foldNoteApplied = false;
   _prevNotesBeforeFold = '';
-  /* v4.2.16: 還原受款人資訊 */
+  /* v4.2.17: 還原受款人資訊 */
   if (typeof setPayeeData === 'function') setPayeeData(rec.payee || null);
   if (typeof updatePayeeSectionVisibility === 'function') updatePayeeSectionVisibility();
 }
@@ -2490,7 +2496,7 @@ function fillForm(rec) {
 /* ══════════════════════
    SAVE / LOAD / DELETE
    ══════════════════════ */
-/* v4.2.16 受款人必填把關：動支單（expense）存檔與修改時，都必須先選受款人；
+/* v4.2.17 受款人必填把關：動支單（expense）存檔與修改時，都必須先選受款人；
    作廢紀錄例外。憑繳費單（bill）視為已選定受款人，可存檔。 */
 function validatePayeeBeforeSave(data) {
   if (data.formType !== 'expense') return true;   /* 請購單無受款人欄位 */
@@ -2525,7 +2531,15 @@ async function saveRecord() {
   try {
     if (!currentId) {
       if (!data.voucherNo) {
-        data.voucherNo = generateVoucherNo(cachedRecords);
+        /* v4.2.17 改由 server 撈 max（掃全部，含封存/作廢），避免封存後同號重用 */
+        try {
+          const r = await fetch('/api/records?next-voucher=1');
+          if (r.ok) {
+            const j = await r.json();
+            if (j && j.next) data.voucherNo = j.next;
+          }
+        } catch (_) { /* fallback to client calc */ }
+        if (!data.voucherNo) data.voucherNo = generateVoucherNo(cachedRecords);
         document.getElementById('voucher-no').value = data.voucherNo;
       }
       currentId = Date.now().toString();
@@ -2573,10 +2587,16 @@ async function saveRecord() {
     /* 彈出憑證編號通知 */
     document.getElementById('saved-no-display').textContent = data.voucherNo || '—';
     document.getElementById('saved-modal').style.display = '';
-  } catch(_) {
+  } catch(err) {
     setSyncStatus('● 儲存失敗','err');
-    showToast('✗ 儲存失敗，請確認網路');
-    showMsg('✗ 儲存失敗');
+    /* v4.2.17 憑證號重複時，清空 voucherNo 以便下次存檔重新取號 */
+    if (err && err.status === 409) {
+      document.getElementById('voucher-no').value = '';
+      showAlert(`✗ 存檔失敗：<br>${esc(err.message || '憑證編號重複')}<br>請重新點「存檔」以取下一個新號。`, '⚠️');
+    } else {
+      showToast('✗ 儲存失敗，請確認網路');
+      showMsg('✗ 儲存失敗');
+    }
   }
 }
 
@@ -3753,7 +3773,7 @@ function showCopyPopup(no, opts = {}) {
 })();
 
 /* ══════════════════════════════════
-   受款人資訊 (v4.2.16)
+   受款人資訊 (v4.2.17)
    ══════════════════════════════════ */
 let PAYEES = [];
 const NONGHUI_KW = '佳里區農會';
@@ -3774,7 +3794,7 @@ async function loadPayees() {
 }
 
 function _payeeFilteredByType(type) {
-  /* v4.2.16 凍結的受款人使用者端一律過濾掉（管理者 admin.html 仍可看到/解凍） */
+  /* v4.2.17 凍結的受款人使用者端一律過濾掉（管理者 admin.html 仍可看到/解凍） */
   const active = PAYEES.filter(p => !p.frozen);
   if (type === 'vendor') {
     return active.filter(p => !(p.bank||'').includes(NONGHUI_KW));
