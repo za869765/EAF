@@ -629,7 +629,7 @@ body.sb-resizing * { pointer-events: none !important; }
 .ci-pur  { color: #6d4c41; }
 
 /* ══════════════════════════════════
-   PAYEE SECTION (v4.2.15)
+   PAYEE SECTION (v4.2.16)
    ══════════════════════════════════ */
 #payee-section {
   max-width: 210mm; margin: 10mm auto 20mm; padding: 14px 18px;
@@ -826,7 +826,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.15</div>
+      <div id="sb-version">v4.2.16</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1113,17 +1113,17 @@ body.sb-resizing * { pointer-events: none !important; }
 
   </div><!-- /#form-page -->
 
-  <!-- ══════════════════════ 受款人資訊（v4.2.15，螢幕顯示；列印處理留 Phase 2） ══════════════════════ -->
+  <!-- ══════════════════════ 受款人資訊（v4.2.16，螢幕顯示；列印處理留 Phase 2） ══════════════════════ -->
   <section id="payee-section" style="display:none;">
     <div class="payee-title">💳 受款人資訊</div>
     <div class="payee-row">
       <label class="payee-lbl">類別</label>
       <select id="payee-type" onchange="onPayeeTypeChange()">
-        <option value="">— 請選擇 —</option>
+        <option value="">— 請選擇受款人資料 —</option>
         <option value="vendor">匯款廠商</option>
         <option value="nonghui">農會廠商</option>
         <option value="employee">員工/代墊</option>
-        <option value="bill">繳費單</option>
+        <option value="bill">憑繳費單</option>
       </select>
       <span id="payee-bill-label" style="display:none; margin-left:12px; color:#c62828; font-weight:bold;">憑繳費單</span>
     </div>
@@ -1384,7 +1384,7 @@ function applyType(type, { regen = true } = {}) {
   const changed = formType !== type;
   formType = type;
   const isPurchase = type === 'purchase';
-  /* v4.2.15: 僅 動支單 顯示受款人資訊區塊 */
+  /* v4.2.16: 僅 動支單 顯示受款人資訊區塊 */
   if (typeof updatePayeeSectionVisibility === 'function') updatePayeeSectionVisibility();
 
   /* 徽章 */
@@ -2482,7 +2482,7 @@ function fillForm(rec) {
   document.getElementById('notes').value = rec.notes || '';
   _foldNoteApplied = false;
   _prevNotesBeforeFold = '';
-  /* v4.2.15: 還原受款人資訊 */
+  /* v4.2.16: 還原受款人資訊 */
   if (typeof setPayeeData === 'function') setPayeeData(rec.payee || null);
   if (typeof updatePayeeSectionVisibility === 'function') updatePayeeSectionVisibility();
 }
@@ -2490,9 +2490,35 @@ function fillForm(rec) {
 /* ══════════════════════
    SAVE / LOAD / DELETE
    ══════════════════════ */
+/* v4.2.16 受款人必填把關：動支單（expense）存檔與修改時，都必須先選受款人；
+   作廢紀錄例外。憑繳費單（bill）視為已選定受款人，可存檔。 */
+function validatePayeeBeforeSave(data) {
+  if (data.formType !== 'expense') return true;   /* 請購單無受款人欄位 */
+  if (data.voided) return true;                    /* 作廢紀錄免驗 */
+  const pType = document.getElementById('payee-type')?.value || '';
+  if (!pType) {
+    alert('請先選擇受款人資料\n\n（類別：匯款廠商 / 農會廠商 / 員工/代墊 / 憑繳費單）');
+    document.getElementById('payee-type')?.focus();
+    return false;
+  }
+  if (pType === 'bill') return true;               /* 憑繳費單 OK */
+  const pName = (document.getElementById('payee-name')?.value || '').trim();
+  if (!pName) {
+    alert('請先點選或新建受款人（戶名不可為空）');
+    document.getElementById('payee-kw')?.focus();
+    return false;
+  }
+  return true;
+}
+
 async function saveRecord() {
+  const _preData = getFormData();
+  if (!validatePayeeBeforeSave(_preData)) {
+    setSyncStatus('● 已連線', 'ok');
+    return;
+  }
   setSyncStatus('⟳ 儲存中…', 'busy');
-  const data = getFormData();
+  const data = _preData;
   const now  = new Date();
   const ts   = `${now.getFullYear()-1911}/${pad(now.getMonth()+1)}/${pad(now.getDate())} `+
                `${pad(now.getHours())}:${pad(now.getMinutes())}`;
@@ -3727,7 +3753,7 @@ function showCopyPopup(no, opts = {}) {
 })();
 
 /* ══════════════════════════════════
-   受款人資訊 (v4.2.15)
+   受款人資訊 (v4.2.16)
    ══════════════════════════════════ */
 let PAYEES = [];
 const NONGHUI_KW = '佳里區農會';
@@ -3748,17 +3774,19 @@ async function loadPayees() {
 }
 
 function _payeeFilteredByType(type) {
+  /* v4.2.16 凍結的受款人使用者端一律過濾掉（管理者 admin.html 仍可看到/解凍） */
+  const active = PAYEES.filter(p => !p.frozen);
   if (type === 'vendor') {
-    return PAYEES.filter(p => !(p.bank||'').includes(NONGHUI_KW));
+    return active.filter(p => !(p.bank||'').includes(NONGHUI_KW));
   }
   if (type === 'nonghui') {
-    return PAYEES.filter(p => (p.bank||'').includes(NONGHUI_KW));
+    return active.filter(p => (p.bank||'').includes(NONGHUI_KW));
   }
   if (type === 'employee') {
-    /* 員工清單 + 已存在 PAYEES 中對應名字的帳號資料 */
+    /* 員工清單 + 已存在 active PAYEES 中對應名字的帳號資料 */
     const result = [];
     EMPLOYEE_LIST.forEach(name => {
-      const matches = PAYEES.filter(p => p.name === name);
+      const matches = active.filter(p => p.name === name);
       if (matches.length) {
         result.push(...matches);
       } else {

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v4.2.15</title>
+<title>管理者入口 — 動支單系統 v4.2.16</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
@@ -391,7 +391,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.2.15</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.2.16</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -408,7 +408,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.2.15</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.2.16</span>
     <button id="maint-btn" onclick="toggleMaintenance()" style="padding:4px 14px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;"></button>
     <a class="link-btn" href="/acc.html" style="background:#1b5e20;">📒 會計帳務</a>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
@@ -639,7 +639,7 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
     </div>
 
     <!-- ── Tab: settings ── -->
-    <!-- ── Tab: payees (v4.2.15) ── -->
+    <!-- ── Tab: payees (v4.2.16) ── -->
     <div id="tab-payees" class="tab-pane">
       <div class="toolbar" style="flex-wrap:wrap; gap:8px;">
         <button class="btn btn-gray" onclick="loadPayeesAdmin()">🔄 重新載入</button>
@@ -648,7 +648,9 @@ body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14p
         <input id="payee-import-file" type="file" accept=".json" style="display:none;" onchange="importPayeesJson(event)">
         <input id="payees-kw" type="text" placeholder="🔍 關鍵字（戶名/銀行/帳號）" style="padding:5px 10px; border:1px solid #b0bec5; border-radius:4px; font-size:13px; min-width:240px;" oninput="renderPayeesAdmin()">
         <select id="payees-filter" style="padding:5px 10px; border:1px solid #b0bec5; border-radius:4px; font-size:13px;" onchange="renderPayeesAdmin()">
-          <option value="">全部</option>
+          <option value="active">☀️ 僅未凍結</option>
+          <option value="">全部（含凍結）</option>
+          <option value="frozen">🧊 僅凍結</option>
           <option value="nonghui">含佳里區農會</option>
           <option value="vendor">其他銀行</option>
           <option value="isNew">僅新廠商</option>
@@ -922,7 +924,7 @@ function showTab(name) {
 }
 
 /* ════════════════════
-   PAYEES (v4.2.15)
+   PAYEES (v4.2.16)
    ════════════════════ */
 let PAYEES_ADMIN = [];
 const PAYEE_NONGHUI_KW = '佳里區農會';
@@ -950,7 +952,9 @@ function renderPayeesAdmin() {
   const kw = (document.getElementById('payees-kw').value || '').trim().toLowerCase();
   const filter = document.getElementById('payees-filter').value;
   let list = PAYEES_ADMIN.slice();
-  if (filter === 'nonghui') list = list.filter(p => (p.bank||'').includes(PAYEE_NONGHUI_KW));
+  if (filter === 'active') list = list.filter(p => !p.frozen);
+  else if (filter === 'frozen') list = list.filter(p => p.frozen);
+  else if (filter === 'nonghui') list = list.filter(p => (p.bank||'').includes(PAYEE_NONGHUI_KW));
   else if (filter === 'vendor') list = list.filter(p => !(p.bank||'').includes(PAYEE_NONGHUI_KW));
   else if (filter === 'isNew') list = list.filter(p => p.isNew);
   if (kw) {
@@ -970,23 +974,34 @@ function renderPayeesAdmin() {
         ? `<span style="color:#e65100; font-weight:bold;">🆕 ${_payeeEsc(p.createdAt||'—')}</span>`
         : _payeeEsc(p.lastTransferDate || '—');
       const source = p.isNew ? '頁面新建' : 'CSV 匯入';
-      return `<tr style="border-top:1px solid #eee;">
-        <td style="padding:6px 10px;">${_payeeEsc(p.name)}</td>
+      // v4.2.16 凍結功能：凍結中的受款人以灰階顯示，動作按鈕改為 ☀️ 解凍
+      const rowStyle = p.frozen
+        ? 'border-top:1px solid #eee; background:#f5f5f5; color:#9e9e9e;'
+        : 'border-top:1px solid #eee;';
+      const frozenBadge = p.frozen
+        ? '<span style="display:inline-block; margin-left:6px; padding:1px 6px; background:#78909c; color:#fff; border-radius:3px; font-size:11px;">🧊 凍結</span>'
+        : '';
+      const toggleBtn = p.frozen
+        ? `<button class="btn" style="background:#ff9800; color:#fff; padding:3px 10px; font-size:12px;" onclick="togglePayeeFrozen('${_payeeEsc(key)}', false)">☀️ 解凍</button>`
+        : `<button class="btn" style="background:#607d8b; color:#fff; padding:3px 10px; font-size:12px;" onclick="togglePayeeFrozen('${_payeeEsc(key)}', true)">🧊 凍結</button>`;
+      return `<tr style="${rowStyle}">
+        <td style="padding:6px 10px;">${_payeeEsc(p.name)}${frozenBadge}</td>
         <td style="padding:6px 10px; font-family:monospace;">${_payeeEsc(p.acctNo)}</td>
         <td style="padding:6px 10px;">${_payeeEsc(p.bank)}</td>
         <td style="padding:6px 10px;">${dateCell}</td>
         <td style="padding:6px 10px; color:#666;">${source}</td>
         <td style="padding:6px 10px; white-space:nowrap;">
           <button class="btn btn-gray" style="padding:3px 10px; font-size:12px;" onclick="openPayeeEdit('${_payeeEsc(key)}')">✏️</button>
-          <button class="btn" style="background:#b71c1c; color:#fff; padding:3px 10px; font-size:12px;" onclick="deletePayee('${_payeeEsc(key)}')">🗑</button>
+          ${toggleBtn}
         </td>
       </tr>`;
     }).join('');
   }
   const nonghuiCount = PAYEES_ADMIN.filter(p => (p.bank||'').includes(PAYEE_NONGHUI_KW)).length;
   const newCount = PAYEES_ADMIN.filter(p => p.isNew).length;
+  const frozenCount = PAYEES_ADMIN.filter(p => p.frozen).length;
   document.getElementById('payees-summary').textContent =
-    `共 ${PAYEES_ADMIN.length} 筆 (含佳里區農會 ${nonghuiCount}、新廠商 ${newCount})，目前顯示 ${list.length} 筆`;
+    `共 ${PAYEES_ADMIN.length} 筆 (含佳里區農會 ${nonghuiCount}、新廠商 ${newCount}、凍結 ${frozenCount})，目前顯示 ${list.length} 筆`;
 }
 
 let _payeeEditKey = null;
@@ -1043,19 +1058,29 @@ async function savePayeeEdit() {
   }
 }
 
-async function deletePayee(key) {
-  if (!confirm('確定刪除此受款人？')) return;
+/* v4.2.16 凍結 / 解凍受款人（取代刪除；保留歷史資料供日後參考，凍結者不會被 index.html 搜尋到） */
+async function togglePayeeFrozen(key, freeze) {
   if (!PASS) { alert('請先登入'); return; }
+  const target = PAYEES_ADMIN.find(x => `${x.name||''}||${x.acctNo||''}||${x.bank||''}` === key);
+  if (!target) { alert('找不到此受款人'); return; }
+  const action = freeze ? '凍結' : '解凍';
+  if (!confirm(`確定${action}「${target.name}」？` + (freeze ? '\n凍結後，使用者在動支單將無法搜尋到此受款人，但管理者仍可查看/編輯/解凍。' : ''))) return;
+  const list = PAYEES_ADMIN.map(p => {
+    const k = `${p.name||''}||${p.acctNo||''}||${p.bank||''}`;
+    if (k === key) return { ...p, frozen: !!freeze };
+    return p;
+  });
   try {
-    const r = await fetch('/api/payees?key=' + encodeURIComponent(key), {
-      method: 'DELETE',
-      headers: { 'X-Admin-Pass': PASS }
+    const r = await fetch('/api/payees', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Pass': PASS },
+      body: JSON.stringify(list)
     });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     await loadPayeesAdmin();
-    setMsg('payees-msg', '✓ 已刪除', false);
+    setMsg('payees-msg', `✓ 已${action}`, false);
   } catch (e) {
-    alert('刪除失敗：' + e.message);
+    alert(`${action}失敗：` + e.message);
   }
 }
 
