@@ -83,23 +83,36 @@ export async function onRequest(context) {
         }
       }
 
-      await DB.prepare(`
-        INSERT INTO records (id, voucher_no, form_type, voided, saved_at, data)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET
-          voucher_no = excluded.voucher_no,
-          form_type  = excluded.form_type,
-          voided     = excluded.voided,
-          saved_at   = excluded.saved_at,
-          data       = excluded.data
-      `).bind(
-        record.id,
-        record.voucherNo || '',
-        record.formType  || '',
-        record.voided ? 1 : 0,
-        record.savedAt   || '',
-        JSON.stringify(record)
-      ).run();
+      try {
+        await DB.prepare(`
+          INSERT INTO records (id, voucher_no, form_type, voided, saved_at, data)
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            voucher_no = excluded.voucher_no,
+            form_type  = excluded.form_type,
+            voided     = excluded.voided,
+            saved_at   = excluded.saved_at,
+            data       = excluded.data
+        `).bind(
+          record.id,
+          record.voucherNo || '',
+          record.formType  || '',
+          record.voided ? 1 : 0,
+          record.savedAt   || '',
+          JSON.stringify(record)
+        ).run();
+      } catch (e) {
+        /* v4.2.28 UNIQUE INDEX 最後防線：並發存檔撞號時 DB 會擋下，翻譯成 409 */
+        const msg = String(e.message || '');
+        if (msg.includes('UNIQUE') && msg.includes('voucher_no')) {
+          return json({
+            ok: false,
+            error: `憑證編號 ${record.voucherNo} 並發衝突，請重新存檔以取新號`,
+            code: 'DUP_VOUCHER_NO'
+          }, 409);
+        }
+        throw e;
+      }
 
       return json({ ok: true });
     } catch (e) {
@@ -134,9 +147,22 @@ export async function onRequest(context) {
       }
       const voidedBit = rec.voided ? 1 : 0;
       /* v4.2.17 同步更新 voucher_no 欄位（原本只更新 data 欄，導致 voucher_no 資料與 JSON 失同步） */
-      await DB.prepare(
-        'UPDATE records SET voided = ?, voucher_no = ?, data = ? WHERE id = ?'
-      ).bind(voidedBit, rec.voucherNo || '', JSON.stringify(rec), id).run();
+      try {
+        await DB.prepare(
+          'UPDATE records SET voided = ?, voucher_no = ?, data = ? WHERE id = ?'
+        ).bind(voidedBit, rec.voucherNo || '', JSON.stringify(rec), id).run();
+      } catch (e) {
+        /* v4.2.28 UNIQUE INDEX 最後防線 */
+        const msg = String(e.message || '');
+        if (msg.includes('UNIQUE') && msg.includes('voucher_no')) {
+          return json({
+            ok: false,
+            error: `憑證編號 ${rec.voucherNo} 並發衝突（可能因其他人同時修改）`,
+            code: 'DUP_VOUCHER_NO'
+          }, 409);
+        }
+        throw e;
+      }
 
       return json({ ok: true });
     } catch (e) {
