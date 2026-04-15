@@ -296,6 +296,12 @@ body.sb-resizing * { pointer-events: none !important; }
     transparent calc(50% - .6px), #888 calc(50% - .6px),
     #888 calc(50% + .6px), transparent calc(50% + .6px));
 }
+/* v4.2.26 承辦/單位主管格：中間淡淡細線，可容上下兩個章 */
+.sg td#sg-officer {
+  background: linear-gradient(to bottom,
+    transparent calc(50% - .3px), #d4d4d4 calc(50% - .3px),
+    #d4d4d4 calc(50% + .3px), transparent calc(50% + .3px));
+}
 
 /* Cut line（高度、字寬各加倍） */
 .cut-line {
@@ -911,7 +917,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.25</div>
+      <div id="sb-version">v4.2.26</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1093,7 +1099,7 @@ body.sb-resizing * { pointer-events: none !important; }
         <col style="width:20%"><col style="width:20%">
       </colgroup>
       <tr>
-        <td>承辦/單位主管</td>
+        <td id="sg-officer">承辦/單位主管</td>
         <td id="sg-purchase">採購<div id="purchase-note" style="font-size:9px; color:#c62828; font-weight:bold; margin-top:1px; display:none;">已查非拒絕往來廠商</div></td>
         <td id="sg-financial" style="font-size:10px;">
           財物或軟體登記
