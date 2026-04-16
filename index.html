@@ -925,7 +925,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.30</div>
+      <div id="sb-version">v4.2.31</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1233,7 +1233,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <div id="payees-add-row" style="display:none; margin-top:6px;">
         <button type="button" onclick="addPayeeCard()" style="padding:5px 14px; background:#fff; color:#1565c0; border:1.5px solid #1565c0; border-radius:4px; cursor:pointer; font-size:13px; font-weight:bold;">＋ 新增受款人</button>
       </div>
-      <!-- v4.2.30 代墊原因（僅員工/代墊類別顯示，選填） -->
+      <!-- v4.2.31 代墊原因（僅員工/代墊類別顯示，選填） -->
       <div id="row-payee-reason" class="payee-row" style="display:none; margin-top:10px;">
         <label class="payee-lbl">代墊原因</label>
         <input type="text" id="payee-reason" placeholder="選填，有填寫時列印才會顯示" style="flex:1;" oninput="updatePayeePrintLine()">
@@ -1248,7 +1248,7 @@ body.sb-resizing * { pointer-events: none !important; }
 
   </div><!-- /#form-page -->
 
-  <!-- 新建受款人 Modal (v4.2.30 放大版，銀行搜尋拆分獨立彈窗) -->
+  <!-- 新建受款人 Modal (v4.2.31 放大版，銀行搜尋拆分獨立彈窗) -->
   <div id="new-payee-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9000; align-items:center; justify-content:center;">
     <div style="background:#fff; width:780px; max-width:96vw; border-radius:10px; padding:32px 36px; box-shadow:0 10px 40px rgba(0,0,0,.35); max-height:92vh; overflow-y:auto;">
       <h2 style="margin:0 0 24px; color:#1e2a38; font-size:22px; border-bottom:2px solid #e0e0e0; padding-bottom:12px;">＋ 新建受款人</h2>
@@ -1283,7 +1283,7 @@ body.sb-resizing * { pointer-events: none !important; }
     </div>
   </div>
 
-  <!-- 銀行搜尋獨立彈窗 (v4.2.30) -->
+  <!-- 銀行搜尋獨立彈窗 (v4.2.31) -->
   <div id="bank-search-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:9100; align-items:center; justify-content:center;">
     <div style="background:#fff; width:620px; max-width:96vw; border-radius:10px; padding:28px 30px; box-shadow:0 10px 40px rgba(0,0,0,.4); max-height:85vh; display:flex; flex-direction:column;">
       <h3 style="margin:0 0 16px; color:#1e2a38; font-size:18px;">🔍 搜尋銀行/分行</h3>
@@ -1295,7 +1295,7 @@ body.sb-resizing * { pointer-events: none !important; }
     </div>
   </div>
 
-  <!-- 複製前次單 — 是否帶入受款人 確認彈窗 (v4.2.30) -->
+  <!-- 複製前次單 — 是否帶入受款人 確認彈窗 (v4.2.31) -->
   <div id="copy-payee-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:8900; align-items:center; justify-content:center;">
     <div style="background:#fff; width:480px; max-width:94vw; border-radius:10px; padding:28px 32px; box-shadow:0 8px 32px rgba(0,0,0,.3);">
       <h3 style="margin:0 0 14px; color:#1e2a38; font-size:18px;">📋 複製前次單</h3>
@@ -2607,7 +2607,7 @@ function getFormData() {
     /* v4.2.23 多筆受款人：payees 陣列為主資料；payee 保留第一筆供舊代碼相容讀取 */
     payees: (typeof getPayeesData === 'function') ? getPayeesData() : [],
     payee:  (typeof getPayeeData  === 'function') ? getPayeeData()  : null,
-    /* v4.2.30 代墊原因（僅員工/代墊類別有意義） */
+    /* v4.2.31 代墊原因（僅員工/代墊類別有意義） */
     payeeReason: (document.getElementById('payee-reason')?.value || '').trim()
   };
 }
@@ -2680,7 +2680,7 @@ function fillForm(rec) {
   /* v4.2.23: 還原受款人（優先 payees 陣列，退回舊 payee 物件） */
   if (typeof setPayeesData === 'function') setPayeesData(rec.payees, rec.payee);
   else if (typeof setPayeeData === 'function') setPayeeData(rec.payee || null);
-  /* v4.2.30 代墊原因 */
+  /* v4.2.31 代墊原因 */
   const _prEl = document.getElementById('payee-reason');
   if (_prEl) _prEl.value = rec.payeeReason || '';
   if (typeof updatePayeeSectionVisibility === 'function') updatePayeeSectionVisibility();
@@ -2755,6 +2755,17 @@ async function saveRecord() {
   /* v4.2.23 人數不一致善意提醒（非強制），確認取消則中止存檔 */
   const ok = await _confirmItemPayeeCountMismatch(_preData);
   if (!ok) { setSyncStatus('● 已連線', 'ok'); return; }
+  /* v4.2.31 其他說明事項提醒：有填寫時告知不會被【複製前次單】帶走 */
+  const _notesVal = (_preData.notes || '').trim();
+  if (_notesVal) {
+    const _notesOk = await showConfirm(
+      '【複製前次單】功能<strong>不會拷貝</strong>「其他說明事項」的內容。<br>' +
+      '如需日後複製時沿用，建議將說明移至「用途說明」欄。<br><br>' +
+      '<span style="color:#78909c; font-size:12px;">（可直接確定繼續存檔）</span>',
+      { title: '⚠️ 其他說明事項有填寫', okText: '✓ 繼續存檔', cancelText: '✗ 返回修改' }
+    );
+    if (!_notesOk) { setSyncStatus('● 已連線', 'ok'); return; }
+  }
   setSyncStatus('⟳ 儲存中…', 'busy');
   const data = _preData;
   const now  = new Date();
@@ -3726,7 +3737,7 @@ function doCopyByNo() {
   copyFromRecord(rec.id);
   closeCopyModal();
 }
-let _copyPendingRec = null;  /* v4.2.30 暫存待複製的紀錄 */
+let _copyPendingRec = null;  /* v4.2.31 暫存待複製的紀錄 */
 function copyFromRecord(id) {
   const rec = cachedRecords.find(r => r.id === id);
   if (!rec) return;
@@ -3739,7 +3750,7 @@ function copyFromRecord(id) {
     return;
   }
   closeCopyModal();
-  /* v4.2.30 若有受款人資料則先詢問是否帶入 */
+  /* v4.2.31 若有受款人資料則先詢問是否帶入 */
   const payees = rec.payees || (rec.payee && rec.payee.name ? [rec.payee] : []);
   _copyPendingRec = rec;
   if (payees.length > 0) {
@@ -4158,7 +4169,7 @@ function onPayeeTypeChange() {
   addRow.style.display    = '';
   /* 自動帶入：僅 動支單 + 員工/代墊 */
   autoBtn.style.display = (type === 'employee' && _currentFormTypeExp()) ? '' : 'none';
-  /* v4.2.30 代墊原因：僅員工/代墊顯示 */
+  /* v4.2.31 代墊原因：僅員工/代墊顯示 */
   if (reasonRow) reasonRow.style.display = (type === 'employee') ? '' : 'none';
   /* 起始一張空卡供挑選 */
   _payeeCards.push({ name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'' });
@@ -4347,7 +4358,7 @@ function openNewPayeeModal(prefillName) {
   setTimeout(() => document.getElementById('np-acct').focus(), 50);
 }
 
-/* v4.2.30 銀行搜尋獨立彈窗 */
+/* v4.2.31 銀行搜尋獨立彈窗 */
 function openBankSearchModal() {
   loadBanks();
   document.getElementById('bsm-kw').value = '';
@@ -4427,7 +4438,7 @@ async function submitNewPayee() {
   const name = document.getElementById('np-name').value.trim();
   const bank = document.getElementById('np-bank').value.trim();
   const acct = document.getElementById('np-acct').value.trim();
-  /* v4.2.30 三欄必填驗證（存款銀行必須由搜尋選取） */
+  /* v4.2.31 三欄必填驗證（存款銀行必須由搜尋選取） */
   if (!bank) { showToast('✗ 請先選擇存款銀行（點「🔍 選擇銀行」）'); return; }
   if (!acct) { showToast('✗ 請輸入存款帳號'); return; }
   if (!name) { showToast('✗ 請輸入戶名'); return; }
@@ -4514,7 +4525,7 @@ function setPayeesData(payees, legacyPayee) {
   container.style.display = '';
   addRow.style.display = '';
   autoBtn.style.display = (t === 'employee' && _currentFormTypeExp()) ? '' : 'none';
-  /* v4.2.30 代墊原因 */
+  /* v4.2.31 代墊原因 */
   const _rr = document.getElementById('row-payee-reason');
   const _ri = document.getElementById('payee-reason');
   if (_rr) _rr.style.display = (t === 'employee') ? '' : 'none';
@@ -4552,7 +4563,7 @@ function updatePayeePrintLine() {
     const idx = cards.length > 1 ? `<span class="pl-idx">#${i+1}</span>　` : '';
     return `<div class="pl-row">${idx}${parts.join('　　')}${newMark}</div>`;
   }).join('');
-  /* v4.2.30 代墊原因（有填寫才加） */
+  /* v4.2.31 代墊原因（有填寫才加） */
   const _reason = (document.getElementById('payee-reason')?.value || '').trim();
   const _reasonHtml = (type === 'employee' && _reason)
     ? `<div class="pl-row" style="margin-top:4px;"><span class="pl-lbl">代墊原因：</span>${esc(_reason)}</div>`
