@@ -40,15 +40,14 @@ export async function onRequest({ request, env }) {
     }
   }
 
-  /* 以下寫入操作皆需管理密碼 */
   const adminPass = env.ADMIN_PASS;
   const providedPass = request.headers.get('X-Admin-Pass');
-  if (!adminPass || providedPass !== adminPass) {
-    return json({ error: '密碼錯誤' }, 401);
-  }
 
-  /* ── POST：整包覆寫 ── */
+  /* ── POST：整包覆寫（需管理密碼） ── */
   if (request.method === 'POST') {
+    if (!adminPass || providedPass !== adminPass) {
+      return json({ error: '密碼錯誤' }, 401);
+    }
     try {
       const payees = await request.json();
       if (!Array.isArray(payees)) return json({ error: '須為陣列' }, 400);
@@ -64,11 +63,20 @@ export async function onRequest({ request, env }) {
 
   /* ── PATCH：單筆 upsert（name+acctNo+bank 為 key）
      v4.2.25 bug#6：改用 CAS 風格（UPDATE ... WHERE value=舊值）避免 read-modify-write 遺失並發寫入；
-     最多重試 3 次。 */
+     最多重試 3 次。
+     v4.2.32：freeze-only PATCH（僅設 frozen:true）不需管理密碼。 */
   if (request.method === 'PATCH') {
     try {
       const incoming = await request.json();
       if (!incoming || !incoming.name) return json({ error: 'missing name' }, 400);
+      /* freeze-only：僅 name+acctNo+bank+frozen，且 frozen===true，不需管理密碼 */
+      const isFreezeOnly = incoming.frozen === true &&
+        Object.keys(incoming).filter(k => k !== 'name' && k !== 'acctNo' && k !== 'bank' && k !== 'frozen').length === 0;
+      if (!isFreezeOnly) {
+        if (!adminPass || providedPass !== adminPass) {
+          return json({ error: '密碼錯誤' }, 401);
+        }
+      }
 
       const MAX_RETRY = 3;
       for (let attempt = 0; attempt < MAX_RETRY; attempt++) {

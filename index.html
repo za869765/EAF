@@ -680,6 +680,26 @@ body.sb-resizing * { pointer-events: none !important; }
 #payee-section .payee-item .pi-meta { color: #888; font-size: 11px; margin-top: 2px; }
 #payee-section .payee-item .pi-new { color: #e65100; font-weight: bold; }
 
+/* v4.2.32 鎖定後受款人區塊：隱藏新增/操作按鈕，僅允許獨立修改按鈕 */
+#form-page.locked #payees-add-row { display: none !important; }
+#form-page:not(.locked) #payee-edit-btn { display: none !important; }
+#form-page.locked.voided #payee-edit-btn { display: none !important; }
+#form-page.locked #payee-section .pc-unpick,
+#form-page.locked #payee-section .pc-remove,
+#form-page.locked #payee-section .payee-btn-new { pointer-events: none; opacity: 0.45; }
+/* 作廢受款人：在搜尋列表中顯示刪除線 */
+.payee-item.payee-item-frozen { opacity: 0.6; pointer-events: none; cursor: default; }
+.payee-item.payee-item-frozen .pi-name,
+.payee-item.payee-item-frozen .pi-bank,
+.payee-item.payee-item-frozen .pi-acct { text-decoration: line-through; color: #aaa; }
+/* 原受款人歷史（被取代的） */
+#payee-prev-display .prev-card {
+  padding: 6px 10px; margin-bottom: 6px;
+  border: 1px dashed #ccc; border-radius: 4px;
+  color: #aaa; font-size: 13px; text-decoration: line-through;
+  background: #fafafa;
+}
+
 /* v4.2.23 多筆受款人卡片 */
 #payee-section .payee-card {
   border: 1px solid #cfd8dc; border-radius: 5px; padding: 8px 12px;
@@ -925,7 +945,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.31</div>
+      <div id="sb-version">v4.2.32</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1217,6 +1237,7 @@ body.sb-resizing * { pointer-events: none !important; }
     <!-- ══ 受款人資訊 v4.2.23 多筆卡片版 ══ -->
     <section id="payee-section" style="display:none;">
       <div class="payee-title">💳 受款人資訊</div>
+      <button type="button" id="payee-edit-btn" onclick="openPayeeEditMode()" style="float:right; margin-top:-28px; padding:4px 12px; background:#1565c0; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">✎ 修改受款人</button>
       <div class="payee-row">
         <label class="payee-lbl">類別</label>
         <select id="payee-type" onchange="onPayeeTypeChange()">
@@ -1237,6 +1258,13 @@ body.sb-resizing * { pointer-events: none !important; }
       <div id="row-payee-reason" class="payee-row" style="display:none; margin-top:10px;">
         <label class="payee-lbl">代墊原因</label>
         <input type="text" id="payee-reason" placeholder="選填，有填寫時列印才會顯示" style="flex:1;" oninput="updatePayeePrintLine()">
+      </div>
+      <!-- v4.2.32 前次受款人歷史（被取代時顯示刪除線） -->
+      <div id="payee-prev-display" style="display:none; margin-top:8px;"></div>
+      <!-- v4.2.32 受款人編輯確認列（僅鎖定編輯模式顯示） -->
+      <div id="payee-edit-confirm-row" style="display:none; margin-top:10px;">
+        <button type="button" onclick="savePayeesOnly()" style="padding:5px 14px; background:#2e7d32; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:600;">💾 更新受款人</button>
+        <button type="button" onclick="cancelPayeeEditMode()" style="margin-left:8px; padding:5px 12px; background:#f5f5f5; color:#333; border:1px solid #999; border-radius:4px; cursor:pointer; font-size:13px;">✕ 取消</button>
       </div>
     </section>
 
@@ -2608,7 +2636,8 @@ function getFormData() {
     payees: (typeof getPayeesData === 'function') ? getPayeesData() : [],
     payee:  (typeof getPayeeData  === 'function') ? getPayeeData()  : null,
     /* v4.2.31 代墊原因（僅員工/代墊類別有意義） */
-    payeeReason: (document.getElementById('payee-reason')?.value || '').trim()
+    payeeReason: (document.getElementById('payee-reason')?.value || '').trim(),
+    prevPayees: _loadedPrevPayees,
   };
 }
 
@@ -2683,6 +2712,9 @@ function fillForm(rec) {
   /* v4.2.31 代墊原因 */
   const _prEl = document.getElementById('payee-reason');
   if (_prEl) _prEl.value = rec.payeeReason || '';
+  /* v4.2.32 還原 prevPayees */
+  _loadedPrevPayees = Array.isArray(rec.prevPayees) ? rec.prevPayees : [];
+  renderPrevPayeesDisplay(_loadedPrevPayees);
   if (typeof updatePayeeSectionVisibility === 'function') updatePayeeSectionVisibility();
 }
 
@@ -4095,13 +4127,19 @@ async function loadPayees() {
 }
 
 function _payeeFilteredByType(type) {
-  /* v4.2.17 凍結的受款人使用者端一律過濾掉（管理者 admin.html 仍可看到/解凍） */
+  /* v4.2.32：凍結的受款人仍顯示在搜尋列表（標記 _frozen:true），但排在末尾且不可選取。
+     v4.2.17 以前：一律過濾（管理者 admin.html 仍可看到/解凍）。 */
   const active = PAYEES.filter(p => !p.frozen);
+  const frozen = PAYEES.filter(p => p.frozen);
   if (type === 'vendor') {
-    return active.filter(p => !(p.bank||'').includes(NONGHUI_KW));
+    const a = active.filter(p => !(p.bank||'').includes(NONGHUI_KW));
+    const f = frozen.filter(p => !(p.bank||'').includes(NONGHUI_KW)).map(p => ({...p, _frozen:true}));
+    return [...a, ...f];
   }
   if (type === 'nonghui') {
-    return active.filter(p => (p.bank||'').includes(NONGHUI_KW));
+    const a = active.filter(p => (p.bank||'').includes(NONGHUI_KW));
+    const f = frozen.filter(p => (p.bank||'').includes(NONGHUI_KW)).map(p => ({...p, _frozen:true}));
+    return [...a, ...f];
   }
   if (type === 'employee') {
     /* 員工清單 + 已存在 active PAYEES 中對應名字的帳號資料 */
@@ -4115,7 +4153,9 @@ function _payeeFilteredByType(type) {
         result.push({ name, acctNo:'', bank:'', _placeholder:true });
       }
     });
-    return result;
+    /* 凍結的員工受款人排在末尾 */
+    const frozenEmp = frozen.filter(p => EMPLOYEE_LIST.includes(p.name)).map(p => ({...p, _frozen:true}));
+    return [...result, ...frozenEmp];
   }
   return [];
 }
@@ -4125,6 +4165,9 @@ function _payeeFilteredByType(type) {
    ══════════════════════════════════ */
 let _payeeCards = [];           // [{name, bank, acctNo, isNew, expanded, kw}, ...]
 let _npTargetCardIdx = -1;      // 新建 modal 回填目標卡
+let _prevPayeeCards = [];       // v4.2.32 受款人取代歷史（鎖定編輯前的舊資料）
+let _loadedPrevPayees = [];     // v4.2.32 從紀錄載入的 prevPayees
+let _payeeEditMode = false;     // v4.2.32 是否正在鎖定後編輯受款人
 
 function _currentFormTypeExp() {
   /* 依 form-page 的 class 或 window.formType 判斷是否為動支單 */
@@ -4175,6 +4218,116 @@ function onPayeeTypeChange() {
   _payeeCards.push({ name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'' });
   renderPayeeCards();
   updatePayeePrintLine();
+}
+
+/* v4.2.32 鎖定後修改受款人 */
+function openPayeeEditMode() {
+  if (!currentId) return;
+  _prevPayeeCards = _payeeCards.filter(c => c.name || c.bank || c.acctNo).map(c => ({...c}));
+  _payeeEditMode = true;
+  _payeeCards = [{ name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'' }];
+  renderPayeeCards();
+  renderPrevPayeesDisplay(_prevPayeeCards);
+  document.getElementById('payees-add-row').style.display = '';
+  document.getElementById('payee-edit-confirm-row').style.display = '';
+  document.getElementById('payee-edit-btn').style.display = 'none';
+  // unlock payee-type select for editing
+  document.getElementById('payee-type').removeAttribute('disabled');
+  updatePayeePrintLine();
+}
+
+function cancelPayeeEditMode() {
+  _payeeCards = _prevPayeeCards.length
+    ? _prevPayeeCards
+    : [{ name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'' }];
+  _prevPayeeCards = [];
+  _payeeEditMode = false;
+  renderPayeeCards();
+  renderPrevPayeesDisplay(_loadedPrevPayees);
+  document.getElementById('payees-add-row').style.display = 'none';
+  document.getElementById('payee-edit-confirm-row').style.display = 'none';
+  document.getElementById('payee-edit-btn').style.display = '';
+  document.getElementById('payee-type').setAttribute('disabled', '');
+  updatePayeePrintLine();
+}
+
+async function savePayeesOnly() {
+  const newPayees = getPayeesData().filter(p => p.name);
+  if (!newPayees.length) { showToast('✗ 請先選擇受款人'); return; }
+  const prevPayees = _prevPayeeCards.map(c => ({
+    type: document.getElementById('payee-type').value || '',
+    name: c.name, bank: c.bank, acctNo: c.acctNo
+  }));
+  setSyncStatus('⟳ 更新中…', 'busy');
+  try {
+    await apiPatch(currentId, { payees: newPayees, prevPayees, payee: newPayees[0] || null });
+    const idx = cachedRecords.findIndex(r => r.id === currentId);
+    if (idx >= 0) {
+      cachedRecords[idx].payees = newPayees;
+      cachedRecords[idx].prevPayees = prevPayees;
+      cachedRecords[idx].payee = newPayees[0] || null;
+    }
+    _loadedPrevPayees = prevPayees;
+    _prevPayeeCards = [];
+    _payeeEditMode = false;
+    renderPayeeCards();
+    renderPrevPayeesDisplay(_loadedPrevPayees);
+    document.getElementById('payees-add-row').style.display = 'none';
+    document.getElementById('payee-edit-confirm-row').style.display = 'none';
+    document.getElementById('payee-edit-btn').style.display = '';
+    document.getElementById('payee-type').setAttribute('disabled', '');
+    updatePayeePrintLine();
+    setSyncStatus('● 已更新受款人', 'ok');
+    setTimeout(() => { if (!_maintenance) setSyncStatus('● 已連線', 'ok'); }, 800);
+    showToast('✓ 受款人已更新');
+  } catch(e) {
+    setSyncStatus('● 已連線', 'ok');
+    showToast('✗ 更新失敗: ' + (e.message || ''));
+  }
+}
+
+function renderPrevPayeesDisplay(list) {
+  const el = document.getElementById('payee-prev-display');
+  if (!el) return;
+  if (!list || !list.length) { el.innerHTML = ''; el.style.display = 'none'; return; }
+  el.style.display = '';
+  el.innerHTML = '<div style="color:#888; font-size:12px; margin-bottom:6px; font-weight:600;">原受款人（已更換）</div>' +
+    list.map(c => {
+      const nm = esc(c.name || '—');
+      const bk = esc(c.bank || '—');
+      const ac = esc(c.acctNo || c.acctno || '—');
+      return `<div class="prev-card">${nm}　${bk}　${ac}</div>`;
+    }).join('');
+}
+
+async function freezePayeeFromSearch(cardI, k) {
+  const c = document.getElementById('payees-container');
+  const box = c?.querySelector(`.payee-card[data-idx="${cardI}"] .pc-list`);
+  const p = box?._filtered?.[k];
+  if (!p || p._frozen || p._placeholder) return;
+  const ok = await showConfirm(
+    `確定將「<strong>${esc(p.name)}</strong>」標記為作廢？<br>` +
+    `作廢後仍可搜尋到（顯示刪除線），但無法被選取，需由管理員後台「還原」。`,
+    { title: '⛔ 標記受款人作廢', okText: '確定作廢', cancelText: '取消', swapButtons: true }
+  );
+  if (!ok) return;
+  try {
+    const pass = localStorage.getItem('eaf_admin_pass') || '';
+    const r = await fetch('/api/payees', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Pass': pass },
+      body: JSON.stringify({ name: p.name, acctNo: p.acctNo, bank: p.bank, frozen: true })
+    });
+    if (r.ok) {
+      await loadPayees();
+      _payeeCardKwChange(cardI, _payeeCards[cardI]?.kw || '');
+      showToast('✓ 已標記作廢（仍可搜尋但不可選取）');
+    } else {
+      showToast('✗ 作廢失敗，請聯繫管理員');
+    }
+  } catch(_) {
+    showToast('✗ 作廢操作失敗');
+  }
 }
 
 function renderPayeeCards() {
@@ -4240,13 +4393,22 @@ function renderPayeeCardList(i) {
     return;
   }
   box.innerHTML = list.map((p, k) => {
+    if (p._frozen) {
+      return `<div class="payee-item payee-item-frozen">
+        <div><span class="pi-name">${esc(p.name||'—')}</span><span class="pi-bank">${esc(p.bank||'—')}</span><span class="pi-acct">${esc(p.acctNo||'—')}</span>　<span style="font-size:11px; color:#888;">🧊 已作廢</span></div>
+      </div>`;
+    }
     const meta = p._placeholder
       ? '<span class="pi-new">（員工清單 — 尚無帳號資料，請新建）</span>'
       : (p.isNew
           ? `<span class="pi-new">🆕 新廠商</span> 建立於 ${p.createdAt||'—'}`
           : (p.lastTransferDate ? `最後匯款：${p.lastTransferDate}` : ''));
+    const voidBtn = p._placeholder ? '' :
+      `<button type="button" class="pi-void-btn" onclick="event.stopPropagation(); freezePayeeFromSearch(${i}, ${k})"
+        title="標記此受款人為作廢"
+        style="float:right; padding:2px 8px; background:#ffebee; color:#c62828; border:1px solid #ef9a9a; border-radius:3px; font-size:11px; cursor:pointer; margin-top:-2px;">⛔ 作廢</button>`;
     return `<div class="payee-item" data-k="${k}" onclick="_pickPayeeFromBox(${i}, ${k})">
-      <div><span class="pi-name">${esc(p.name||'—')}</span><span class="pi-bank">${esc(p.bank||'—')}</span><span class="pi-acct">${esc(p.acctNo||'—')}</span></div>
+      <div>${voidBtn}<span class="pi-name">${esc(p.name||'—')}</span><span class="pi-bank">${esc(p.bank||'—')}</span><span class="pi-acct">${esc(p.acctNo||'—')}</span></div>
       <div class="pi-meta">${meta}</div>
     </div>`;
   }).join('');
@@ -4568,7 +4730,16 @@ function updatePayeePrintLine() {
   const _reasonHtml = (type === 'employee' && _reason)
     ? `<div class="pl-row" style="margin-top:4px;"><span class="pl-lbl">代墊原因：</span>${esc(_reason)}</div>`
     : '';
-  line.innerHTML = `<span class="pl-title">受款人資訊：</span>${rows}${_reasonHtml}`;
+  /* v4.2.32 前次受款人（刪除線） */
+  const _prevList = _payeeEditMode ? _prevPayeeCards : _loadedPrevPayees;
+  const _prevHtml = _prevList.length
+    ? _prevList.map(c => `<div class="pl-row" style="text-decoration:line-through; color:#aaa;">` +
+        `<span style="color:#999; font-size:10px;">（原）</span>` +
+        `<span class="pl-lbl">戶名：</span>${esc(c.name||'—')}　` +
+        `<span class="pl-lbl">帳號：</span>${esc(c.acctNo||c.acctno||'—')}` +
+        `</div>`).join('')
+    : '';
+  line.innerHTML = `<span class="pl-title">受款人資訊：</span>${_prevHtml}${rows}${_reasonHtml}`;
 }
 
 /* v4.2.22 請購單 / 動支單 皆顯示受款人資訊 */
