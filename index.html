@@ -4444,8 +4444,8 @@ function renderPayeeCardList(i) {
           : (p.lastTransferDate ? `最後匯款：${p.lastTransferDate}` : ''));
     const voidBtn = p._placeholder ? '' :
       `<button type="button" class="pi-void-btn" onclick="event.stopPropagation(); freezePayeeFromSearch(${i}, ${k})"
-        title="標記此受款人為作廢"
-        style="float:right; padding:2px 8px; background:#ffebee; color:#c62828; border:1px solid #ef9a9a; border-radius:3px; font-size:11px; cursor:pointer; margin-top:-2px;">⛔ 作廢</button>`;
+        title="操作此受款人"
+        style="float:right; padding:2px 8px; background:#f5f5f5; color:#555; border:1px solid #ccc; border-radius:3px; font-size:11px; cursor:pointer; margin-top:-2px;">操作</button>`;
     return `<div class="payee-item" data-k="${k}" onclick="_pickPayeeFromBox(${i}, ${k})">
       <div>${voidBtn}<span class="pi-name">${esc(p.name||'—')}</span><span class="pi-bank">${esc(p.bank||'—')}</span><span class="pi-acct">${esc(p.acctNo||'—')}</span></div>
       <div class="pi-meta">${meta}</div>
