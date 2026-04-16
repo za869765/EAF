@@ -1255,9 +1255,9 @@ body.sb-resizing * { pointer-events: none !important; }
           <option value="vendor">匯款廠商</option>
           <option value="nonghui">農會廠商</option>
           <option value="employee">員工/代墊</option>
-          <option value="bill">憑繳費單</option>
+          <option value="bill">憑繳費單 / 匯費</option>
         </select>
-        <span id="payee-bill-label" style="display:none; margin-left:12px; color:#c62828; font-weight:bold;">憑繳費單</span>
+        <span id="payee-bill-label" style="display:none; margin-left:12px; color:#c62828; font-weight:bold;">憑繳費單 / 匯費</span>
         <button type="button" id="payee-auto-btn" style="display:none; margin-left:12px; padding:4px 12px; background:#1565c0; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;" onclick="autoFillEmployeePayees()">🪄 從動支說明自動帶入</button>
       </div>
       <div id="payees-container" style="display:none;"></div>
@@ -2013,6 +2013,7 @@ const ITEM_TYPE_PURPOSES = ['3201','3298'];
 let itemType = 'consumable';   /* consumable | nonconsumable | property */
 
 let _suppressAutoFill = false;   /* 載入已存記錄時抑制自動填入 */
+let _auto2706Bill = false;       /* 2706 自動帶入「憑繳費單/匯費」旗標 */
 /* v4.2.14: 鎖定狀態下預算科目變動偵測（只有真的跟 baseline 不同才顯示 💾 確認更新科目，
    並且把 _editingSaved 設為 true 防止使用者切換紀錄） */
 let _subjectBaseline = null;
@@ -2288,6 +2289,13 @@ function onPurposeChange() {
       const notesEl = document.getElementById('notes');
       if (!notesEl.value.trim()) notesEl.value = getAutoText('transferFee', '匯費無收據');
     }
+    /* 受款人類別自動帶入「憑繳費單 / 匯費」（空白時才觸發） */
+    const _ptEl = document.getElementById('payee-type');
+    if (_ptEl && !_ptEl.value) {
+      _ptEl.value = 'bill';
+      _auto2706Bill = true;
+      onPayeeTypeChange();
+    }
   }
 
   /* 離開 2706：若第一列仍是自動帶入的預設值則清除（使用者已修改過的不影響） */
@@ -2309,6 +2317,12 @@ function onPurposeChange() {
       calcRow(0);
     }
     if (nameMatch || priceMatch) calcTotal();
+    /* 受款人類別若由 2706 自動帶入，離開時清除 */
+    if (_auto2706Bill) {
+      const _ptEl = document.getElementById('payee-type');
+      if (_ptEl && _ptEl.value === 'bill') { _ptEl.value = ''; onPayeeTypeChange(); }
+      _auto2706Bill = false;
+    }
   }
   updateBudgetInfo();
   _checkSubjectDirty();
@@ -2740,7 +2754,7 @@ function validatePayeeBeforeSave(data) {
   if (data.voided) return true;
   const pType = document.getElementById('payee-type')?.value || '';
   if (!pType) {
-    showAlert('請先選擇受款人資料<br><br>（類別：匯款廠商 / 農會廠商 / 員工/代墊 / 憑繳費單）', '⚠️');
+    showAlert('請先選擇受款人資料<br><br>（類別：匯款廠商 / 農會廠商 / 員工/代墊 / 憑繳費單 / 匯費）', '⚠️');
     document.getElementById('payee-type')?.focus();
     return false;
   }
@@ -4274,7 +4288,11 @@ function cancelPayeeEditMode() {
 }
 
 async function savePayeesOnly() {
-  const newPayees = getPayeesData().filter(p => p.name);
+  const _pType = document.getElementById('payee-type')?.value || '';
+  /* bill 類型無需帳號卡片，直接允許更新 */
+  const newPayees = _pType === 'bill'
+    ? getPayeesData()
+    : getPayeesData().filter(p => p.name);
   if (!newPayees.length) { showToast('✗ 請先選擇受款人'); return; }
   const prevPayees = _prevPayeeCards.map(c => ({
     type: document.getElementById('payee-type').value || '',
@@ -4750,7 +4768,7 @@ function updatePayeePrintLine() {
   if (!line) return;
   const type = document.getElementById('payee-type')?.value || '';
   if (!type) { line.innerHTML = ''; return; }
-  if (type === 'bill') { line.innerHTML = '<span class="pl-title">受款人資訊：</span>　憑繳費單'; return; }
+  if (type === 'bill') { line.innerHTML = '<span class="pl-title">受款人資訊：</span>　憑繳費單 / 匯費'; return; }
   const cards = _payeeCards.filter(c => c.name || c.bank || c.acctNo);
   if (!cards.length) { line.innerHTML = ''; return; }
   const rows = cards.map((c, i) => {
