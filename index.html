@@ -3003,6 +3003,7 @@ function cancelEdit() {
     loadRecord(currentId);
   } else {
     currentId = null;
+    _editingSaved = false;
     document.getElementById('form-page').classList.add('inactive');
     document.getElementById('form-page').classList.remove('locked');
     hideAllBtns();
@@ -4815,8 +4816,11 @@ window.addEventListener('afterprint', () => {
   <div class="unsaved-box">
     <div class="unsaved-icon">⚠️</div>
     <div class="unsaved-title">目前修改的尚未存檔</div>
-    <div class="unsaved-msg">請先按「確定存檔」儲存，<br>或按「放棄修改」離開編輯模式。</div>
-    <button class="unsaved-ok" onclick="closeUnsavedModal()">確定</button>
+    <div class="unsaved-msg">請先存檔，或放棄修改後再繼續。</div>
+    <div style="display:flex; gap:10px; justify-content:center; margin-top:4px;">
+      <button class="unsaved-ok" style="background:#1565c0;" onclick="closeUnsavedModal()">✏️ 繼續編輯</button>
+      <button class="unsaved-ok" style="background:#b71c1c;" onclick="closeUnsavedModal(); cancelEdit();">↩ 放棄修改</button>
+    </div>
   </div>
 </div>
 
