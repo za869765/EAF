@@ -680,13 +680,23 @@ body.sb-resizing * { pointer-events: none !important; }
 #payee-section .payee-item .pi-meta { color: #888; font-size: 11px; margin-top: 2px; }
 #payee-section .payee-item .pi-new { color: #e65100; font-weight: bold; }
 
-/* v4.2.32 鎖定後受款人區塊：隱藏新增/操作按鈕，僅允許獨立修改按鈕 */
-#form-page.locked #payees-add-row { display: none !important; }
+/* v4.2.33 鎖定後受款人區塊：隱藏新增/操作按鈕，僅允許獨立修改按鈕 */
+#form-page.locked #payees-add-row { display: none; }
 #form-page:not(.locked) #payee-edit-btn { display: none !important; }
 #form-page.locked.voided #payee-edit-btn { display: none !important; }
 #form-page.locked #payee-section .pc-unpick,
 #form-page.locked #payee-section .pc-remove,
 #form-page.locked #payee-section .payee-btn-new { pointer-events: none; opacity: 0.45; }
+/* v4.2.33 payee-editing 模式：覆蓋鎖定限制，讓編輯 UI 正常互動 */
+#form-page.locked #payee-section.payee-editing input,
+#form-page.locked #payee-section.payee-editing textarea,
+#form-page.locked #payee-section.payee-editing select { pointer-events: auto !important; }
+#form-page.locked #payee-section.payee-editing #payees-add-row { display: block; }
+#form-page.locked #payee-section.payee-editing .pc-unpick,
+#form-page.locked #payee-section.payee-editing .pc-remove,
+#form-page.locked #payee-section.payee-editing .payee-btn-new { pointer-events: auto; opacity: 1; }
+/* v4.2.33 代墊原因：鎖定時仍可編輯（非作廢），淡黃底提示 */
+#form-page.locked:not(.voided) #payee-reason { pointer-events: auto !important; background: #fff8e1 !important; border-color: #ffa726 !important; }
 /* 作廢受款人：在搜尋列表中顯示刪除線 */
 .payee-item.payee-item-frozen { opacity: 0.6; pointer-events: none; cursor: default; }
 .payee-item.payee-item-frozen .pi-name,
@@ -945,7 +955,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.32</div>
+      <div id="sb-version">v4.2.33</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1257,11 +1267,11 @@ body.sb-resizing * { pointer-events: none !important; }
       <!-- v4.2.31 代墊原因（僅員工/代墊類別顯示，選填） -->
       <div id="row-payee-reason" class="payee-row" style="display:none; margin-top:10px;">
         <label class="payee-lbl">代墊原因</label>
-        <input type="text" id="payee-reason" placeholder="選填，有填寫時列印才會顯示" style="flex:1;" oninput="updatePayeePrintLine()">
+        <input type="text" id="payee-reason" placeholder="選填，有填寫時列印才會顯示" style="flex:1;" oninput="updatePayeePrintLine()" onblur="_autoSavePayeeReason()">
       </div>
-      <!-- v4.2.32 前次受款人歷史（被取代時顯示刪除線） -->
+      <!-- v4.2.33 前次受款人歷史（被取代時顯示刪除線） -->
       <div id="payee-prev-display" style="display:none; margin-top:8px;"></div>
-      <!-- v4.2.32 受款人編輯確認列（僅鎖定編輯模式顯示） -->
+      <!-- v4.2.33 受款人編輯確認列（僅鎖定編輯模式顯示） -->
       <div id="payee-edit-confirm-row" style="display:none; margin-top:10px;">
         <button type="button" onclick="savePayeesOnly()" style="padding:5px 14px; background:#2e7d32; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:600;">💾 更新受款人</button>
         <button type="button" onclick="cancelPayeeEditMode()" style="margin-left:8px; padding:5px 12px; background:#f5f5f5; color:#333; border:1px solid #999; border-radius:4px; cursor:pointer; font-size:13px;">✕ 取消</button>
@@ -2712,7 +2722,7 @@ function fillForm(rec) {
   /* v4.2.31 代墊原因 */
   const _prEl = document.getElementById('payee-reason');
   if (_prEl) _prEl.value = rec.payeeReason || '';
-  /* v4.2.32 還原 prevPayees */
+  /* v4.2.33 還原 prevPayees */
   _loadedPrevPayees = Array.isArray(rec.prevPayees) ? rec.prevPayees : [];
   renderPrevPayeesDisplay(_loadedPrevPayees);
   if (typeof updatePayeeSectionVisibility === 'function') updatePayeeSectionVisibility();
@@ -2948,11 +2958,14 @@ async function loadRecord(id) {
         if (el) { el.removeAttribute('disabled'); el.removeAttribute('readonly'); }
       });
       /* v4.2.14: 設定 baseline，按鈕預設隱藏，等使用者真的改到科目才顯示 */
+      /* v4.2.33 baseline 的 lecturer 與 fillForm 邏輯一致，避免舊紀錄欄位差異導致誤判 dirty */
+      const _blLecturer = (rec.lecturerType === 'lecturer' || rec.lecturerType === 'bonus' || rec.lecturerType === 'promo')
+                          ? rec.lecturerType : (rec.isLecturer || '');
       _subjectBaseline = {
         main:     rec.acctCode    || '',
         bp:       rec.bpCode      || '',
         purpose:  rec.purposeCode || '',
-        lecturer: rec.isLecturer  || '',
+        lecturer: _blLecturer,
         taxDoc:   rec.taxDocType4501 || ''
       };
       document.getElementById('save-btn').innerHTML = isUnclassified ? '💾 補登存檔' : '💾 確認更新科目';
@@ -3061,6 +3074,9 @@ function lockForm() {
   page.querySelectorAll('input, textarea').forEach(el => el.setAttribute('readonly',''));
   /* select 需加 disabled 才能真正禁止點選；未分類例外在 loadRecord 內移除 */
   page.querySelectorAll('select').forEach(el => el.setAttribute('disabled',''));
+  /* v4.2.33 例外：代墊原因隨時可輸入（非作廢），類似預算科目例外 */
+  const _prLock = document.getElementById('payee-reason');
+  if (_prLock) _prLock.removeAttribute('readonly');
   _setBtn('save-btn',    'none');
   _setBtn('cancel-btn',  'none');
   _setBtn('clear-btn',   'none');
@@ -4127,7 +4143,7 @@ async function loadPayees() {
 }
 
 function _payeeFilteredByType(type) {
-  /* v4.2.32：凍結的受款人仍顯示在搜尋列表（標記 _frozen:true），但排在末尾且不可選取。
+  /* v4.2.33：凍結的受款人仍顯示在搜尋列表（標記 _frozen:true），但排在末尾且不可選取。
      v4.2.17 以前：一律過濾（管理者 admin.html 仍可看到/解凍）。 */
   const active = PAYEES.filter(p => !p.frozen);
   const frozen = PAYEES.filter(p => p.frozen);
@@ -4165,9 +4181,9 @@ function _payeeFilteredByType(type) {
    ══════════════════════════════════ */
 let _payeeCards = [];           // [{name, bank, acctNo, isNew, expanded, kw}, ...]
 let _npTargetCardIdx = -1;      // 新建 modal 回填目標卡
-let _prevPayeeCards = [];       // v4.2.32 受款人取代歷史（鎖定編輯前的舊資料）
-let _loadedPrevPayees = [];     // v4.2.32 從紀錄載入的 prevPayees
-let _payeeEditMode = false;     // v4.2.32 是否正在鎖定後編輯受款人
+let _prevPayeeCards = [];       // v4.2.33 受款人取代歷史（鎖定編輯前的舊資料）
+let _loadedPrevPayees = [];     // v4.2.33 從紀錄載入的 prevPayees
+let _payeeEditMode = false;     // v4.2.33 是否正在鎖定後編輯受款人
 
 function _currentFormTypeExp() {
   /* 依 form-page 的 class 或 window.formType 判斷是否為動支單 */
@@ -4220,18 +4236,21 @@ function onPayeeTypeChange() {
   updatePayeePrintLine();
 }
 
-/* v4.2.32 鎖定後修改受款人 */
+/* v4.2.33 鎖定後修改受款人 */
 function openPayeeEditMode() {
   if (!currentId) return;
   _prevPayeeCards = _payeeCards.filter(c => c.name || c.bank || c.acctNo).map(c => ({...c}));
   _payeeEditMode = true;
   _payeeCards = [{ name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'' }];
+  /* v4.2.33 加 payee-editing class 解除 CSS 鎖定限制 */
+  document.getElementById('payee-section').classList.add('payee-editing');
   renderPayeeCards();
   renderPrevPayeesDisplay(_prevPayeeCards);
-  document.getElementById('payees-add-row').style.display = '';
+  /* 移除 payee 區段內所有 input 的 readonly（排除 payee-reason） */
+  document.querySelectorAll('#payees-container input, #payees-add-row input').forEach(el => el.removeAttribute('readonly'));
   document.getElementById('payee-edit-confirm-row').style.display = '';
   document.getElementById('payee-edit-btn').style.display = 'none';
-  // unlock payee-type select for editing
+  /* 解鎖 payee-type select */
   document.getElementById('payee-type').removeAttribute('disabled');
   updatePayeePrintLine();
 }
@@ -4242,9 +4261,9 @@ function cancelPayeeEditMode() {
     : [{ name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'' }];
   _prevPayeeCards = [];
   _payeeEditMode = false;
+  document.getElementById('payee-section').classList.remove('payee-editing');
   renderPayeeCards();
   renderPrevPayeesDisplay(_loadedPrevPayees);
-  document.getElementById('payees-add-row').style.display = 'none';
   document.getElementById('payee-edit-confirm-row').style.display = 'none';
   document.getElementById('payee-edit-btn').style.display = '';
   document.getElementById('payee-type').setAttribute('disabled', '');
@@ -4258,9 +4277,11 @@ async function savePayeesOnly() {
     type: document.getElementById('payee-type').value || '',
     name: c.name, bank: c.bank, acctNo: c.acctNo
   }));
+  /* v4.2.33 同時帶入代墊原因 */
+  const payeeReason = (document.getElementById('payee-reason')?.value || '').trim();
   setSyncStatus('⟳ 更新中…', 'busy');
   try {
-    await apiPatch(currentId, { payees: newPayees, prevPayees, payee: newPayees[0] || null });
+    await apiPatch(currentId, { payees: newPayees, prevPayees, payee: newPayees[0] || null, payeeReason });
     const idx = cachedRecords.findIndex(r => r.id === currentId);
     if (idx >= 0) {
       cachedRecords[idx].payees = newPayees;
@@ -4270,9 +4291,9 @@ async function savePayeesOnly() {
     _loadedPrevPayees = prevPayees;
     _prevPayeeCards = [];
     _payeeEditMode = false;
+    document.getElementById('payee-section').classList.remove('payee-editing');
     renderPayeeCards();
     renderPrevPayeesDisplay(_loadedPrevPayees);
-    document.getElementById('payees-add-row').style.display = 'none';
     document.getElementById('payee-edit-confirm-row').style.display = 'none';
     document.getElementById('payee-edit-btn').style.display = '';
     document.getElementById('payee-type').setAttribute('disabled', '');
@@ -4298,6 +4319,19 @@ function renderPrevPayeesDisplay(list) {
       const ac = esc(c.acctNo || c.acctno || '—');
       return `<div class="prev-card">${nm}　${bk}　${ac}</div>`;
     }).join('');
+}
+
+/* v4.2.33 代墊原因鎖定後自動存檔（onblur 觸發） */
+async function _autoSavePayeeReason() {
+  const page = document.getElementById('form-page');
+  if (!page.classList.contains('locked') || page.classList.contains('voided')) return;
+  if (!currentId) return;
+  const val = (document.getElementById('payee-reason')?.value || '').trim();
+  try {
+    await apiPatch(currentId, { payeeReason: val });
+    const idx = cachedRecords.findIndex(r => r.id === currentId);
+    if (idx >= 0) cachedRecords[idx].payeeReason = val;
+  } catch(_) { /* silent fail */ }
 }
 
 async function freezePayeeFromSearch(cardI, k) {
@@ -4333,6 +4367,7 @@ async function freezePayeeFromSearch(cardI, k) {
 function renderPayeeCards() {
   const c = document.getElementById('payees-container');
   if (!c) return;
+  const _isLockedForm = document.getElementById('form-page')?.classList.contains('locked') && !_payeeEditMode;
   c.innerHTML = _payeeCards.map((card, i) => {
     const hasData = card.name || card.bank || card.acctNo;
     const removable = _payeeCards.length > 1;
@@ -4341,11 +4376,13 @@ function renderPayeeCards() {
       : '';
     if (hasData && !card.expanded) {
       const newMark = card.isNew ? '　<span style="color:#e65100; font-weight:bold;">★新受款人</span>' : '';
+      /* v4.2.33 鎖定模式的「變更」改為觸發 openPayeeEditMode() */
+      const unpickFn = _isLockedForm ? 'openPayeeEditMode()' : `unpickPayeeCard(${i})`;
       return `<div class="payee-card" data-idx="${i}">
         <div class="pc-header"><span class="pc-title">受款人 #${i+1}</span>${removeBtn}</div>
         <div class="pc-selected">
           <span class="pc-selected-text">${esc(card.name)}　<span style="color:#555; font-weight:normal;">${esc(card.bank)}　${esc(card.acctNo)}</span>${newMark}</span>
-          <button type="button" class="pc-unpick" onclick="unpickPayeeCard(${i})">變更</button>
+          <button type="button" class="pc-unpick" onclick="${unpickFn}">變更</button>
         </div>
       </div>`;
     }
@@ -4730,7 +4767,7 @@ function updatePayeePrintLine() {
   const _reasonHtml = (type === 'employee' && _reason)
     ? `<div class="pl-row" style="margin-top:4px;"><span class="pl-lbl">代墊原因：</span>${esc(_reason)}</div>`
     : '';
-  /* v4.2.32 前次受款人（刪除線） */
+  /* v4.2.33 前次受款人（刪除線） */
   const _prevList = _payeeEditMode ? _prevPayeeCards : _loadedPrevPayees;
   const _prevHtml = _prevList.length
     ? _prevList.map(c => `<div class="pl-row" style="text-decoration:line-through; color:#aaa;">` +
