@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.0</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -374,7 +374,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.0</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.1</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <a class="tbtn tbtn-blue" href="/acc-import.html" style="background:#4a148c;">📥 傳票匯入</a>
@@ -386,6 +386,8 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   <button class="tab-btn active" onclick="switchTab('home',this)">🏠 首頁</button>
   <button class="tab-btn" onclick="switchTab('work',this)">🔔 月底結算</button>
   <button class="tab-btn" onclick="switchTab('voucher',this)">📄 轉帳傳票</button>
+  <button class="tab-btn" onclick="switchTab('income',this)">📥 收入傳票</button>
+  <button class="tab-btn" onclick="switchTab('expense',this)">📤 支出傳票</button>
   <button class="tab-btn" onclick="switchTab('inventory',this)">📦 醫療用品庫存</button>
   <button class="tab-btn" onclick="switchTab('property',this)">🏚️ 財產管理</button>
   <button class="tab-btn" onclick="switchTab('allowance',this)">🔻 備抵醫療折讓</button>
@@ -951,6 +953,37 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   </div>
 </div><!-- /tab-voucher -->
 
+<!-- ══════════════════════════════════════════
+     TAB：收入傳票（v4.4.1 — 從 acc_voucher_entries 匯入版讀取）
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-income">
+  <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
+    <span style="font-size:13px; font-weight:700; color:#fff;" id="income-title">收入傳票</span>
+    <span id="income-stat" style="font-size:11px; color:#90a4ae;"></span>
+    <label style="margin-left:auto;font-size:11px;color:#90a4ae;display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" id="income-year-mode" onchange="renderImportedVouchers('收入')"> 顯示整年
+    </label>
+  </div>
+  <div class="card"><div class="card-bd" style="padding:0;" id="income-body">
+    <div style="padding:24px;text-align:center;color:#78909c;">載入中…</div>
+  </div></div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     TAB：支出傳票（v4.4.1 — 從 acc_voucher_entries 匯入版讀取）
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-expense">
+  <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
+    <span style="font-size:13px; font-weight:700; color:#fff;" id="expense-title">支出傳票</span>
+    <span id="expense-stat" style="font-size:11px; color:#90a4ae;"></span>
+    <label style="margin-left:auto;font-size:11px;color:#90a4ae;display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" id="expense-year-mode" onchange="renderImportedVouchers('支出')"> 顯示整年
+    </label>
+  </div>
+  <div class="card"><div class="card-bd" style="padding:0;" id="expense-body">
+    <div style="padding:24px;text-align:center;color:#78909c;">載入中…</div>
+  </div></div>
+</div>
 
 <!-- ══════════════════════════════════════════
      TAB 3：醫療用品庫存
@@ -1626,6 +1659,8 @@ async function switchTab(name, btn){
     public:    ()=> renderPublicTab(),
     inventory: ()=>{ renderInvLedger('drug'); renderInvLedger('supply'); },
     property:  ()=> updateDeprBalance(),
+    income:    ()=> renderImportedVouchers('收入'),
+    expense:   ()=> renderImportedVouchers('支出'),
   };
   if(TAB_RENDERS[name]) TAB_RENDERS[name]();
 }
@@ -1655,6 +1690,8 @@ function onYmChange(){
   renderPayable();
   renderCustodial();
   renderSurplusTab();
+  renderImportedVouchers('收入');
+  renderImportedVouchers('支出');
   /* renderInvLedger → updatePrevMonthLabels → STATE._invCurBal 已更新，重算校正量 */
   calcInv();
 }
@@ -5002,8 +5039,27 @@ async function onAccEntriesUpload(inp){
     }
     if (!out.length) throw new Error('沒解析到任何分錄，請確認檔案格式');
 
+    // v4.4.1 前端 diff：比對上傳前 AccV2 快照 → 新增 / 更新 / 略過（per type）
+    await AccV2.ensure();
+    const beforeMap = new Map();
+    (AccV2._entries||[]).forEach(e => beforeMap.set(`${e.voucher_no}#${e.seq}`, e));
+    const sameFields = (a,b) =>
+      a.debit===b.debit && a.credit===b.credit &&
+      (a.subject||'')===(b.subject||'') && (a.sub_account||'')===(b.sub_account||'') &&
+      (a.purpose||'')===(b.purpose||'') && (a.description||'')===(b.description||'') &&
+      (a.make_date||'')===(b.make_date||'');
+    const stats = {};
+    const typeIcon = { '收入':'📥', '支出':'📤', '轉帳':'🔄', '其他':'⚪' };
+    out.forEach(r => {
+      const t = (r.voucher_type in typeIcon) ? r.voucher_type : '其他';
+      if(!stats[t]) stats[t] = { add:0, upd:0, skip:0 };
+      const prev = beforeMap.get(`${r.voucher_no}#${r.seq}`);
+      if(!prev) stats[t].add++;
+      else if(sameFields(prev, r)) stats[t].skip++;
+      else stats[t].upd++;
+    });
+
     const CHUNK = 500;
-    let ins=0, upd=0;
     for (let i=0;i<out.length;i+=CHUNK){
       const chunk = out.slice(i,i+CHUNK);
       const resp = await fetch('/api/acc/v2/entries', {
@@ -5013,30 +5069,24 @@ async function onAccEntriesUpload(inp){
       });
       const j = await resp.json();
       if (!resp.ok) throw new Error(j.error || ('HTTP '+resp.status));
-      ins += j.inserted||0; upd += j.updated||0;
-    }
-    const byType = {}; const vset = new Set();
-    let deb=0, cre=0;
-    for (const r of out){
-      byType[r.voucher_type] = (byType[r.voucher_type]||0)+1;
-      vset.add(r.voucher_no); deb += r.debit; cre += r.credit;
     }
     const ymArr = [...new Set(out.map(r=>r.ym).filter(Boolean))].sort();
-    const tag = (txt,color='#e3f2fd',fg='#1565c0') =>
-      `<span style="display:inline-block;background:${color};color:${fg};padding:3px 10px;border-radius:12px;margin:3px 4px 0 0;font-size:12px;">${txt}</span>`;
-    box.innerHTML =
-      tag(`✅ 新增 ${ins} 筆`,'#d9f5d9','#1a6b1a') +
-      tag(`~ 覆寫 ${upd} 筆`,'#ffe9c7','#8a4a00') +
-      tag(`分錄 ${out.length}`) +
-      tag(`傳票 ${vset.size} 張`) +
-      Object.entries(byType).map(([t,n])=>tag(`${t} ${n}`)).join('') +
-      tag(`借方 ${deb.toLocaleString()}`) +
-      tag(`貸方 ${cre.toLocaleString()}`) +
-      tag(deb===cre?'✓ 借貸平衡':'✗ 不平 '+(deb-cre), deb===cre?'#d9f5d9':'#f8d7d7', deb===cre?'#1a6b1a':'#8a1a1a') +
-      tag(`ym: ${ymArr.join(', ')||'(空)'}`);
-    // v4.4.0 匯入成功 → 重新拉 AccV2 並重繪
+    const lines = Object.keys(stats).map(t => {
+      const s = stats[t];
+      return `${typeIcon[t]} ${t}傳票：✅ 新增 ${s.add} ｜ 🔁 更新 ${s.upd} ｜ ⏭ 略過 ${s.skip}`;
+    });
+    const totalAdd = Object.values(stats).reduce((s,x)=>s+x.add,0);
+    const totalUpd = Object.values(stats).reduce((s,x)=>s+x.upd,0);
+    const totalSkip= Object.values(stats).reduce((s,x)=>s+x.skip,0);
+    box.innerHTML = `<div style="background:#e8f5e9;color:#1b5e20;padding:12px 14px;border-radius:6px;font-size:13px;line-height:1.8;">
+      <b>✅ 匯入完成</b> — ${out.length} 筆分錄（ym: ${ymArr.join(', ')||'空'}）<br>
+      ${lines.map(l=>l.replace(/</g,'&lt;')).join('<br>')}
+    </div>`;
+    alert(`✅ 匯入完成（${out.length} 筆）\n\n${lines.join('\n')}\n\n合計：新增 ${totalAdd}，更新 ${totalUpd}，略過 ${totalSkip}`);
     await AccV2.refresh();
-    renderPayable(); renderCustodial(); renderSurplusTab(); updateHomeDashboard();
+    renderPayable(); renderCustodial(); renderSurplusTab();
+    renderImportedVouchers('收入'); renderImportedVouchers('支出');
+    updateHomeDashboard();
   } catch (e) {
     box.innerHTML = '<span style="color:#c62828;font-weight:600;">❌ '+e.message+'</span>';
     console.error(e);
@@ -5549,6 +5599,63 @@ function renderSurplusTab(){
   if(initEl) initEl.textContent = fmt(initVal);
   if(addEl)  addEl.textContent  = totalAdd > 0 ? fmt(totalAdd) : '0';
   if(balEl)  balEl.textContent  = fmt(bal);
+}
+
+/* ════════════════════════════════════════════
+   v4.4.1 收入 / 支出 / 轉帳 傳票 — 匯入版 (acc_voucher_entries) 唯讀呈現
+   ════════════════════════════════════════════ */
+function renderImportedVouchers(type){
+  const { y, ym, label } = getYm();
+  const key = type === '收入' ? 'income' : (type === '支出' ? 'expense' : null);
+  if(!key) return;
+  const yearMode = document.getElementById(key+'-year-mode')?.checked;
+  const title = document.getElementById(key+'-title');
+  const stat  = document.getElementById(key+'-stat');
+  const body  = document.getElementById(key+'-body');
+  if(!body) return;
+  if(title) title.textContent = (yearMode ? `${y}年度 全部 ` : `${label} `) + type + '傳票（匯入版 D1）';
+  const rows = yearMode ? AccV2.entries({ type, yearPrefix: y }) : AccV2.entries({ type, ym });
+  const groups = new Map();
+  rows.forEach(e=>{
+    if(!groups.has(e.voucher_no)) groups.set(e.voucher_no, { no:e.voucher_no, date:e.make_date, entries:[] });
+    groups.get(e.voucher_no).entries.push(e);
+  });
+  const list = [...groups.values()].sort((a,b)=>(b.date||'').localeCompare(a.date||'') || b.no.localeCompare(a.no));
+  const tD = rows.reduce((s,e)=>s+(e.debit||0),0);
+  const tC = rows.reduce((s,e)=>s+(e.credit||0),0);
+  if(stat) stat.textContent = `${list.length} 張 ｜ ${rows.length} 筆分錄 ｜ 借 ${tD.toLocaleString()} ｜ 貸 ${tC.toLocaleString()}${tD===tC?' ✓':' ✗ 不平'}`;
+  if(!list.length){
+    body.innerHTML = `<div style="padding:32px;text-align:center;color:#78909c;">📭 尚無${type}傳票 —— 請至「月底結算」匯入 FNWFRX0090 Excel</div>`;
+    return;
+  }
+  const hd = type === '收入' ? 'hd-green' : 'hd-red';
+  body.innerHTML = list.map(g=>{
+    const gD = g.entries.reduce((s,e)=>s+(e.debit||0),0);
+    const gC = g.entries.reduce((s,e)=>s+(e.credit||0),0);
+    return `<div style="border-bottom:6px solid #eceff1;">
+      <div class="card-hd ${hd}">📄 ${g.no}　<span style="font-size:11px;opacity:.85;margin-left:6px;">${g.date||''}</span>
+        <span style="margin-left:auto;font-size:12px;">${g.entries.length} 筆 ｜ 借 ${gD.toLocaleString()} ｜ 貸 ${gC.toLocaleString()}${gD===gC?' ✓':' ✗'}</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:#f5f5f5;color:#546e7a;">
+          <th style="padding:6px 10px;text-align:left;width:30px;">序</th>
+          <th style="padding:6px 10px;text-align:left;width:170px;">會計科目</th>
+          <th style="padding:6px 10px;text-align:left;width:160px;">沖銷科目/用途</th>
+          <th style="padding:6px 10px;text-align:left;">摘要</th>
+          <th style="padding:6px 10px;text-align:right;width:92px;">借方</th>
+          <th style="padding:6px 10px;text-align:right;width:92px;">貸方</th>
+        </tr></thead>
+        <tbody>${g.entries.sort((a,b)=>a.seq-b.seq).map((e,i)=>`<tr style="${i%2?'background:#fafafa':''}">
+          <td style="padding:5px 10px;color:#546e7a;">${e.seq}</td>
+          <td style="padding:5px 10px;">${(e.subject||'').replace(/</g,'&lt;')}</td>
+          <td style="padding:5px 10px;font-size:11px;color:#546e7a;">${[(e.sub_account||''),(e.purpose||'')].filter(Boolean).join(' / ').replace(/</g,'&lt;')}</td>
+          <td style="padding:5px 10px;font-size:11px;">${(e.description||'').replace(/</g,'&lt;')}</td>
+          <td style="padding:5px 10px;text-align:right;color:#1565c0;font-weight:${e.debit?'600':'400'};">${e.debit?e.debit.toLocaleString():''}</td>
+          <td style="padding:5px 10px;text-align:right;color:#c62828;font-weight:${e.credit?'600':'400'};">${e.credit?e.credit.toLocaleString():''}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+  }).join('');
 }
 
 function initInitBalCard(){
