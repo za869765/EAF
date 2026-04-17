@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.3.1</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -374,7 +374,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.3.1</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.0</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <a class="tbtn tbtn-blue" href="/acc-import.html" style="background:#4a148c;">📥 傳票匯入</a>
@@ -4547,34 +4547,72 @@ function seed114Vouchers(){
 
 
 /* ════════════════════════════════════════════
-   應付費用 210205 — 種子資料 + 渲染
+   v4.4.0 AccV2 資料層 — 所有分頁以伺服器 voucher_entries / monthly 為唯一真實來源
    ════════════════════════════════════════════ */
-const PAYABLE_SEED = {
-  asOf:'11503', account:'210205', name:'應付費用', total:115323,
-  categories:[
-    { code:'01', name:'繳局統籌款', subtotal:25862, note:'依規定繳回局端，不可分配給員工', entries:[
-      { ym:'11501', day:30, ref:'300002 序27', desc:'114年度雜項收入：繳局統籌款(66123×0.95×0.1=6,281)+11409醫師獎勵金(3300×0.95×0.9×0.7=1,975)', amt:8256 },
-      { ym:'11501', day:30, ref:'300003 序2',  desc:'11501當月繳局統籌款525+3,310+1,418=5,253', amt:5253 },
-      { ym:'11502', day:26, ref:'300004 序17', desc:'114年度雜項收入：繳局統籌款(900×0.95×0.1=86)+11409醫師獎勵金(900×0.95×0.9×0.7=538)', amt:624 },
-      { ym:'11502', day:26, ref:'300004 序31', desc:'11502當月繳局統籌款378+719+4,527=7,186', amt:7186 },
-      { ym:'11503', day:31, ref:'300005 序15', desc:'114年度雜項收入：繳局統籌款(6224×0.1=622)+11412醫師獎勵金(6,224×0.9×0.7=3,921)', amt:4543 }
-    ]},
-    { code:'02a', name:'醫師獎勵金', subtotal:37600, note:'醫師診療績效獎金（雜項收入×0.95×0.9×0.7）', entries:[
-      { ym:'11501', day:30, ref:'300002 序26', desc:'11404醫師獎勵金(62823×0.95×0.9×0.7=37,600)', amt:37600 },
-    ]},
-    { code:'02b', name:'員工獎勵金', subtotal:29977, note:'員工績效獎勵金（雜項收入×0.95×0.9×0.3）', entries:[
-      { ym:'11412', day:31, ref:'300114 序2',  desc:'114.12員工獎勵金', amt:11104 },
-      { ym:'11501', day:30, ref:'300002 序26', desc:'114年度員工獎勵金(66123×0.95×0.9×0.3=16,961)', amt:16961 },
-      { ym:'11502', day:26, ref:'300004 序16', desc:'114012員工獎勵金(900×0.95×0.9×0.3=231)', amt:231 },
-      { ym:'11503', day:31, ref:'300005 序14', desc:'11412員工獎勵金(6,224×0.9×0.3=1,681)', amt:1681 }
-    ]},
-    { code:'03', name:'員工款', subtotal:21884, note:'臨時人員實領＋代扣款（勞保/健保/勞退）→ 代扣部分性質同代收款，待繳各主管機關', entries:[
-      { ym:'11503', day:31, ref:'300005 序11', desc:'11503臨時人員實領13,258元：黎欣妮6,937+方雪雲6,321', amt:13258 },
-      { ym:'11503', day:31, ref:'300005 序12', desc:'115.3臨時人員補助代扣款8,626元（勞保2,736+健保4,685+勞退1,202）', amt:8626 }
-    ]},
-    { code:'99', name:'其他', subtotal:0, note:'動支單付款（全勤禮品、電信費等）', entries:[] }
-  ]
+window.AccV2 = {
+  _entries: null,
+  _monthly: null,
+  _vouchers: null,
+  _ledger: null,
+  _config: null,
+  _loading: null,
+  async ensure(force=false){
+    if(!force && this._entries !== null) return;
+    if(this._loading) return this._loading;
+    this._loading = (async ()=>{
+      try{
+        const resp = await fetch('/api/acc/v2/bootstrap');
+        if(!resp.ok) throw new Error('HTTP '+resp.status);
+        const j = await resp.json();
+        this._entries  = j.voucher_entries || [];
+        this._monthly  = j.monthly || {};
+        this._vouchers = j.vouchers || {};
+        this._ledger   = j.ledger || {};
+        this._config   = j.config || {};
+      } catch(e){
+        console.warn('[AccV2] bootstrap failed:', e);
+        this._entries = []; this._monthly = {}; this._vouchers = {}; this._ledger = {}; this._config = {};
+      } finally {
+        this._loading = null;
+      }
+    })();
+    return this._loading;
+  },
+  refresh(){ return this.ensure(true); },
+  entries(f={}){
+    const list = this._entries || [];
+    return list.filter(e=>{
+      if(f.ym && e.ym !== f.ym) return false;
+      if(f.yearPrefix && !String(e.ym||'').startsWith(f.yearPrefix)) return false;
+      if(f.type && e.voucher_type !== f.type) return false;
+      if(f.subjectPrefix && !String(e.subject||'').startsWith(f.subjectPrefix)) return false;
+      if(f.subjectPrefixes && !f.subjectPrefixes.some(p=>String(e.subject||'').startsWith(p))) return false;
+      return true;
+    });
+  },
+  monthly(ym){ return this._monthly?.[ym]?.data || null; }
 };
+
+/* ── 應付費用 210205 類別定義（01/02a/02b/03/99），Excel sub_account 字串直判 ── */
+const PAY_CATS_DEF = [
+  { code:'01',  name:'繳局統籌款',  hd:'hd-teal',   icon:'🏦',   note:'依規定繳回局端，不可分配給員工' },
+  { code:'02a', name:'醫師獎勵金',  hd:'hd-purple', icon:'👨‍⚕️', note:'醫師診療績效獎金' },
+  { code:'02b', name:'員工獎勵金',  hd:'hd-purple', icon:'🏅',   note:'員工績效獎勵金' },
+  { code:'03',  name:'員工款',      hd:'hd-amber',  icon:'👥',   note:'臨時人員實領＋代扣款' },
+  { code:'99',  name:'其他',        hd:'hd-dark',   icon:'📋',   note:'動支單付款等' }
+];
+function payCatOf(sub_account, description){
+  const s = String(sub_account||'').replace(/\s/g,'');
+  if(s.startsWith('01')) return '01';
+  if(s.startsWith('02a')) return '02a';
+  if(s.startsWith('02b')) return '02b';
+  if(s.startsWith('02')){
+    return String(description||'').includes('醫師') ? '02a' : '02b';
+  }
+  if(s.startsWith('03')) return '03';
+  if(s.startsWith('99')) return '99';
+  return '99';
+}
 /* 補種 115-0013/0014/0015 一月進貨（picker 過濾不到，直接寫入明細帳） */
 async function seedMissingJanDrug(){
   if(localStorage.getItem('acc_fix_jan_drug_299')) return;
@@ -4605,12 +4643,6 @@ function fixMar盤損(){
   if(fixed) accSave('acc_inv_drug', data);
   localStorage.setItem('acc_fix_mar_panduan_350','1');
 }
-function migratePayableSplit02(){
-  // 將舊版 02 員工獎勵金 拆分為 02a 醫師 + 02b 員工
-  if(localStorage.getItem('acc_payable_split02')) return;
-  localStorage.removeItem('acc_payable'); // 強制重新寫入新結構
-  localStorage.setItem('acc_payable_split02','1');
-}
 async function migrateVoucher11503Full(){
   // v4：credit desc 也加 NIIS 明細，同步 D1
   if(localStorage.getItem('acc_mig_v11503_d1v4')) return;
@@ -4620,18 +4652,6 @@ async function migrateVoucher11503Full(){
   }
   localStorage.setItem('acc_mig_v11503_d1v4','1');
   console.log('[mig11503v4] D1+localStorage 已補種 11503 含NIIS明細(debit+credit)');
-}
-async function seedPayable(){
-  if(localStorage.getItem('acc_payable')) return;
-  const val = JSON.stringify(PAYABLE_SEED);
-  localStorage.setItem('acc_payable', val);
-  const pass = sessionStorage.getItem('adminPass')||'';
-  fetch('/api/acc',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Admin-Pass':pass},
-    body: JSON.stringify([{key:'acc_payable', value:val}])
-  }).catch(e=>console.warn('[seedPayable] D1 write failed:',e));
-  console.log('[seedPayable] 應付費用資料已寫入 D1');
 }
 /* 清除舊版 select option 文字污染 desc 欄位（v3.0.2 migration） */
 async function fixCorruptedDesc(){
@@ -4863,39 +4883,29 @@ async function fixDrug11503(){
   localStorage.setItem('acc_fix_drug_11503','1');
   if(changed) console.log('[fixDrug11503] 已補入11503 進貨12842+領用7800+盤損2');
 }
+/* v4.4.0 loadPayable — 從 AccV2 伺服器分錄即時聚合（無 localStorage、無 SEED） */
 function loadPayable(){
-  const raw = localStorage.getItem('acc_payable');
-  if(!raw) return PAYABLE_SEED;
-  try{
-    const data = JSON.parse(raw);
-    /* v4.3.1：dedupe — 同 category.entries 內，若 amt 相同保留 day>0 的那筆 */
-    let dirty = false;
-    (data.categories || []).forEach(cat => {
-      const entries = cat.entries || [];
-      const seen = new Map();
-      for (const e of entries) {
-        const d = Number(e.day) || 0;
-        if (seen.has(e.amt)) {
-          const prev = seen.get(e.amt);
-          const prevD = Number(prev.day) || 0;
-          if (d > prevD) seen.set(e.amt, e);
-        } else {
-          seen.set(e.amt, e);
-        }
-      }
-      if (seen.size !== entries.length) {
-        cat.entries = [...seen.values()];
-        cat.subtotal = cat.entries.reduce((s,e)=>s+(e.amt||0),0);
-        dirty = true;
-      }
+  const cats = PAY_CATS_DEF.map(c => ({ ...c, subtotal:0, entries:[] }));
+  const idx = {}; cats.forEach(c => idx[c.code] = c);
+  const rows = AccV2.entries({ type:'轉帳', subjectPrefix:'210205' });
+  rows.forEach(e => {
+    const bal = (e.credit||0) - (e.debit||0); // 貸方=應付增加, 借方=沖銷
+    if(!bal) return;
+    const code = payCatOf(e.sub_account, e.description);
+    const c = idx[code] || idx['99'];
+    const dayMatch = String(e.make_date||'').match(/\/(\d{1,2})$/);
+    c.entries.push({
+      ym: e.ym,
+      day: dayMatch ? Number(dayMatch[1]) : '',
+      ref: `${e.voucher_no||''}#${e.seq||''}`,
+      desc: e.description || '',
+      amt: bal,
+      make_date: e.make_date||''
     });
-    if (dirty) {
-      data.total = (data.categories || []).reduce((s,c)=>s+(c.subtotal||0), 0);
-      localStorage.setItem('acc_payable', JSON.stringify(data));
-      console.log('[loadPayable] 自動清除重複 entries，已回寫 localStorage');
-    }
-    return data;
-  } catch(e){ return PAYABLE_SEED; }
+    c.subtotal += bal;
+  });
+  const total = cats.reduce((s,c)=>s+c.subtotal, 0);
+  return { account:'210205', name:'應付費用', total, categories: cats };
 }
 function fmtPayDate(ym, day){
   if(!ym) return '';
@@ -4904,80 +4914,42 @@ function fmtPayDate(ym, day){
   const m = (s.slice(3,5)||'').replace(/^0/,'');
   return `${y}/${m}/${String(day||'').padStart(2,'0')}`;
 }
+/* v4.4.0 renderPayable — 純呈現，資料源：AccV2（轉帳傳票 210205 貸方） */
 function renderPayable(){
   const data = loadPayable();
-  const ym = curYm();
-  // 清除舊的動態項目
-  (data.categories||[]).forEach(cat=>{ cat.entries = (cat.entries||[]).filter(e=>!e._dyn); });
-
-  // 從最新傳票讀取當月分錄 → 動態合併至對應類別
-  const vRaw = localStorage.getItem('acc_vouchers_'+ym);
-  if(vRaw){
-    try{
-      const vs = JSON.parse(vRaw);
-      let curG = '';
-      vs.forEach(v=>{
-        if(v.group) curG = v.group;
-        // 貸方 210205 應付費用 → 依 subAccount 歸類
-        if(v.type==='credit' && (v.subject||'').includes('210205')){
-          const sub = v.subAccount||'';
-          let catCode = '03';  // 預設員工款
-          if(sub.includes('01')) catCode = '01';       // 繳局統籌款
-          else if(sub.includes('02a')) catCode = '02a'; // 醫師獎勵金
-          else if(sub.includes('02b')) catCode = '02b'; // 員工獎勵金
-          else if(sub.includes('99')) catCode = '99';   // 其他（獨立分類）
-          const cat = (data.categories||[]).find(c=>c.code===catCode);
-          if(cat){
-            cat.entries.push({ ym, day:'', ref:curG||'轉帳傳票', desc:v.desc||'', amt:v.cr||0, _dyn:true });
-          }
-        }
-      });
-    }catch(e){}
-  }
-
-  // 也合併 Picker 已選但尚未產製傳票的項目
-  const dynItems = (STATE.month.pickerItems||[]).filter(r=>r.purposeCode!=='1501'&&r.purposeCode!=='2713');
-  // 若傳票已有資料，picker items 已包含在傳票中，不重複加
-  if(dynItems.length && !vRaw){
-    const cat03 = (data.categories||[]).find(c=>c.code==='03');
-    if(cat03){
-      dynItems.forEach(r=>{
-        cat03.entries.push({ ym: r.yearMonth||ym, day:31, ref:r.voucher||r.id, desc:r.desc||r.purposeDesc, amt:r.amount, _dyn:true });
-      });
-    }
-  }
-
-  // 重算小計
-  (data.categories||[]).forEach(cat=>{ cat.subtotal = (cat.entries||[]).reduce((s,e)=>s+(e.amt||0),0); });
-  data.total = (data.categories||[]).reduce((s,c)=>s+(c.subtotal||0),0);
   const totalEl = document.getElementById('pay-total');
   if(totalEl) totalEl.textContent = fmt(data.total||0);
-  (data.categories||[]).forEach(cat=>{
+  data.categories.forEach(cat=>{
     const el = document.getElementById('pay-cat'+cat.code);
     if(el) el.textContent = fmt(cat.subtotal||0);
   });
   const sec = document.getElementById('payable-sections');
   if(!sec) return;
-  const CAT_HDR = {'01':'hd-teal','02a':'hd-purple','02b':'hd-purple','03':'hd-amber','99':'hd-dark'};
-  const CAT_ICN = {'01':'🏦','02a':'👨‍⚕️','02b':'🏅','03':'👥','99':'📋'};
-  sec.innerHTML = (data.categories||[]).map(cat=>`
+  const empty = data.categories.every(c=>!c.entries.length);
+  if(empty){
+    sec.innerHTML = `<div class="card"><div class="card-bd" style="text-align:center;padding:32px;color:#78909c;">
+      📭 此資料庫尚無轉帳傳票 —— 請至「月底結算」頁面匯入 FNWFRX0090 Excel。
+    </div></div>`;
+    return;
+  }
+  sec.innerHTML = data.categories.map(cat=>`
     <div class="card">
-      <div class="card-hd ${CAT_HDR[cat.code]||'hd-dark'}">
-        ${CAT_ICN[cat.code]||''} ${cat.code}　${cat.name}
+      <div class="card-hd ${cat.hd}">
+        ${cat.icon} ${cat.code}　${cat.name}
         <span style="margin-left:auto;font-size:13px;font-weight:700;">小計 ${fmt(cat.subtotal)}</span>
       </div>
       ${cat.note?`<div style="font-size:11px;padding:6px 12px;color:#546e7a;background:#f9f9f9;border-bottom:1px solid #e0e0e0;">💡 ${cat.note}</div>`:''}
       <div class="card-bd" style="padding:0;">
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <thead><tr style="background:#f5f5f5;color:#546e7a;">
-            <th style="padding:6px 10px;text-align:left;width:72px;">日期</th>
-            <th style="padding:6px 10px;text-align:left;width:100px;">傳票/序號</th>
+            <th style="padding:6px 10px;text-align:left;width:82px;">日期</th>
+            <th style="padding:6px 10px;text-align:left;width:130px;">傳票#序</th>
             <th style="padding:6px 10px;text-align:left;">摘要</th>
             <th style="padding:6px 10px;text-align:right;width:90px;">金額</th>
           </tr></thead>
           <tbody>
-            ${[...(cat.entries||[])].sort((a,b)=>((b.ym||'')+(b.day||0)).localeCompare((a.ym||'')+(String(a.day||0).padStart(2,'0')))).map((e,i)=>`<tr style="${i%2?'background:#fafafa':''}">
-              <td style="padding:6px 10px;color:#546e7a;white-space:nowrap;">${fmtPayDate(e.ym,e.day)}</td>
+            ${[...cat.entries].sort((a,b)=>(b.make_date||'').localeCompare(a.make_date||'')).map((e,i)=>`<tr style="${i%2?'background:#fafafa':''}">
+              <td style="padding:6px 10px;color:#546e7a;white-space:nowrap;">${e.make_date||fmtPayDate(e.ym,e.day)}</td>
               <td style="padding:6px 10px;color:#1565c0;font-size:11px;white-space:nowrap;">${(e.ref||'').replace(/</g,'&lt;')}</td>
               <td style="padding:6px 10px;color:#333;font-size:11px;">${(e.desc||'').replace(/</g,'&lt;')}</td>
               <td style="padding:6px 10px;text-align:right;font-weight:600;color:${e.amt<0?'#1b5e20':'#b71c1c'};">${fmt(Math.abs(e.amt))}${e.amt<0?' ✓':''}</td>
@@ -5062,6 +5034,9 @@ async function onAccEntriesUpload(inp){
       tag(`貸方 ${cre.toLocaleString()}`) +
       tag(deb===cre?'✓ 借貸平衡':'✗ 不平 '+(deb-cre), deb===cre?'#d9f5d9':'#f8d7d7', deb===cre?'#1a6b1a':'#8a1a1a') +
       tag(`ym: ${ymArr.join(', ')||'(空)'}`);
+    // v4.4.0 匯入成功 → 重新拉 AccV2 並重繪
+    await AccV2.refresh();
+    renderPayable(); renderCustodial(); renderSurplusTab(); updateHomeDashboard();
   } catch (e) {
     box.innerHTML = '<span style="color:#c62828;font-weight:600;">❌ '+e.message+'</span>';
     console.error(e);
@@ -5296,8 +5271,8 @@ function applyExpenseWriteoff(){
   showSaveMsg('✅ 支出傳票沖銷已套用');
 }
 
-/* ════ 應付代收款 210203 ════ */
-const CUSTODIAL_SEED = {
+/* ════ 應付代收款 210203 — v4.4.0 伺服器聚合 ════ */
+const _CUSTODIAL_SEED_DELETED = null;  /*
   asOf:'11503', account:'210203', name:'應付代收款', total:343167,
   groups:[
     { code:'21020301', name:'衛生所公務預算經費', subtotal:80011, note:'受委託代收公務預算撥款，待繳回局端', color:'hd-blue',
@@ -5391,7 +5366,7 @@ const CUSTODIAL_SEED = {
       ]
     }
   ]
-};
+};  */
 /* 自動帶入 Q1 三個月累積賸餘 + 繳局統籌款 + 員工款 */
 function seedYearQ1Data(){
   const {y} = getYm();
@@ -5418,88 +5393,98 @@ function seedYearQ1Data(){
   localStorage.setItem('acc_fix_yearq1_302','1');
   console.log('[seedYearQ1Data] Q1 三個月資料已帶入');
 }
-async function seedCustodial(){
-  if(localStorage.getItem('acc_custodial_v6')) return;
-  ['acc_custodial','acc_custodial_v2','acc_custodial_v3','acc_custodial_v4','acc_custodial_v5'].forEach(k=>localStorage.removeItem(k));
-  const val = JSON.stringify(CUSTODIAL_SEED);
-  localStorage.setItem('acc_custodial', val);
-  const pass = sessionStorage.getItem('adminPass')||'';
-  fetch('/api/acc',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','X-Admin-Pass':pass},
-    body: JSON.stringify([{key:'acc_custodial', value:val}])
-  }).catch(e=>console.warn('[seedCustodial] D1 write failed:',e));
-  localStorage.setItem('acc_custodial_v6','1');
-  console.log('[seedCustodial] 應付代收款完整明細已寫入 D1');
-}
+/* v4.4.0 代收款類別定義 + 伺服器聚合 */
+const CUST_GROUPS_DEF = [
+  { code:'21020301', name:'衛生所公務預算經費', color:'hd-blue',   note:'受委託代收公務預算撥款（僅顯示，實際明細在「公務預算」頁）' },
+  { code:'21020302', name:'各業務差旅費',       color:'hd-teal',   note:'各業務出差旅費代收保管' },
+  { code:'21020311', name:'國健科',             color:'hd-green',  note:'國民健康署業務補助款代收保管' },
+  { code:'21020312', name:'疾管科',             color:'hd-purple', note:'疾病管制署業務補助款代收保管' },
+  { code:'21020321', name:'代收款（薪資相關）', color:'hd-amber',  note:'依保險別自動分卡：公保/退撫/公健/勞健/勞保/勞退' }
+];
+/* 薪資相關 21020321 依 description 關鍵字自動分到 6 張卡片 */
+const SALARY_BUCKETS = [
+  { key:'公保', name:'🔵 公保（公務人員保險）', test: d => /公保/.test(d) },
+  { key:'退撫', name:'🟤 退撫（退休撫卹基金）', test: d => /退撫/.test(d) },
+  { key:'公健', name:'🟢 公健（公保人員健保費）', test: d => /(公健|職員健保)/.test(d) },
+  { key:'勞健', name:'🟡 勞健（勞保人員健保費）', test: d => /(勞健|勞工健保)/.test(d) },
+  { key:'勞保', name:'🔴 勞保（勞工保險費）',   test: d => /勞保/.test(d) },
+  { key:'勞退', name:'🟠 勞退（勞工退休準備金）', test: d => /勞退/.test(d) },
+  { key:'其他', name:'⚪ 其他',                  test: ()=> true }
+];
 function loadCustodial(){
-  const raw = localStorage.getItem('acc_custodial');
-  if(!raw) return CUSTODIAL_SEED;
-  try{
-    const data = JSON.parse(raw);
-    /* v4.3.1：自動 dedupe
-       - 同 sub 內，若兩筆以上 amt 相同，優先保留 day>0（真實日期）的那筆
-       - 丟掉 day='' 或 day=0 的殘留 seed
-       - 若沒有重複則完全不動
-       - 會把 subtotal / group.subtotal / data.total 重算，並回寫 localStorage */
-    let dirty = false;
-    (data.groups || []).forEach(g => {
-      (g.subs || []).forEach(sub => {
-        const entries = sub.entries || [];
-        const seen = new Map(); // (amt+desc 前 20 字) → entry（保留 day 最大者）
-        for (const e of entries) {
-          const key = (e.amt||0) + '|' + String(e.desc||'').slice(0,20);
-          const d = Number(e.day) || 0;
-          if (seen.has(key)) {
-            const prev = seen.get(key);
-            const prevD = Number(prev.day) || 0;
-            if (d > prevD) seen.set(key, e);
-          } else {
-            seen.set(key, e);
-          }
-        }
-        if (seen.size !== entries.length) {
-          sub.entries = [...seen.values()];
-          sub.subtotal = sub.entries.reduce((s,e)=>s+(e.amt||0),0);
-          dirty = true;
-        }
-      });
-      g.subtotal = (g.subs || []).reduce((s,sub)=>s+(sub.subtotal||0), 0);
-    });
-    if (dirty) {
-      data.total = (data.groups || []).reduce((s,g)=>s+(g.subtotal||0), 0);
-      localStorage.setItem('acc_custodial', JSON.stringify(data));
-      console.log('[loadCustodial] 自動清除重複 entries，已回寫 localStorage');
+  const groups = CUST_GROUPS_DEF.map(g => ({
+    ...g, subtotal:0,
+    subs: g.code==='21020321'
+      ? SALARY_BUCKETS.map(b => ({ name:b.name, key:b.key, subtotal:0, entries:[] }))
+      : [{ name:'明細', subtotal:0, entries:[] }]
+  }));
+  const idx = {}; groups.forEach(g => idx[g.code] = g);
+  const prefixes = CUST_GROUPS_DEF.map(g => g.code);
+  const rows = AccV2.entries({ subjectPrefixes: prefixes });
+  rows.forEach(e => {
+    const subject = String(e.subject||'').replace(/\s/g,'');
+    const code = prefixes.find(p => subject.startsWith(p)) || '';
+    const g = idx[code]; if(!g) return;
+    const bal = (e.credit||0) - (e.debit||0); // 貸方=代收增加, 借方=沖銷
+    if(!bal) return;
+    let sub;
+    if(code === '21020321'){
+      const b = SALARY_BUCKETS.find(x => x.test(e.description||'')) || SALARY_BUCKETS[SALARY_BUCKETS.length-1];
+      sub = g.subs.find(s => s.key === b.key);
+    } else {
+      sub = g.subs[0];
     }
-    return data;
-  } catch(e){ return CUSTODIAL_SEED; }
+    const dayMatch = String(e.make_date||'').match(/\/(\d{1,2})$/);
+    sub.entries.push({
+      ym: e.ym,
+      day: dayMatch ? Number(dayMatch[1]) : '',
+      ref: `${e.voucher_no||''}#${e.seq||''}`,
+      desc: e.description || '',
+      amt: bal,
+      make_date: e.make_date||''
+    });
+    sub.subtotal += bal;
+  });
+  groups.forEach(g => {
+    g.subs = g.subs.filter(s => s.entries.length);
+    g.subtotal = g.subs.reduce((s,x)=>s+x.subtotal, 0);
+  });
+  const total = groups.reduce((s,g)=>s+g.subtotal, 0);
+  return { account:'210203', name:'應付代收款', total, groups };
 }
 function renderCustodial(){
   const data = loadCustodial();
   const totalEl = document.getElementById('cust-total');
   if(totalEl) totalEl.textContent = fmt(data.total||0);
   const ID_MAP = {'21020301':'cust-301','21020302':'cust-302','21020311':'cust-311','21020312':'cust-312','21020321':'cust-321'};
-  (data.groups||[]).forEach(g=>{ const el=document.getElementById(ID_MAP[g.code]); if(el) el.textContent=fmt(g.subtotal||0); });
+  data.groups.forEach(g=>{ const el=document.getElementById(ID_MAP[g.code]); if(el) el.textContent=fmt(g.subtotal||0); });
   const sec = document.getElementById('custodial-sections');
   if(!sec) return;
-  sec.innerHTML = (data.groups||[]).map(g=>`
+  const empty = data.groups.every(g => !g.subs.length);
+  if(empty){
+    sec.innerHTML = `<div class="card"><div class="card-bd" style="text-align:center;padding:32px;color:#78909c;">
+      📭 此資料庫尚無代收款分錄 —— 請匯入傳票明細 Excel。
+    </div></div>`;
+    return;
+  }
+  sec.innerHTML = data.groups.map(g=>`
     <div class="card">
-      <div class="card-hd ${g.color||'hd-dark'}">
+      <div class="card-hd ${g.color}">
         🏦 ${g.code}　${g.name}
         <span style="margin-left:auto;font-size:13px;font-weight:700;">合計 ${fmt(g.subtotal)}</span>
       </div>
       ${g.note?`<div style="font-size:11px;padding:6px 12px;color:#546e7a;background:#f9f9f9;border-bottom:1px solid #e0e0e0;">💡 ${g.note}</div>`:''}
-      ${(g.subs||[]).map(sub=>`
-        <div style="padding:0 0 0 0;">
+      ${g.subs.map(sub=>`
+        <div>
           <div style="background:#eceff1;padding:5px 12px;font-size:11px;font-weight:600;color:#37474f;border-bottom:1px solid #e0e0e0;">
             ${sub.name}
             <span style="float:right;color:#1b5e20;">${fmt(sub.subtotal)}</span>
           </div>
           <table style="width:100%;border-collapse:collapse;font-size:12px;">
             <tbody>
-              ${[...(sub.entries||[])].sort((a,b)=>((b.ym||'')+(String(b.day||0).padStart(2,'0'))).localeCompare((a.ym||'')+(String(a.day||0).padStart(2,'0')))).map((e,i)=>`<tr style="${i%2?'background:#fafafa':''}">
-                <td style="padding:5px 10px;color:#546e7a;white-space:nowrap;width:70px;">${e.ym?fmtPayDate(e.ym,e.day):''}</td>
-                <td style="padding:5px 10px;color:#1565c0;font-size:11px;white-space:nowrap;width:95px;">${(e.ref||'').replace(/</g,'&lt;')}</td>
+              ${[...sub.entries].sort((a,b)=>(b.make_date||'').localeCompare(a.make_date||'')).map((e,i)=>`<tr style="${i%2?'background:#fafafa':''}">
+                <td style="padding:5px 10px;color:#546e7a;white-space:nowrap;width:80px;">${e.make_date||fmtPayDate(e.ym,e.day)}</td>
+                <td style="padding:5px 10px;color:#1565c0;font-size:11px;white-space:nowrap;width:110px;">${(e.ref||'').replace(/</g,'&lt;')}</td>
                 <td style="padding:5px 10px;color:#333;font-size:11px;">${(e.desc||'').replace(/</g,'&lt;')}</td>
                 <td style="padding:5px 10px;text-align:right;font-weight:600;color:${e.amt<0?'#b71c1c':'#1b5e20'};width:85px;">${e.amt<0?'-'+fmt(Math.abs(e.amt))+' ✓':fmt(e.amt)}</td>
               </tr>`).join('')}
@@ -6669,18 +6654,16 @@ function logout(){ window.location.href = '/admin.html'; }
   /* init: renderInvLedger → updatePrevMonthLabels → STATE._invCurBal 已設定
      重算一次盤點校正量（loadMonthData 在 renderInvLedger 前跑，STATE._invCurBal 當時未就緒） */
   calcInv();
+  // v4.4.0 先拉 AccV2 bootstrap（以伺服器 voucher_entries 為真實來源）
+  await AccV2.ensure();
   // 應付費用分頁
-  fixMar盤損(); // 修正11503盤盈→盤損（被 resetQ1InvData353 覆蓋，flag 保留）
-  migratePayableSplit02(); // 02→02a醫師+02b員工
-  await migrateVoucher11503Full(); // 11503補齊完整22筆分錄（同步更新D1）
-  await seedPayable();
+  fixMar盤損();
+  await migrateVoucher11503Full();
   await fixDrugCloseValues();
   renderPayable();
-  // Q1 年度分配資料帶入
   seedYearQ1Data();
-  updateHomeDashboard();  /* v4.3.1 修正：recalcYearTotals 已於 v3.7.0 改名，兩處呼叫一併修正，避免 init 崩潰導致 loadVoucherView 沒執行，畫面看起來像資料消失 */
+  updateHomeDashboard();
   // 應付代收款分頁
-  await seedCustodial();
   renderCustodial();
   // 累積賸餘分頁
   renderSurplusTab();
