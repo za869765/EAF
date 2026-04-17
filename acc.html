@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.3.0</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.3.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -374,7 +374,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.3.0</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.3.1</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <a class="tbtn tbtn-blue" href="/acc-import.html" style="background:#4a148c;">📥 傳票匯入</a>
@@ -1606,7 +1606,7 @@ function showSaveMsg(msg='✓ 已儲存', ok=true){
    Tab 切換
 ════════════════════════════════════════════ */
 async function switchTab(name, btn){
-  /* v4.3.0：離開月底結算前問 dirty */
+  /* v4.3.1：離開月底結算前問 dirty */
   if (document.getElementById('tab-work')?.classList.contains('active') && name !== 'work' && window.__accPromptSaveAll) {
     await window.__accPromptSaveAll();
   }
@@ -4866,7 +4866,36 @@ async function fixDrug11503(){
 function loadPayable(){
   const raw = localStorage.getItem('acc_payable');
   if(!raw) return PAYABLE_SEED;
-  try{ return JSON.parse(raw); }catch(e){ return PAYABLE_SEED; }
+  try{
+    const data = JSON.parse(raw);
+    /* v4.3.1：dedupe — 同 category.entries 內，若 amt 相同保留 day>0 的那筆 */
+    let dirty = false;
+    (data.categories || []).forEach(cat => {
+      const entries = cat.entries || [];
+      const seen = new Map();
+      for (const e of entries) {
+        const d = Number(e.day) || 0;
+        if (seen.has(e.amt)) {
+          const prev = seen.get(e.amt);
+          const prevD = Number(prev.day) || 0;
+          if (d > prevD) seen.set(e.amt, e);
+        } else {
+          seen.set(e.amt, e);
+        }
+      }
+      if (seen.size !== entries.length) {
+        cat.entries = [...seen.values()];
+        cat.subtotal = cat.entries.reduce((s,e)=>s+(e.amt||0),0);
+        dirty = true;
+      }
+    });
+    if (dirty) {
+      data.total = (data.categories || []).reduce((s,c)=>s+(c.subtotal||0), 0);
+      localStorage.setItem('acc_payable', JSON.stringify(data));
+      console.log('[loadPayable] 自動清除重複 entries，已回寫 localStorage');
+    }
+    return data;
+  } catch(e){ return PAYABLE_SEED; }
 }
 function fmtPayDate(ym, day){
   if(!ym) return '';
@@ -5406,7 +5435,44 @@ async function seedCustodial(){
 function loadCustodial(){
   const raw = localStorage.getItem('acc_custodial');
   if(!raw) return CUSTODIAL_SEED;
-  try{ return JSON.parse(raw); }catch(e){ return CUSTODIAL_SEED; }
+  try{
+    const data = JSON.parse(raw);
+    /* v4.3.1：自動 dedupe
+       - 同 sub 內，若兩筆以上 amt 相同，優先保留 day>0（真實日期）的那筆
+       - 丟掉 day='' 或 day=0 的殘留 seed
+       - 若沒有重複則完全不動
+       - 會把 subtotal / group.subtotal / data.total 重算，並回寫 localStorage */
+    let dirty = false;
+    (data.groups || []).forEach(g => {
+      (g.subs || []).forEach(sub => {
+        const entries = sub.entries || [];
+        const seen = new Map(); // (amt+desc 前 20 字) → entry（保留 day 最大者）
+        for (const e of entries) {
+          const key = (e.amt||0) + '|' + String(e.desc||'').slice(0,20);
+          const d = Number(e.day) || 0;
+          if (seen.has(key)) {
+            const prev = seen.get(key);
+            const prevD = Number(prev.day) || 0;
+            if (d > prevD) seen.set(key, e);
+          } else {
+            seen.set(key, e);
+          }
+        }
+        if (seen.size !== entries.length) {
+          sub.entries = [...seen.values()];
+          sub.subtotal = sub.entries.reduce((s,e)=>s+(e.amt||0),0);
+          dirty = true;
+        }
+      });
+      g.subtotal = (g.subs || []).reduce((s,sub)=>s+(sub.subtotal||0), 0);
+    });
+    if (dirty) {
+      data.total = (data.groups || []).reduce((s,g)=>s+(g.subtotal||0), 0);
+      localStorage.setItem('acc_custodial', JSON.stringify(data));
+      console.log('[loadCustodial] 自動清除重複 entries，已回寫 localStorage');
+    }
+    return data;
+  } catch(e){ return CUSTODIAL_SEED; }
 }
 function renderCustodial(){
   const data = loadCustodial();
@@ -6045,7 +6111,7 @@ function toggleSectionLock(name){
     btn.textContent = '🔒 鎖定中…';
     btn.classList.add('locked');
     if(ts){ ts.textContent = '⏳ 寫入 D1…'; ts.style.color = '#ff8f00'; }
-    /* v4.3.0：等 server 真的回 200 才顯示時間戳，不再假裝成功 */
+    /* v4.3.1：等 server 真的回 200 才顯示時間戳，不再假裝成功 */
     Promise.resolve(saveMonthData()).then(ok => {
       if (ok) {
         btn.textContent = '🔒 已鎖定';
@@ -6065,7 +6131,7 @@ function toggleSectionLock(name){
 }
 
 /* ════════════════════════════════════════════
-   v4.3.0：離開區塊自動提示存檔（不需按鎖定）
+   v4.3.1：離開區塊自動提示存檔（不需按鎖定）
    - 在區塊內 input 變動 → 記 dirty
    - focus/click 轉到別的區塊或頁面空白 → confirm 是否存檔
 ════════════════════════════════════════════ */
@@ -6300,7 +6366,7 @@ function saveMonthData(){
       return rows;
     })(),
   };
-  /* v4.3.0：月底結算改走 v2 API（acc_monthly 結構化表）
+  /* v4.3.1：月底結算改走 v2 API（acc_monthly 結構化表）
      - 同步寫 localStorage 當 cache
      - 非同步 PUT /api/acc/v2/monthly/<ym>，等 server 真的回 200 才顯示「已存 D1」
      - 失敗會在畫面紅字顯示 HTTP 錯誤，不再假裝成功 */
@@ -6337,7 +6403,7 @@ async function loadMonthData(){
     const el = document.getElementById(id);
     if(el && !el.readOnly) el.value = '';
   });
-  /* v4.3.0：先問 server（真相來源）；沒有再退回 localStorage cache */
+  /* v4.3.1：先問 server（真相來源）；沒有再退回 localStorage cache */
   let d = null;
   try {
     const resp = await fetch('/api/acc/v2/monthly/' + ym);
@@ -6577,7 +6643,7 @@ function logout(){ window.location.href = '/admin.html'; }
   // 讀本月資料
   loadMonthData();
   // 三格卡片（年度累積）
-  updateHomeDashboard();  /* v4.3.0 修正：recalcYearTotals 已於 v3.7.0 改名，兩處呼叫一併修正，避免 init 崩潰導致 loadVoucherView 沒執行，畫面看起來像資料消失 */
+  updateHomeDashboard();  /* v4.3.1 修正：recalcYearTotals 已於 v3.7.0 改名，兩處呼叫一併修正，避免 init 崩潰導致 loadVoucherView 沒執行，畫面看起來像資料消失 */
   // 醫療用品合計
   updateInvTotal();
   // 財產帳面淨值自動計算 + 月份標籤
@@ -6612,7 +6678,7 @@ function logout(){ window.location.href = '/admin.html'; }
   renderPayable();
   // Q1 年度分配資料帶入
   seedYearQ1Data();
-  updateHomeDashboard();  /* v4.3.0 修正：recalcYearTotals 已於 v3.7.0 改名，兩處呼叫一併修正，避免 init 崩潰導致 loadVoucherView 沒執行，畫面看起來像資料消失 */
+  updateHomeDashboard();  /* v4.3.1 修正：recalcYearTotals 已於 v3.7.0 改名，兩處呼叫一併修正，避免 init 崩潰導致 loadVoucherView 沒執行，畫面看起來像資料消失 */
   // 應付代收款分頁
   await seedCustodial();
   renderCustodial();
