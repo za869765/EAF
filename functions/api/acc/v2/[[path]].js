@@ -76,6 +76,17 @@ async function ensureSchema(DB) {
     `CREATE UNIQUE INDEX IF NOT EXISTS idx_acc_ventry_key ON acc_voucher_entries(voucher_no, seq)`,
     `CREATE INDEX IF NOT EXISTS idx_acc_ventry_ym ON acc_voucher_entries(ym)`,
     `CREATE INDEX IF NOT EXISTS idx_acc_ventry_type ON acc_voucher_entries(voucher_type)`,
+    `CREATE TABLE IF NOT EXISTS acc_voucher_entries_history (
+       id INTEGER PRIMARY KEY AUTOINCREMENT,
+       voucher_no TEXT NOT NULL,
+       seq INTEGER NOT NULL,
+       voucher_type TEXT,
+       ym TEXT,
+       action TEXT NOT NULL,
+       field_diffs TEXT NOT NULL DEFAULT '{}',
+       changed_at TEXT NOT NULL)`,
+    `CREATE INDEX IF NOT EXISTS idx_acc_vhist_key ON acc_voucher_entries_history(voucher_no, seq)`,
+    `CREATE INDEX IF NOT EXISTS idx_acc_vhist_time ON acc_voucher_entries_history(changed_at)`,
     `CREATE TABLE IF NOT EXISTS acc_ledger (
        id INTEGER PRIMARY KEY AUTOINCREMENT,
        ledger_type TEXT NOT NULL,
@@ -264,6 +275,17 @@ export async function onRequest({ request, env }) {
         ).bind(...binds).all();
         return json(results);
       }
+      // GET /entries/history?voucher_no=&limit= → 歷史變更資料
+      if (method === 'GET' && res2 === 'history') {
+        const vno = url.searchParams.get('voucher_no');
+        const limit = Math.min(Number(url.searchParams.get('limit')) || 500, 5000);
+        const where = vno ? ' WHERE voucher_no = ?' : '';
+        const binds = vno ? [vno] : [];
+        const { results } = await DB.prepare(
+          `SELECT * FROM acc_voucher_entries_history${where} ORDER BY id DESC LIMIT ${limit}`
+        ).bind(...binds).all();
+        return json(results);
+      }
       // GET /entries/:voucher_no → 單張傳票全部分錄
       if (method === 'GET' && res2) {
         const { results } = await DB.prepare(
@@ -302,26 +324,69 @@ export async function onRequest({ request, env }) {
             updated_at   = excluded.updated_at
         `);
         const stmts = [];
-        let inserted = 0, updated = 0;
-        // 先查已存在的 key（用來回報 inserted vs updated 筆數）
-        const keys = rows.map(r => `${r.voucher_no}::${r.seq}`);
-        const existing = new Set();
-        if (keys.length) {
-          const chunks = [];
-          for (let i = 0; i < rows.length; i += 50) chunks.push(rows.slice(i, i + 50));
-          for (const ch of chunks) {
+        let inserted = 0, updated = 0, unchanged = 0;
+        // 先抓已存在 row 全欄位（要用於 diff）
+        const existing = new Map();
+        if (rows.length) {
+          for (let i = 0; i < rows.length; i += 50) {
+            const ch = rows.slice(i, i + 50);
             const placeholders = ch.map(() => '(?, ?)').join(',');
             const binds = [];
             for (const r of ch) { binds.push(String(r.voucher_no||''), Number(r.seq)||0); }
             const q = await DB.prepare(
-              `SELECT voucher_no, seq FROM acc_voucher_entries WHERE (voucher_no, seq) IN (VALUES ${placeholders})`
+              `SELECT * FROM acc_voucher_entries WHERE (voucher_no, seq) IN (VALUES ${placeholders})`
             ).bind(...binds).all();
-            for (const x of q.results) existing.add(`${x.voucher_no}::${x.seq}`);
+            for (const x of q.results) existing.set(`${x.voucher_no}::${x.seq}`, x);
           }
         }
+        // 歷史紀錄 prepared stmt
+        const insHist = DB.prepare(`
+          INSERT INTO acc_voucher_entries_history
+            (voucher_no, seq, voucher_type, ym, action, field_diffs, changed_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        const DIFF_FIELDS = ['voucher_type','ym','make_date','post_date','subject','sub_account',
+          'purpose','description','debit','credit','payee_info','payee_amount'];
+        const normVal = (v) => (v == null || v === '') ? null : v;
         for (const r of rows) {
           const key = `${r.voucher_no}::${r.seq}`;
-          if (existing.has(key)) updated++; else inserted++;
+          const old = existing.get(key);
+          const newVals = {
+            voucher_type: String(r.voucher_type||''),
+            ym: String(r.ym||''),
+            make_date: r.make_date||null,
+            post_date: r.post_date||null,
+            subject: r.subject||null,
+            sub_account: r.sub_account||null,
+            purpose: r.purpose||null,
+            description: r.description||null,
+            debit: Math.round(Number(r.debit)||0),
+            credit: Math.round(Number(r.credit)||0),
+            payee_info: r.payee_info||null,
+            payee_amount: Math.round(Number(r.payee_amount)||0),
+          };
+          let action = null;
+          const diffs = {};
+          if (!old) {
+            action = 'insert';
+            inserted++;
+            for (const f of DIFF_FIELDS) diffs[f] = [null, newVals[f]];
+          } else {
+            for (const f of DIFF_FIELDS) {
+              const a = normVal(old[f]);
+              const b = normVal(newVals[f]);
+              if (String(a) !== String(b)) diffs[f] = [a, b];
+            }
+            if (Object.keys(diffs).length > 0) { action = 'update'; updated++; }
+            else { unchanged++; }
+          }
+          if (action) {
+            stmts.push(insHist.bind(
+              String(r.voucher_no||''), Number(r.seq)||0,
+              newVals.voucher_type, newVals.ym, action,
+              JSON.stringify(diffs), updatedAt
+            ));
+          }
           stmts.push(ins.bind(
             String(r.voucher_no || ''),
             String(r.voucher_type || ''),
@@ -346,7 +411,7 @@ export async function onRequest({ request, env }) {
         for (let i = 0; i < stmts.length; i += 50) {
           await DB.batch(stmts.slice(i, i + 50));
         }
-        return json({ ok: true, total: rows.length, inserted, updated, updated_at: updatedAt });
+        return json({ ok: true, total: rows.length, inserted, updated, unchanged, updated_at: updatedAt });
       }
       // DELETE /entries/:voucher_no  → 砍整張傳票（誤匯入救援用）
       if (method === 'DELETE' && res2) {
