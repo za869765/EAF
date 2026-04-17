@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.6</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.7</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -374,7 +374,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.6</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.7</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -956,7 +956,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 </div><!-- /tab-voucher -->
 
 <!-- ══════════════════════════════════════════
-     TAB：收入傳票（v4.4.6 — 從 acc_voucher_entries 匯入版讀取）
+     TAB：收入傳票（v4.4.7 — 從 acc_voucher_entries 匯入版讀取）
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-income">
   <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
@@ -972,7 +972,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 </div>
 
 <!-- ══════════════════════════════════════════
-     TAB：支出傳票（v4.4.6 — 從 acc_voucher_entries 匯入版讀取）
+     TAB：支出傳票（v4.4.7 — 從 acc_voucher_entries 匯入版讀取）
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-expense">
   <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
@@ -1274,6 +1274,26 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
       ✅ 備折餘額 &gt; 基本數額 → <span style="color:#2e7d32; font-weight:600;">不需提列</span><br>
       ⚠️ 備折餘額 &lt; 基本數額 → <span style="color:#c62828; font-weight:600;">提列差額</span>（借 510615 / 貸 110306）<br>
       🏆 獎勵金基礎 ＝ (醫療收入 − 醫療成本) × 95%；餘 5% 留存醫療基金
+    </div>
+  </div>
+
+  <!-- v4.4.7 折讓率設定 + 110305 應收醫療帳款（從 D1 acc_voucher_entries 聚合） -->
+  <div class="card">
+    <div class="card-hd hd-dark">⚙️ 折讓率設定 + 110305 應收醫療帳款</div>
+    <div class="card-bd" style="padding:12px 16px;">
+      <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center;font-size:13px;">
+        <label style="display:flex;align-items:center;gap:6px;">折讓率：
+          <input id="allow-rate-input" type="number" step="0.0001" min="0" style="width:100px;padding:3px 6px;" placeholder="0.0345">
+          <span style="color:#78909c;font-size:11px;">（如 0.0345 代表 3.45%）</span>
+        </label>
+        <button class="btn btn-gray" style="font-size:11px;padding:3px 10px;" onclick="saveAllowRate()">💾 儲存</button>
+        <span id="allow-rate-hint" style="color:#80cbc4;font-size:11px;"></span>
+      </div>
+      <div style="margin-top:14px;border-top:1px dashed #37474f;padding-top:10px;">
+        <div style="font-size:12px;color:#cfd8dc;margin-bottom:6px;">📥 110305 應收醫療帳款 — 由匯入版傳票聚合（借-貸）</div>
+        <div id="ar-110305-summary" style="font-size:12px;color:#90a4ae;">載入中…</div>
+        <div id="ar-110305-table" style="margin-top:8px;"></div>
+      </div>
     </div>
   </div>
 
@@ -1690,7 +1710,7 @@ async function switchTab(name, btn){
   if(ymBar) ymBar.style.display = name==='home' ? 'none' : 'flex';
   // 切換時重新渲染各分頁（避免 init 尚未完成時空白）
   const TAB_RENDERS = {
-    allowance: ()=> renderAllowLedger(),
+    allowance: ()=>{ renderAllowLedger(); renderAllowanceRateAndAR(); },
     payable:   ()=> renderPayable(),
     custodial: ()=> renderCustodial(),
     surplus:   ()=> renderSurplusTab(),
@@ -2852,7 +2872,7 @@ function renderVouchers(){
   tbody.innerHTML = '';
   const {y,m} = getVoucherYm();
   const ymKey = String(y) + String(m).padStart(2,'0');
-  // v4.4.6 匯入版 轉帳傳票（D1 acc_voucher_entries）優先顯示
+  // v4.4.7 匯入版 轉帳傳票（D1 acc_voucher_entries）優先顯示
   const imported = (window.AccV2 && AccV2.entries) ? AccV2.entries({type:'轉帳', ym: ymKey}) : [];
   if(imported.length > 0){
     renderVouchersFromImport(tbody, imported);
@@ -2938,7 +2958,75 @@ function renderVouchers(){
   document.getElementById('voucher-count').textContent = `共 ${STATE.vouchers.filter(v=>!v._sep).length} 筆`;
 }
 
-// v4.4.6 清除 D1 假空白分錄
+// v4.4.7 清除 D1 假空白分錄
+// v4.4.7 折讓率 + 110305 應收醫療帳款 聚合
+const ALLOW_RATE_KEY = 'acc_allowance_rate';
+function getAllowRate(){ return Number(localStorage.getItem(ALLOW_RATE_KEY)) || 0; }
+function saveAllowRate(){
+  const v = Number(document.getElementById('allow-rate-input').value);
+  if(!(v >= 0)) { alert('折讓率必須 >= 0'); return; }
+  localStorage.setItem(ALLOW_RATE_KEY, String(v));
+  renderAllowanceRateAndAR();
+  alert('✅ 已儲存');
+}
+function renderAllowanceRateAndAR(){
+  const rate = getAllowRate();
+  const rateEl = document.getElementById('allow-rate-input');
+  if(rateEl) rateEl.value = rate || '';
+  const hint = document.getElementById('allow-rate-hint');
+  if(hint) hint.textContent = rate ? `目前：${(rate*100).toFixed(2)}%` : '尚未設定';
+  const {y} = getYm();
+  const entries = (window.AccV2 && AccV2.entries)
+    ? AccV2.entries({ yearPrefix: String(y), subjectPrefix: '110305' })
+    : [];
+  const byYm = new Map();
+  let totalD = 0, totalC = 0;
+  entries.forEach(e => {
+    const d = e.debit||0, c = e.credit||0;
+    totalD += d; totalC += c;
+    if(!byYm.has(e.ym)) byYm.set(e.ym, { d:0, c:0 });
+    const b = byYm.get(e.ym); b.d += d; b.c += c;
+  });
+  const balance = totalD - totalC;
+  const basicAmount = rate > 0 ? Math.round(balance * rate * 1.5) : 0;
+  const summaryEl = document.getElementById('ar-110305-summary');
+  if(summaryEl){
+    summaryEl.innerHTML =
+      `<span style="color:#80cbc4;">${y}年度帳上：</span>`
+      + ` 借 ${totalD.toLocaleString()} ｜ 貸 ${totalC.toLocaleString()} ｜`
+      + ` <b style="color:#ffc107;">餘額 ${balance.toLocaleString()}</b>`
+      + (rate > 0 ? ` ｜ 基本數額（餘額×折讓率×1.5）= <b style="color:#ff8a65;">${basicAmount.toLocaleString()}</b>` : '');
+  }
+  const tableEl = document.getElementById('ar-110305-table');
+  if(tableEl){
+    if(!byYm.size){
+      tableEl.innerHTML = '<div style="color:#78909c;font-size:11px;padding:4px 0;">（目前尚未匯入 110305 應收醫療帳款分錄）</div>';
+    } else {
+      const keys = [...byYm.keys()].sort();
+      let runBal = 0;
+      tableEl.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:#37474f;color:#cfd8dc;">
+          <th style="padding:5px 8px;text-align:left;">年月</th>
+          <th style="padding:5px 8px;text-align:right;">借方</th>
+          <th style="padding:5px 8px;text-align:right;">貸方</th>
+          <th style="padding:5px 8px;text-align:right;">當月淨額</th>
+          <th style="padding:5px 8px;text-align:right;">累計餘額</th>
+        </tr></thead><tbody>${keys.map(ym => {
+          const b = byYm.get(ym);
+          const net = b.d - b.c;
+          runBal += net;
+          return `<tr style="border-top:1px solid #455a64;">
+            <td style="padding:5px 8px;color:#b0bec5;">${ym}</td>
+            <td style="padding:5px 8px;text-align:right;color:#64b5f6;">${b.d?b.d.toLocaleString():''}</td>
+            <td style="padding:5px 8px;text-align:right;color:#ef5350;">${b.c?b.c.toLocaleString():''}</td>
+            <td style="padding:5px 8px;text-align:right;color:#cfd8dc;">${net.toLocaleString()}</td>
+            <td style="padding:5px 8px;text-align:right;color:#ffc107;font-weight:600;">${runBal.toLocaleString()}</td>
+          </tr>`;
+        }).join('')}</tbody></table>`;
+    }
+  }
+}
+
 async function cleanupBlankEntries(){
   if(!confirm('確定要刪除 D1 裡「無會計科目且借貸皆 0」的假空白分錄？\n此操作不可復原。')) return;
   try {
@@ -2950,13 +3038,14 @@ async function cleanupBlankEntries(){
     renderPayable(); renderCustodial(); renderSurplusTab();
     renderImportedVouchers('收入'); renderImportedVouchers('支出');
     renderVouchers();
+    renderAllowanceRateAndAR();
     renderChangeHistory();
   } catch(e){
     alert('❌ 清除失敗：' + e.message);
   }
 }
 
-// v4.4.6 匯入版 轉帳傳票 render（D1 優先）
+// v4.4.7 匯入版 轉帳傳票 render（D1 優先）
 function renderVouchersFromImport(tbody, entries){
   const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   const groups = new Map();
@@ -5142,7 +5231,7 @@ async function onAccEntriesUpload(inp){
       const voucher_no = trim(r[2]).replace(/\s/g,'');
       if (!/^\d{6,}$/.test(voucher_no)) continue;
       const voucher_type = trim((r2 && r2[2]) || '').replace(/\s/g,'');
-      // v4.4.6 略過空白行（報表重印 header / 分頁）：無 subject 且 借貸皆 0
+      // v4.4.7 略過空白行（報表重印 header / 分頁）：無 subject 且 借貸皆 0
       if(!trim(r[3]) && !num(r[7]) && !num(r[8])) continue;
       seqMap[voucher_no] = (seqMap[voucher_no]||0) + 1;
       out.push({
@@ -5157,7 +5246,7 @@ async function onAccEntriesUpload(inp){
     }
     if (!out.length) throw new Error('沒解析到任何分錄，請確認檔案格式');
 
-    // v4.4.6 前端 diff：比對上傳前 AccV2 快照 → 新增 / 更新 / 略過（per type）
+    // v4.4.7 前端 diff：比對上傳前 AccV2 快照 → 新增 / 更新 / 略過（per type）
     await AccV2.ensure();
     const beforeMap = new Map();
     (AccV2._entries||[]).forEach(e => beforeMap.set(`${e.voucher_no}#${e.seq}`, e));
@@ -5177,7 +5266,7 @@ async function onAccEntriesUpload(inp){
       else stats[t].upd++;
     });
 
-    // v4.4.6 上傳前彈窗確認
+    // v4.4.7 上傳前彈窗確認
     const previewLines = Object.keys(stats).map(t => {
       const s = stats[t];
       return `${typeIcon[t]} ${t}傳票：新增 ${s.add}｜更新 ${s.upd}｜略過 ${s.skip}`;
@@ -5219,6 +5308,7 @@ async function onAccEntriesUpload(inp){
     renderPayable(); renderCustodial(); renderSurplusTab();
     renderImportedVouchers('收入'); renderImportedVouchers('支出');
     renderVouchers();
+    renderAllowanceRateAndAR();
     updateHomeDashboard();
   } catch (e) {
     box.innerHTML = '<span style="color:#c62828;font-weight:600;">❌ '+e.message+'</span>';
@@ -5735,7 +5825,7 @@ function renderSurplusTab(){
 }
 
 /* ════════════════════════════════════════════
-   v4.4.6 收入 / 支出 / 轉帳 傳票 — 匯入版 (acc_voucher_entries) 唯讀呈現
+   v4.4.7 收入 / 支出 / 轉帳 傳票 — 匯入版 (acc_voucher_entries) 唯讀呈現
    ════════════════════════════════════════════ */
 function renderImportedVouchers(type){
   const { y, ym, label } = getYm();
@@ -6510,7 +6600,7 @@ function checkDrugEntered(){
 }
 
 /* 財產帳面淨值 + 月份標籤 自動填入 */
-// v4.4.6 每月折舊額設定（基準 + 變更點）
+// v4.4.7 每月折舊額設定（基準 + 變更點）
 const DEPR_KEY = 'acc_prop_depr_schedule';
 function loadDeprSchedule(){
   try { return JSON.parse(localStorage.getItem(DEPR_KEY) || '{}'); } catch(e){ return {}; }
