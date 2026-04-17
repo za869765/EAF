@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.4</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.5</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -374,10 +374,11 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.4</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.5</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
+  <button class="tbtn" onclick="cleanupBlankEntries()" style="background:#5d4037;border:none;cursor:pointer;" title="刪除 D1 中無科目且借貸皆 0 的假空白分錄">🧹 清空白</button>
   <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
 </div>
 
@@ -955,7 +956,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 </div><!-- /tab-voucher -->
 
 <!-- ══════════════════════════════════════════
-     TAB：收入傳票（v4.4.4 — 從 acc_voucher_entries 匯入版讀取）
+     TAB：收入傳票（v4.4.5 — 從 acc_voucher_entries 匯入版讀取）
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-income">
   <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
@@ -971,7 +972,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 </div>
 
 <!-- ══════════════════════════════════════════
-     TAB：支出傳票（v4.4.4 — 從 acc_voucher_entries 匯入版讀取）
+     TAB：支出傳票（v4.4.5 — 從 acc_voucher_entries 匯入版讀取）
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-expense">
   <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
@@ -2830,7 +2831,7 @@ function renderVouchers(){
   tbody.innerHTML = '';
   const {y,m} = getVoucherYm();
   const ymKey = String(y) + String(m).padStart(2,'0');
-  // v4.4.4 匯入版 轉帳傳票（D1 acc_voucher_entries）優先顯示
+  // v4.4.5 匯入版 轉帳傳票（D1 acc_voucher_entries）優先顯示
   const imported = (window.AccV2 && AccV2.entries) ? AccV2.entries({type:'轉帳', ym: ymKey}) : [];
   if(imported.length > 0){
     renderVouchersFromImport(tbody, imported);
@@ -2916,7 +2917,25 @@ function renderVouchers(){
   document.getElementById('voucher-count').textContent = `共 ${STATE.vouchers.filter(v=>!v._sep).length} 筆`;
 }
 
-// v4.4.4 匯入版 轉帳傳票 render（D1 優先）
+// v4.4.5 清除 D1 假空白分錄
+async function cleanupBlankEntries(){
+  if(!confirm('確定要刪除 D1 裡「無會計科目且借貸皆 0」的假空白分錄？\n此操作不可復原。')) return;
+  try {
+    const resp = await fetch('/api/acc/v2/entries/cleanup-blank', { method:'POST' });
+    const j = await resp.json();
+    if(!resp.ok) throw new Error(j.error || ('HTTP '+resp.status));
+    alert(`🧹 已刪除 ${j.deleted} 筆假空白分錄`);
+    await AccV2.refresh();
+    renderPayable(); renderCustodial(); renderSurplusTab();
+    renderImportedVouchers('收入'); renderImportedVouchers('支出');
+    renderVouchers();
+    renderChangeHistory();
+  } catch(e){
+    alert('❌ 清除失敗：' + e.message);
+  }
+}
+
+// v4.4.5 匯入版 轉帳傳票 render（D1 優先）
 function renderVouchersFromImport(tbody, entries){
   const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   const groups = new Map();
@@ -5102,7 +5121,7 @@ async function onAccEntriesUpload(inp){
       const voucher_no = trim(r[2]).replace(/\s/g,'');
       if (!/^\d{6,}$/.test(voucher_no)) continue;
       const voucher_type = trim((r2 && r2[2]) || '').replace(/\s/g,'');
-      // v4.4.4 略過空白行（報表重印 header / 分頁）：無 subject 且 借貸皆 0
+      // v4.4.5 略過空白行（報表重印 header / 分頁）：無 subject 且 借貸皆 0
       if(!trim(r[3]) && !num(r[7]) && !num(r[8])) continue;
       seqMap[voucher_no] = (seqMap[voucher_no]||0) + 1;
       out.push({
@@ -5117,7 +5136,7 @@ async function onAccEntriesUpload(inp){
     }
     if (!out.length) throw new Error('沒解析到任何分錄，請確認檔案格式');
 
-    // v4.4.4 前端 diff：比對上傳前 AccV2 快照 → 新增 / 更新 / 略過（per type）
+    // v4.4.5 前端 diff：比對上傳前 AccV2 快照 → 新增 / 更新 / 略過（per type）
     await AccV2.ensure();
     const beforeMap = new Map();
     (AccV2._entries||[]).forEach(e => beforeMap.set(`${e.voucher_no}#${e.seq}`, e));
@@ -5137,7 +5156,7 @@ async function onAccEntriesUpload(inp){
       else stats[t].upd++;
     });
 
-    // v4.4.4 上傳前彈窗確認
+    // v4.4.5 上傳前彈窗確認
     const previewLines = Object.keys(stats).map(t => {
       const s = stats[t];
       return `${typeIcon[t]} ${t}傳票：新增 ${s.add}｜更新 ${s.upd}｜略過 ${s.skip}`;
@@ -5695,7 +5714,7 @@ function renderSurplusTab(){
 }
 
 /* ════════════════════════════════════════════
-   v4.4.4 收入 / 支出 / 轉帳 傳票 — 匯入版 (acc_voucher_entries) 唯讀呈現
+   v4.4.5 收入 / 支出 / 轉帳 傳票 — 匯入版 (acc_voucher_entries) 唯讀呈現
    ════════════════════════════════════════════ */
 function renderImportedVouchers(type){
   const { y, ym, label } = getYm();

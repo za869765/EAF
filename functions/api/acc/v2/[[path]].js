@@ -275,6 +275,13 @@ export async function onRequest({ request, env }) {
         ).bind(...binds).all();
         return json(results);
       }
+      // POST /entries/cleanup-blank → 清除空白分錄（無 subject 且借貸皆 0）
+      if (method === 'POST' && res2 === 'cleanup-blank') {
+        const r = await DB.prepare(
+          `DELETE FROM acc_voucher_entries WHERE (subject IS NULL OR subject = '') AND debit = 0 AND credit = 0`
+        ).run();
+        return json({ ok: true, deleted: r.meta?.changes ?? 0 });
+      }
       // GET /entries/history?voucher_no=&limit= → 歷史變更資料
       if (method === 'GET' && res2 === 'history') {
         const vno = url.searchParams.get('voucher_no');
