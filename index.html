@@ -955,7 +955,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.2.34</div>
+      <div id="sb-version">v4.2.35</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -2738,6 +2738,8 @@ function fillForm(rec) {
   /* v4.2.31 代墊原因 */
   const _prEl = document.getElementById('payee-reason');
   if (_prEl) _prEl.value = rec.payeeReason || '';
+  /* v4.2.35 載入後重新整理列印行，確保代墊原因會進入 #payee-print-line */
+  if (typeof updatePayeePrintLine === 'function') updatePayeePrintLine();
   /* v4.2.33 還原 prevPayees */
   _loadedPrevPayees = Array.isArray(rec.prevPayees) ? rec.prevPayees : [];
   renderPrevPayeesDisplay(_loadedPrevPayees);
@@ -4783,10 +4785,10 @@ function updatePayeePrintLine() {
     const idx = cards.length > 1 ? `<span class="pl-idx">#${i+1}</span>　` : '';
     return `<div class="pl-row">${idx}${parts.join('　　')}${newMark}</div>`;
   }).join('');
-  /* v4.2.31 代墊原因（有填寫才加） */
+  /* v4.2.31 代墊原因（有填寫才加）；v4.2.35 末端加「職章：」提示列印後蓋章 */
   const _reason = (document.getElementById('payee-reason')?.value || '').trim();
   const _reasonHtml = (type === 'employee' && _reason)
-    ? `<div class="pl-row" style="margin-top:4px;"><span class="pl-lbl">代墊原因：</span>${esc(_reason)}</div>`
+    ? `<div class="pl-row" style="margin-top:4px;"><span class="pl-lbl">代墊原因：</span>${esc(_reason)}　<span class="pl-lbl">職章：</span><span style="display:inline-block; min-width:28mm; border-bottom:1px solid #000;">&nbsp;</span></div>`
     : '';
   /* v4.2.33 前次受款人（刪除線） */
   const _prevList = _payeeEditMode ? _prevPayeeCards : _loadedPrevPayees;
