@@ -54,6 +54,28 @@ async function ensureSchema(DB) {
        locked INTEGER NOT NULL DEFAULT 0,
        locked_at TEXT,
        updated_at TEXT NOT NULL)`,
+    `CREATE TABLE IF NOT EXISTS acc_voucher_entries (
+       id INTEGER PRIMARY KEY AUTOINCREMENT,
+       voucher_no TEXT NOT NULL,
+       voucher_type TEXT NOT NULL,
+       ym TEXT NOT NULL,
+       seq INTEGER NOT NULL,
+       make_date TEXT,
+       post_date TEXT,
+       subject TEXT,
+       sub_account TEXT,
+       purpose TEXT,
+       description TEXT,
+       debit INTEGER NOT NULL DEFAULT 0,
+       credit INTEGER NOT NULL DEFAULT 0,
+       payee_info TEXT,
+       payee_amount INTEGER NOT NULL DEFAULT 0,
+       source TEXT NOT NULL DEFAULT 'excel_import',
+       imported_at TEXT,
+       updated_at TEXT NOT NULL)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS idx_acc_ventry_key ON acc_voucher_entries(voucher_no, seq)`,
+    `CREATE INDEX IF NOT EXISTS idx_acc_ventry_ym ON acc_voucher_entries(ym)`,
+    `CREATE INDEX IF NOT EXISTS idx_acc_ventry_type ON acc_voucher_entries(voucher_type)`,
     `CREATE TABLE IF NOT EXISTS acc_ledger (
        id INTEGER PRIMARY KEY AUTOINCREMENT,
        ledger_type TEXT NOT NULL,
@@ -119,11 +141,12 @@ export async function onRequest({ request, env }) {
   try {
     /* ──────── GET /bootstrap ──────── */
     if (method === 'GET' && res1 === 'bootstrap' && !res2) {
-      const [vR, mR, lR, cR] = await Promise.all([
+      const [vR, mR, lR, cR, eR] = await Promise.all([
         DB.prepare('SELECT ym, entries, locked, locked_at, updated_at FROM acc_vouchers').all(),
         DB.prepare('SELECT ym, data, locked, locked_at, updated_at FROM acc_monthly').all(),
         DB.prepare('SELECT id, ledger_type, ym, entry_type, amount, description, ref_id, voided, updated_at FROM acc_ledger ORDER BY id').all(),
         DB.prepare('SELECT key, value, updated_at FROM acc_config').all(),
+        DB.prepare('SELECT * FROM acc_voucher_entries ORDER BY voucher_no, seq').all(),
       ]);
       const vouchers = {};
       for (const r of vR.results) vouchers[r.ym] = {
@@ -145,7 +168,7 @@ export async function onRequest({ request, env }) {
       for (const r of cR.results) {
         try { config[r.key] = JSON.parse(r.value); } catch { config[r.key] = r.value; }
       }
-      return json({ vouchers, monthly, ledger, config });
+      return json({ vouchers, monthly, ledger, config, voucher_entries: eR.results });
     }
 
     /* ──────── VOUCHERS ──────── */
@@ -226,6 +249,113 @@ export async function onRequest({ request, env }) {
       }
     }
 
+    /* ──────── VOUCHER ENTRIES（分錄顆粒，Excel 匯入用） ──────── */
+    if (res1 === 'entries') {
+      // GET /entries?ym=11503&type=支出  → 列表查詢
+      if (method === 'GET' && !res2) {
+        const ym = url.searchParams.get('ym');
+        const vtype = url.searchParams.get('type');
+        const conds = []; const binds = [];
+        if (ym)    { conds.push('ym = ?');           binds.push(ym); }
+        if (vtype) { conds.push('voucher_type = ?'); binds.push(vtype); }
+        const where = conds.length ? ' WHERE ' + conds.join(' AND ') : '';
+        const { results } = await DB.prepare(
+          `SELECT * FROM acc_voucher_entries${where} ORDER BY voucher_no, seq`
+        ).bind(...binds).all();
+        return json(results);
+      }
+      // GET /entries/:voucher_no → 單張傳票全部分錄
+      if (method === 'GET' && res2) {
+        const { results } = await DB.prepare(
+          'SELECT * FROM acc_voucher_entries WHERE voucher_no = ? ORDER BY seq'
+        ).bind(res2).all();
+        return json(results);
+      }
+      // PUT /entries  body: [rows]  → upsert by (voucher_no, seq) — 重複匯入零重覆計算
+      if (method === 'PUT' && !res2) {
+        if (!auth(request, env)) return json({ error: '密碼錯誤' }, 401);
+        const rows = await request.json();
+        if (!Array.isArray(rows)) return json({ error: 'body must be array' }, 400);
+        const updatedAt = nowIso();
+        const ins = DB.prepare(`
+          INSERT INTO acc_voucher_entries
+            (voucher_no, voucher_type, ym, seq, make_date, post_date,
+             subject, sub_account, purpose, description,
+             debit, credit, payee_info, payee_amount,
+             source, imported_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(voucher_no, seq) DO UPDATE SET
+            voucher_type = excluded.voucher_type,
+            ym           = excluded.ym,
+            make_date    = excluded.make_date,
+            post_date    = excluded.post_date,
+            subject      = excluded.subject,
+            sub_account  = excluded.sub_account,
+            purpose      = excluded.purpose,
+            description  = excluded.description,
+            debit        = excluded.debit,
+            credit       = excluded.credit,
+            payee_info   = excluded.payee_info,
+            payee_amount = excluded.payee_amount,
+            source       = excluded.source,
+            imported_at  = excluded.imported_at,
+            updated_at   = excluded.updated_at
+        `);
+        const stmts = [];
+        let inserted = 0, updated = 0;
+        // 先查已存在的 key（用來回報 inserted vs updated 筆數）
+        const keys = rows.map(r => `${r.voucher_no}::${r.seq}`);
+        const existing = new Set();
+        if (keys.length) {
+          const chunks = [];
+          for (let i = 0; i < rows.length; i += 50) chunks.push(rows.slice(i, i + 50));
+          for (const ch of chunks) {
+            const placeholders = ch.map(() => '(?, ?)').join(',');
+            const binds = [];
+            for (const r of ch) { binds.push(String(r.voucher_no||''), Number(r.seq)||0); }
+            const q = await DB.prepare(
+              `SELECT voucher_no, seq FROM acc_voucher_entries WHERE (voucher_no, seq) IN (VALUES ${placeholders})`
+            ).bind(...binds).all();
+            for (const x of q.results) existing.add(`${x.voucher_no}::${x.seq}`);
+          }
+        }
+        for (const r of rows) {
+          const key = `${r.voucher_no}::${r.seq}`;
+          if (existing.has(key)) updated++; else inserted++;
+          stmts.push(ins.bind(
+            String(r.voucher_no || ''),
+            String(r.voucher_type || ''),
+            String(r.ym || ''),
+            Number(r.seq) || 0,
+            r.make_date || null,
+            r.post_date || null,
+            r.subject || null,
+            r.sub_account || null,
+            r.purpose || null,
+            r.description || null,
+            Math.round(Number(r.debit) || 0),
+            Math.round(Number(r.credit) || 0),
+            r.payee_info || null,
+            Math.round(Number(r.payee_amount) || 0),
+            String(r.source || 'excel_import'),
+            r.imported_at || updatedAt,
+            updatedAt
+          ));
+        }
+        // D1 batch 一次最多 ~100 條，分段送
+        for (let i = 0; i < stmts.length; i += 50) {
+          await DB.batch(stmts.slice(i, i + 50));
+        }
+        return json({ ok: true, total: rows.length, inserted, updated, updated_at: updatedAt });
+      }
+      // DELETE /entries/:voucher_no  → 砍整張傳票（誤匯入救援用）
+      if (method === 'DELETE' && res2) {
+        if (!auth(request, env)) return json({ error: '密碼錯誤' }, 401);
+        const r = await DB.prepare('DELETE FROM acc_voucher_entries WHERE voucher_no = ?').bind(res2).run();
+        return json({ ok: true, voucher_no: res2, deleted: r.meta?.changes ?? 0 });
+      }
+    }
+
     /* ──────── LEDGER ──────── */
     if (res1 === 'ledger') {
       if (method === 'GET' && res2) {
@@ -286,11 +416,16 @@ export async function onRequest({ request, env }) {
 
     /* ──────── EXPORT ──────── */
     if (method === 'GET' && res1 === 'export' && !res2) {
-      const [vR, mR, lR, cR] = await Promise.all([
+      const [vR, mR, lR, cR, eR] = await Promise.all([
         DB.prepare('SELECT ym, entries, locked, locked_at, updated_at FROM acc_vouchers ORDER BY ym').all(),
         DB.prepare('SELECT ym, data, locked, locked_at, updated_at FROM acc_monthly ORDER BY ym').all(),
         DB.prepare('SELECT ledger_type, ym, entry_type, amount, description, ref_id, voided FROM acc_ledger ORDER BY ledger_type, ym, id').all(),
         DB.prepare('SELECT key, value FROM acc_config ORDER BY key').all(),
+        DB.prepare(`SELECT voucher_no, voucher_type, ym, seq, make_date, post_date,
+                           subject, sub_account, purpose, description,
+                           debit, credit, payee_info, payee_amount,
+                           source, imported_at
+                    FROM acc_voucher_entries ORDER BY voucher_no, seq`).all(),
       ]);
       const dump = {
         version: 2,
@@ -311,6 +446,7 @@ export async function onRequest({ request, env }) {
           try { acc[r.key] = JSON.parse(r.value); } catch { acc[r.key] = r.value; }
           return acc;
         }, {}),
+        voucher_entries: eR.results,
       };
       const canonical = canonicalize(dump);
       return new Response(JSON.stringify(canonical, null, 2), {
@@ -348,10 +484,32 @@ export async function onRequest({ request, env }) {
       for (const [k, v] of Object.entries(body.config || {})) {
         stmts.push(insC.bind(k, typeof v === 'string' ? v : JSON.stringify(v), updatedAt));
       }
-      await DB.batch(stmts);
+      // voucher_entries：import 時先清空再塞（完整 dump 場景）
+      stmts.push(DB.prepare('DELETE FROM acc_voucher_entries'));
+      const insE = DB.prepare(`INSERT INTO acc_voucher_entries
+        (voucher_no, voucher_type, ym, seq, make_date, post_date,
+         subject, sub_account, purpose, description,
+         debit, credit, payee_info, payee_amount,
+         source, imported_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      for (const e of body.voucher_entries || []) {
+        stmts.push(insE.bind(
+          String(e.voucher_no||''), String(e.voucher_type||''), String(e.ym||''), Number(e.seq)||0,
+          e.make_date||null, e.post_date||null, e.subject||null, e.sub_account||null,
+          e.purpose||null, e.description||null,
+          Math.round(Number(e.debit)||0), Math.round(Number(e.credit)||0),
+          e.payee_info||null, Math.round(Number(e.payee_amount)||0),
+          String(e.source||'excel_import'), e.imported_at||null, updatedAt
+        ));
+      }
+      // 分段送避免超過 D1 batch 上限
+      for (let i = 0; i < stmts.length; i += 50) {
+        await DB.batch(stmts.slice(i, i + 50));
+      }
       return json({ ok: true, imported: {
         vouchers: (body.vouchers||[]).length, monthly: (body.monthly||[]).length,
         ledger: (body.ledger||[]).length, config: Object.keys(body.config||{}).length,
+        voucher_entries: (body.voucher_entries||[]).length,
       }});
     }
 
