@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.11</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.12</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -374,7 +374,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.11</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.12</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -397,7 +397,6 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
   <button class="tab-btn" onclick="switchTab('custodial',this)">🏦 代收款</button>
   <button class="tab-btn" onclick="switchTab('surplus',this)">💰 累積賸餘</button>
   <button class="tab-btn" onclick="switchTab('history',this)">📜 歷史變更資料</button>
-  <button class="tab-btn" onclick="switchTab('reconcile',this)">🔍 對帳</button>
 </div>
 
 <!-- ── 全域年月選單 ── -->
@@ -958,7 +957,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 </div><!-- /tab-voucher -->
 
 <!-- ══════════════════════════════════════════
-     TAB：收入傳票（v4.4.11 — 從 acc_voucher_entries 匯入版讀取）
+     TAB：收入傳票（v4.4.12 — 從 acc_voucher_entries 匯入版讀取）
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-income">
   <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
@@ -974,7 +973,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
 </div>
 
 <!-- ══════════════════════════════════════════
-     TAB：支出傳票（v4.4.11 — 從 acc_voucher_entries 匯入版讀取）
+     TAB：支出傳票（v4.4.12 — 從 acc_voucher_entries 匯入版讀取）
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-expense">
   <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
@@ -1279,7 +1278,7 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     </div>
   </div>
 
-  <!-- v4.4.11 折讓率設定 + 110305 應收醫療帳款（從 D1 acc_voucher_entries 聚合） -->
+  <!-- v4.4.12 折讓率設定 + 110305 應收醫療帳款（從 D1 acc_voucher_entries 聚合） -->
   <div class="card">
     <div class="card-hd hd-dark">⚙️ 折讓率設定 + 110305 應收醫療帳款</div>
     <div class="card-bd" style="padding:12px 16px;">
@@ -1481,20 +1480,6 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <div style="padding:24px;text-align:center;color:#78909c;">載入中…</div>
   </div></div>
 </div><!-- /tab-history -->
-
-<!-- ══════════════════════════════════════════
-     TAB：對帳（系統模擬 vs D1 匯入實際）
-══════════════════════════════════════════ -->
-<div class="tab-pane" id="tab-reconcile">
-  <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
-    <span style="font-size:13px; font-weight:700; color:#fff;">🔍 轉帳傳票對帳</span>
-    <span id="reconcile-stat" style="font-size:11px; color:#90a4ae;">比對「系統計算」與「D1 匯入」</span>
-    <button onclick="renderReconcile()" style="margin-left:auto;padding:4px 10px;border-radius:4px;border:none;background:#0288d1;color:#fff;cursor:pointer;font-size:12px;">🔄 重新比對</button>
-  </div>
-  <div class="card"><div class="card-bd" style="padding:0;" id="reconcile-body">
-    <div style="padding:24px;text-align:center;color:#78909c;">請切換到本分頁以載入…</div>
-  </div></div>
-</div><!-- /tab-reconcile -->
 
 </div><!-- /content -->
 
@@ -1736,7 +1721,6 @@ async function switchTab(name, btn){
     income:    ()=> renderImportedVouchers('收入'),
     expense:   ()=> renderImportedVouchers('支出'),
     history:   ()=> renderChangeHistory(),
-    reconcile: ()=> renderReconcile(),
   };
   if(TAB_RENDERS[name]) TAB_RENDERS[name]();
 }
@@ -1822,7 +1806,7 @@ function onDiscountToggle(){
     calcReminders();
   }
 }
-// v4.4.11 自動提列：依折讓率 + 110305 AR 當年度餘額 + 110306 備折餘額
+// v4.4.12 自動提列：依折讓率 + 110305 AR 當年度餘額 + 110306 備折餘額
 //   1. 不足 → 自動勾選 + 自動填入差額
 //   2. 足夠 → 自動取消勾選
 //   3. 使用者可事後手動改 checkbox / 金額覆蓋
@@ -2429,7 +2413,7 @@ function confirmPicker(){
    製作前應付費用預檢
 ════════════════════════════════════════════ */
 async function preCheckVoucher(){
-  // v4.4.11 產製前刷新折讓建議，確保 STATE.month.discount 已套用最新基本數額
+  // v4.4.12 產製前刷新折讓建議，確保 STATE.month.discount 已套用最新基本數額
   if(typeof updateDiscountAdvisor === 'function'){
     await AccV2.refresh();
     renderAllowLedger();
@@ -2591,7 +2575,7 @@ function generateVouchers(){
   }
 
 
-  // 5. 醫療折讓（若需提列）— v4.4.11 借 備抵醫療折讓 / 貸 醫療折讓
+  // 5. 醫療折讓（若需提列）— v4.4.12 借 備抵醫療折讓 / 貸 醫療折讓
   const discountNeeded = document.getElementById('discount-needed').checked;
   if(discountNeeded){
     const discAmt = STATE.month.discount.amount || 0;
@@ -2944,7 +2928,7 @@ function renderVouchers(){
   tbody.innerHTML = '';
   const {y,m} = getVoucherYm();
   const ymKey = String(y) + String(m).padStart(2,'0');
-  // v4.4.11 匯入版 轉帳傳票（D1 acc_voucher_entries）優先顯示
+  // v4.4.12 匯入版 轉帳傳票（D1 acc_voucher_entries）優先顯示
   const imported = (window.AccV2 && AccV2.entries) ? AccV2.entries({type:'轉帳', ym: ymKey}) : [];
   if(imported.length > 0){
     renderVouchersFromImport(tbody, imported);
@@ -3030,8 +3014,8 @@ function renderVouchers(){
   document.getElementById('voucher-count').textContent = `共 ${STATE.vouchers.filter(v=>!v._sep).length} 筆`;
 }
 
-// v4.4.11 清除 D1 假空白分錄
-// v4.4.11 折讓率 + 110305 應收醫療帳款 聚合
+// v4.4.12 清除 D1 假空白分錄
+// v4.4.12 折讓率 + 110305 應收醫療帳款 聚合
 const ALLOW_RATE_KEY = 'acc_allowance_rate';
 function getAllowRate(){ return Number(localStorage.getItem(ALLOW_RATE_KEY)) || 0; }
 function saveAllowRate(){
@@ -3062,7 +3046,7 @@ function renderAllowanceRateAndAR(){
   const balance = totalD - totalC;
   const basicAmount = rate > 0 ? Math.round(balance * rate * 1.5) : 0;
 
-  // v4.4.11 加做 110306 備抵醫療折讓 / 410698 醫療折讓 當年度聚合
+  // v4.4.12 加做 110306 備抵醫療折讓 / 410698 醫療折讓 當年度聚合
   const agg = (prefix) => {
     const es = (window.AccV2 && AccV2.entries) ? AccV2.entries({ yearPrefix: String(y), subjectPrefix: prefix }) : [];
     let D = 0, C = 0;
@@ -3135,7 +3119,7 @@ async function cleanupBlankEntries(){
   }
 }
 
-// v4.4.11 匯入版 轉帳傳票 render（D1 優先）
+// v4.4.12 匯入版 轉帳傳票 render（D1 優先）
 function renderVouchersFromImport(tbody, entries){
   const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   const groups = new Map();
@@ -5322,7 +5306,7 @@ async function onAccEntriesUpload(inp){
       const voucher_no = trim(r[2]).replace(/\s/g,'');
       if (!/^\d{6,}$/.test(voucher_no)) continue;
       const voucher_type = trim((r2 && r2[2]) || '').replace(/\s/g,'');
-      // v4.4.11 略過空白行（報表重印 header / 分頁）：無 subject 且 借貸皆 0
+      // v4.4.12 略過空白行（報表重印 header / 分頁）：無 subject 且 借貸皆 0
       if(!trim(r[3]) && !num(r[7]) && !num(r[8])) continue;
       seqMap[voucher_no] = (seqMap[voucher_no]||0) + 1;
       out.push({
@@ -5337,7 +5321,7 @@ async function onAccEntriesUpload(inp){
     }
     if (!out.length) throw new Error('沒解析到任何分錄，請確認檔案格式');
 
-    // v4.4.11 前端 diff：比對上傳前 AccV2 快照 → 新增 / 更新 / 略過（per type）
+    // v4.4.12 前端 diff：比對上傳前 AccV2 快照 → 新增 / 更新 / 略過（per type）
     await AccV2.ensure();
     const beforeMap = new Map();
     (AccV2._entries||[]).forEach(e => beforeMap.set(`${e.voucher_no}#${e.seq}`, e));
@@ -5357,7 +5341,7 @@ async function onAccEntriesUpload(inp){
       else stats[t].upd++;
     });
 
-    // v4.4.11 上傳前彈窗確認
+    // v4.4.12 上傳前彈窗確認
     const previewLines = Object.keys(stats).map(t => {
       const s = stats[t];
       return `${typeIcon[t]} ${t}傳票：新增 ${s.add}｜更新 ${s.upd}｜略過 ${s.skip}`;
@@ -5917,7 +5901,7 @@ function renderSurplusTab(){
 }
 
 /* ════════════════════════════════════════════
-   v4.4.11 收入 / 支出 / 轉帳 傳票 — 匯入版 (acc_voucher_entries) 唯讀呈現
+   v4.4.12 收入 / 支出 / 轉帳 傳票 — 匯入版 (acc_voucher_entries) 唯讀呈現
    ════════════════════════════════════════════ */
 function renderImportedVouchers(type){
   const { y, ym, label } = getYm();
@@ -6038,127 +6022,6 @@ async function renderChangeHistory(){
         <td style="padding:6px 10px;font-size:11px;">${diffHtml}</td>
       </tr>`;
     }).join('')}</tbody></table>`;
-}
-
-/* ════════════════════════════════════════════
-   對帳：系統模擬 vs D1 匯入實際
-════════════════════════════════════════════ */
-function renderReconcile(){
-  const body = document.getElementById('reconcile-body');
-  const stat = document.getElementById('reconcile-stat');
-  if(!body) return;
-  const { ym, label } = getYm();
-
-  // 系統計算：STATE.vouchers（本地模擬）
-  const local = Array.isArray(STATE.vouchers) ? STATE.vouchers : [];
-  // D1 匯入：只比對轉帳傳票
-  const imported = (window.AccV2 && AccV2.entries) ? AccV2.entries({ type:'轉帳', ym }) : [];
-
-  if(!local.length && !imported.length){
-    if(stat) stat.textContent = `${label} 無資料`;
-    body.innerHTML = `<div style="padding:32px;text-align:center;color:#78909c;">
-      📭 ${label} 尚無任何轉帳傳票<br>
-      <span style="font-size:12px;">請先到「月底結算」製作系統傳票，或匯入真實會計資料</span>
-    </div>`;
-    return;
-  }
-
-  // 以 6 碼科目前綴聚合
-  const code6 = s => (String(s||'').match(/\d{6}/)||[''])[0];
-  const agg = {};
-  const add = (k, src, dr, cr) => {
-    if(!k) return;
-    if(!agg[k]) agg[k] = { subject:k, localDr:0, localCr:0, d1Dr:0, d1Cr:0 };
-    if(src==='local'){ agg[k].localDr += dr||0; agg[k].localCr += cr||0; }
-    else            { agg[k].d1Dr    += dr||0; agg[k].d1Cr    += cr||0; }
-  };
-  local.forEach(v => add(code6(v.subject), 'local', v.dr||0, v.cr||0));
-  imported.forEach(e => add(code6(e.subject), 'd1', e.debit||0, e.credit||0));
-
-  // 找回完整科目名（D1 優先）
-  const nameMap = {};
-  imported.forEach(e => { const k=code6(e.subject); if(k && !nameMap[k]) nameMap[k]=e.subject; });
-  local.forEach(v => { const k=code6(v.subject); if(k && !nameMap[k]) nameMap[k]=v.subject; });
-
-  const keys = Object.keys(agg).sort();
-  let matchCnt = 0, diffCnt = 0, missLocal = 0, missD1 = 0;
-  let totalLocalDr=0, totalLocalCr=0, totalD1Dr=0, totalD1Cr=0;
-
-  const rowsHtml = keys.map(k => {
-    const r = agg[k];
-    const drDiff = r.d1Dr - r.localDr;
-    const crDiff = r.d1Cr - r.localCr;
-    const localEmpty = r.localDr===0 && r.localCr===0;
-    const d1Empty = r.d1Dr===0 && r.d1Cr===0;
-    let status, rowBg;
-    if(localEmpty && !d1Empty){ status='<span style="color:#c62828;font-weight:600;">⚠ 系統缺</span>'; rowBg='background:#ffebee;'; missLocal++; }
-    else if(!localEmpty && d1Empty){ status='<span style="color:#e65100;font-weight:600;">⚠ D1 缺</span>'; rowBg='background:#fff3e0;'; missD1++; }
-    else if(drDiff===0 && crDiff===0){ status='<span style="color:#2e7d32;font-weight:600;">✓ 相符</span>'; rowBg=''; matchCnt++; }
-    else { status='<span style="color:#c62828;font-weight:600;">✗ 不符</span>'; rowBg='background:#fff8e1;'; diffCnt++; }
-    totalLocalDr+=r.localDr; totalLocalCr+=r.localCr; totalD1Dr+=r.d1Dr; totalD1Cr+=r.d1Cr;
-    const fmt = n => n ? n.toLocaleString() : '<span style="color:#b0bec5;">—</span>';
-    const diffFmt = n => n===0 ? '<span style="color:#b0bec5;">0</span>' :
-      `<b style="color:${n>0?'#c62828':'#1565c0'};">${n>0?'+':''}${n.toLocaleString()}</b>`;
-    return `<tr style="${rowBg}border-top:1px solid #eceff1;">
-      <td style="padding:6px 10px;font-family:monospace;font-size:12px;">${(nameMap[k]||k).replace(/</g,'&lt;')}</td>
-      <td style="padding:6px 10px;text-align:right;color:#1565c0;">${fmt(r.localDr)}</td>
-      <td style="padding:6px 10px;text-align:right;color:#c62828;">${fmt(r.localCr)}</td>
-      <td style="padding:6px 10px;text-align:right;color:#1565c0;border-left:2px solid #cfd8dc;">${fmt(r.d1Dr)}</td>
-      <td style="padding:6px 10px;text-align:right;color:#c62828;">${fmt(r.d1Cr)}</td>
-      <td style="padding:6px 10px;text-align:right;border-left:2px solid #cfd8dc;">${diffFmt(drDiff)}</td>
-      <td style="padding:6px 10px;text-align:right;">${diffFmt(crDiff)}</td>
-      <td style="padding:6px 10px;text-align:center;">${status}</td>
-    </tr>`;
-  }).join('');
-
-  const balDiffDr = totalD1Dr - totalLocalDr;
-  const balDiffCr = totalD1Cr - totalLocalCr;
-
-  if(stat){
-    stat.innerHTML = `${label} · 系統 ${local.length} 筆 / D1 ${imported.length} 筆 · `+
-      `<span style="color:#2e7d32;">✓${matchCnt}</span> `+
-      `<span style="color:#c62828;">✗${diffCnt}</span> `+
-      `<span style="color:#e65100;">D1缺${missD1}</span> `+
-      `<span style="color:#c62828;">系統缺${missLocal}</span>`;
-  }
-
-  body.innerHTML = `
-    <div style="padding:10px 14px;background:#fff8e1;border-bottom:1px solid #ffe082;color:#5d4037;font-size:12px;line-height:1.6;">
-      💡 <b>觀念</b>：本系統僅為「計算工具 + 自動化模擬」，真正資料以 D1（會計系統匯入）為準。<br>
-      若有「✗ 不符」或「缺」→ 表示模擬規則需要調整，以符合真實會計系統作法。
-    </div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;">
-      <thead>
-        <tr style="background:#37474f;color:#fff;">
-          <th style="padding:8px 10px;text-align:left;" rowspan="2">會計科目</th>
-          <th style="padding:6px 10px;text-align:center;background:#455a64;" colspan="2">🧮 系統計算</th>
-          <th style="padding:6px 10px;text-align:center;background:#546e7a;border-left:2px solid #263238;" colspan="2">🗄️ D1 匯入</th>
-          <th style="padding:6px 10px;text-align:center;background:#b71c1c;border-left:2px solid #263238;" colspan="2">Δ 差額 (D1−系統)</th>
-          <th style="padding:8px 10px;text-align:center;" rowspan="2">狀態</th>
-        </tr>
-        <tr style="background:#263545;color:#cfd8dc;font-size:11px;">
-          <th style="padding:4px 10px;text-align:right;">借方</th>
-          <th style="padding:4px 10px;text-align:right;">貸方</th>
-          <th style="padding:4px 10px;text-align:right;border-left:2px solid #263238;">借方</th>
-          <th style="padding:4px 10px;text-align:right;">貸方</th>
-          <th style="padding:4px 10px;text-align:right;border-left:2px solid #263238;">Δ借</th>
-          <th style="padding:4px 10px;text-align:right;">Δ貸</th>
-        </tr>
-      </thead>
-      <tbody>${rowsHtml}</tbody>
-      <tfoot>
-        <tr style="background:#eceff1;font-weight:700;border-top:2px solid #546e7a;">
-          <td style="padding:8px 10px;">合計</td>
-          <td style="padding:8px 10px;text-align:right;color:#1565c0;">${totalLocalDr.toLocaleString()}</td>
-          <td style="padding:8px 10px;text-align:right;color:#c62828;">${totalLocalCr.toLocaleString()}</td>
-          <td style="padding:8px 10px;text-align:right;color:#1565c0;border-left:2px solid #cfd8dc;">${totalD1Dr.toLocaleString()}</td>
-          <td style="padding:8px 10px;text-align:right;color:#c62828;">${totalD1Cr.toLocaleString()}</td>
-          <td style="padding:8px 10px;text-align:right;border-left:2px solid #cfd8dc;color:${balDiffDr?'#c62828':'#2e7d32'};">${balDiffDr>0?'+':''}${balDiffDr.toLocaleString()}</td>
-          <td style="padding:8px 10px;text-align:right;color:${balDiffCr?'#c62828':'#2e7d32'};">${balDiffCr>0?'+':''}${balDiffCr.toLocaleString()}</td>
-          <td style="padding:8px 10px;text-align:center;">${(balDiffDr===0&&balDiffCr===0)?'<span style="color:#2e7d32;">✓</span>':'<span style="color:#c62828;">✗</span>'}</td>
-        </tr>
-      </tfoot>
-    </table>`;
 }
 
 function initInitBalCard(){
@@ -6813,7 +6676,7 @@ function checkDrugEntered(){
 }
 
 /* 財產帳面淨值 + 月份標籤 自動填入 */
-// v4.4.11 每月折舊額設定（基準 + 變更點）
+// v4.4.12 每月折舊額設定（基準 + 變更點）
 const DEPR_KEY = 'acc_prop_depr_schedule';
 function loadDeprSchedule(){
   try { return JSON.parse(localStorage.getItem(DEPR_KEY) || '{}'); } catch(e){ return {}; }
@@ -7184,7 +7047,7 @@ async function loadMonthData(){
   syncVoucherToWork(ym);
   // 自動欄位重算
   calcIncome(); calcOther(); calcDrug(); calcInv(); calcBonus(); calcIncomeBreakdown(); calcExpenseTotal(); updateHomeDashboard();
-  // v4.4.11 自動提列醫療折讓
+  // v4.4.12 自動提列醫療折讓
   if(typeof renderAllowLedger === 'function') renderAllowLedger();
   if(typeof updateDiscountAdvisor === 'function') updateDiscountAdvisor();
 }
@@ -7343,7 +7206,7 @@ function logout(){ window.location.href = '/admin.html'; }
   calcInv();
   // v4.4.0 先拉 AccV2 bootstrap（以伺服器 voucher_entries 為真實來源）
   await AccV2.ensure();
-  // v4.4.11 AccV2 就緒後重渲染轉帳傳票（F5 後優先顯示匯入版）
+  // v4.4.12 AccV2 就緒後重渲染轉帳傳票（F5 後優先顯示匯入版）
   renderVouchers();
   // 應付費用分頁
   fixMar盤損();
