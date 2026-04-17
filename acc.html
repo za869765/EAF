@@ -499,6 +499,21 @@ body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px;
     <span id="work-month-title" style="font-weight:700; font-size:14px; color:#1e2a38;">115 年 3 月 月底結算</span>
   </div>
 
+  <!-- ── 傳票明細匯入（每月一次，直接 upsert 進 D1，重複不重計） ── -->
+  <div style="margin:8px 0 14px; background:#fff; border:2px solid #ab47bc; border-radius:8px; padding:10px 14px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+      <div>
+        <div style="font-weight:700; font-size:13px; color:#4a148c;">📥 傳票明細匯入（FNWFRX0090_*.xlsx）</div>
+        <div style="font-size:11px; color:#78909c; margin-top:2px;">收入/支出 傳票每月從會計系統匯出一次 → 選檔後自動解析 + 上傳到 D1；唯一鍵 (傳票編號, 分錄序號) 重複匯入零重複計算</div>
+      </div>
+      <label style="display:inline-flex; align-items:center; gap:6px; background:#f3e5f5; border:2px dashed #ab47bc; border-radius:8px; padding:8px 16px; cursor:pointer; font-size:13px; font-weight:600; color:#6a1b9a;">
+        📎 選擇 Excel 檔
+        <input type="file" id="acc-entries-upload" accept=".xlsx,.xls" onchange="onAccEntriesUpload(this)" style="display:none;">
+      </label>
+    </div>
+    <div id="acc-entries-result" style="display:none; margin-top:10px; font-size:12px;"></div>
+  </div>
+
   <!-- ── 獎勵金計算表預覽 ── -->
   <div style="margin:8px 0 14px; overflow-x:auto; border:2px solid #78909c; border-radius:8px;">
     <div style="background:#37474f; color:#fff; padding:6px 14px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:space-between;">
@@ -4944,7 +4959,85 @@ function renderPayable(){
     </div>`).join('');
 }
 
-/* ════ 支出傳票上傳 → 沖銷應付費用 / 代收款 ════ */
+/* ════ 傳票明細匯入（v2 API：upsert by voucher_no+seq，重複不重計） ════ */
+async function onAccEntriesUpload(inp){
+  const f = inp.files[0]; if(!f) return;
+  const box = document.getElementById('acc-entries-result');
+  box.style.display = 'block';
+  box.innerHTML = '<span style="color:#e65100;">⏳ 解析 + 上傳中… ('+f.name+')</span>';
+  const trim = s => String(s ?? '').trim();
+  const num  = s => s==null||s===''?0:(Math.round(Number(String(s).replace(/[,\s]/g,''))||0));
+  const ymFromDate = d => { const m = trim(d).match(/^(\d{3,4})\/(\d{1,2})\/\d{1,2}$/); return m?m[1]+String(m[2]).padStart(2,'0'):''; };
+  try {
+    const buf = await f.arrayBuffer();
+    const wb  = XLSX.read(buf, { type:'array' });
+    const ws  = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
+    let startIdx = 3;
+    for (let i=0;i<Math.min(10,rows.length);i++){
+      if (trim(rows[i][0]).includes('製') && trim(rows[i][0]).includes('日')) { startIdx = i+2; break; }
+    }
+    const out = []; const seqMap = {};
+    for (let i=startIdx;i<rows.length;i+=2){
+      const r = rows[i], r2 = rows[i+1];
+      if (!r || !trim(r[2])) continue;
+      const voucher_no = trim(r[2]).replace(/\s/g,'');
+      if (!/^\d{6,}$/.test(voucher_no)) continue;
+      const voucher_type = trim((r2 && r2[2]) || '').replace(/\s/g,'');
+      seqMap[voucher_no] = (seqMap[voucher_no]||0) + 1;
+      out.push({
+        voucher_no, voucher_type, ym: ymFromDate(trim(r[0])), seq: seqMap[voucher_no],
+        make_date: trim(r[0]), post_date: trim(r[1]),
+        subject: trim(r[3]), sub_account: trim(r[4]),
+        purpose: trim(r[5]), description: trim(r[6]),
+        debit: num(r[7]), credit: num(r[8]),
+        payee_info: trim(r[9]) || null, payee_amount: num(r[10]),
+        source: 'excel_import',
+      });
+    }
+    if (!out.length) throw new Error('沒解析到任何分錄，請確認檔案格式');
+
+    const CHUNK = 500;
+    let ins=0, upd=0;
+    for (let i=0;i<out.length;i+=CHUNK){
+      const chunk = out.slice(i,i+CHUNK);
+      const resp = await fetch('/api/acc/v2/entries', {
+        method:'PUT',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(chunk),
+      });
+      const j = await resp.json();
+      if (!resp.ok) throw new Error(j.error || ('HTTP '+resp.status));
+      ins += j.inserted||0; upd += j.updated||0;
+    }
+    const byType = {}; const vset = new Set();
+    let deb=0, cre=0;
+    for (const r of out){
+      byType[r.voucher_type] = (byType[r.voucher_type]||0)+1;
+      vset.add(r.voucher_no); deb += r.debit; cre += r.credit;
+    }
+    const ymArr = [...new Set(out.map(r=>r.ym).filter(Boolean))].sort();
+    const tag = (txt,color='#e3f2fd',fg='#1565c0') =>
+      `<span style="display:inline-block;background:${color};color:${fg};padding:3px 10px;border-radius:12px;margin:3px 4px 0 0;font-size:12px;">${txt}</span>`;
+    box.innerHTML =
+      tag(`✅ 新增 ${ins} 筆`,'#d9f5d9','#1a6b1a') +
+      tag(`~ 覆寫 ${upd} 筆`,'#ffe9c7','#8a4a00') +
+      tag(`分錄 ${out.length}`) +
+      tag(`傳票 ${vset.size} 張`) +
+      Object.entries(byType).map(([t,n])=>tag(`${t} ${n}`)).join('') +
+      tag(`借方 ${deb.toLocaleString()}`) +
+      tag(`貸方 ${cre.toLocaleString()}`) +
+      tag(deb===cre?'✓ 借貸平衡':'✗ 不平 '+(deb-cre), deb===cre?'#d9f5d9':'#f8d7d7', deb===cre?'#1a6b1a':'#8a1a1a') +
+      tag(`ym: ${ymArr.join(', ')||'(空)'}`);
+  } catch (e) {
+    box.innerHTML = '<span style="color:#c62828;font-weight:600;">❌ '+e.message+'</span>';
+    console.error(e);
+  } finally {
+    inp.value = '';
+  }
+}
+
+/* ════ 支出傳票上傳 → 沖銷應付費用 / 代收款（舊版，已由 onAccEntriesUpload 取代） ════ */
 function onExpenseUpload(inp){
   const f = inp.files[0]; if(!f) return;
   const st = document.getElementById('expense-upload-status');

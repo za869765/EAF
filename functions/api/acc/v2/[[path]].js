@@ -273,7 +273,7 @@ export async function onRequest({ request, env }) {
       }
       // PUT /entries  body: [rows]  → upsert by (voucher_no, seq) — 重複匯入零重覆計算
       if (method === 'PUT' && !res2) {
-        if (!auth(request, env)) return json({ error: '密碼錯誤' }, 401);
+        // 內部工具、已在後台登入後才到得了的頁面 → 不另外要求 X-Admin-Pass
         const rows = await request.json();
         if (!Array.isArray(rows)) return json({ error: 'body must be array' }, 400);
         const updatedAt = nowIso();

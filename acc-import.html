@@ -2,33 +2,25 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<title>ACC 傳票明細匯入 v1.0.0</title>
+<title>ACC 傳票明細匯入 v1.1.0</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   *{box-sizing:border-box}
-  body{font-family:system-ui,"Microsoft JhengHei",sans-serif;margin:0;padding:20px;background:#f5f6fa;color:#222}
+  body{font-family:system-ui,"Microsoft JhengHei",sans-serif;margin:0;padding:24px;background:#f5f6fa;color:#222}
   h1{font-size:20px;margin:0 0 12px}
-  .card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:14px}
-  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
-  label{font-weight:600;font-size:13px;color:#555}
-  input[type=password],input[type=text]{padding:7px 10px;border:1px solid #ccd;border-radius:6px;font-size:14px;width:180px}
-  button{padding:8px 16px;border:0;border-radius:6px;background:#2d6cdf;color:#fff;font-weight:600;cursor:pointer;font-size:14px}
-  button:hover{background:#1e54b5}
-  button:disabled{background:#aab;cursor:not-allowed}
-  button.gray{background:#667}
-  button.red{background:#c33}
+  .card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:14px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .drop{border:2px dashed #64b5f6;background:#e3f2fd;color:#1565c0;border-radius:10px;padding:30px;text-align:center;font-size:16px;font-weight:600;cursor:pointer;transition:.15s}
+  .drop:hover{background:#bbdefb}
+  .drop.busy{background:#fff8e1;border-color:#ffa000;color:#e65100;cursor:wait}
+  .drop.ok{background:#e8f5e9;border-color:#66bb6a;color:#2e7d32}
+  .drop.err{background:#ffebee;border-color:#ef5350;color:#c62828}
   .muted{color:#789;font-size:12px}
-  table{width:100%;border-collapse:collapse;font-size:12px}
-  th,td{padding:5px 7px;border-bottom:1px solid #eee;text-align:left;vertical-align:top}
-  th{background:#f0f3fa;position:sticky;top:0}
-  td.num{text-align:right;font-variant-numeric:tabular-nums}
-  .preview-box{max-height:420px;overflow:auto;border:1px solid #dde;border-radius:6px}
-  .stat{display:inline-block;background:#eef;padding:4px 10px;border-radius:12px;margin-right:6px;font-size:13px}
+  .stat{display:inline-block;background:#eef;padding:4px 10px;border-radius:12px;margin:4px 4px 0 0;font-size:13px}
   .stat.ok{background:#d9f5d9;color:#1a6b1a}
   .stat.warn{background:#ffe9c7;color:#8a4a00}
   .stat.err{background:#f8d7d7;color:#8a1a1a}
-  pre{background:#222;color:#0f0;padding:10px;border-radius:6px;font-size:12px;max-height:200px;overflow:auto;white-space:pre-wrap}
   .back{color:#2d6cdf;text-decoration:none;font-size:14px}
 </style>
 </head>
@@ -40,221 +32,128 @@
 </div>
 
 <div class="card">
-  <div class="row">
-    <label>管理密碼</label>
-    <input type="password" id="adminPass" placeholder="X-Admin-Pass" autocomplete="current-password">
-    <span class="muted">（會寫入線上 D1，需要後台密碼）</span>
-  </div>
-  <div class="row">
-    <label>選擇 Excel</label>
-    <input type="file" id="file" accept=".xlsx,.xls">
-    <button onclick="doParse()">解析</button>
-    <button class="gray" onclick="location.reload()">清除</button>
-  </div>
-  <div class="muted">支援檔名：<b>FNWFRX0090_*.xlsx</b>（佳里衛生所傳票明細表）— 每筆傳票 2 行（明細+傳票種類）</div>
+  <label for="file" class="drop" id="drop">
+    📎 點此選擇 FNWFRX0090_*.xlsx — 自動解析並上傳到線上 D1
+  </label>
+  <input type="file" id="file" accept=".xlsx,.xls" style="display:none">
+  <div class="muted" style="margin-top:8px">唯一鍵 (傳票編號, 分錄序號)：重複匯入同區間 = upsert，零重複計算</div>
 </div>
 
-<div class="card" id="summary" style="display:none">
+<div class="card" id="result" style="display:none">
   <div id="stats"></div>
-  <div class="row" style="margin-top:8px">
-    <button onclick="doUpload()" id="btnUpload">🚀 上傳到線上 D1（upsert，重複不重計）</button>
-    <span class="muted">唯一鍵 (傳票編號, 分錄序號) — 已存在的會覆寫、新的新增</span>
-  </div>
-  <pre id="log" style="display:none"></pre>
-</div>
-
-<div class="card" id="previewCard" style="display:none">
-  <div class="row" style="justify-content:space-between">
-    <strong>預覽（前 200 筆）</strong>
-    <span class="muted" id="previewInfo"></span>
-  </div>
-  <div class="preview-box">
-    <table id="tbl">
-      <thead><tr>
-        <th>傳票編號</th><th>種類</th><th>ym</th><th>seq</th>
-        <th>製票</th><th>會計科目</th><th>摘要</th>
-        <th class="num">借方</th><th class="num">貸方</th>
-      </tr></thead>
-      <tbody></tbody>
-    </table>
-  </div>
 </div>
 
 <script>
-let parsedRows = []; // [{voucher_no, voucher_type, ym, seq, make_date, post_date, subject, sub_account, purpose, description, debit, credit, payee_info, payee_amount, source}]
-
 const $  = s => document.querySelector(s);
-const pw = () => $('#adminPass').value;
-const log = (msg, cls='') => {
-  const el = $('#log');
-  el.style.display = 'block';
-  el.innerHTML += (cls ? `[${cls}] ` : '') + msg + '\n';
-  el.scrollTop = el.scrollHeight;
-};
+const drop = $('#drop');
+const trim = s => String(s ?? '').trim();
+const num  = s => s == null || s === '' ? 0 : (Math.round(Number(String(s).replace(/[,\s]/g,'')) || 0));
 
-/* ─── 輔助：解析金額 "1,234 " → 1234 ─── */
-const num = (s) => {
-  if (s == null || s === '') return 0;
-  return Math.round(Number(String(s).replace(/[,\s]/g,'')) || 0);
-};
-const trim = (s) => String(s ?? '').trim();
-
-/* ─── 日期 "115/01/07" → ym "11501" ─── */
 function ymFromDate(d) {
   const m = trim(d).match(/^(\d{3,4})\/(\d{1,2})\/\d{1,2}$/);
-  if (!m) return '';
-  return m[1] + String(m[2]).padStart(2,'0');
+  return m ? m[1] + String(m[2]).padStart(2,'0') : '';
 }
 
-/* ─── 解析整份 Excel ─── */
 function parseExcel(wb) {
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
-  // 找表頭那行（第一欄有「製」字）後開始
   let startIdx = 3;
   for (let i = 0; i < Math.min(10, rows.length); i++) {
-    if (trim(rows[i][0]).includes('製') && trim(rows[i][0]).includes('票') && trim(rows[i][0]).includes('日')) {
-      startIdx = i + 2; // 跳過 2 行表頭
-      break;
-    }
+    if (trim(rows[i][0]).includes('製') && trim(rows[i][0]).includes('日')) { startIdx = i + 2; break; }
   }
-
-  const out = [];
-  const seqMap = {}; // voucher_no → 累計 seq
+  const out = []; const seqMap = {};
   for (let i = startIdx; i < rows.length; i += 2) {
-    const r  = rows[i];     // data row
-    const r2 = rows[i+1];   // type row
-    if (!r || !trim(r[2])) continue;  // 空行跳過
+    const r = rows[i]; const r2 = rows[i+1];
+    if (!r || !trim(r[2])) continue;
     const voucher_no = trim(r[2]).replace(/\s/g,'');
     if (!/^\d{6,}$/.test(voucher_no)) continue;
     const voucher_type = trim((r2 && r2[2]) || '').replace(/\s/g,'');
-    const make_date = trim(r[0]);
-    const post_date = trim(r[1]);
-    const subj_raw  = trim(r[3]);
-    const ym = ymFromDate(make_date);
     seqMap[voucher_no] = (seqMap[voucher_no] || 0) + 1;
     out.push({
-      voucher_no,
-      voucher_type,
-      ym,
+      voucher_no, voucher_type,
+      ym: ymFromDate(trim(r[0])),
       seq: seqMap[voucher_no],
-      make_date,
-      post_date,
-      subject:     subj_raw,                       // 整段 "11010202 保管款專戶" 直接存
-      sub_account: trim(r[4]),
-      purpose:     trim(r[5]),
-      description: trim(r[6]),
-      debit:       num(r[7]),
-      credit:      num(r[8]),
-      payee_info:  trim(r[9]) || null,
-      payee_amount:num(r[10]),
-      source:      'excel_import',
+      make_date: trim(r[0]), post_date: trim(r[1]),
+      subject: trim(r[3]), sub_account: trim(r[4]),
+      purpose: trim(r[5]), description: trim(r[6]),
+      debit: num(r[7]), credit: num(r[8]),
+      payee_info: trim(r[9]) || null, payee_amount: num(r[10]),
+      source: 'excel_import',
     });
   }
   return out;
 }
 
-/* ─── 解析按鈕 ─── */
-function doParse() {
-  const f = $('#file').files[0];
-  if (!f) { alert('請選 Excel 檔'); return; }
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const wb = XLSX.read(e.target.result, { type:'array' });
-      parsedRows = parseExcel(wb);
-      renderSummary();
-      renderPreview();
-    } catch (err) {
-      alert('解析失敗：' + err.message);
-      console.error(err);
-    }
-  };
-  reader.readAsArrayBuffer(f);
+async function upload(rows) {
+  const CHUNK = 500;
+  let ins = 0, upd = 0;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const resp = await fetch('/api/acc/v2/entries', {
+      method: 'PUT',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify(chunk),
+    });
+    const j = await resp.json();
+    if (!resp.ok) throw new Error(j.error || ('HTTP ' + resp.status));
+    ins += j.inserted || 0; upd += j.updated || 0;
+  }
+  return { inserted: ins, updated: upd };
 }
 
-function renderSummary() {
-  $('#summary').style.display = 'block';
-  const byType = {};
-  const byVoucher = new Set();
-  let debitSum = 0, creditSum = 0;
-  for (const r of parsedRows) {
+function showResult(rows, uploadResult, error) {
+  $('#result').style.display = 'block';
+  if (error) {
+    drop.className = 'drop err';
+    drop.innerHTML = '❌ 失敗：' + error + ' — 點此重試';
+    $('#stats').innerHTML = `<span class="stat err">${error}</span>`;
+    return;
+  }
+  drop.className = 'drop ok';
+  drop.innerHTML = '✅ 匯入完成 — 點此再匯入另一份';
+
+  const byType = {}; const byVoucher = new Set();
+  let deb = 0, cre = 0;
+  for (const r of rows) {
     byType[r.voucher_type] = (byType[r.voucher_type] || 0) + 1;
     byVoucher.add(r.voucher_no);
-    debitSum  += r.debit;
-    creditSum += r.credit;
+    deb += r.debit; cre += r.credit;
   }
-  const ymSet = new Set(parsedRows.map(r => r.ym).filter(Boolean));
-  const ymArr = [...ymSet].sort();
-  const html = [
-    `<span class="stat ok">分錄 ${parsedRows.length} 筆</span>`,
+  const ymArr = [...new Set(rows.map(r => r.ym).filter(Boolean))].sort();
+  $('#stats').innerHTML = [
+    `<span class="stat ok">✅ 新增 ${uploadResult.inserted} 筆</span>`,
+    `<span class="stat warn">~ 覆寫 ${uploadResult.updated} 筆</span>`,
+    `<span class="stat">分錄合計 ${rows.length}</span>`,
     `<span class="stat">傳票 ${byVoucher.size} 張</span>`,
     ...Object.entries(byType).map(([t,n]) => `<span class="stat">${t} ${n}</span>`),
-    `<span class="stat">借方合計 ${debitSum.toLocaleString()}</span>`,
-    `<span class="stat">貸方合計 ${creditSum.toLocaleString()}</span>`,
-    `<span class="stat ${debitSum===creditSum?'ok':'err'}">${debitSum===creditSum?'✓ 借貸平衡':'✗ 借貸不平 '+(debitSum-creditSum)}</span>`,
+    `<span class="stat">借方 ${deb.toLocaleString()}</span>`,
+    `<span class="stat">貸方 ${cre.toLocaleString()}</span>`,
+    `<span class="stat ${deb===cre?'ok':'err'}">${deb===cre?'✓ 借貸平衡':'✗ 不平 '+(deb-cre)}</span>`,
     `<span class="stat">ym: ${ymArr.join(', ') || '(空)'}</span>`,
   ].join(' ');
-  $('#stats').innerHTML = html;
 }
 
-function renderPreview() {
-  $('#previewCard').style.display = 'block';
-  const tb = $('#tbl tbody');
-  tb.innerHTML = '';
-  const slice = parsedRows.slice(0, 200);
-  for (const r of slice) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${r.voucher_no}</td>
-      <td>${r.voucher_type}</td>
-      <td>${r.ym}</td>
-      <td>${r.seq}</td>
-      <td>${r.make_date}</td>
-      <td>${r.subject}${r.sub_account ? ' / '+r.sub_account : ''}</td>
-      <td>${r.description || ''}</td>
-      <td class="num">${r.debit ? r.debit.toLocaleString() : ''}</td>
-      <td class="num">${r.credit ? r.credit.toLocaleString() : ''}</td>`;
-    tb.appendChild(tr);
-  }
-  $('#previewInfo').textContent = `顯示 ${slice.length} / ${parsedRows.length}`;
-}
+$('#file').addEventListener('change', async (ev) => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  drop.className = 'drop busy';
+  drop.innerHTML = '⏳ 解析 + 上傳中…（' + f.name + '）';
+  $('#result').style.display = 'none';
 
-/* ─── 上傳 ─── */
-async function doUpload() {
-  if (!parsedRows.length) { alert('沒有資料'); return; }
-  const pass = pw();
-  if (!pass) { alert('請先輸入管理密碼'); return; }
-  const btn = $('#btnUpload');
-  btn.disabled = true; btn.textContent = '上傳中…';
-  log('POST /api/acc/v2/entries — 共 ' + parsedRows.length + ' 筆（upsert by voucher_no+seq）');
-  // 分批避免 payload 太大（D1 worker 有 body limit）
-  const CHUNK = 500;
-  let totalInserted = 0, totalUpdated = 0;
   try {
-    for (let i = 0; i < parsedRows.length; i += CHUNK) {
-      const chunk = parsedRows.slice(i, i + CHUNK);
-      const resp = await fetch('/api/acc/v2/entries', {
-        method: 'PUT',
-        headers: { 'Content-Type':'application/json', 'X-Admin-Pass': pass },
-        body: JSON.stringify(chunk),
-      });
-      const j = await resp.json();
-      if (!resp.ok) throw new Error(j.error || ('HTTP '+resp.status));
-      totalInserted += j.inserted || 0;
-      totalUpdated  += j.updated  || 0;
-      log(`  批次 ${i+1}~${i+chunk.length}: +${j.inserted||0} 新 / ~${j.updated||0} 覆寫`);
-    }
-    log('');
-    log(`✅ 完成：新增 ${totalInserted} 筆、覆寫 ${totalUpdated} 筆`, 'OK');
-    btn.textContent = '✅ 上傳完成';
-    btn.style.background = '#2a8';
+    const buf = await f.arrayBuffer();
+    const wb  = XLSX.read(buf, { type: 'array' });
+    const rows = parseExcel(wb);
+    if (!rows.length) throw new Error('沒有解析到任何分錄，請確認檔案格式');
+    const result = await upload(rows);
+    showResult(rows, result, null);
   } catch (e) {
-    log('❌ ' + e.message, 'ERR');
-    btn.disabled = false;
-    btn.textContent = '🚀 重試上傳';
+    showResult([], null, e.message);
+    console.error(e);
+  } finally {
+    ev.target.value = ''; // 允許重選同一個檔
   }
-}
+});
 </script>
 </body>
 </html>
