@@ -2389,9 +2389,16 @@ function getIncomeType(r) {
   /* 代收款／基金負擔：acctName 以「代收」開頭或等於「基金負擔」者排除出納列計 */
   const an = r.acctName || '';
   if (an.startsWith('代收') || an === '基金負擔' || an.includes('基金負擔')) return '';
+  /* v4.2.37 列計51所得：4501 用途 + 收據型 */
+  if (pc === '4501' && r.taxDocType4501 === 'receipt') return '列計51所得';
   if (at === '財/社團法人') return '列計92所得';
   if (at === '醫療門診診所/檢驗所' || at === '診所/檢驗所' || at === 'HPV') return '列計9A所得';
   if (at === '個人' || ['1501','2713','7103'].includes(pc) || r.income50Type) return '列計50所得';
+  /* v4.2.37 宣導品：單價 ≥ 500 即列計50所得（年度計算） */
+  if (r.lecturerType === 'promo') {
+    const maxP = (r.items||[]).reduce((m, it) => Math.max(m, parseFloat(it.price)||0), 0);
+    if (maxP >= 500) return '列計50所得';
+  }
   return '';
 }
 
@@ -2536,12 +2543,12 @@ function renderCashierSection(label, recs, yr, color) {
 let _cashierTab = '50';
 function renderCashierPane() {
   const active = _rptRecords.filter(r => !r.voided);
-  const groups = { '列計50所得': [], '列計9A所得': [], '列計92所得': [] };
+  const groups = { '列計50所得': [], '列計51所得': [], '列計9A所得': [], '列計92所得': [] };
   active.forEach(r => { const t = getIncomeType(r); if (groups[t]) groups[t].push(r); });
 
   /* ── 年度選擇器 ── */
   const selEl = document.getElementById('cashier-year-sel');
-  const allIncomeRecs = [...groups['列計50所得'], ...groups['列計9A所得'], ...groups['列計92所得']];
+  const allIncomeRecs = [...groups['列計50所得'], ...groups['列計51所得'], ...groups['列計9A所得'], ...groups['列計92所得']];
   const yearSet = new Set();
   allIncomeRecs.forEach(r => {
     const pm = getPayMonth(r);
@@ -2559,13 +2566,20 @@ function renderCashierPane() {
   const yr = selEl ? selEl.value : (years[0]||'');
 
   /* ── 依年度篩選各類別 ── */
-  const inc50 = groups['列計50所得'].filter(r => getPayMonth(r).startsWith(yr + '/'));
+  /* v4.2.37 列計50：拆成月份（非宣導品）與全年（宣導品） */
+  const inc50All     = groups['列計50所得'];
+  const inc50Month   = inc50All.filter(r => r.lecturerType !== 'promo')
+                               .filter(r => getPayMonth(r).startsWith(yr + '/'));
+  const inc50Annual  = inc50All.filter(r => r.lecturerType === 'promo')
+                               .filter(r => (r.applyDateRoc||'').startsWith(yr + '年'));
+  const inc50 = [...inc50Month, ...inc50Annual];
+  const inc51 = groups['列計51所得'].filter(r => (r.applyDateRoc||'').startsWith(yr + '年'));
   const inc9a = groups['列計9A所得'].filter(r => (r.applyDateRoc||'').startsWith(yr + '年'));
   const inc92 = groups['列計92所得'].filter(r => (r.applyDateRoc||'').startsWith(yr + '年'));
 
   /* ── 統計卡片（依選定年度） ── */
-  const cardColors = { '列計50所得':'#1565c0', '列計9A所得':'#2e7d32', '列計92所得':'#6a1b9a' };
-  const filtered = { '列計50所得': inc50, '列計9A所得': inc9a, '列計92所得': inc92 };
+  const cardColors = { '列計50所得':'#1565c0', '列計51所得':'#e65100', '列計9A所得':'#2e7d32', '列計92所得':'#6a1b9a' };
+  const filtered = { '列計50所得': inc50, '列計51所得': inc51, '列計9A所得': inc9a, '列計92所得': inc92 };
   document.getElementById('income-cards').innerHTML = Object.entries(filtered).map(([lbl, recs]) => {
     const total = recs.reduce((s,r) => s+(Number(r.total)||0), 0);
     return `<div class="income-card">
@@ -2575,9 +2589,9 @@ function renderCashierPane() {
     </div>`;
   }).join('');
 
-  /* ── 列計50所得：依實付月分組 ── */
+  /* ── 列計50所得（月份）：依實付月分組 ── */
   const monthMap = {};
-  inc50.forEach(r => {
+  inc50Month.forEach(r => {
     const ym = getPayMonth(r);
     if (!monthMap[ym]) monthMap[ym] = [];
     monthMap[ym].push(r);
@@ -2650,14 +2664,49 @@ function renderCashierPane() {
         </table>
       </div>
     </div>`;
-  }).join('') : `<p style="color:#888; padding:12px 0; font-size:13px;">此年度無列計50所得紀錄</p>`;
+  }).join('') : `<p style="color:#888; padding:12px 0; font-size:13px;">此年度無列計50所得（月份）紀錄</p>`;
+
+  /* ── 列計50所得（全年／宣導品） ── */
+  const annualTotal = inc50Annual.reduce((s,r) => s + (Number(r.total)||0), 0);
+  const sidAnnual   = `csh50_annual_${yr}`;
+  const annualRows  = inc50Annual.map(r => `
+    <tr data-id="${esc(r.id||'')}">
+      <td><input type="checkbox" onchange="updateSelCount('${sidAnnual}')"></td>
+      <td>${esc(r.voucherNo||'—')}</td>
+      <td>${esc(r.applyDateRoc||r.applyDateRaw||'')}</td>
+      <td>${esc(r.acctName||'')}</td>
+      <td>${esc(r.purposeCode||'')} ${esc(cleanPurpose(r.purposeName)||'')}</td>
+      <td>${esc(r.acctType||'')}</td>
+      <td class="td-r-admin">$${fmtN(r.total||0)}</td>
+    </tr>`).join('') || `<tr><td colspan="7" class="no-data">無紀錄</td></tr>`;
+  const annualSection = `<div class="export-section" style="margin-top:10px; margin-bottom:10px;">
+    <h4 style="color:#1565c0;">${yr}年 全年（宣導品）　合計 $${fmtN(annualTotal)}　${inc50Annual.length} 筆</h4>
+    <div class="export-toolbar">
+      <button class="btn btn-gray" onclick="selAll('${sidAnnual}')">全選</button>
+      <button class="btn btn-gray" onclick="invertSel('${sidAnnual}')">反選</button>
+      <button class="btn btn-green" onclick="exportCashierCSV('${sidAnnual}','列計50_全年宣導品_${yr}年')">⬇ 匯出 CSV</button>
+      <span class="sel-count" id="cnt-${sidAnnual}">0 筆已選</span>
+    </div>
+    <div class="export-table-wrap">
+      <table class="export-table" id="${sidAnnual}">
+        <thead><tr>
+          <th><input type="checkbox" onchange="selAllChk('${sidAnnual}',this)"></th>
+          <th>憑證編號</th><th>申請日期</th><th>主科目</th><th>用途別</th>
+          <th>帳戶類別</th><th style="text-align:right;">金額</th>
+        </tr></thead>
+        <tbody>${annualRows}</tbody>
+      </table>
+    </div>
+  </div>`;
 
   /* ── 組合輸出 ── */
   let html = `<div class="export-section" style="margin-bottom:14px;">
     <h4 style="color:#1565c0;">列計50所得（${inc50.length} 筆）</h4>
     ${barChartHtml}
     ${monthSections}
+    ${annualSection}
   </div>`;
+  html += renderCashierSection('列計51所得', inc51, yr, '#e65100');
   html += renderCashierSection('列計9A所得', inc9a, yr, '#2e7d32');
   html += renderCashierSection('列計92所得', inc92, yr, '#6a1b9a');
   html += renderNhiSection(yr);
