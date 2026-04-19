@@ -1267,9 +1267,16 @@ body.sb-resizing * { pointer-events: none !important; }
         <button type="button" onclick="addPayeeCard()" style="padding:5px 14px; background:#fff; color:#1565c0; border:1.5px solid #1565c0; border-radius:4px; cursor:pointer; font-size:13px; font-weight:bold;">＋ 新增受款人</button>
       </div>
       <!-- v4.2.31 代墊原因（僅員工/代墊類別顯示，選填） -->
+      <!-- v4.4.13: 填過的文字自動記憶（localStorage），下拉可選之前用過的原因，不重複 -->
       <div id="row-payee-reason" class="payee-row" style="display:none; margin-top:10px;">
         <label class="payee-lbl">代墊原因</label>
-        <input type="text" id="payee-reason" placeholder="選填，有填寫時列印才會顯示" style="flex:1;" oninput="updatePayeePrintLine()" onblur="_autoSavePayeeReason()">
+        <input type="text" id="payee-reason" list="payee-reason-history"
+               placeholder="選填，有填寫時列印才會顯示；下拉可選之前用過的原因"
+               autocomplete="off"
+               style="flex:1;"
+               oninput="updatePayeePrintLine()"
+               onblur="_autoSavePayeeReason(); savePayeeReasonToHistory(this.value);">
+        <datalist id="payee-reason-history"></datalist>
       </div>
       <!-- v4.2.33 前次受款人歷史（被取代時顯示刪除線） -->
       <div id="payee-prev-display" style="display:none; margin-top:8px;"></div>
@@ -1723,6 +1730,14 @@ async function loadHistory() {
     else setSyncStatus('● 已連線', 'ok');
     buildFilterDropdowns();
     applyHistoryFilter();
+    /* v4.4.13 把既有紀錄中的代墊原因也 seed 進歷史記憶 */
+    try {
+      const seen = new Set();
+      cachedRecords.forEach(r => {
+        const v = (r.payeeReason || '').trim();
+        if (v && !seen.has(v)) { seen.add(v); savePayeeReasonToHistory(v); }
+      });
+    } catch(_){}
   } catch(_) {
     setSyncStatus('● 連線失敗，請確認網路', 'err');
     renderHistory([]);
@@ -4362,6 +4377,47 @@ async function _autoSavePayeeReason() {
     const idx = cachedRecords.findIndex(r => r.id === currentId);
     if (idx >= 0) cachedRecords[idx].payeeReason = val;
   } catch(_) { /* silent fail */ }
+}
+
+/* v4.4.13 代墊原因歷史記憶 — localStorage 每台裝置獨立，唯一文字自動記住最多 50 筆 */
+const _PAYEE_REASON_KEY = 'eaf_payee_reason_history';
+const _PAYEE_REASON_MAX = 50;
+function _loadPayeeReasonHistory() {
+  try {
+    const raw = localStorage.getItem(_PAYEE_REASON_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter(s => typeof s === 'string' && s.trim()) : [];
+  } catch(_) { return []; }
+}
+function _renderPayeeReasonDatalist() {
+  const dl = document.getElementById('payee-reason-history');
+  if (!dl) return;
+  const hist = _loadPayeeReasonHistory();
+  dl.innerHTML = hist.map(s => `<option value="${esc(s)}"></option>`).join('');
+}
+function savePayeeReasonToHistory(val) {
+  const v = (val || '').trim();
+  if (!v) return;
+  let hist = _loadPayeeReasonHistory();
+  /* 用過的文字搬到最前，保持唯一；長度截斷 */
+  hist = hist.filter(s => s !== v);
+  hist.unshift(v);
+  if (hist.length > _PAYEE_REASON_MAX) hist = hist.slice(0, _PAYEE_REASON_MAX);
+  try {
+    localStorage.setItem(_PAYEE_REASON_KEY, JSON.stringify(hist));
+  } catch(_) { /* quota 滿時清掉最舊幾筆後重試 */
+    try {
+      localStorage.setItem(_PAYEE_REASON_KEY, JSON.stringify(hist.slice(0, 20)));
+    } catch(_e){}
+  }
+  _renderPayeeReasonDatalist();
+}
+/* 初始化：DOM 就緒時把既有歷史寫進 datalist */
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _renderPayeeReasonDatalist);
+} else {
+  _renderPayeeReasonDatalist();
 }
 
 async function freezePayeeFromSearch(cardI, k) {
