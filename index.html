@@ -957,7 +957,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.17</div>
+      <div id="sb-version">v4.4.18</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1267,7 +1267,7 @@ body.sb-resizing * { pointer-events: none !important; }
         <button type="button" onclick="addPayeeCard()" style="padding:5px 14px; background:#fff; color:#1565c0; border:1.5px solid #1565c0; border-radius:4px; cursor:pointer; font-size:13px; font-weight:bold;">＋ 新增受款人</button>
       </div>
       <!-- v4.2.31 代墊原因（僅員工/代墊類別顯示，選填） -->
-      <!-- v4.4.17: 填過的文字自動記憶（localStorage），下拉可選之前用過的原因，不重複 -->
+      <!-- v4.4.18: 填過的文字自動記憶（localStorage），下拉可選之前用過的原因，不重複 -->
       <div id="row-payee-reason" class="payee-row" style="display:none; margin-top:10px;">
         <label class="payee-lbl">代墊原因</label>
         <input type="text" id="payee-reason" list="payee-reason-history"
@@ -1730,7 +1730,7 @@ async function loadHistory() {
     else setSyncStatus('● 已連線', 'ok');
     buildFilterDropdowns();
     applyHistoryFilter();
-    /* v4.4.17 把既有紀錄中的代墊原因也 seed 進歷史記憶 */
+    /* v4.4.18 把既有紀錄中的代墊原因也 seed 進歷史記憶 */
     try {
       const seen = new Set();
       cachedRecords.forEach(r => {
@@ -4379,7 +4379,7 @@ async function _autoSavePayeeReason() {
   } catch(_) { /* silent fail */ }
 }
 
-/* v4.4.17 代墊原因歷史記憶 — localStorage 每台裝置獨立，唯一文字自動記住最多 50 筆 */
+/* v4.4.18 代墊原因歷史記憶 — localStorage 每台裝置獨立，唯一文字自動記住最多 50 筆 */
 const _PAYEE_REASON_KEY = 'eaf_payee_reason_history';
 const _PAYEE_REASON_MAX = 50;
 function _loadPayeeReasonHistory() {
