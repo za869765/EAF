@@ -4,12 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>採購(費用動支)申請單 － 臺南市佳里區衛生所</title>
+<link rel="stylesheet" href="design.css">
 <style>
 /* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: '標楷體','DFKai-SB','BiauKai','KaiTi',serif;
-  font-size: 13px; background: #e8eaf0; color: #111;
+  /* Claude design 套用：parchment 紙背景、serif 報表標題、warm 中性色 */
+  font-family: '標楷體','DFKai-SB','BiauKai','KaiTi', var(--font-serif, serif);
+  font-size: 13px; background: var(--parchment, #f5f4ed); color: var(--near-black, #141413);
 }
 
 /* ══════════════════════════════════

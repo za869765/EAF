@@ -9,9 +9,11 @@
 <title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.12</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="design.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Segoe UI','Microsoft JhengHei',sans-serif; font-size: 14px; background: #f0f2f5; color: #1a1a2e; }
+/* Claude design：帳冊頁改 parchment；既有深色 top-bar 保留對比 */
+body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif); font-size: 14px; background: var(--parchment, #f5f4ed); color: var(--near-black, #141413); }
 
 /* ── Top Bar ── */
 #top-bar {

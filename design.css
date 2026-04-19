@@ -1,0 +1,325 @@
+/* ==========================================================================
+   EAF Claude Design System
+   Source: github.com/za869765/DESIGN/DESIGN-claude.md
+   Adapted for 衛生所會計/獎勵金系統 — parchment 紙感帳冊氛圍
+   ========================================================================== */
+
+:root {
+    /* ── 色票 Surface ─────────────────────────────────────────── */
+    --parchment:     #f5f4ed;   /* 主背景，溫暖紙色 */
+    --ivory:         #faf9f5;   /* 卡片/元件表面 */
+    --pure-white:    #ffffff;   /* 純白（最大對比用） */
+    --warm-sand:     #e8e6dc;   /* 次要互動表面 */
+    --dark-surface:  #30302e;   /* 暗色容器（警示/強調） */
+    --deep-dark:     #141413;   /* 最深色（標題/重點） */
+
+    /* ── 色票 Text ─────────────────────────────────────────────── */
+    --near-black:    #141413;   /* 主要文字 */
+    --charcoal-warm: #4d4c48;   /* 淺底深字（按鈕/Body 加強） */
+    --olive-gray:    #5e5d59;   /* 次要 Body 文字 */
+    --stone-gray:    #87867f;   /* 淡化 metadata/footnote */
+    --dark-warm:     #3d3d3a;   /* 連結/次要強調 */
+    --warm-silver:   #b0aea5;   /* 深底淺字 */
+
+    /* ── 色票 Brand / Semantic ────────────────────────────────── */
+    --terracotta:      #c96442; /* 主 CTA（僅主要按鈕使用） */
+    --terracotta-deep: #a84e2f;
+    --coral:           #d97757;
+    --error-crimson:   #b53333;
+    --focus-blue:      #3898ec; /* 僅 input focus ring 使用 */
+    --ok-warm:         #5c8653; /* 溫和橄欖綠（成功狀態） */
+
+    /* ── 邊框 / 光環 ───────────────────────────────────────────── */
+    --border-cream: #f0eee6;   /* 最淡，卡片預設邊 */
+    --border-warm:  #e8e6dc;   /* 顯眼分隔 */
+    --border-dark:  #30302e;   /* 深底卡片邊 */
+    --ring-warm:    #d1cfc5;   /* 按鈕 hover/focus 光環 */
+    --ring-subtle:  #e0dfd5;
+    --ring-deep:    #c2c0b6;
+
+    /* ── 字族（Anthropic 字體不公開；用接近的 fallback） ───────── */
+    --font-serif:   'Anthropic Serif', 'Source Serif Pro', Georgia, 'DFKai-SB', 'BiauKai', 'KaiTi', serif;
+    --font-sans:    'Anthropic Sans', 'Inter', 'Microsoft JhengHei', '微軟正黑體', system-ui, -apple-system, sans-serif;
+    --font-mono:    'Anthropic Mono', 'JetBrains Mono', 'SF Mono', Menlo, ui-monospace, monospace;
+
+    /* ── 圓角 ─────────────────────────────────────────────────── */
+    --r-sharp:    4px;
+    --r-sm:       6px;
+    --r-md:       8px;      /* 一般按鈕/卡 */
+    --r-lg:       12px;     /* 主要按鈕/input */
+    --r-xl:       16px;
+    --r-2xl:      24px;
+    --r-3xl:      32px;
+
+    /* ── 陰影（warm ring 為主，drop shadow 極淡） ─────────────── */
+    --sh-ring-1:      0 0 0 1px var(--ring-warm);
+    --sh-ring-deep:   0 0 0 1px var(--ring-deep);
+    --sh-whisper:     0 4px 24px rgba(20, 20, 19, 0.05);
+    --sh-card:        0 0 0 1px var(--border-cream);
+    --sh-card-warm:   0 0 0 1px var(--border-warm);
+
+    /* ── 間距（8px base） ─────────────────────────────────────── */
+    --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+    --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 72px;
+}
+
+/* ==========================================================================
+   Baseline
+   ========================================================================== */
+
+html {
+    background: var(--parchment);
+}
+body {
+    background: var(--parchment);
+    color: var(--near-black);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+}
+
+/* 標題序列（衛生所業務報表也用 serif → 帳冊感） */
+h1, h2, h3, h4, h5, h6,
+.d-heading, .d-title {
+    font-family: var(--font-serif);
+    font-weight: 500;    /* serif 保持 500，不上粗體 */
+    color: var(--near-black);
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+}
+h1 { font-size: 32px; line-height: 1.1; }
+h2 { font-size: 25px; }
+h3 { font-size: 20px; }
+h4 { font-size: 17px; }
+
+/* 連結 */
+a {
+    color: var(--dark-warm);
+    text-decoration: none;
+    border-bottom: 1px solid var(--border-warm);
+    transition: color 140ms, border-color 140ms;
+}
+a:hover {
+    color: var(--near-black);
+    border-bottom-color: var(--terracotta);
+}
+
+/* code / monospace */
+code, pre, kbd, samp, .mono {
+    font-family: var(--font-mono);
+    font-size: 0.94em;
+}
+
+/* ==========================================================================
+   共用元件 — 為 EAF 的既有 class 提供 warm parchment 版本
+   使用者原本的 inline style 仍可覆蓋；這裡只提供「未覆蓋時」的合理預設
+   ========================================================================== */
+
+/* --- 按鈕：原生 button/input[type=button]/.btn/.ym-action --- */
+button,
+input[type="button"],
+input[type="submit"],
+.btn,
+.ym-action {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 500;
+    background: var(--warm-sand);
+    color: var(--charcoal-warm);
+    border: none;
+    border-radius: var(--r-md);
+    padding: 8px 14px;
+    cursor: pointer;
+    box-shadow: var(--sh-ring-1);
+    transition: background 140ms, box-shadow 140ms, color 140ms;
+    line-height: 1.3;
+}
+button:hover,
+input[type="button"]:hover,
+input[type="submit"]:hover,
+.btn:hover,
+.ym-action:hover {
+    background: #ded9ca;
+    box-shadow: var(--sh-ring-deep);
+}
+button:disabled, .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Primary CTA（請在需要的按鈕加 class="primary" 或 .btn.primary） */
+.primary,
+button.primary,
+.btn.primary,
+.btn-primary {
+    background: var(--terracotta);
+    color: var(--ivory);
+    box-shadow: 0 0 0 1px var(--terracotta);
+}
+.primary:hover,
+button.primary:hover,
+.btn.primary:hover,
+.btn-primary:hover {
+    background: var(--terracotta-deep);
+    box-shadow: 0 0 0 1px var(--terracotta-deep);
+}
+
+/* Danger button */
+.danger, button.danger, .btn.danger {
+    background: var(--error-crimson);
+    color: var(--ivory);
+    box-shadow: 0 0 0 1px var(--error-crimson);
+}
+.danger:hover, button.danger:hover, .btn.danger:hover {
+    background: #943535;
+}
+
+/* Ghost / outline */
+.ghost, button.ghost, .btn.ghost {
+    background: transparent;
+    color: var(--charcoal-warm);
+    box-shadow: 0 0 0 1px var(--ring-warm);
+}
+.ghost:hover, button.ghost:hover, .btn.ghost:hover {
+    background: var(--warm-sand);
+}
+
+/* --- 輸入類 --- */
+input[type="text"],
+input[type="number"],
+input[type="date"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+select,
+textarea,
+.pk-in,
+.fi,
+.v-inp,
+.pub-inp,
+.fta {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    background: var(--ivory);
+    color: var(--near-black);
+    border: 1px solid var(--border-warm);
+    border-radius: var(--r-lg);
+    padding: 6px 12px;
+    outline: none;
+    transition: border-color 140ms, box-shadow 140ms;
+}
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="search"]:focus,
+select:focus,
+textarea:focus,
+.pk-in:focus,
+.fi:focus,
+.v-inp:focus,
+.pub-inp:focus,
+.fta:focus {
+    border-color: var(--focus-blue);
+    box-shadow: 0 0 0 3px rgba(56, 152, 236, 0.15);
+}
+textarea { resize: vertical; }
+
+/* --- 表格 --- */
+table.d-table, .d-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+table.d-table th, .d-table th {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    text-align: left;
+    padding: 10px 12px;
+    background: var(--warm-sand);
+    color: var(--near-black);
+    border-bottom: 2px solid var(--border-warm);
+}
+table.d-table td, .d-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-cream);
+    color: var(--olive-gray);
+}
+table.d-table tr:hover td, .d-table tr:hover td {
+    background: var(--ivory);
+}
+
+/* --- 卡片 / 容器 --- */
+.d-card,
+.card,
+.acct-card,
+.byr-box,
+.pk-box,
+.app-modal-body {
+    background: var(--ivory);
+    border: 1px solid var(--border-cream);
+    border-radius: var(--r-md);
+    box-shadow: var(--sh-whisper);
+}
+
+/* --- 徽章 --- */
+.d-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    border-radius: 24px;
+    background: var(--warm-sand);
+    color: var(--charcoal-warm);
+    border: 1px solid var(--ring-warm);
+}
+.d-badge.ok    { background: #e8ede0; color: #466934; border-color: #c8d4b2; }
+.d-badge.warn  { background: #f6ecd9; color: #8a6626; border-color: #e5d5ad; }
+.d-badge.error { background: #f4d9d5; color: #8a2f2a; border-color: #e3b7b0; }
+
+/* --- 分隔線 --- */
+hr, .d-hr {
+    border: none;
+    border-top: 1px solid var(--border-warm);
+    margin: var(--sp-5) 0;
+}
+
+/* ==========================================================================
+   Scrollbar — 仍維持細緻（chrome/safari）
+   ========================================================================== */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--parchment); }
+::-webkit-scrollbar-thumb {
+    background: var(--ring-warm);
+    border-radius: 8px;
+    border: 2px solid var(--parchment);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--ring-deep); }
+
+/* ==========================================================================
+   列印友善（帳冊匯出）
+   ========================================================================== */
+@media print {
+    body { background: #fff; color: #000; }
+    .d-card, .card { box-shadow: none; border-color: #ccc; }
+    a { border-bottom: none; color: #000; }
+}
+
+/* ==========================================================================
+   Utility — 可替代 inline style
+   ========================================================================== */
+.d-ink-1 { color: var(--near-black); }
+.d-ink-2 { color: var(--charcoal-warm); }
+.d-ink-3 { color: var(--olive-gray); }
+.d-ink-4 { color: var(--stone-gray); }
+.d-muted { color: var(--stone-gray); }
+.d-bg-parchment { background: var(--parchment); }
+.d-bg-ivory     { background: var(--ivory); }
+.d-bg-sand      { background: var(--warm-sand); }
+.d-serif { font-family: var(--font-serif); }
+.d-sans  { font-family: var(--font-sans); }
+.d-mono  { font-family: var(--font-mono); }

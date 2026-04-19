@@ -5,14 +5,17 @@
 <title>ACC 傳票明細匯入 v4.4.12</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="design.css">
 <style>
   *{box-sizing:border-box}
-  body{font-family:system-ui,"Microsoft JhengHei",sans-serif;margin:0;padding:24px;background:#f5f6fa;color:#222}
-  h1{font-size:20px;margin:0 0 12px}
-  .card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:14px}
+  /* Claude design：匯入頁 parchment 暖色、serif 標題 */
+  body{font-family:var(--font-sans, system-ui,"Microsoft JhengHei",sans-serif);margin:0;padding:24px;background:var(--parchment,#f5f4ed);color:var(--near-black,#222)}
+  h1{font-family:var(--font-serif, Georgia, serif);font-weight:500;font-size:25px;margin:0 0 16px;color:var(--near-black)}
+  .card{background:var(--ivory,#fff);border:1px solid var(--border-cream,#f0eee6);border-radius:var(--r-md,10px);padding:20px;box-shadow:var(--sh-whisper, 0 4px 24px rgba(0,0,0,.05));margin-bottom:14px}
   .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .drop{border:2px dashed #64b5f6;background:#e3f2fd;color:#1565c0;border-radius:10px;padding:30px;text-align:center;font-size:16px;font-weight:600;cursor:pointer;transition:.15s}
-  .drop:hover{background:#bbdefb}
+  /* drop zone 改暖 terracotta 呼應主 CTA */
+  .drop{border:2px dashed var(--terracotta,#c96442);background:#f9ede7;color:var(--terracotta-deep,#a84e2f);border-radius:var(--r-lg,12px);padding:30px;text-align:center;font-size:16px;font-weight:600;cursor:pointer;transition:.15s}
+  .drop:hover{background:#f4ddd4}
   .drop.busy{background:#fff8e1;border-color:#ffa000;color:#e65100;cursor:wait}
   .drop.ok{background:#e8f5e9;border-color:#66bb6a;color:#2e7d32}
   .drop.err{background:#ffebee;border-color:#ef5350;color:#c62828}

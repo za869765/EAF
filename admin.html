@@ -4,10 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>管理者入口 — 動支單系統 v4.4.12</title>
+<link rel="stylesheet" href="design.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif; font-size: 14px;
-       background: #f0f2f5; color: #1a1a2e; }
+/* Claude design：admin 頁改 parchment 暖色調 */
+body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-serif); font-size: 14px;
+       background: var(--parchment, #f5f4ed); color: var(--near-black, #141413); }
 
 /* ── Login ── */
 #login-wrap {
