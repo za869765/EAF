@@ -1689,7 +1689,12 @@ async function apiPatch(id, patch) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
   });
-  if (!r.ok) throw 0;
+  if (!r.ok) {
+    /* bug #26: 原本 `throw 0` 讓呼叫端拿不到 status/message，跟 apiPost 行為不一致 */
+    let msg = `HTTP ${r.status}`;
+    try { const j = await r.json(); if (j && j.error) msg = j.error; } catch(_) {}
+    const err = new Error(msg); err.status = r.status; throw err;
+  }
   return r.json();
 }
 /* DELETE 已移除（僅管理者後台保留還原作廢功能，永久刪除不再提供） */

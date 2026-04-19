@@ -1888,13 +1888,16 @@ function updateCalcTable(){
   const badge = document.getElementById('calc-ym-badge');
   if(badge) badge.textContent = `${y}年${m}月`;
 
-  // ── 全部合計（掛帳 + 不給付 − 折讓 − 支出）──
+  // ── 全部合計（掛帳 + 不給付 + 剔除 − 折讓 − 支出）──
   const totalInc  = pnum(document.getElementById('inc-total')?.value);
   const disc      = document.getElementById('discount-needed')?.checked
                   ? pnum(document.getElementById('discount-amount-input')?.value) : 0;
   const noncov    = pnum(document.getElementById('inc-lab')?.value)
                   + pnum(document.getElementById('inc-copay')?.value)
                   + pnum(document.getElementById('inc-noncov')?.value);
+  /* bug #27: reject 原本硬寫 0，docs 公式 G4=B4-C4+D4+E4-F4 E4 為正號加項。
+     目前 E4 (申復剔除) 欄位 UI 尚未實作 (需 C16/F24，acc.html 沒對應 input)，
+     暫以 0 保留佔位，但把符號改成 + 讓未來接上 input 時公式正確。 */
   const reject    = 0;
   const totalExp  = pnum(document.getElementById('expense-510601-total')?.textContent);
 
@@ -1906,14 +1909,19 @@ function updateCalcTable(){
   // ── 門診醫療 = 總額 − 衛生保健 ──
   const mInc = totalInc - hInc;
   const mExp = totalExp - hExp;
-  const mNet = mInc + noncov - disc - reject - mExp;
+  /* bug #27: 折讓依 B4:B5 比例分攤；原本 disc 全扣在 mNet、hNet 完全沒分攤折讓，
+     文件公式 C4 = ROUND(B4 × D8)、C5 = C6 − C4。以掛帳金額比例近似。 */
+  const mDisc = totalInc > 0 ? Math.round(disc * mInc / totalInc) : 0;
+  const hDisc = Math.max(0, disc - mDisc);
+  const mNet = mInc + noncov + reject - mDisc - mExp;
   const mFund5  = Math.round(mNet * 0.05);
   const mBureau = Math.round(mNet * 0.95 * 0.1);
   const mStaff  = Math.round(mNet * 0.95 * 0.9 * 0.3);
   const mDoctor = mNet - mFund5 - mBureau - mStaff;
 
   // ── 衛生保健（員工比例 0.7，加班費只減繳局，醫師不受影響）──
-  const hNet2   = hInc - hExp;
+  /* bug #27: 原本 hNet2 = hInc - hExp 完全沒扣折讓，D5/E5 仍為 0，但衛保折讓 C5 應扣 */
+  const hNet2   = hInc - hDisc - hExp;
   const hFund5  = Math.round(hNet2 * 0.05);
   const hBureau = Math.round(hNet2 * 0.95 * 0.1 - hOvertime);
   const hStaff  = Math.round(hNet2 * 0.95 * 0.9 * 0.7);
@@ -1922,12 +1930,14 @@ function updateCalcTable(){
   const s = (id, v) => { const el=document.getElementById(id); if(el) el.textContent = v ? fmt(v) : '-'; };
 
   // 門診醫療 row
-  s('ct-inc',mInc); s('ct-disc',disc); s('ct-noncov',noncov); s('ct-reject',reject);
+  /* bug #27: ct-disc 顯示門診分攤折讓 mDisc，不再顯示總折讓 disc */
+  s('ct-inc',mInc); s('ct-disc',mDisc); s('ct-noncov',noncov); s('ct-reject',reject);
   s('ct-exp',mExp); s('ct-net',mNet); s('ct-fund5',mFund5);
   s('ct-bureau',mBureau); s('ct-doctor',mDoctor); s('ct-staff',mStaff);
 
   // 衛生保健 row
-  s('ct-h-inc',hInc); s('ct-h-disc',0); s('ct-h-noncov',0); s('ct-h-reject',0);
+  /* bug #27: ct-h-disc 顯示衛保分攤折讓 hDisc，不再硬寫 0 */
+  s('ct-h-inc',hInc); s('ct-h-disc',hDisc); s('ct-h-noncov',0); s('ct-h-reject',0);
   s('ct-h-exp',hExp); s('ct-h-net',hNet2); s('ct-h-fund5',hFund5);
   s('ct-h-bureau',hBureau); s('ct-h-doctor',hDoctor); s('ct-h-staff',hStaff);
 

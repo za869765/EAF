@@ -27,7 +27,8 @@
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+  /* bug #29: 加 DELETE，handler 有 DELETE /entries/:voucher_no 但原本 preflight 擋下 */
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Pass',
 };
 
@@ -200,13 +201,15 @@ export async function onRequest({ request, env }) {
       if (method === 'PUT' && res2) {
         if (!auth(request, env)) return json({ error: '密碼錯誤' }, 401);
         const body = await request.json();
-        const cur = await DB.prepare('SELECT locked FROM acc_vouchers WHERE ym = ?').bind(res2).first();
+        /* bug #28: 需保留原 locked_at，重鎖時不要覆寫稽核時間戳 */
+        const cur = await DB.prepare('SELECT locked, locked_at FROM acc_vouchers WHERE ym = ?').bind(res2).first();
         if (cur && cur.locked && !body.unlock && body.locked !== false) {
           return json({ error: `${res2} 已鎖定，需 {unlock:true} 才能覆寫` }, 409);
         }
         const entries = JSON.stringify(body.entries || []);
         const locked = body.locked ? 1 : 0;
-        const lockedAt = body.locked ? nowIso() : null;
+        /* 鎖定時：若原本已鎖，沿用舊 locked_at；首次鎖才寫 now */
+        const lockedAt = body.locked ? (cur && cur.locked_at ? cur.locked_at : nowIso()) : null;
         const updatedAt = nowIso();
         await DB.prepare(`
           INSERT INTO acc_vouchers (ym, entries, locked, locked_at, updated_at)
@@ -239,13 +242,14 @@ export async function onRequest({ request, env }) {
       if (method === 'PUT' && res2) {
         if (!auth(request, env)) return json({ error: '密碼錯誤' }, 401);
         const body = await request.json();
-        const cur = await DB.prepare('SELECT locked FROM acc_monthly WHERE ym = ?').bind(res2).first();
+        /* bug #28: 保留原 locked_at（同 vouchers PUT 的修法） */
+        const cur = await DB.prepare('SELECT locked, locked_at FROM acc_monthly WHERE ym = ?').bind(res2).first();
         if (cur && cur.locked && !body.unlock && body.locked !== false) {
           return json({ error: `${res2} 月結已鎖定，需 {unlock:true} 才能覆寫` }, 409);
         }
         const data = JSON.stringify(body.data || {});
         const locked = body.locked ? 1 : 0;
-        const lockedAt = body.locked ? nowIso() : null;
+        const lockedAt = body.locked ? (cur && cur.locked_at ? cur.locked_at : nowIso()) : null;
         const updatedAt = nowIso();
         await DB.prepare(`
           INSERT INTO acc_monthly (ym, data, locked, locked_at, updated_at)
