@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.22</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.23</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -70,7 +70,7 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
 .hd-blue   { background: #3d4f74; }
 .card-bd { padding: 12px 14px; }
 
-/* v4.4.22 應付費用 立帳/沖帳 chip */
+/* v4.4.23 應付費用 立帳/沖帳 chip */
 .acc-chip {
   display: inline-block;
   padding: 1px 7px;
@@ -396,7 +396,7 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.22</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.23</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -979,7 +979,7 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
 </div><!-- /tab-voucher -->
 
 <!-- ══════════════════════════════════════════
-     TAB：收入傳票（v4.4.22 — 從 acc_voucher_entries 匯入版讀取）
+     TAB：收入傳票（v4.4.23 — 從 acc_voucher_entries 匯入版讀取）
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-income">
   <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
@@ -995,7 +995,7 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
 </div>
 
 <!-- ══════════════════════════════════════════
-     TAB：支出傳票（v4.4.22 — 從 acc_voucher_entries 匯入版讀取）
+     TAB：支出傳票（v4.4.23 — 從 acc_voucher_entries 匯入版讀取）
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-expense">
   <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
@@ -1300,7 +1300,7 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
     </div>
   </div>
 
-  <!-- v4.4.22 折讓率設定 + 110305 應收醫療帳款（從 D1 acc_voucher_entries 聚合） -->
+  <!-- v4.4.23 折讓率設定 + 110305 應收醫療帳款（從 D1 acc_voucher_entries 聚合） -->
   <div class="card">
     <div class="card-hd hd-dark">⚙️ 折讓率設定 + 110305 應收醫療帳款</div>
     <div class="card-bd" style="padding:12px 16px;">
@@ -1832,7 +1832,7 @@ function onDiscountToggle(){
     calcReminders();
   }
 }
-// v4.4.22 自動提列：依折讓率 + 110305 AR 當年度餘額 + 110306 備折餘額
+// v4.4.23 自動提列：依折讓率 + 110305 AR 當年度餘額 + 110306 備折餘額
 //   1. 不足 → 自動勾選 + 自動填入差額
 //   2. 足夠 → 自動取消勾選
 //   3. 使用者可事後手動改 checkbox / 金額覆蓋
@@ -2449,7 +2449,7 @@ function confirmPicker(){
    製作前應付費用預檢
 ════════════════════════════════════════════ */
 async function preCheckVoucher(){
-  // v4.4.22 產製前刷新折讓建議，確保 STATE.month.discount 已套用最新基本數額
+  // v4.4.23 產製前刷新折讓建議，確保 STATE.month.discount 已套用最新基本數額
   if(typeof updateDiscountAdvisor === 'function'){
     await AccV2.refresh();
     renderAllowLedger();
@@ -2611,7 +2611,7 @@ function generateVouchers(){
   }
 
 
-  // 5. 醫療折讓（若需提列）— v4.4.22 借 備抵醫療折讓 / 貸 醫療折讓
+  // 5. 醫療折讓（若需提列）— v4.4.23 借 備抵醫療折讓 / 貸 醫療折讓
   const discountNeeded = document.getElementById('discount-needed').checked;
   if(discountNeeded){
     const discAmt = STATE.month.discount.amount || 0;
@@ -2964,7 +2964,7 @@ function renderVouchers(){
   tbody.innerHTML = '';
   const {y,m} = getVoucherYm();
   const ymKey = String(y) + String(m).padStart(2,'0');
-  // v4.4.22 匯入版 轉帳傳票（D1 acc_voucher_entries）優先顯示
+  // v4.4.23 匯入版 轉帳傳票（D1 acc_voucher_entries）優先顯示
   const imported = (window.AccV2 && AccV2.entries) ? AccV2.entries({type:'轉帳', ym: ymKey}) : [];
   if(imported.length > 0){
     renderVouchersFromImport(tbody, imported);
@@ -3050,8 +3050,8 @@ function renderVouchers(){
   document.getElementById('voucher-count').textContent = `共 ${STATE.vouchers.filter(v=>!v._sep).length} 筆`;
 }
 
-// v4.4.22 清除 D1 假空白分錄
-// v4.4.22 折讓率 + 110305 應收醫療帳款 聚合
+// v4.4.23 清除 D1 假空白分錄
+// v4.4.23 折讓率 + 110305 應收醫療帳款 聚合
 const ALLOW_RATE_KEY = 'acc_allowance_rate';
 function getAllowRate(){ return Number(localStorage.getItem(ALLOW_RATE_KEY)) || 0; }
 function saveAllowRate(){
@@ -3082,7 +3082,7 @@ function renderAllowanceRateAndAR(){
   const balance = totalD - totalC;
   const basicAmount = rate > 0 ? Math.round(balance * rate * 1.5) : 0;
 
-  // v4.4.22 加做 110306 備抵醫療折讓 / 410698 醫療折讓 當年度聚合
+  // v4.4.23 加做 110306 備抵醫療折讓 / 410698 醫療折讓 當年度聚合
   const agg = (prefix) => {
     const es = (window.AccV2 && AccV2.entries) ? AccV2.entries({ yearPrefix: String(y), subjectPrefix: prefix }) : [];
     let D = 0, C = 0;
@@ -3155,7 +3155,7 @@ async function cleanupBlankEntries(){
   }
 }
 
-// v4.4.22 匯入版 轉帳傳票 render（D1 優先）
+// v4.4.23 匯入版 轉帳傳票 render（D1 優先）
 function renderVouchersFromImport(tbody, entries){
   const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   const groups = new Map();
@@ -5236,7 +5236,7 @@ async function fixDrug11503(){
   localStorage.setItem('acc_fix_drug_11503','1');
   if(changed) console.log('[fixDrug11503] 已補入11503 進貨12842+領用7800+盤損2');
 }
-/* v4.4.22 上年度結轉立帳拆分：結轉的員工獎勵金實際包含醫師部份（前一年合計入帳時沒拆）
+/* v4.4.23 上年度結轉立帳拆分：結轉的員工獎勵金實際包含醫師部份（前一年合計入帳時沒拆）
    按公式比例 醫師:員工 = 0.7:0.3（docs/115獎勵金計算表_公式說明.md 第 K5 / K4 欄）拆回 02a/02b
    觸發：sub_account 指向 02b（或 02） AND description 含「結轉」關鍵字 */
 function splitCarryOverBonus(desc, amt, code){
@@ -5254,7 +5254,7 @@ function splitCarryOverBonus(desc, amt, code){
   ];
 }
 
-/* v4.4.22 單筆傳票同時描述醫師+員工獎勵金時（如「醫師獎勵金(...=37600)+員工獎勵金(...=16961)」），
+/* v4.4.23 單筆傳票同時描述醫師+員工獎勵金時（如「醫師獎勵金(...=37600)+員工獎勵金(...=16961)」），
    依算式結果拆分成 02a / 02b 兩筆；拆分總和必須等於 |bal| 才拆。
    立帳(credit, +) 與 沖帳(debit, −) 都會拆 —— 原本只拆正值，造成「一張支出傳票付醫師+員工合計」
    時整筆錯歸 02a、02b 沖帳漏算、02a 負淨餘誇大的問題。 */
@@ -5278,8 +5278,8 @@ function splitBonusByDesc(desc, amt){
 
 /* v4.4.0 loadPayable — 從 AccV2 伺服器分錄即時聚合（無 localStorage、無 SEED）
    v4.4.15 — 移除 type:'轉帳' 限制，納入支出傳票的 210205 沖帳分錄（借方）
-   v4.4.22 — 支出傳票沖帳若該類完全無立帳對應（含年結轉）→ 略過顯示
-   v4.4.22 —
+   v4.4.23 — 支出傳票沖帳若該類完全無立帳對應（含年結轉）→ 略過顯示
+   v4.4.23 —
      a) 加「截至選定月份」ym filter — 原本顯示 4 月資料到 3/31 cut-off 報表，造成員工款淨餘 0 假象
      b) 上年度結轉於 02b 的分錄拆分成 02a/02b 各 7:3（符合獎勵金公式） */
 function loadPayable(){
@@ -5290,7 +5290,7 @@ function loadPayable(){
   }));
   const idx = {}; cats.forEach(c => idx[c.code] = c);
   let rows = AccV2.entries({ subjectPrefix:'210205' });
-  /* v4.4.22 ym 截止過濾：排除選定月份之後的分錄 */
+  /* v4.4.23 ym 截止過濾：排除選定月份之後的分錄 */
   if(filterYm){
     rows = rows.filter(e => !e.ym || String(e.ym) <= filterYm);
   }
@@ -5357,7 +5357,7 @@ function renderPayable(){
   const data = loadPayable();
   const totalEl = document.getElementById('pay-total');
   if(totalEl) totalEl.textContent = fmt(data.total||0);
-  /* v4.4.22 動態更新截至日期 */
+  /* v4.4.23 動態更新截至日期 */
   const hintEl = document.getElementById('payable-cutoff-hint');
   if(hintEl){
     const {y,m} = (typeof getYm === 'function') ? getYm() : {y:'115',m:'3'};
@@ -5377,10 +5377,10 @@ function renderPayable(){
     </div></div>`;
     return;
   }
-  /* v4.4.22:
+  /* v4.4.23:
      - 欄位順序：＋立帳（LEFT）→ −沖帳（RIGHT） — 符合「要立才能沖」因果
      - 顏色：立帳 = 綠（正面入帳/收到應付項目）、沖帳 = 紅（付出扣除）
-     - 支出傳票的沖帳分錄 v4.4.22 已納入 loadPayable，不再漏算 */
+     - 支出傳票的沖帳分錄 v4.4.23 已納入 loadPayable，不再漏算 */
   sec.innerHTML = data.categories.map(cat=>{
       const rows = [...cat.entries]
           .sort((a,b)=>(b.make_date||'').localeCompare(a.make_date||''))
@@ -5486,7 +5486,7 @@ async function onAccEntriesUpload(inp){
       const voucher_no = trim(r[2]).replace(/\s/g,'');
       if (!/^\d{6,}$/.test(voucher_no)) continue;
       const voucher_type = trim((r2 && r2[2]) || '').replace(/\s/g,'');
-      // v4.4.22 略過空白行（報表重印 header / 分頁）：無 subject 且 借貸皆 0
+      // v4.4.23 略過空白行（報表重印 header / 分頁）：無 subject 且 借貸皆 0
       if(!trim(r[3]) && !num(r[7]) && !num(r[8])) continue;
       seqMap[voucher_no] = (seqMap[voucher_no]||0) + 1;
       out.push({
@@ -5501,7 +5501,7 @@ async function onAccEntriesUpload(inp){
     }
     if (!out.length) throw new Error('沒解析到任何分錄，請確認檔案格式');
 
-    // v4.4.22 前端 diff：比對上傳前 AccV2 快照 → 新增 / 更新 / 略過（per type）
+    // v4.4.23 前端 diff：比對上傳前 AccV2 快照 → 新增 / 更新 / 略過（per type）
     await AccV2.ensure();
     const beforeMap = new Map();
     (AccV2._entries||[]).forEach(e => beforeMap.set(`${e.voucher_no}#${e.seq}`, e));
@@ -5521,7 +5521,7 @@ async function onAccEntriesUpload(inp){
       else stats[t].upd++;
     });
 
-    // v4.4.22 上傳前彈窗確認
+    // v4.4.23 上傳前彈窗確認
     const previewLines = Object.keys(stats).map(t => {
       const s = stats[t];
       return `${typeIcon[t]} ${t}傳票：新增 ${s.add}｜更新 ${s.upd}｜略過 ${s.skip}`;
@@ -5952,12 +5952,12 @@ function loadCustodial(){
   const idx = {}; groups.forEach(g => idx[g.code] = g);
   const prefixes = CUST_GROUPS_DEF.map(g => g.code);
   let rows = AccV2.entries({ subjectPrefixes: prefixes });
-  /* v4.4.22 ym 截止過濾 */
+  /* v4.4.23 ym 截止過濾 */
   if(filterYm){
     rows = rows.filter(e => !e.ym || String(e.ym) <= filterYm);
   }
 
-  /* v4.4.22 Pass 1: 算每個 sub-bucket 是否有任何立帳 */
+  /* v4.4.23 Pass 1: 算每個 sub-bucket 是否有任何立帳 */
   const subHasAccrue = {}; // key = groupCode + '|' + subKey
   rows.forEach(e => {
     const subject = String(e.subject||'').replace(/\s/g,'');
@@ -6026,7 +6026,7 @@ function renderCustodial(){
   const data = loadCustodial();
   const totalEl = document.getElementById('cust-total');
   if(totalEl) totalEl.textContent = fmt(data.total||0);
-  /* v4.4.22 動態更新截至日期 */
+  /* v4.4.23 動態更新截至日期 */
   const hintEl = document.getElementById('custodial-cutoff-hint');
   if(hintEl){
     const {y,m} = (typeof getYm === 'function') ? getYm() : {y:'115',m:'3'};
@@ -6044,7 +6044,7 @@ function renderCustodial(){
     </div></div>`;
     return;
   }
-  /* v4.4.22 代收款也改立帳/沖帳左右欄呈現 */
+  /* v4.4.23 代收款也改立帳/沖帳左右欄呈現 */
   sec.innerHTML = data.groups.map(g=>`
     <div class="card">
       <div class="card-hd ${g.color}">
@@ -6166,7 +6166,7 @@ function renderSurplusTab(){
 }
 
 /* ════════════════════════════════════════════
-   v4.4.22 收入 / 支出 / 轉帳 傳票 — 匯入版 (acc_voucher_entries) 唯讀呈現
+   v4.4.23 收入 / 支出 / 轉帳 傳票 — 匯入版 (acc_voucher_entries) 唯讀呈現
    ════════════════════════════════════════════ */
 function renderImportedVouchers(type){
   const { y, ym, label } = getYm();
@@ -6941,7 +6941,7 @@ function checkDrugEntered(){
 }
 
 /* 財產帳面淨值 + 月份標籤 自動填入 */
-// v4.4.22 每月折舊額設定（基準 + 變更點）
+// v4.4.23 每月折舊額設定（基準 + 變更點）
 const DEPR_KEY = 'acc_prop_depr_schedule';
 function loadDeprSchedule(){
   try { return JSON.parse(localStorage.getItem(DEPR_KEY) || '{}'); } catch(e){ return {}; }
@@ -7312,7 +7312,7 @@ async function loadMonthData(){
   syncVoucherToWork(ym);
   // 自動欄位重算
   calcIncome(); calcOther(); calcDrug(); calcInv(); calcBonus(); calcIncomeBreakdown(); calcExpenseTotal(); updateHomeDashboard();
-  // v4.4.22 自動提列醫療折讓
+  // v4.4.23 自動提列醫療折讓
   if(typeof renderAllowLedger === 'function') renderAllowLedger();
   if(typeof updateDiscountAdvisor === 'function') updateDiscountAdvisor();
 }
@@ -7471,7 +7471,7 @@ function logout(){ window.location.href = '/admin.html'; }
   calcInv();
   // v4.4.0 先拉 AccV2 bootstrap（以伺服器 voucher_entries 為真實來源）
   await AccV2.ensure();
-  // v4.4.22 AccV2 就緒後重渲染轉帳傳票（F5 後優先顯示匯入版）
+  // v4.4.23 AccV2 就緒後重渲染轉帳傳票（F5 後優先顯示匯入版）
   renderVouchers();
   // 應付費用分頁
   fixMar盤損();
