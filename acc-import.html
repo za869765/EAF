@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<title>ACC 傳票明細匯入 v4.4.23</title>
+<title>ACC 傳票明細匯入 v4.4.24</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -52,9 +52,22 @@ const drop = $('#drop');
 const trim = s => String(s ?? '').trim();
 const num  = s => s == null || s === '' ? 0 : (Math.round(Number(String(s).replace(/[,\s]/g,'')) || 0));
 
+/* v4.4.24 bug #10: 與 acc.html ymFromDate 同步升級 — 接受 - . / serial */
 function ymFromDate(d) {
-  const m = trim(d).match(/^(\d{3,4})\/(\d{1,2})\/\d{1,2}$/);
-  return m ? m[1] + String(m[2]).padStart(2,'0') : '';
+  if (d == null || d === '') return '';
+  let s = String(d).trim().replace(/[／]/g, '/').replace(/[年月]/g, '/').replace(/日/g,'');
+  let m = s.match(/^(\d{2,4})[\/\-\.](\d{1,2})[\/\-\.]\d{1,2}/);
+  if (m) {
+    let y = parseInt(m[1], 10);
+    if (y >= 1911 && y < 2300) y -= 1911;
+    return String(y).padStart(3,'0') + String(parseInt(m[2],10)).padStart(2,'0');
+  }
+  const n = Number(s);
+  if (Number.isFinite(n) && n > 20000 && n < 80000) {
+    const d2 = new Date(Math.round((n - 25569) * 86400 * 1000));
+    if (!isNaN(d2.getTime())) return String(d2.getFullYear() - 1911).padStart(3,'0') + String(d2.getMonth()+1).padStart(2,'0');
+  }
+  return '';
 }
 
 function parseExcel(wb) {
@@ -71,6 +84,9 @@ function parseExcel(wb) {
     const voucher_no = trim(r[2]).replace(/\s/g,'');
     if (!/^\d{6,}$/.test(voucher_no)) continue;
     const voucher_type = trim((r2 && r2[2]) || '').replace(/\s/g,'');
+    /* v4.4.24 bug #8: 跟主頁 onAccEntriesUpload 同步 — 略過空白行（無 subject 且借貸皆 0），
+       否則 seq 會比主頁多算一格，下次重匯整批 (voucher_no, seq) 全錯位變新 insert */
+    if (!trim(r[3]) && !num(r[7]) && !num(r[8])) continue;
     seqMap[voucher_no] = (seqMap[voucher_no] || 0) + 1;
     out.push({
       voucher_no, voucher_type,
@@ -89,12 +105,19 @@ function parseExcel(wb) {
 
 async function upload(rows) {
   const CHUNK = 500;
+  /* v4.4.24 bug #3: 獨立頁面可能沒 sessionStorage adminPass，缺時 prompt 一次 */
+  let adminPass = sessionStorage.getItem('adminPass') || '';
+  if (!adminPass) {
+    adminPass = prompt('請輸入管理員密碼以匯入：') || '';
+    if (!adminPass) { alert('已取消匯入'); return; }
+    sessionStorage.setItem('adminPass', adminPass);
+  }
   let ins = 0, upd = 0;
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK);
     const resp = await fetch('/api/acc/v2/entries', {
       method: 'PUT',
-      headers: { 'Content-Type':'application/json' },
+      headers: { 'Content-Type':'application/json', 'X-Admin-Pass': adminPass },
       body: JSON.stringify(chunk),
     });
     const j = await resp.json();

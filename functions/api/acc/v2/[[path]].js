@@ -202,8 +202,9 @@ export async function onRequest({ request, env }) {
         if (!auth(request, env)) return json({ error: '密碼錯誤' }, 401);
         const body = await request.json();
         /* bug #28: 需保留原 locked_at，重鎖時不要覆寫稽核時間戳 */
+        /* bug #2 (v4.4.24): 原本 `body.locked !== false` 讓前端硬送 locked:false 可繞過 409 偷偷解鎖；改為「只有 unlock=true 才能寫已鎖月」 */
         const cur = await DB.prepare('SELECT locked, locked_at FROM acc_vouchers WHERE ym = ?').bind(res2).first();
-        if (cur && cur.locked && !body.unlock && body.locked !== false) {
+        if (cur && cur.locked && !body.unlock) {
           return json({ error: `${res2} 已鎖定，需 {unlock:true} 才能覆寫` }, 409);
         }
         const entries = JSON.stringify(body.entries || []);
@@ -243,8 +244,9 @@ export async function onRequest({ request, env }) {
         if (!auth(request, env)) return json({ error: '密碼錯誤' }, 401);
         const body = await request.json();
         /* bug #28: 保留原 locked_at（同 vouchers PUT 的修法） */
+        /* bug #2 (v4.4.24): 同上，移除 locked !== false 後門 */
         const cur = await DB.prepare('SELECT locked, locked_at FROM acc_monthly WHERE ym = ?').bind(res2).first();
-        if (cur && cur.locked && !body.unlock && body.locked !== false) {
+        if (cur && cur.locked && !body.unlock) {
           return json({ error: `${res2} 月結已鎖定，需 {unlock:true} 才能覆寫` }, 409);
         }
         const data = JSON.stringify(body.data || {});
@@ -280,7 +282,9 @@ export async function onRequest({ request, env }) {
         return json(results);
       }
       // POST /entries/cleanup-blank → 清除空白分錄（無 subject 且借貸皆 0）
+      // bug #3 (v4.4.24): 原本完全無 auth，任何外部訪客可觸發硬刪除 → 補 admin auth
       if (method === 'POST' && res2 === 'cleanup-blank') {
+        if (!auth(request, env)) return json({ error: '密碼錯誤' }, 401);
         const r = await DB.prepare(
           `DELETE FROM acc_voucher_entries WHERE (subject IS NULL OR subject = '') AND debit = 0 AND credit = 0`
         ).run();
@@ -306,7 +310,10 @@ export async function onRequest({ request, env }) {
       }
       // PUT /entries  body: [rows]  → upsert by (voucher_no, seq) — 重複匯入零重覆計算
       if (method === 'PUT' && !res2) {
-        // 內部工具、已在後台登入後才到得了的頁面 → 不另外要求 X-Admin-Pass
+        // bug #3 (v4.4.24): 原本「後台登入才到得了」前提不成立 — acc-import.html / acc.html 都無 auth 閘
+        //   攻擊者可直接 PUT 偽造 100k 筆分錄污染 acc_voucher_entries 跟 history
+        //   補 admin auth，前端已在 v4.4.24 改送 X-Admin-Pass
+        if (!auth(request, env)) return json({ error: '密碼錯誤' }, 401);
         const rows = await request.json();
         if (!Array.isArray(rows)) return json({ error: 'body must be array' }, 400);
         const updatedAt = nowIso();
@@ -425,10 +432,34 @@ export async function onRequest({ request, env }) {
         return json({ ok: true, total: rows.length, inserted, updated, unchanged, updated_at: updatedAt });
       }
       // DELETE /entries/:voucher_no  → 砍整張傳票（誤匯入救援用）
+      // bug #16 (v4.4.24): 原本直接 DELETE 不寫 history → 稽核上完全靜默
+      //   先 SELECT 舊值、INSERT acc_voucher_entries_history with action='delete' + diffs，再 DELETE
       if (method === 'DELETE' && res2) {
         if (!auth(request, env)) return json({ error: '密碼錯誤' }, 401);
+        const oldRows = await DB.prepare(
+          'SELECT * FROM acc_voucher_entries WHERE voucher_no = ?'
+        ).bind(res2).all();
+        const changedAt = nowIso();
+        const histStmts = (oldRows.results || []).map(old => {
+          const diffs = {};
+          for (const f of ['voucher_type','ym','make_date','post_date','subject','sub_account',
+                           'purpose','description','debit','credit','payee_info','payee_amount']) {
+            diffs[f] = [old[f], null];
+          }
+          return DB.prepare(`
+            INSERT INTO acc_voucher_entries_history
+              (voucher_no, seq, voucher_type, ym, action, field_diffs, changed_at)
+            VALUES (?, ?, ?, ?, 'delete', ?, ?)
+          `).bind(old.voucher_no, old.seq, old.voucher_type || '', old.ym || '',
+                  JSON.stringify(diffs), changedAt);
+        });
+        if (histStmts.length) {
+          for (let i = 0; i < histStmts.length; i += 50) {
+            await DB.batch(histStmts.slice(i, i + 50));
+          }
+        }
         const r = await DB.prepare('DELETE FROM acc_voucher_entries WHERE voucher_no = ?').bind(res2).run();
-        return json({ ok: true, voucher_no: res2, deleted: r.meta?.changes ?? 0 });
+        return json({ ok: true, voucher_no: res2, deleted: r.meta?.changes ?? 0, history_logged: histStmts.length });
       }
     }
 
