@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.27</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.28</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -70,7 +70,7 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
 .hd-blue   { background: #3d4f74; }
 .card-bd { padding: 12px 14px; }
 
-/* v4.4.27 應付費用 立帳/沖帳 chip */
+/* v4.4.28 應付費用 立帳/沖帳 chip */
 .acc-chip {
   display: inline-block;
   padding: 1px 7px;
@@ -390,7 +390,7 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
   }
 })();
 
-/* v4.4.27 #6 round-2 補強：監聽其他 tab（如 admin.html）刪除 acc_admin_pass → 此 tab 也登出
+/* v4.4.28 #6 round-2 補強：監聽其他 tab（如 admin.html）刪除 acc_admin_pass → 此 tab 也登出
    原本問題：admin.html logout 清 localStorage，但 acc.html tab 的 sessionStorage 還在，F5 後 IIFE 又把 pass 寫回 localStorage
    修法：別 tab 觸發 storage event 時，本 tab 也清 sessionStorage 並 redirect */
 window.addEventListener('storage', (ev) => {
@@ -408,7 +408,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.27</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.28</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -991,7 +991,7 @@ window.addEventListener('storage', (ev) => {
 </div><!-- /tab-voucher -->
 
 <!-- ══════════════════════════════════════════
-     TAB：收入傳票（v4.4.27 — 從 acc_voucher_entries 匯入版讀取）
+     TAB：收入傳票（v4.4.28 — 從 acc_voucher_entries 匯入版讀取）
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-income">
   <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
@@ -1007,7 +1007,7 @@ window.addEventListener('storage', (ev) => {
 </div>
 
 <!-- ══════════════════════════════════════════
-     TAB：支出傳票（v4.4.27 — 從 acc_voucher_entries 匯入版讀取）
+     TAB：支出傳票（v4.4.28 — 從 acc_voucher_entries 匯入版讀取）
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-expense">
   <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
@@ -1312,7 +1312,7 @@ window.addEventListener('storage', (ev) => {
     </div>
   </div>
 
-  <!-- v4.4.27 折讓率設定 + 110305 應收醫療帳款（從 D1 acc_voucher_entries 聚合） -->
+  <!-- v4.4.28 折讓率設定 + 110305 應收醫療帳款（從 D1 acc_voucher_entries 聚合） -->
   <div class="card">
     <div class="card-hd hd-dark">⚙️ 折讓率設定 + 110305 應收醫療帳款</div>
     <div class="card-bd" style="padding:12px 16px;">
@@ -1790,7 +1790,7 @@ function onYmChange(){
   renderSurplusTab();
   renderImportedVouchers('收入');
   renderImportedVouchers('支出');
-  /* v4.4.27 bug #16 (v4.4.27 修復 round-1 review):
+  /* v4.4.28 bug #16 (v4.4.28 修復 round-1 review):
      原本想「切 ym 時刷新 history tab」，但 renderChangeHistory / 後端 history endpoint
      都沒有 ym filter（依 voucher_no 過濾），無 ym 切換意義 → 拿掉避免無謂 API 呼叫。
      真正修復方向（待後續）：(a) history endpoint 接受 ym 參數，或 (b) 前端依 ym 過濾顯示 */
@@ -1848,7 +1848,7 @@ function onDiscountToggle(){
     calcReminders();
   }
 }
-// v4.4.27 自動提列：依折讓率 + 110305 AR 當年度餘額 + 110306 備折餘額
+// v4.4.28 自動提列：依折讓率 + 110305 AR 當年度餘額 + 110306 備折餘額
 //   1. 不足 → 自動勾選 + 自動填入差額
 //   2. 足夠 → 自動取消勾選
 //   3. 使用者可事後手動改 checkbox / 金額覆蓋
@@ -2465,7 +2465,7 @@ function confirmPicker(){
    製作前應付費用預檢
 ════════════════════════════════════════════ */
 async function preCheckVoucher(){
-  // v4.4.27 產製前刷新折讓建議，確保 STATE.month.discount 已套用最新基本數額
+  // v4.4.28 產製前刷新折讓建議，確保 STATE.month.discount 已套用最新基本數額
   if(typeof updateDiscountAdvisor === 'function'){
     await AccV2.refresh();
     renderAllowLedger();
@@ -2627,7 +2627,7 @@ function generateVouchers(){
   }
 
 
-  // 5. 醫療折讓（若需提列）— v4.4.27 借 備抵醫療折讓 / 貸 醫療折讓
+  // 5. 醫療折讓（若需提列）— v4.4.28 借 備抵醫療折讓 / 貸 醫療折讓
   const discountNeeded = document.getElementById('discount-needed').checked;
   if(discountNeeded){
     const discAmt = STATE.month.discount.amount || 0;
@@ -2795,7 +2795,7 @@ function patchVouchersLegacy(ym){
     }
   });
   if(changed){
-    /* v4.4.27 bug #12: 原本手寫 fetch 沒更新 _ts、catch 吞錯 → 下次 accInitSync 用 D1 舊版覆蓋
+    /* v4.4.28 bug #12: 原本手寫 fetch 沒更新 _ts、catch 吞錯 → 下次 accInitSync 用 D1 舊版覆蓋
        直接呼叫 saveVouchers() 統一寫主 key + ts，並如實處理失敗 */
     saveVouchers().catch(e => console.warn('[patchVouchersLegacy] saveVouchers failed', e));
   }
@@ -2863,7 +2863,7 @@ async function saveVouchers(){
   renderSurplusTab();
   renderAllowLedger();
   updateHomeDashboard();
-  return ok; // v4.4.27: 給 _scheduleVoucherAutoSave 用來清 dirty 旗標
+  return ok; // v4.4.28: 給 _scheduleVoucherAutoSave 用來清 dirty 旗標
 }
 
 /* ════════════════════════════════════════════
@@ -2940,9 +2940,9 @@ function updateVoucherLockBtn(){
   }
 }
 
-/* v4.4.27 bug #4: debounced 自動存檔 — 原本解鎖編輯後若不按鎖定直接離開全丟
+/* v4.4.28 bug #4: debounced 自動存檔 — 原本解鎖編輯後若不按鎖定直接離開全丟
    每次編輯後 1 秒無新編輯就寫一次
-   v4.4.27 修復：beforeunload 期間 async fetch 會被瀏覽器中止 → 改用 fetch keepalive flag
+   v4.4.28 修復：beforeunload 期間 async fetch 會被瀏覽器中止 → 改用 fetch keepalive flag
                  keepalive 可在 page unload 後繼續完成 request（modern browsers, body ≤64KB） */
 let _voucherAutoSaveTimer = null;
 let _voucherDirty = false; // 編輯後到 D1 寫入完成前的旗標
@@ -3011,13 +3011,13 @@ function editVoucherCell(idx, field, val){
   const tcr = document.getElementById('v-tot-cr');
   if(tdr) tdr.textContent = fmt(dr);
   if(tcr) tcr.textContent = fmt(cr);
-  _scheduleVoucherAutoSave(); // v4.4.27 #4
+  _scheduleVoucherAutoSave(); // v4.4.28 #4
 }
 
 function deleteVoucherRow(idx){
   STATE.vouchers.splice(idx,1);
   renderVouchers();
-  _scheduleVoucherAutoSave(300); // v4.4.27 #4: 刪除較關鍵，縮短 debounce
+  _scheduleVoucherAutoSave(300); // v4.4.28 #4: 刪除較關鍵，縮短 debounce
 }
 
 function addManualVoucherRow(){
@@ -3037,7 +3037,7 @@ function renderVouchers(){
   tbody.innerHTML = '';
   const {y,m} = getVoucherYm();
   const ymKey = String(y) + String(m).padStart(2,'0');
-  // v4.4.27 匯入版 轉帳傳票（D1 acc_voucher_entries）優先顯示
+  // v4.4.28 匯入版 轉帳傳票（D1 acc_voucher_entries）優先顯示
   const imported = (window.AccV2 && AccV2.entries) ? AccV2.entries({type:'轉帳', ym: ymKey}) : [];
   if(imported.length > 0){
     renderVouchersFromImport(tbody, imported);
@@ -3123,15 +3123,15 @@ function renderVouchers(){
   document.getElementById('voucher-count').textContent = `共 ${STATE.vouchers.filter(v=>!v._sep).length} 筆`;
 }
 
-// v4.4.27 清除 D1 假空白分錄
-// v4.4.27 折讓率 + 110305 應收醫療帳款 聚合
+// v4.4.28 清除 D1 假空白分錄
+// v4.4.28 折讓率 + 110305 應收醫療帳款 聚合
 const ALLOW_RATE_KEY = 'acc_allowance_rate';
 function getAllowRate(){ return Number(localStorage.getItem(ALLOW_RATE_KEY)) || 0; }
 async function saveAllowRate(){
   const v = Number(document.getElementById('allow-rate-input').value);
   if(!(v >= 0)) { alert('折讓率必須 >= 0'); return; }
-  /* v4.4.27 bug #5: 改走 accSave 同步寫 D1（原本只 localStorage，換裝置全丟）
-     v4.4.27 修：改 await 並依結果顯示真實狀態，避免 D1 失敗仍顯示「已儲存」 */
+  /* v4.4.28 bug #5: 改走 accSave 同步寫 D1（原本只 localStorage，換裝置全丟）
+     v4.4.28 修：改 await 並依結果顯示真實狀態，避免 D1 失敗仍顯示「已儲存」 */
   const ok = await accSave(ALLOW_RATE_KEY, String(v));
   renderAllowanceRateAndAR();
   alert(ok ? '✅ 已存 D1' : '⚠️ 僅存本機（D1 寫入失敗，請檢查網路或重新登入 admin）');
@@ -3157,7 +3157,7 @@ function renderAllowanceRateAndAR(){
   const balance = totalD - totalC;
   const basicAmount = rate > 0 ? Math.round(balance * rate * 1.5) : 0;
 
-  // v4.4.27 加做 110306 備抵醫療折讓 / 410698 醫療折讓 當年度聚合
+  // v4.4.28 加做 110306 備抵醫療折讓 / 410698 醫療折讓 當年度聚合
   const agg = (prefix) => {
     const es = (window.AccV2 && AccV2.entries) ? AccV2.entries({ yearPrefix: String(y), subjectPrefix: prefix }) : [];
     let D = 0, C = 0;
@@ -3177,7 +3177,7 @@ function renderAllowanceRateAndAR(){
       + `<div style="margin-bottom:6px;"><span style="color:#ffab91;">110306 備抵醫療折讓：</span>`
       + ` 借 ${a110306.D.toLocaleString()} ｜ 貸 ${a110306.C.toLocaleString()} ｜`
       + ` <b style="color:#66bb6a;">餘額 ${a110306.bal.toLocaleString()}</b> <span style="color:#78909c;font-size:11px;">(${a110306.n}筆)</span>`
-      /* v4.4.27 bug #17 (v4.4.27 修):
+      /* v4.4.28 bug #17 (v4.4.28 修):
          - 加 _loaded 旗標避免初值（renderAllowLedger 還沒跑時）誤報
          - 容忍 100 元差額（原本 < 1 太嚴格，浮點/round 會頻閃） */
       + (() => {
@@ -3228,7 +3228,7 @@ function renderAllowanceRateAndAR(){
 async function cleanupBlankEntries(){
   if(!confirm('確定要刪除 D1 裡「無會計科目且借貸皆 0」的假空白分錄？\n此操作不可復原。')) return;
   try {
-    /* v4.4.27 bug #3: 補 X-Admin-Pass */
+    /* v4.4.28 bug #3: 補 X-Admin-Pass */
     const resp = await fetch('/api/acc/v2/entries/cleanup-blank', {
       method:'POST',
       headers: { 'X-Admin-Pass': sessionStorage.getItem('adminPass') || '' },
@@ -3240,7 +3240,7 @@ async function cleanupBlankEntries(){
     renderPayable(); renderCustodial(); renderSurplusTab();
     renderImportedVouchers('收入'); renderImportedVouchers('支出');
     renderVouchers();
-    /* v4.4.27 #17 round-2 修：renderAllowLedger 必須先跑（設 _loaded 旗標），renderAllowanceRateAndAR 對帳才不誤報 */
+    /* v4.4.28 #17 round-2 修：renderAllowLedger 必須先跑（設 _loaded 旗標），renderAllowanceRateAndAR 對帳才不誤報 */
     renderAllowLedger(); updateDiscountAdvisor();
     renderAllowanceRateAndAR();
     renderChangeHistory();
@@ -3249,7 +3249,7 @@ async function cleanupBlankEntries(){
   }
 }
 
-// v4.4.27 匯入版 轉帳傳票 render（D1 優先）
+// v4.4.28 匯入版 轉帳傳票 render（D1 優先）
 function renderVouchersFromImport(tbody, entries){
   const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   const groups = new Map();
@@ -3374,7 +3374,7 @@ function exportExcel(){
   const COLS = ['製  票  日  期','入  帳  日  期','會     計     科     目','沖     銷     科     目     子     目','用     途     別     科     目','摘                                 要','借方金額','貸方金額'];
 
   const aoa = [];
-  /* v4.4.27 bug #15: 標題列 A1:G1（共 7 格）+ H1 列印日期
+  /* v4.4.28 bug #15: 標題列 A1:G1（共 7 格）+ H1 列印日期
      原本標題擠在 A:F、G1 變列印日期、H1 空 → 視覺錯位 */
   aoa.push([`佳里區衛生所傳票明細表`,'','','','','','',`列印日期：${printDate}`]);
   // 欄頭
@@ -3745,7 +3745,7 @@ function renderAllowLedger(){
 
   document.getElementById('allow-tbody').innerHTML = html;
   STATE.allowance.currentBalance = bal;
-  STATE.allowance._loaded = true; // v4.4.27 #17 旗標：renderAllowanceRateAndAR 對帳時可信任
+  STATE.allowance._loaded = true; // v4.4.28 #17 旗標：renderAllowanceRateAndAR 對帳時可信任
   const el = id => document.getElementById(id);
   if(el('al-balance'))   el('al-balance').textContent   = fmt(bal);
   if(el('rc-allowance')) el('rc-allowance').textContent = fmt(bal);
@@ -3881,7 +3881,7 @@ async function accInitSync(){
         skipSet.add(k + '_ts');
       }
     }
-    /* v4.4.27 #14 修復 round-2 FAIL：dead snapshot key（v4.4 後從不讀）一律跳過寫回 localStorage
+    /* v4.4.28 #14 修復 round-2 FAIL：dead snapshot key（v4.4 後從不讀）一律跳過寫回 localStorage
        這些 key 在舊版 v4.4.12-v4.4.23 寫入過 D1，每次 accInitSync 都會把垃圾灌回本機 */
     const DEAD_KEYS = new Set(['acc_payable','acc_custodial']);
     /* 第二遍：依 skipSet 決定是否寫入 localStorage */
@@ -5338,7 +5338,7 @@ async function fixDrug11503(){
   localStorage.setItem('acc_fix_drug_11503','1');
   if(changed) console.log('[fixDrug11503] 已補入11503 進貨12842+領用7800+盤損2');
 }
-/* v4.4.27 上年度結轉立帳拆分：結轉的員工獎勵金實際包含醫師部份（前一年合計入帳時沒拆）
+/* v4.4.28 上年度結轉立帳拆分：結轉的員工獎勵金實際包含醫師部份（前一年合計入帳時沒拆）
    按公式比例 醫師:員工 = 0.7:0.3（docs/115獎勵金計算表_公式說明.md 第 K5 / K4 欄）拆回 02a/02b
    觸發：sub_account 指向 02b（或 02） AND description 含「結轉」關鍵字 */
 function splitCarryOverBonus(desc, amt, code){
@@ -5356,7 +5356,7 @@ function splitCarryOverBonus(desc, amt, code){
   ];
 }
 
-/* v4.4.27 單筆傳票同時描述醫師+員工獎勵金時（如「醫師獎勵金(...=37600)+員工獎勵金(...=16961)」），
+/* v4.4.28 單筆傳票同時描述醫師+員工獎勵金時（如「醫師獎勵金(...=37600)+員工獎勵金(...=16961)」），
    依算式結果拆分成 02a / 02b 兩筆；拆分總和必須等於 |bal| 才拆。
    立帳(credit, +) 與 沖帳(debit, −) 都會拆 —— 原本只拆正值，造成「一張支出傳票付醫師+員工合計」
    時整筆錯歸 02a、02b 沖帳漏算、02a 負淨餘誇大的問題。 */
@@ -5380,8 +5380,8 @@ function splitBonusByDesc(desc, amt){
 
 /* v4.4.0 loadPayable — 從 AccV2 伺服器分錄即時聚合（無 localStorage、無 SEED）
    v4.4.15 — 移除 type:'轉帳' 限制，納入支出傳票的 210205 沖帳分錄（借方）
-   v4.4.27 — 支出傳票沖帳若該類完全無立帳對應（含年結轉）→ 略過顯示
-   v4.4.27 —
+   v4.4.28 — 支出傳票沖帳若該類完全無立帳對應（含年結轉）→ 略過顯示
+   v4.4.28 —
      a) 加「截至選定月份」ym filter — 原本顯示 4 月資料到 3/31 cut-off 報表，造成員工款淨餘 0 假象
      b) 上年度結轉於 02b 的分錄拆分成 02a/02b 各 7:3（符合獎勵金公式） */
 function loadPayable(){
@@ -5392,7 +5392,7 @@ function loadPayable(){
   }));
   const idx = {}; cats.forEach(c => idx[c.code] = c);
   let rows = AccV2.entries({ subjectPrefix:'210205' });
-  /* v4.4.27 ym 截止過濾；v4.4.27 #9 補：算出被排除的「空 ym」筆數讓 UI 顯示 */
+  /* v4.4.28 ym 截止過濾；v4.4.28 #9 補：算出被排除的「空 ym」筆數讓 UI 顯示 */
   let _emptyYmCount = 0;
   if(filterYm){
     rows = rows.filter(e => {
@@ -5463,7 +5463,7 @@ function renderPayable(){
   const data = loadPayable();
   const totalEl = document.getElementById('pay-total');
   if(totalEl) totalEl.textContent = fmt(data.total||0);
-  /* v4.4.27 動態更新截至日期 */
+  /* v4.4.28 動態更新截至日期 */
   const hintEl = document.getElementById('payable-cutoff-hint');
   if(hintEl){
     const {y,m} = (typeof getYm === 'function') ? getYm() : {y:'115',m:'3'};
@@ -5476,7 +5476,7 @@ function renderPayable(){
   });
   const sec = document.getElementById('payable-sections');
   if(!sec) return;
-  /* v4.4.27 #9 補：UI 提示被排除的「空 ym」筆數 */
+  /* v4.4.28 #9 補：UI 提示被排除的「空 ym」筆數 */
   const _emptyYmHint = (data._emptyYmCount > 0)
     ? `<div style="font-size:11px;padding:6px 12px;color:#8a6626;background:#fbf0d3;border:1px solid #e5d5ad;border-radius:6px;margin-bottom:8px;">⚠️ 已排除 ${data._emptyYmCount} 筆「無 ym」分錄（製票日格式無法解析）。請到「歷史變更資料」或「轉帳傳票」檢查並修正製票日。</div>`
     : '';
@@ -5487,10 +5487,10 @@ function renderPayable(){
     </div></div>`;
     return;
   }
-  /* v4.4.27:
+  /* v4.4.28:
      - 欄位順序：＋立帳（LEFT）→ −沖帳（RIGHT） — 符合「要立才能沖」因果
      - 顏色：立帳 = 綠（正面入帳/收到應付項目）、沖帳 = 紅（付出扣除）
-     - 支出傳票的沖帳分錄 v4.4.27 已納入 loadPayable，不再漏算 */
+     - 支出傳票的沖帳分錄 v4.4.28 已納入 loadPayable，不再漏算 */
   sec.innerHTML = _emptyYmHint + data.categories.map(cat=>{
       const rows = [...cat.entries]
           .sort((a,b)=>(b.make_date||'').localeCompare(a.make_date||''))
@@ -5579,7 +5579,7 @@ async function onAccEntriesUpload(inp){
   box.innerHTML = '<span style="color:#e65100;">⏳ 解析 + 上傳中… ('+f.name+')</span>';
   const trim = s => String(s ?? '').trim();
   const num  = s => s==null||s===''?0:(Math.round(Number(String(s).replace(/[,\s]/g,''))||0));
-  /* v4.4.27 bug #10: 接受 / - . 分隔符、Excel serial、全形斜線、年/月/日字樣
+  /* v4.4.28 bug #10: 接受 / - . 分隔符、Excel serial、全形斜線、年/月/日字樣
      原本只認 YYY/M/D，dash 或 serial 都吐空字串 → 配合 ym filter 造成資料錯月顯示 */
   const ymFromDate = (d) => {
     if (d == null || d === '') return '';
@@ -5613,7 +5613,7 @@ async function onAccEntriesUpload(inp){
       const voucher_no = trim(r[2]).replace(/\s/g,'');
       if (!/^\d{6,}$/.test(voucher_no)) continue;
       const voucher_type = trim((r2 && r2[2]) || '').replace(/\s/g,'');
-      // v4.4.27 略過空白行（報表重印 header / 分頁）：無 subject 且 借貸皆 0
+      // v4.4.28 略過空白行（報表重印 header / 分頁）：無 subject 且 借貸皆 0
       if(!trim(r[3]) && !num(r[7]) && !num(r[8])) continue;
       seqMap[voucher_no] = (seqMap[voucher_no]||0) + 1;
       out.push({
@@ -5628,11 +5628,11 @@ async function onAccEntriesUpload(inp){
     }
     if (!out.length) throw new Error('沒解析到任何分錄，請確認檔案格式');
 
-    // v4.4.27 前端 diff：比對上傳前 AccV2 快照 → 新增 / 更新 / 略過（per type）
+    // v4.4.28 前端 diff：比對上傳前 AccV2 快照 → 新增 / 更新 / 略過（per type）
     await AccV2.ensure();
     const beforeMap = new Map();
     (AccV2._entries||[]).forEach(e => beforeMap.set(`${e.voucher_no}#${e.seq}`, e));
-    /* v4.4.27 bug #7: 原本只比 7 個欄位，與後端 DIFF_FIELDS 12 個對不上
+    /* v4.4.28 bug #7: 原本只比 7 個欄位，與後端 DIFF_FIELDS 12 個對不上
        使用者改 voucher_type / post_date / payee_info / payee_amount / ym 後重匯
        前端顯示「略過」但後端實際 update → 統計騙人 + history 爆
        補齊跟後端 DIFF_FIELDS 一樣的欄位 */
@@ -5656,7 +5656,7 @@ async function onAccEntriesUpload(inp){
       else stats[t].upd++;
     });
 
-    // v4.4.27 上傳前彈窗確認
+    // v4.4.28 上傳前彈窗確認
     const previewLines = Object.keys(stats).map(t => {
       const s = stats[t];
       return `${typeIcon[t]} ${t}傳票：新增 ${s.add}｜更新 ${s.upd}｜略過 ${s.skip}`;
@@ -5664,7 +5664,7 @@ async function onAccEntriesUpload(inp){
     const pTotalAdd = Object.values(stats).reduce((s,x)=>s+x.add,0);
     const pTotalUpd = Object.values(stats).reduce((s,x)=>s+x.upd,0);
     const pTotalSkip= Object.values(stats).reduce((s,x)=>s+x.skip,0);
-    /* v4.4.27 bug #10: ym 缺失警告 — 提醒這些分錄會被 ym filter 排除 */
+    /* v4.4.28 bug #10: ym 缺失警告 — 提醒這些分錄會被 ym filter 排除 */
     const ymMissing = out.filter(r => !r.ym).length;
     const ymWarn = ymMissing > 0
       ? `\n\n⚠️ 警告：${ymMissing} 筆分錄無法解析「製票日」→ ym 為空，將被「截至 X 月」報表排除。\n常見原因：日期格式為 dash（2026-03-31）或 Excel serial。請檢查原始檔。`
@@ -5680,7 +5680,7 @@ async function onAccEntriesUpload(inp){
       const chunk = out.slice(i,i+CHUNK);
       const resp = await fetch('/api/acc/v2/entries', {
         method:'PUT',
-        /* v4.4.27 bug #3: 補 X-Admin-Pass */
+        /* v4.4.28 bug #3: 補 X-Admin-Pass */
         headers:{'Content-Type':'application/json','X-Admin-Pass': sessionStorage.getItem('adminPass') || ''},
         body: JSON.stringify(chunk),
       });
@@ -5704,7 +5704,7 @@ async function onAccEntriesUpload(inp){
     renderPayable(); renderCustodial(); renderSurplusTab();
     renderImportedVouchers('收入'); renderImportedVouchers('支出');
     renderVouchers();
-    /* v4.4.27 #17 round-2 修：同上，renderAllowLedger 必須先跑 */
+    /* v4.4.28 #17 round-2 修：同上，renderAllowLedger 必須先跑 */
     renderAllowLedger(); updateDiscountAdvisor();
     renderAllowanceRateAndAR();
     updateHomeDashboard();
@@ -5892,7 +5892,7 @@ function applyExpenseWriteoff(){
     });
     (data.categories||[]).forEach(cat=>{ cat.subtotal = (cat.entries||[]).reduce((s,e)=>s+(e.amt||0),0); });
     data.total = (data.categories||[]).reduce((s,c)=>s+(c.subtotal||0),0);
-    /* v4.4.27 bug #14: 移除 accSave('acc_payable') —— loadPayable v4.4 後直接從 AccV2 重算，
+    /* v4.4.28 bug #14: 移除 accSave('acc_payable') —— loadPayable v4.4 後直接從 AccV2 重算，
        此處 snapshot 寫入 D1 永遠不被讀取，等於浪費 quota + 寫入 race。 */
   }
 
@@ -5922,11 +5922,11 @@ function applyExpenseWriteoff(){
       group.subtotal = (group.subs||[]).reduce((s,sub)=>s+(sub.subtotal||0),0);
     });
     data.total = (data.groups||[]).reduce((s,g)=>s+(g.subtotal||0),0);
-    /* v4.4.27 bug #14: 同上，loadCustodial 從 AccV2 重算不讀此 snapshot，移除死寫入 */
+    /* v4.4.28 bug #14: 同上，loadCustodial 從 AccV2 重算不讀此 snapshot，移除死寫入 */
   }
 
   // ── 沖銷累積賸餘 ──
-  /* v4.4.27 bug #11 (round-2 補強):
+  /* v4.4.28 bug #11 (round-2 補強):
      round-1 修了 vnum 欄位名，但「移除型 re-import」（A+B 第二次只剩 A）仍會殘留 B。
      round-2 改：每次 upload 把「本次 result.items 涉及的 vno 全集」(不只 surplus type) 從 map 中刪除，
                 再依 active surplus 重新累加。這樣同 vno 重匯會覆寫、移除型也能正確清掉舊值。 */
@@ -6108,7 +6108,7 @@ function loadCustodial(){
   const idx = {}; groups.forEach(g => idx[g.code] = g);
   const prefixes = CUST_GROUPS_DEF.map(g => g.code);
   let rows = AccV2.entries({ subjectPrefixes: prefixes });
-  /* v4.4.27 ym 截止過濾；v4.4.27 #9 補：算出被排除的「空 ym」筆數讓 UI 顯示 */
+  /* v4.4.28 ym 截止過濾；v4.4.28 #9 補：算出被排除的「空 ym」筆數讓 UI 顯示 */
   let _emptyYmCount = 0;
   if(filterYm){
     rows = rows.filter(e => {
@@ -6117,7 +6117,7 @@ function loadCustodial(){
     });
   }
 
-  /* v4.4.27 Pass 1: 算每個 sub-bucket 是否有任何立帳 */
+  /* v4.4.28 Pass 1: 算每個 sub-bucket 是否有任何立帳 */
   const subHasAccrue = {}; // key = groupCode + '|' + subKey
   rows.forEach(e => {
     const subject = String(e.subject||'').replace(/\s/g,'');
@@ -6186,7 +6186,7 @@ function renderCustodial(){
   const data = loadCustodial();
   const totalEl = document.getElementById('cust-total');
   if(totalEl) totalEl.textContent = fmt(data.total||0);
-  /* v4.4.27 動態更新截至日期 */
+  /* v4.4.28 動態更新截至日期 */
   const hintEl = document.getElementById('custodial-cutoff-hint');
   if(hintEl){
     const {y,m} = (typeof getYm === 'function') ? getYm() : {y:'115',m:'3'};
@@ -6197,7 +6197,7 @@ function renderCustodial(){
   data.groups.forEach(g=>{ const el=document.getElementById(ID_MAP[g.code]); if(el) el.textContent=fmt(g.subtotal||0); });
   const sec = document.getElementById('custodial-sections');
   if(!sec) return;
-  /* v4.4.27 #9 同 renderPayable */
+  /* v4.4.28 #9 同 renderPayable */
   const _emptyYmHint = (data._emptyYmCount > 0)
     ? `<div style="font-size:11px;padding:6px 12px;color:#8a6626;background:#fbf0d3;border:1px solid #e5d5ad;border-radius:6px;margin-bottom:8px;">⚠️ 已排除 ${data._emptyYmCount} 筆「無 ym」分錄（製票日格式無法解析）。</div>`
     : '';
@@ -6208,7 +6208,7 @@ function renderCustodial(){
     </div></div>`;
     return;
   }
-  /* v4.4.27 代收款也改立帳/沖帳左右欄呈現 */
+  /* v4.4.28 代收款也改立帳/沖帳左右欄呈現 */
   sec.innerHTML = _emptyYmHint + data.groups.map(g=>`
     <div class="card">
       <div class="card-hd ${g.color}">
@@ -6330,7 +6330,7 @@ function renderSurplusTab(){
 }
 
 /* ════════════════════════════════════════════
-   v4.4.27 收入 / 支出 / 轉帳 傳票 — 匯入版 (acc_voucher_entries) 唯讀呈現
+   v4.4.28 收入 / 支出 / 轉帳 傳票 — 匯入版 (acc_voucher_entries) 唯讀呈現
    ════════════════════════════════════════════ */
 function renderImportedVouchers(type){
   const { y, ym, label } = getYm();
@@ -6817,7 +6817,7 @@ function medRestore(id){
       // 從 medPostedIds 移除
       medPostedIds.delete(String(id));
       accSave(MED_POSTED_KEY, [...medPostedIds]);
-      /* v4.4.27 bug #13: 原本用 desc.includes(voucherNo) 模糊比對，同 voucherNo 多筆進貨會全砍
+      /* v4.4.28 bug #13: 原本用 desc.includes(voucherNo) 模糊比對，同 voucherNo 多筆進貨會全砍
          改用 medId === String(id) 精確比對（_doMedPost 寫入時已存 medId） */
       if(r){
         ['drug','supply'].forEach(type=>{
@@ -7105,7 +7105,7 @@ function checkDrugEntered(){
 }
 
 /* 財產帳面淨值 + 月份標籤 自動填入 */
-// v4.4.27 每月折舊額設定（基準 + 變更點）
+// v4.4.28 每月折舊額設定（基準 + 變更點）
 const DEPR_KEY = 'acc_prop_depr_schedule';
 function loadDeprSchedule(){
   try { return JSON.parse(localStorage.getItem(DEPR_KEY) || '{}'); } catch(e){ return {}; }
@@ -7125,7 +7125,7 @@ async function saveDeprSchedule(){
   const base = Number(document.getElementById('depr-base-input').value) || 0;
   const existing = getDeprSchedule();
   const next = { base, changes: existing.changes };
-  /* v4.4.27: await + 真實狀態 */
+  /* v4.4.28: await + 真實狀態 */
   const ok = await accSave(DEPR_KEY, next);
   renderDeprSchedule();
   updateDeprBalance();
@@ -7139,7 +7139,7 @@ async function addDeprChange(){
   const s = getDeprSchedule();
   s.changes = s.changes.filter(c => String(c.from_ym) !== ym).concat([{from_ym: ym, value: val}]);
   s.changes.sort((a,b)=>String(a.from_ym).localeCompare(String(b.from_ym)));
-  /* v4.4.27: await + alert */
+  /* v4.4.28: await + alert */
   const ok = await accSave(DEPR_KEY, s);
   document.getElementById('depr-new-ym').value='';
   document.getElementById('depr-new-val').value='';
@@ -7150,7 +7150,7 @@ async function addDeprChange(){
 async function removeDeprChange(ym){
   const s = getDeprSchedule();
   s.changes = s.changes.filter(c => String(c.from_ym) !== String(ym));
-  /* v4.4.27: await + alert if D1 fail */
+  /* v4.4.28: await + alert if D1 fail */
   const ok = await accSave(DEPR_KEY, s);
   renderDeprSchedule();
   updateDeprBalance();
@@ -7336,7 +7336,7 @@ function saveMonthData(){
      - 同步寫 localStorage 當 cache
      - 非同步 PUT /api/acc/v2/monthly/<ym>，等 server 真的回 200 才顯示「已存 D1」
      - 失敗會在畫面紅字顯示 HTTP 錯誤，不再假裝成功
-     - v4.4.27 bug #1: 補 X-Admin-Pass header；#2: body 不送 locked（原本硬送 false 會偷偷解鎖）*/
+     - v4.4.28 bug #1: 補 X-Admin-Pass header；#2: body 不送 locked（原本硬送 false 會偷偷解鎖）*/
   localStorage.setItem(LS.monthly(ym), JSON.stringify(data));
   return fetch('/api/acc/v2/monthly/' + ym, {
     method: 'PUT',
@@ -7485,7 +7485,7 @@ async function loadMonthData(){
   syncVoucherToWork(ym);
   // 自動欄位重算
   calcIncome(); calcOther(); calcDrug(); calcInv(); calcBonus(); calcIncomeBreakdown(); calcExpenseTotal(); updateHomeDashboard();
-  // v4.4.27 自動提列醫療折讓
+  // v4.4.28 自動提列醫療折讓
   if(typeof renderAllowLedger === 'function') renderAllowLedger();
   if(typeof updateDiscountAdvisor === 'function') updateDiscountAdvisor();
 }
@@ -7567,7 +7567,7 @@ function syncVoucherToWork(ym){
 /* ════════════════════════════════════════════
    登出
 ════════════════════════════════════════════ */
-/* v4.4.27 bug #6: 原本只跳頁不清憑證，acc_admin_pass 永久留裝置、AccV2 快取殘留
+/* v4.4.28 bug #6: 原本只跳頁不清憑證，acc_admin_pass 永久留裝置、AccV2 快取殘留
    登出時一次清光 session / local admin pass + 所有 AccV2 敏感快取 */
 function logout(){
   try {
@@ -7589,9 +7589,9 @@ function logout(){
 ════════════════════════════════════════════ */
 (async function init(){
   // ① 先從 D1 同步（以雲端資料覆寫 localStorage，確保換裝置或清 Cookie 後資料不遺失）
-  //    v4.4.27 round-2 修：accInitSync 內部已 hard-skip DEAD_KEYS（acc_payable/acc_custodial）
+  //    v4.4.28 round-2 修：accInitSync 內部已 hard-skip DEAD_KEYS（acc_payable/acc_custodial）
   await accInitSync();
-  /* v4.4.27 #14 round-3 修：flag 改命名一致 acc_v4426；
+  /* v4.4.28 #14 round-3 修：flag 改命名一致 acc_v4426；
      D1 cleanup 失敗或無 adminPass 時不設 flag，避免該裝置永遠不再嘗試清 D1 殘留 */
   if (!localStorage.getItem('acc_v4426_clean_dead_snap')) {
     try {
@@ -7683,7 +7683,7 @@ function logout(){
   calcInv();
   // v4.4.0 先拉 AccV2 bootstrap（以伺服器 voucher_entries 為真實來源）
   await AccV2.ensure();
-  // v4.4.27 AccV2 就緒後重渲染轉帳傳票（F5 後優先顯示匯入版）
+  // v4.4.28 AccV2 就緒後重渲染轉帳傳票（F5 後優先顯示匯入版）
   renderVouchers();
   // 應付費用分頁
   fixMar盤損();
