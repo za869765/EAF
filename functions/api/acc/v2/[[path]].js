@@ -434,6 +434,7 @@ export async function onRequest({ request, env }) {
       // DELETE /entries/:voucher_no  → 砍整張傳票（誤匯入救援用）
       // bug #16 (v4.4.24): 原本直接 DELETE 不寫 history → 稽核上完全靜默
       //   先 SELECT 舊值、INSERT acc_voucher_entries_history with action='delete' + diffs，再 DELETE
+      // v4.4.25 修：history INSERT + DELETE 改為單一 D1.batch 確保原子性（避免 history 寫一半或 DELETE 失敗造成假性刪除）
       if (method === 'DELETE' && res2) {
         if (!auth(request, env)) return json({ error: '密碼錯誤' }, 401);
         const oldRows = await DB.prepare(
@@ -453,13 +454,22 @@ export async function onRequest({ request, env }) {
           `).bind(old.voucher_no, old.seq, old.voucher_type || '', old.ym || '',
                   JSON.stringify(diffs), changedAt);
         });
-        if (histStmts.length) {
+        const deleteStmt = DB.prepare('DELETE FROM acc_voucher_entries WHERE voucher_no = ?').bind(res2);
+        /* 一次 batch：D1 batch 是 transaction，全部成功或全部失敗，避免「history 寫了但 entries 沒刪」 */
+        const allStmts = histStmts.concat([deleteStmt]);
+        let totalDeleted = 0;
+        if (allStmts.length <= 50) {
+          const result = await DB.batch(allStmts);
+          totalDeleted = result[result.length - 1]?.meta?.changes ?? 0;
+        } else {
+          /* 超過 50 條（罕見：單張傳票分錄極多）：分批，但最後一批必須含 deleteStmt 一起做 */
           for (let i = 0; i < histStmts.length; i += 50) {
             await DB.batch(histStmts.slice(i, i + 50));
           }
+          const r = await deleteStmt.run();
+          totalDeleted = r.meta?.changes ?? 0;
         }
-        const r = await DB.prepare('DELETE FROM acc_voucher_entries WHERE voucher_no = ?').bind(res2).run();
-        return json({ ok: true, voucher_no: res2, deleted: r.meta?.changes ?? 0, history_logged: histStmts.length });
+        return json({ ok: true, voucher_no: res2, deleted: totalDeleted, history_logged: histStmts.length });
       }
     }
 
