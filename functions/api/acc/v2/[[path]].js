@@ -455,19 +455,26 @@ export async function onRequest({ request, env }) {
                   JSON.stringify(diffs), changedAt);
         });
         const deleteStmt = DB.prepare('DELETE FROM acc_voucher_entries WHERE voucher_no = ?').bind(res2);
-        /* 一次 batch：D1 batch 是 transaction，全部成功或全部失敗，避免「history 寫了但 entries 沒刪」 */
+        /* v4.4.25 round-2 #16 補強：fallback 路徑也要保證最後一批跟 deleteStmt 一起 batch
+           原本「先分批 history、再單獨 deleteStmt.run()」非原子 → history 半寫但 delete 失敗會殘留不一致
+           新做法：除最後一批外照常 batch；最後一批 append deleteStmt 同 batch 提交 */
         const allStmts = histStmts.concat([deleteStmt]);
         let totalDeleted = 0;
         if (allStmts.length <= 50) {
           const result = await DB.batch(allStmts);
           totalDeleted = result[result.length - 1]?.meta?.changes ?? 0;
         } else {
-          /* 超過 50 條（罕見：單張傳票分錄極多）：分批，但最後一批必須含 deleteStmt 一起做 */
-          for (let i = 0; i < histStmts.length; i += 50) {
-            await DB.batch(histStmts.slice(i, i + 50));
+          /* >50 條（單張傳票分錄極多）：分批執行 history，最後一批必含 deleteStmt 一起 batch */
+          const PER_BATCH = 50;
+          /* 把最後 (PER_BATCH-1) 筆 history + deleteStmt 留到最後 batch */
+          const lastBatchSize = (PER_BATCH - 1);
+          const middleEnd = histStmts.length > lastBatchSize ? histStmts.length - lastBatchSize : 0;
+          for (let i = 0; i < middleEnd; i += PER_BATCH) {
+            await DB.batch(histStmts.slice(i, Math.min(i + PER_BATCH, middleEnd)));
           }
-          const r = await deleteStmt.run();
-          totalDeleted = r.meta?.changes ?? 0;
+          const finalBatch = histStmts.slice(middleEnd).concat([deleteStmt]);
+          const finalResult = await DB.batch(finalBatch);
+          totalDeleted = finalResult[finalResult.length - 1]?.meta?.changes ?? 0;
         }
         return json({ ok: true, voucher_no: res2, deleted: totalDeleted, history_logged: histStmts.length });
       }

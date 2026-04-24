@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="utf-8">
-<title>ACC 傳票明細匯入 v4.4.25</title>
+<title>ACC 傳票明細匯入 v4.4.26</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -52,7 +52,7 @@ const drop = $('#drop');
 const trim = s => String(s ?? '').trim();
 const num  = s => s == null || s === '' ? 0 : (Math.round(Number(String(s).replace(/[,\s]/g,'')) || 0));
 
-/* v4.4.25 bug #10: 與 acc.html ymFromDate 同步升級 — 接受 - . / serial */
+/* v4.4.26 bug #10: 與 acc.html ymFromDate 同步升級 — 接受 - . / serial */
 function ymFromDate(d) {
   if (d == null || d === '') return '';
   let s = String(d).trim().replace(/[／]/g, '/').replace(/[年月]/g, '/').replace(/日/g,'');
@@ -84,7 +84,7 @@ function parseExcel(wb) {
     const voucher_no = trim(r[2]).replace(/\s/g,'');
     if (!/^\d{6,}$/.test(voucher_no)) continue;
     const voucher_type = trim((r2 && r2[2]) || '').replace(/\s/g,'');
-    /* v4.4.25 bug #8: 跟主頁 onAccEntriesUpload 同步 — 略過空白行（無 subject 且借貸皆 0），
+    /* v4.4.26 bug #8: 跟主頁 onAccEntriesUpload 同步 — 略過空白行（無 subject 且借貸皆 0），
        否則 seq 會比主頁多算一格，下次重匯整批 (voucher_no, seq) 全錯位變新 insert */
     if (!trim(r[3]) && !num(r[7]) && !num(r[8])) continue;
     seqMap[voucher_no] = (seqMap[voucher_no] || 0) + 1;
@@ -105,7 +105,7 @@ function parseExcel(wb) {
 
 async function upload(rows) {
   const CHUNK = 500;
-  /* v4.4.25 bug #3: 獨立頁面可能沒 sessionStorage adminPass，缺時 prompt 一次 */
+  /* v4.4.26 bug #3: 獨立頁面可能沒 sessionStorage adminPass，缺時 prompt 一次 */
   let adminPass = sessionStorage.getItem('adminPass') || '';
   if (!adminPass) {
     adminPass = prompt('請輸入管理員密碼以匯入：') || '';
