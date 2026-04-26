@@ -661,15 +661,16 @@ window.addEventListener('storage', (ev) => {
       <div id="discount-advisor" style="margin-top:6px;font-size:12px;line-height:1.6;"></div>
     </div>
     <div class="discount-inputs">
-      <label class="toggle-row">
+      <label class="toggle-row" title="勾選即手動覆蓋系統判斷，強制本月按基本數額提列">
         <input type="checkbox" id="discount-needed" onchange="onDiscountToggle()">
-        本月需提列
+        強制提列
       </label>
+      <!-- ver4.4.30：移除手動輸入金額，改自動帶入「基本數額」-->
       <div id="discount-rate-wrap" style="display:none; align-items:center; gap:6px;">
-        <label style="font-size:11px; color:#546e7a;">提列金額</label>
-        <input class="num-in" id="discount-amount-input" type="text" style="width:110px; text-align:right;"
-               placeholder="0" oninput="onDiscountAmtChange()">
-        <span style="font-size:11px; color:#546e7a;">元</span>
+        <span style="font-size:11px; color:#546e7a;">將提列：</span>
+        <span id="discount-amount-display" style="font-size:13px; font-weight:700; color:#bf360c;">0</span>
+        <span style="font-size:11px; color:#546e7a;">元（系統自動依基本數額帶入）</span>
+        <input type="hidden" id="discount-amount-input" value="0">
       </div>
     </div>
   </div>
@@ -1845,8 +1846,22 @@ function onDiscountToggle(){
   document.getElementById('discount-title').textContent = needed
     ? '⚠️ 本月需提列醫療折讓'
     : '✅ 本月不需提列醫療折讓';
-  if(needed){ onDiscountAmtChange(); } else {
+  // ver4.4.30：勾選即用「基本數額」自動提列；不勾則 0
+  if(needed){
+    const basic = (STATE.allowance && STATE.allowance.lastBasic) || 0;
+    const inp = document.getElementById('discount-amount-input');
+    const disp = document.getElementById('discount-amount-display');
+    if(inp) inp.value = String(basic);
+    if(disp) disp.textContent = basic.toLocaleString();
+    STATE.month.discount = { needed: true, amount: basic };
+    document.getElementById('discount-hint').textContent = basic > 0
+      ? `將提列 ${basic.toLocaleString()} 元（基本數額）→ 四格分配金額已依公式調降`
+      : '尚未設定折讓率或 AR 餘額為 0';
+    calcReminders();
+  } else {
     STATE.month.discount = { needed: false, amount: 0 };
+    const inp = document.getElementById('discount-amount-input');
+    if(inp) inp.value = '0';
     calcReminders();
   }
 }
@@ -1872,6 +1887,10 @@ function updateDiscountAdvisor(){
   const sufficient = allowBal >= basic;
   const diff = Math.max(0, basic - allowBal);
   const ratePct = (rate*100).toFixed(2) + '%';
+  // ver4.4.30：保存 basic 給 onDiscountToggle 與 display 使用
+  if(STATE.allowance) STATE.allowance.lastBasic = basic;
+  const _disp = document.getElementById('discount-amount-display');
+  if(_disp) _disp.textContent = basic.toLocaleString();
   adv.innerHTML = `
     <div style="display:flex;gap:16px;flex-wrap:wrap;">
       <span>📊 AR 餘額 <b>${arBal.toLocaleString()}</b></span>
@@ -1884,16 +1903,20 @@ function updateDiscountAdvisor(){
         : `<span style="color:#c62828;font-weight:600;">⚠️ 差額 ${diff.toLocaleString()} 元 → 自動提列</span>`}
       <span style="color:#90a4ae;font-size:11px;margin-left:8px;">（可事後手動覆蓋）</span>
     </div>`;
-  // 自動同步 checkbox + 金額
+  // ver4.4.30：自動同步 checkbox（不再自動填入差額；勾選後 onDiscountToggle 會用 basic）
+  // 系統建議：足夠 → 不勾；不足 → 勾選（強制提列基本數額）
   const cb = document.getElementById('discount-needed');
-  const inp = document.getElementById('discount-amount-input');
   if(!cb) return;
   if(sufficient){
     if(cb.checked){ cb.checked = false; onDiscountToggle(); }
   } else {
     if(!cb.checked){ cb.checked = true; onDiscountToggle(); }
-    if(inp && Number(String(inp.value).replace(/[,\s]/g,'')) !== diff){
-      inp.value = String(diff); onDiscountAmtChange();
+    else {
+      // 已勾選 → 同步 basic（advisor 重算時保持最新）
+      const inp = document.getElementById('discount-amount-input');
+      if(inp) inp.value = String(basic);
+      STATE.month.discount = { needed: true, amount: basic };
+      calcReminders();
     }
   }
 }
