@@ -1,0 +1,347 @@
+/* ════════════════════════════════════════════════════════
+   EAF Design Tokens — parchment 紙感帳冊風格
+   v4.4.31（115.04 起依「EAF 前端優化建議書」實裝）
+   ════════════════════════════════════════════════════════
+   引入位置：acc.html / admin.html / index.html 的 <head>
+   範圍：色彩 / 字體 / 間距 / 圓角 / 陰影 / 動畫
+   原則：純 CSS variable，不改 HTML 結構，可漸進採用
+   ════════════════════════════════════════════════════════ */
+
+:root,
+[data-eaf-theme="parchment"] {
+  /* === 基礎紙感 === */
+  --eaf-bg:           #efe9d8;  /* 帆布米色（外層 canvas） */
+  --eaf-bg-card:      #faf6e9;  /* 紙張白（卡片底） */
+  --eaf-bg-raised:    #f5efd9;  /* 微浮起 */
+  --eaf-bg-sand:      #ece4cb;  /* 琉璃米（合計列、強調背景） */
+  --eaf-bg-ink:       #2a2a25;  /* 深色背景（dark sidebar 改用此色逐步過渡）*/
+
+  /* === 墨色（文字 4 階） === */
+  --eaf-ink-1:        #2a2a25;  /* 主標題、金額 */
+  --eaf-ink-2:        #4a4a42;  /* 一般內文 */
+  --eaf-ink-3:        #75726a;  /* hint、label */
+  --eaf-ink-4:        #a09b8e;  /* disabled、metadata */
+
+  /* === 主色 === */
+  --eaf-terracotta:   #b75636;  /* CTA、金額、強調 */
+  --eaf-amber:        #b88420;  /* ◆ 標記、金色細線 */
+  --eaf-olive:        #5e7d4c;  /* 已完成、平衡狀態、+ 結餘 */
+  --eaf-crimson:      #a13c2e;  /* 警示、追扣 */
+
+  /* === 科目別（cat-）邊條色 === */
+  --eaf-cat-medical:  #b75636;  /* 醫療基金 */
+  --eaf-cat-public:   #5e7d4c;  /* 公務預算 */
+  --eaf-cat-custody:  #6b5b8a;  /* 代收款 */
+  --eaf-cat-insurance:#b88420;  /* 健保款 */
+
+  /* === 線條 === */
+  --eaf-line:         rgba(20,20,15,0.10);
+  --eaf-line-strong:  rgba(20,20,15,0.18);
+  --eaf-line-soft:    rgba(20,20,15,0.05);
+  --eaf-line-gold:    linear-gradient(90deg, transparent, var(--eaf-amber) 30%, var(--eaf-amber) 70%, transparent);
+
+  /* === 字體棧 === */
+  --eaf-serif: 'Source Serif 4', 'Noto Serif TC', 'PMingLiU', 'STSong', serif;
+  --eaf-sans:  'Inter', 'Noto Sans TC', 'PingFang TC', system-ui, -apple-system, sans-serif;
+  --eaf-num:   'Source Serif 4', 'JetBrains Mono', ui-monospace, monospace;
+  --eaf-mono:  'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+
+  /* === 圓角 === */
+  --eaf-radius-xs:    3px;
+  --eaf-radius-sm:    6px;
+  --eaf-radius-md:    10px;
+  --eaf-radius-lg:    14px;
+
+  /* === 陰影 === */
+  --eaf-shadow-sm:    0 1px 2px rgba(20,20,15,0.05);
+  --eaf-shadow-md:    0 2px 6px rgba(20,20,15,0.08);
+  --eaf-shadow-lg:    0 8px 24px rgba(20,20,15,0.12);
+
+  /* === 間距（density: comfortable 預設）=== */
+  --eaf-gap-xs:       4px;
+  --eaf-gap-sm:       8px;
+  --eaf-gap-md:       14px;
+  --eaf-gap-lg:       20px;
+  --eaf-pad-card:     18px;
+  --eaf-pad-input:    8px 10px;
+  --eaf-h-input:      36px;
+}
+
+/* === density 切換 === */
+[data-eaf-density="compact"] {
+  --eaf-gap-xs: 2px;
+  --eaf-gap-sm: 4px;
+  --eaf-gap-md: 8px;
+  --eaf-gap-lg: 12px;
+  --eaf-pad-card: 10px;
+  --eaf-h-input: 28px;
+}
+[data-eaf-density="normal"] {
+  --eaf-gap-xs: 3px;
+  --eaf-gap-sm: 6px;
+  --eaf-gap-md: 10px;
+  --eaf-gap-lg: 14px;
+  --eaf-pad-card: 14px;
+  --eaf-h-input: 32px;
+}
+
+/* ════════════════════════════════════════════════════════
+   元件 class — 可選擇性套用，不影響既有 inline style
+   ════════════════════════════════════════════════════════ */
+
+.eaf-card {
+  background: var(--eaf-bg-card);
+  border: 1px solid var(--eaf-line);
+  border-radius: var(--eaf-radius-md);
+  box-shadow: var(--eaf-shadow-sm);
+  overflow: hidden;
+}
+.eaf-card--cat {
+  border-left: 4px solid var(--cat, var(--eaf-amber));
+}
+.eaf-card__hd {
+  padding: 10px var(--eaf-pad-card);
+  border-bottom: 1px solid var(--eaf-line-soft);
+  font-family: var(--eaf-serif);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--eaf-ink-1);
+  background: var(--eaf-bg-raised);
+  letter-spacing: 0.5px;
+}
+.eaf-card__bd {
+  padding: var(--eaf-pad-card);
+}
+
+.eaf-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--eaf-h-input);
+  padding: 0 16px;
+  border: 1px solid var(--eaf-line-strong);
+  border-radius: var(--eaf-radius-sm);
+  background: var(--eaf-bg-card);
+  color: var(--eaf-ink-2);
+  font-family: var(--eaf-sans);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, transform .1s;
+}
+.eaf-btn:hover    { background: var(--eaf-bg-raised); border-color: var(--eaf-line-strong); }
+.eaf-btn:active   { transform: translateY(1px); }
+.eaf-btn--primary {
+  background: var(--eaf-terracotta);
+  color: #fff;
+  border-color: transparent;
+  font-weight: 600;
+}
+.eaf-btn--primary:hover { background: #a04a2c; }
+.eaf-btn--ghost {
+  background: transparent;
+  border-color: var(--eaf-line);
+}
+.eaf-btn--danger {
+  background: var(--eaf-crimson);
+  color: #fff;
+  border-color: transparent;
+}
+
+.eaf-input,
+.eaf-select,
+.eaf-textarea {
+  height: var(--eaf-h-input);
+  padding: var(--eaf-pad-input);
+  border: 1px solid var(--eaf-line-strong);
+  border-radius: var(--eaf-radius-sm);
+  background: var(--eaf-bg-card);
+  color: var(--eaf-ink-1);
+  font-family: var(--eaf-sans);
+  font-size: 13px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.eaf-textarea { height: auto; min-height: 80px; resize: vertical; }
+.eaf-input:focus,
+.eaf-select:focus,
+.eaf-textarea:focus {
+  border-color: var(--eaf-amber);
+  box-shadow: 0 0 0 2px rgba(184,132,32,0.15);
+}
+.eaf-input--num {
+  font-family: var(--eaf-num);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.eaf-num {
+  font-family: var(--eaf-num);
+  font-variant-numeric: tabular-nums;
+}
+
+.eaf-label {
+  font-size: 11px;
+  color: var(--eaf-ink-3);
+  letter-spacing: 0.5px;
+}
+.eaf-label--zh {
+  font-family: var(--eaf-serif);
+  font-size: 12px;
+}
+
+.eaf-rule-gold {
+  height: 1px;
+  background: var(--eaf-line-gold);
+  margin: var(--eaf-gap-md) 0;
+  position: relative;
+}
+.eaf-rule-gold::before {
+  content: '◆';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--eaf-bg);
+  padding: 0 8px;
+  color: var(--eaf-amber);
+  font-size: 10px;
+}
+
+.eaf-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  background: var(--eaf-bg-sand);
+  color: var(--eaf-ink-2);
+  border: 1px solid var(--eaf-line);
+}
+.eaf-badge--ok    { background: rgba(94,125,76,0.15);  color: var(--eaf-olive);     border-color: rgba(94,125,76,0.3); }
+.eaf-badge--warn  { background: rgba(184,132,32,0.15); color: var(--eaf-amber);     border-color: rgba(184,132,32,0.3); }
+.eaf-badge--error { background: rgba(161,60,46,0.15);  color: var(--eaf-crimson);   border-color: rgba(161,60,46,0.3); }
+.eaf-badge--info  { background: rgba(183,86,54,0.12);  color: var(--eaf-terracotta); border-color: rgba(183,86,54,0.25); }
+
+.eaf-msg {
+  padding: 10px var(--eaf-pad-card);
+  border-radius: var(--eaf-radius-sm);
+  border: 1px solid var(--eaf-line);
+  background: var(--eaf-bg-raised);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--eaf-ink-2);
+}
+.eaf-msg--info  { background: rgba(183,86,54,0.06); border-color: rgba(183,86,54,0.2); }
+.eaf-msg--warn  { background: rgba(184,132,32,0.08); border-color: rgba(184,132,32,0.3); color: #6e4d10; }
+.eaf-msg--error { background: rgba(161,60,46,0.08);  border-color: rgba(161,60,46,0.3);  color: var(--eaf-crimson); }
+
+.eaf-tab {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--eaf-ink-3);
+  font-family: var(--eaf-sans);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+.eaf-tab:hover  { color: var(--eaf-ink-1); }
+.eaf-tab.active {
+  color: var(--eaf-terracotta);
+  border-bottom-color: var(--eaf-terracotta);
+  font-weight: 600;
+}
+
+/* ════════════════════════════════════════════════════════
+   index.html sidebar — parchment 紙感漸進改造
+   v4.4.31：Phase 2 第一步，sidebar 改紙感
+   ════════════════════════════════════════════════════════ */
+[data-eaf-theme="parchment"] #sidebar {
+  background: var(--eaf-bg-card);
+  color: var(--eaf-ink-2);
+  border-right: 1px solid var(--eaf-line);
+}
+[data-eaf-theme="parchment"] #sb-header {
+  border-bottom-color: var(--eaf-line);
+}
+[data-eaf-theme="parchment"] #sb-header h2 {
+  color: var(--eaf-ink-1);
+  font-family: var(--eaf-serif);
+  font-weight: 600;
+  letter-spacing: 1.5px;
+}
+[data-eaf-theme="parchment"] #sb-version {
+  background: var(--eaf-bg-sand);
+  color: var(--eaf-ink-3);
+  font-family: var(--eaf-num);
+  font-weight: 500;
+  letter-spacing: 1px;
+}
+[data-eaf-theme="parchment"] #admin-link {
+  color: var(--eaf-ink-3);
+}
+[data-eaf-theme="parchment"] #admin-link:hover {
+  color: var(--eaf-terracotta);
+}
+[data-eaf-theme="parchment"] #new-purchase {
+  background: var(--eaf-cat-medical);
+  color: #fff;
+}
+[data-eaf-theme="parchment"] #new-purchase:hover { background: #a04a2c; }
+[data-eaf-theme="parchment"] #new-expense {
+  background: var(--eaf-cat-custody);
+  color: #fff;
+}
+[data-eaf-theme="parchment"] #new-expense:hover { background: #5a4d75; }
+
+[data-eaf-theme="parchment"] #sync-status {
+  border-bottom-color: var(--eaf-line);
+  color: var(--eaf-ink-3);
+}
+[data-eaf-theme="parchment"] #sync-status.ok   { color: var(--eaf-olive); }
+[data-eaf-theme="parchment"] #sync-status.err  { color: var(--eaf-crimson); }
+[data-eaf-theme="parchment"] #sync-status.busy { color: var(--eaf-amber); }
+
+[data-eaf-theme="parchment"] #no-history { color: var(--eaf-ink-4); }
+
+[data-eaf-theme="parchment"] #sf-keyword,
+[data-eaf-theme="parchment"] .sf-select {
+  background: var(--eaf-bg-card);
+  border-color: var(--eaf-line-strong);
+  color: var(--eaf-ink-1);
+}
+[data-eaf-theme="parchment"] #sf-keyword::placeholder { color: var(--eaf-ink-4); }
+[data-eaf-theme="parchment"] #sf-keyword:focus,
+[data-eaf-theme="parchment"] .sf-select:focus { border-color: var(--eaf-amber); }
+[data-eaf-theme="parchment"] #sf-clear { color: var(--eaf-ink-3); }
+[data-eaf-theme="parchment"] #sf-clear:hover { color: var(--eaf-terracotta); }
+[data-eaf-theme="parchment"] #online-count { color: var(--eaf-ink-4); }
+
+[data-eaf-theme="parchment"] .h-item {
+  background: var(--eaf-bg-raised);
+  border-left: 4px solid var(--eaf-cat-medical);
+  border-radius: var(--eaf-radius-sm);
+}
+[data-eaf-theme="parchment"] .h-item:hover { background: var(--eaf-bg-sand); }
+[data-eaf-theme="parchment"] .h-item.expense { border-left-color: var(--eaf-cat-custody); }
+[data-eaf-theme="parchment"] .h-item.acct-medical    { border-left-color: var(--eaf-cat-medical); background: var(--eaf-bg-raised); }
+[data-eaf-theme="parchment"] .h-item.acct-custody    { border-left-color: var(--eaf-cat-public); background: var(--eaf-bg-raised); }
+[data-eaf-theme="parchment"] .h-item.acct-insurance  { border-left-color: var(--eaf-cat-insurance); background: var(--eaf-bg-raised); }
+[data-eaf-theme="parchment"] .h-item.unclassified    { border-left-color: var(--eaf-crimson); background: rgba(161,60,46,0.06); }
+[data-eaf-theme="parchment"] .h-item.active          { background: var(--eaf-bg-sand); box-shadow: inset 2px 0 0 var(--eaf-amber); }
+
+[data-eaf-theme="parchment"] .h-date   { color: var(--eaf-ink-3); }
+[data-eaf-theme="parchment"] .h-title  { color: var(--eaf-ink-1); font-family: var(--eaf-serif); font-weight: 600; }
+[data-eaf-theme="parchment"] .h-amount { color: var(--eaf-olive); font-family: var(--eaf-num); font-variant-numeric: tabular-nums; }
+[data-eaf-theme="parchment"] .h-item.voided          { opacity: .55; }
+[data-eaf-theme="parchment"] .h-item.voided .h-title { color: var(--eaf-ink-4); }
+[data-eaf-theme="parchment"] .h-void { background: var(--eaf-crimson); }
+[data-eaf-theme="parchment"] .h-void:hover { background: #8a3325; }
