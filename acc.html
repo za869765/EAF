@@ -662,21 +662,21 @@ window.addEventListener('storage', (ev) => {
       <div id="discount-advisor" style="margin-top:6px;font-size:12px;line-height:1.6;"></div>
     </div>
     <div class="discount-inputs">
+      <!-- ver4.4.31：「改列衛生保健」cb 移至前面（折讓歸屬選擇是先決條件） -->
+      <label class="toggle-row" title="預設折讓全記入「門診醫療」C4；勾選後改全記入「衛生保健」C5">
+        <input type="checkbox" id="discount-allocate-health" onchange="calcReminders()">
+        改列衛生保健
+      </label>
       <label class="toggle-row" title="勾選即手動覆蓋系統判斷，強制本月按基本數額提列">
         <input type="checkbox" id="discount-needed" onchange="onDiscountToggle()">
         強制提列
       </label>
-      <!-- ver4.4.30：移除手動輸入金額，改自動帶入「基本數額」-->
+      <!-- ver4.4.30：移除手動輸入金額，改自動帶入「基本數額」 -->
       <div id="discount-rate-wrap" style="display:none; align-items:center; gap:6px; flex-wrap:wrap;">
         <span style="font-size:11px; color:#546e7a;">將提列：</span>
         <span id="discount-amount-display" style="font-size:13px; font-weight:700; color:#bf360c;">0</span>
         <span style="font-size:11px; color:#546e7a;">元（系統自動依基本數額帶入）</span>
         <input type="hidden" id="discount-amount-input" value="0">
-        <!-- ver4.4.30：折讓歸屬切換（預設記門診醫療，勾選改記衛生保健） -->
-        <label class="toggle-row" style="font-size:11px; margin-left:14px;" title="預設折讓全記入「門診醫療」C4；勾選後改全記入「衛生保健」C5">
-          <input type="checkbox" id="discount-allocate-health" onchange="calcReminders()">
-          改列衛生保健
-        </label>
       </div>
     </div>
   </div>
