@@ -731,24 +731,22 @@ window.addEventListener('storage', (ev) => {
           <div class="hint">= A門診健保掛帳 − 藥品收入 − 預防保健</div>
         </div>
       </div>
-      <div class="section-title" style="margin-top:14px;">🧾 健保不給付及部分負擔 <span style="font-size:11px;color:#d32f2f;font-weight:400;">(= 檢驗收入 + 部分負擔 + 健保不給付)</span> <span style="font-size:10px;background:#e3f2fd;color:#1565c0;border-radius:3px;padding:1px 8px;margin-left:6px;font-weight:400;">借 110305 應收醫療帳款</span></div>
+      <div class="section-title" style="margin-top:14px;">🧾 醫事服務 + 門診現金收入 <span style="font-size:11px;color:#d32f2f;font-weight:400;">(= 預估醫事服務收入 + 門診現金收入)</span> <span style="font-size:10px;background:#e3f2fd;color:#1565c0;border-radius:3px;padding:1px 8px;margin-left:6px;font-weight:400;">借 110305 應收醫療帳款</span></div>
       <div class="input-grid">
         <div class="input-group">
           <label>A：預估醫事服務收入 <span style="font-size:10px;background:#f3e5f5;color:#6a1b9a;border-radius:2px;padding:0 4px;">貸 41060103</span></label>
           <input class="num-in" id="inc-lab" type="text" placeholder="0" oninput="calcOther()">
         </div>
         <div class="input-group">
-          <label>B：部分負擔 <span style="font-size:10px;background:#f3e5f5;color:#6a1b9a;border-radius:2px;padding:0 4px;">貸 41060102</span></label>
+          <label>B：門診現金收入 <span style="font-size:10px;background:#f3e5f5;color:#6a1b9a;border-radius:2px;padding:0 4px;">貸 41060102</span></label>
           <input class="num-in" id="inc-copay" type="text" placeholder="0" oninput="calcOther()" onblur="saveMonthData()">
         </div>
-        <div class="input-group">
-          <label>C：健保不給付 <span style="font-size:10px;background:#f3e5f5;color:#6a1b9a;border-radius:2px;padding:0 4px;">貸 41060102</span></label>
-          <input class="num-in" id="inc-noncov" type="text" placeholder="0" oninput="calcOther()" onblur="saveMonthData()">
-        </div>
+        <!-- ver4.4.31：原 C：健保不給付欄合併進 B；保留 hidden input 給既有 calcOther / saveMonthData 使用 -->
+        <input type="hidden" id="inc-noncov" value="0">
         <div class="input-group">
           <label style="color:#1565c0;">小計（自動）</label>
           <input class="num-in auto" id="inc-other-total" type="text" readonly>
-          <div class="hint">A + B + C</div>
+          <div class="hint">A + B</div>
         </div>
       </div>
     </div>
