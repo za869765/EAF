@@ -666,11 +666,16 @@ window.addEventListener('storage', (ev) => {
         強制提列
       </label>
       <!-- ver4.4.30：移除手動輸入金額，改自動帶入「基本數額」-->
-      <div id="discount-rate-wrap" style="display:none; align-items:center; gap:6px;">
+      <div id="discount-rate-wrap" style="display:none; align-items:center; gap:6px; flex-wrap:wrap;">
         <span style="font-size:11px; color:#546e7a;">將提列：</span>
         <span id="discount-amount-display" style="font-size:13px; font-weight:700; color:#bf360c;">0</span>
         <span style="font-size:11px; color:#546e7a;">元（系統自動依基本數額帶入）</span>
         <input type="hidden" id="discount-amount-input" value="0">
+        <!-- ver4.4.30：折讓歸屬切換（預設記門診醫療，勾選改記衛生保健） -->
+        <label class="toggle-row" style="font-size:11px; margin-left:14px;" title="預設折讓全記入「門診醫療」C4；勾選後改全記入「衛生保健」C5">
+          <input type="checkbox" id="discount-allocate-health" onchange="calcReminders()">
+          改列衛生保健
+        </label>
       </div>
     </div>
   </div>
@@ -1976,10 +1981,12 @@ function updateCalcTable(){
   // ── 門診醫療 = 總額 − 衛生保健 ──
   const mInc = totalInc - hInc;
   const mExp = totalExp - hExp;
-  /* bug #27: 折讓依 B4:B5 比例分攤；原本 disc 全扣在 mNet、hNet 完全沒分攤折讓，
-     文件公式 C4 = ROUND(B4 × D8)、C5 = C6 − C4。以掛帳金額比例近似。 */
-  const mDisc = totalInc > 0 ? Math.round(disc * mInc / totalInc) : 0;
-  const hDisc = Math.max(0, disc - mDisc);
+  /* ver4.4.30：強制提列預設全記「門診醫療」C4；
+     勾選「改列衛生保健」cb → 全記 C5（衛保）。
+     不再按掛帳比例自動分攤（業務上強制提列為單一歸屬）。 */
+  const _toHealth = document.getElementById('discount-allocate-health')?.checked;
+  const mDisc = _toHealth ? 0 : disc;
+  const hDisc = _toHealth ? disc : 0;
   const mNet = mInc + noncov + reject - mDisc - mExp;
   const mFund5  = Math.round(mNet * 0.05);
   const mBureau = Math.round(mNet * 0.95 * 0.1);
