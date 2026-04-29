@@ -932,6 +932,14 @@ body.sb-resizing * { pointer-events: none !important; }
   .it td.td-name textarea, .it td.td-spec textarea {
     overflow: visible !important; height: auto !important;
   }
+  /* v4.4.32 用途說明 / 其他說明事項：列印時也要全文展開，否則長文吃字 */
+  #purpose-desc, #notes {
+    overflow: visible !important; height: auto !important;
+    white-space: pre-wrap !important; word-break: break-word !important;
+  }
+  /* v4.4.32 請購單交貨欄位：列印時縮窄 38mm→26mm，把空間還給用途說明 */
+  #delivery-fields { width: 26mm !important; padding: 1.5mm !important; }
+  #delivery-fields .fi, #delivery-fields #delivery-date-text { font-size: 10.5px !important; }
   /* Lower section flex-fills remaining space */
   #lower-section { flex: 1; display: flex; flex-direction: column; }
   .lower-wrap { flex: 1; }
@@ -958,7 +966,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.31</div>
+      <div id="sb-version">v4.4.32</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -4880,18 +4888,39 @@ loadPayees();
    afterprint 還原（避免影響螢幕編輯） */
 window.addEventListener('beforeprint', () => {
   const cnt = (_payeeCards || []).filter(c => c.name || c.bank || c.acctNo).length;
-  if (cnt < 2) return;
-  document.querySelectorAll('#items-body tr').forEach(tr => {
-    const nmEl = tr.querySelector('[data-c="name"]');
-    const prEl = tr.querySelector('[data-c="price"]');
-    const nm = (nmEl && nmEl.value || '').trim();
-    const pr = (prEl && prEl.value || '').trim();
-    if (!nm && !pr) tr.classList.add('print-compact');
-  });
+  if (cnt >= 2) {
+    document.querySelectorAll('#items-body tr').forEach(tr => {
+      const nmEl = tr.querySelector('[data-c="name"]');
+      const prEl = tr.querySelector('[data-c="price"]');
+      const nm = (nmEl && nmEl.value || '').trim();
+      const pr = (prEl && prEl.value || '').trim();
+      if (!nm && !pr) tr.classList.add('print-compact');
+    });
+  }
+  /* v4.4.32 用途說明字體依文字長度動態縮小，避免請購單交貨欄位擠壓導致吃字 */
+  const pd = document.getElementById('purpose-desc');
+  if (pd) {
+    const len = (pd.value || '').length;
+    let fz = 12.5, lh = 1.45;
+    if (len > 200)      { fz = 9.5;  lh = 1.30; }
+    else if (len > 140) { fz = 10.5; lh = 1.35; }
+    else if (len > 80)  { fz = 11.5; lh = 1.40; }
+    pd.dataset.printOrigFz = pd.style.fontSize || '';
+    pd.dataset.printOrigLh = pd.style.lineHeight || '';
+    pd.style.fontSize = fz + 'px';
+    pd.style.lineHeight = lh;
+  }
 });
 window.addEventListener('afterprint', () => {
   document.querySelectorAll('#items-body tr.print-compact')
     .forEach(tr => tr.classList.remove('print-compact'));
+  const pd = document.getElementById('purpose-desc');
+  if (pd && 'printOrigFz' in pd.dataset) {
+    pd.style.fontSize   = pd.dataset.printOrigFz;
+    pd.style.lineHeight = pd.dataset.printOrigLh;
+    delete pd.dataset.printOrigFz;
+    delete pd.dataset.printOrigLh;
+  }
 });
 </script>
 
