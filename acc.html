@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.37</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.38</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -409,7 +409,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.37</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.38</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -1542,12 +1542,16 @@ window.addEventListener('storage', (ev) => {
 <div id="picker-overlay" onclick="closePickerBg(event)">
   <div id="picker-box">
     <div id="pk-head">
-      <h3>📋 選擇未出帳動支單（醫療基金 &gt; 510601 門診醫療成本）</h3>
+      <h3>📋 選擇未出帳動支單（510601 門診醫療成本 / 110404 醫療用品）</h3>
       <button class="pk-close" onclick="closePicker()">✕ 關閉</button>
     </div>
     <div id="pk-filter">
       <button class="btn btn-gray" style="font-size:11px; padding:3px 10px;" onclick="selectAllPk()">全選</button>
       <button class="btn btn-gray" style="font-size:11px; padding:3px 10px;" onclick="deselectAllPk()">全不選</button>
+      <label style="font-size:11px; display:inline-flex; align-items:center; gap:4px; margin-left:8px; cursor:pointer; color:#37474f;" title="勾選=只看申請日/交貨日當月；不勾=另含用途說明含當月字樣的歷史單據">
+        <input type="checkbox" id="pk-strict-month" checked onchange="togglePkStrictMonth(this.checked)">
+        嚴格當月
+      </label>
     </div>
     <div id="pk-list"></div>
     <div id="pk-foot">
@@ -1610,26 +1614,33 @@ let STATE = {
 let PICKER_DATA = [];
 async function loadPickerData(){
   const ym = curYm();
+  /* v4.4.38 嚴格當月過濾預設啟用（不靠用途說明字串） */
+  const strict = (typeof pkStrictMonth === 'boolean') ? pkStrictMonth : true;
   try {
     const resp = await fetch('/api/records',{headers:{'Content-Type':'application/json'}});
     if(!resp.ok) return;
     const all = await resp.json();
     PICKER_DATA = all.filter(r=>{
       if(r.archived||r.voided) return false;
-      /* 申請日期 or 交貨日期 or 用途說明含當月 → 顯示 */
       const rym = recYm(r);
       const dym = deliveryYm(r);
-      const mNum = String(+ym.slice(3)); // '3'
+      const mNum = String(+ym.slice(3));
       const descHasMonth = (r.purposeDesc||r.notes||'').includes(mNum+'月');
-      if(rym !== ym && dym !== ym && !descHasMonth) return false;
-      /* 只留 510601 門診醫療成本 */
-      if((r.bpCode||'') !== '510601') return false;
+      if (strict) {
+        if(rym !== ym && dym !== ym) return false;
+      } else {
+        if(rym !== ym && dym !== ym && !descHasMonth) return false;
+      }
+      /* v4.4.38 510601 門診醫療成本 + 110404 醫療用品（採購未付款）皆放行 */
+      const bp = r.bpCode || '';
+      if (bp !== '510601' && bp !== '110404') return false;
       return true;
     }).map(r=>({
       id: String(r.id),
       yearMonth: recYm(r),
       voucher: r.voucherNo||'',
-      subject: '510601 門診醫療成本',
+      bpCode: r.bpCode||'',
+      subject: (r.bpCode==='110404') ? '110404 醫療用品' : '510601 門診醫療成本',
       purposeCode: r.purposeCode||'',
       purposeName: r.purposeName||'',
       purposeDesc: r.purposeDesc||r.purposeName||'',
@@ -2419,10 +2430,15 @@ function renderPicker(kw){
       : isPicked
         ? `<span style="font-size:10px;background:#bbdefb;color:#0d47a1;border-radius:3px;padding:1px 5px;margin-left:4px;">✓ 已帶入</span>`
         : `<span style="font-size:10px;background:#f3e5f5;color:#8e24aa;border-radius:3px;padding:1px 5px;margin-left:4px;">待選入</span>`;
+    /* v4.4.38 醫療用品（110404）vs 門診醫療成本（510601）視覺區分 */
+    const subjectChip = (r.bpCode === '110404')
+      ? `<span style="font-size:10px;background:#e8f5e9;color:#2e7d32;border-radius:3px;padding:1px 6px;margin-left:4px;font-weight:600;" title="借 110404 醫療用品 / 貸 210205 應付費用">📦 醫療用品</span>`
+      : `<span style="font-size:10px;background:#fff3e0;color:#e65100;border-radius:3px;padding:1px 6px;margin-left:4px;" title="借 510601 門診醫療成本 / 貸 210205 應付費用">🏥 門診成本</span>`;
     div.innerHTML = `
       <input type="checkbox" ${(isPicked||isPosted)?'checked':''} ${isPosted?'disabled':''} onchange="togglePk('${r.id}',this)">
       <div class="pk-info">
         <div class="pk-title">${r.voucher||r.id}
+          ${subjectChip}
           <span style="font-size:10px;color:#90a4ae;">${r.purposeDesc} ${r.purposeCode}</span>
           ${badge}
         </div>
@@ -2452,6 +2468,13 @@ function updatePkFoot(){
   document.getElementById('pk-sel-info').textContent=`已選 ${cnt} 項，合計 $${fmt(sum)}`;
 }
 function filterPicker(kw){ renderPicker(kw); }
+/* v4.4.38 嚴格當月 toggle 狀態 + 切換函式（picker 載入時參照） */
+let pkStrictMonth = true;
+async function togglePkStrictMonth(on){
+  pkStrictMonth = !!on;
+  await loadPickerData();
+  renderPicker('');
+}
 function selectAllPk(){ PICKER_DATA.filter(r=>r.purposeCode!=='1501'&&r.purposeCode!=='2713').forEach(r=>{ if(!postedIds.has(r.id)) pickerSelected.add(r.id); }); renderPicker(''); }
 function deselectAllPk(){ pickerSelected.clear(); renderPicker(''); }
 
@@ -2638,14 +2661,17 @@ function generateVouchers(){
   const tempSalary = pnum(document.getElementById('exp-temp-salary')?.value);
   const tempDeduct = pnum(document.getElementById('exp-temp-deduct')?.value);
 
-  // 4. 未出帳動支單 → 掛應付費用
+  // 4. 未出帳動支單 → 掛應付費用（v4.4.38 依 bpCode 分流：110404 借醫療用品 / 510601 借門診醫療成本）
   STATE.month.pickerItems.forEach(r => {
-    // 若手動欄位已填臨時人員，跳過 Picker 選入的同月 2713 避免重複
     if(r.purposeCode==='2713' && (tempSalary>0||tempDeduct>0)) return;
-    /* purposeName 已含「代碼　中文名」如「2706　郵電費」，直接使用；無則退回代碼 */
     const _purpLabel = r.purposeName || r.purposeCode || '';
-    vouchers.push({ group:`動支掛應付（${r.yearMonth}）`, type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:_purpLabel, desc:r.purposeDesc||r.desc||'', dr:r.amount, cr:0 });
-    vouchers.push({ group:'', type:'credit', subject:'210205 應付費用', subAccount:'99.其他', purpose:'', desc:r.purposeDesc||r.desc||'', dr:0, cr:r.amount });
+    const isMedSupply = (r.bpCode === '110404');
+    const debitSubj   = isMedSupply ? '110404 醫療用品' : '510601 門診醫療成本';
+    const groupLabel  = isMedSupply
+      ? `醫療用品採購掛應付（${r.yearMonth}）`
+      : `動支掛應付（${r.yearMonth}）`;
+    vouchers.push({ group:groupLabel, type:'debit',  subject:debitSubj,        subAccount:'',       purpose:_purpLabel, desc:r.purposeDesc||r.desc||'', dr:r.amount, cr:0 });
+    vouchers.push({ group:'',         type:'credit', subject:'210205 應付費用', subAccount:'99.其他', purpose:'',         desc:r.purposeDesc||r.desc||'', dr:0,        cr:r.amount });
   });
   if(tempSalary > 0){
     vouchers.push({ group:'臨時人員應付費用', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'2713 計時與計件人員酬金', desc:`${yymm}臨時人員薪資實領${fmt(tempSalary)}元`, dr:tempSalary, cr:0 });

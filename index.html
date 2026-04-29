@@ -237,7 +237,7 @@ body.sb-resizing * { pointer-events: none !important; }
 .fta { border: none; background: transparent; font-family: inherit;
        font-size: inherit; outline: none; width: 100%; resize: none;
        overflow: hidden; line-height: 1.45; }
-/* v4.4.37 用途說明列印替身：螢幕隱藏，列印時顯示（見 @media print） */
+/* v4.4.38 用途說明列印替身：螢幕隱藏，列印時顯示（見 @media print） */
 #purpose-desc-print { display: none; }
 .fsel {
   border: 1.5px solid #1565c0; border-radius: 4px;
@@ -344,7 +344,7 @@ body.sb-resizing * { pointer-events: none !important; }
   text-align: left; resize: none; overflow: hidden;
   padding: 0; margin: 0; display: block;
   line-height: 1.4;
-  /* v4.4.37 預設 5 行高（autoResize 會放大但不會縮小於 min-height） */
+  /* v4.4.38 預設 5 行高（autoResize 會放大但不會縮小於 min-height） */
   min-height: 7em;
   overflow-wrap: break-word; word-break: break-word;
   ime-mode: active;   /* Firefox：聚焦時啟動輸入法 */
@@ -936,7 +936,7 @@ body.sb-resizing * { pointer-events: none !important; }
   .it td.td-name textarea, .it td.td-spec textarea {
     overflow: visible !important; height: auto !important;
   }
-  /* v4.4.37 用途說明列印改用 div 顯示，限制 5 行內，超過由 JS 自動縮字 */
+  /* v4.4.38 用途說明列印改用 div 顯示，限制 5 行內，超過由 JS 自動縮字 */
   #purpose-desc { display: none !important; }
   #purpose-desc-print {
     display: block !important;
@@ -952,7 +952,7 @@ body.sb-resizing * { pointer-events: none !important; }
     overflow: visible !important; height: auto !important;
     white-space: pre-wrap !important; word-break: break-word !important;
   }
-  /* v4.4.37 採購品名/規格列印限制 5 行內，超過由 JS 縮字 */
+  /* v4.4.38 採購品名/規格列印限制 5 行內，超過由 JS 縮字 */
   .it td.td-name textarea, .it td.td-spec textarea {
     max-height: 5em !important; overflow: hidden !important;
   }
@@ -982,7 +982,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.37</div>
+      <div id="sb-version">v4.4.38</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1138,7 +1138,7 @@ body.sb-resizing * { pointer-events: none !important; }
               <span class="cell-lbl">用途說明</span>
               <textarea class="fta" id="purpose-desc" rows="5"
                         style="font-size:12.5px; min-height:26mm; width:100%;"></textarea>
-              <!-- v4.4.37 列印專用 div：textarea 在列印時瀏覽器會吃字，改用 div 顯示 -->
+              <!-- v4.4.38 列印專用 div：textarea 在列印時瀏覽器會吃字，改用 div 顯示 -->
               <div id="purpose-desc-print" aria-hidden="true"></div>
             </div>
             <!-- 請購單專屬：交貨日期 / 交貨地點 -->
@@ -1752,7 +1752,7 @@ async function loadHistory() {
   setSyncStatus('⟳ 載入中…', 'busy');
   try {
     cachedRecords = await apiGet();
-    /* v4.4.37 重複憑證號偵測（非作廢/封存才看），有重複即在 console + UI 警示 */
+    /* v4.4.38 重複憑證號偵測（非作廢/封存才看），有重複即在 console + UI 警示 */
     {
       const m = new Map();
       cachedRecords.forEach(r => {
@@ -3927,7 +3927,7 @@ function _doCopyRecord(includePayees) {
 }
 
 function newForm(type, opts) {
-  /* v4.4.37 opts.skipUnsavedCheck: true → 由 clearForm() 等呼叫，已確認不需再警示 */
+  /* v4.4.38 opts.skipUnsavedCheck: true → 由 clearForm() 等呼叫，已確認不需再警示 */
   if (!opts?.skipUnsavedCheck && _editingSaved) { showUnsavedWarning(); return; }
   _editingSaved = false;
   currentId = null;
@@ -3938,7 +3938,7 @@ function newForm(type, opts) {
   acctType = '';
   _foldNoteApplied = false;
   _prevNotesBeforeFold = '';
-  /* v4.4.37 受款人區塊：開新單一律清空（避免從別張單繼承受款人卡片） */
+  /* v4.4.38 受款人區塊：開新單一律清空（避免從別張單繼承受款人卡片） */
   _payeeCards = [];
   if (typeof renderPayeeCards === 'function') renderPayeeCards();
   if (typeof updatePayeePrintLine === 'function') updatePayeePrintLine();
@@ -3983,7 +3983,7 @@ async function clearForm() {
   const ok = await showConfirm('目前填入的資料將全部清除，<br>確定要重新開始嗎？',
     { title:'確認清除', icon:'🗑️', okClass:'' });
   if (!ok) return;
-  /* v4.4.37 已確認清除 → 跳過 unsaved 警告，直接重置 */
+  /* v4.4.38 已確認清除 → 跳過 unsaved 警告，直接重置 */
   newForm(formType, { skipUnsavedCheck: true });
 }
 
@@ -4951,7 +4951,7 @@ window.addEventListener('beforeprint', () => {
       if (!nm && !pr) tr.classList.add('print-compact');
     });
   }
-  /* v4.4.37 用途說明：同步至列印替身 div，依文字長度縮字以塞進 5 行（max-height:24mm）
+  /* v4.4.38 用途說明：同步至列印替身 div，依文字長度縮字以塞進 5 行（max-height:24mm）
      用途說明區寬度 ~26mm，每行約 7-12 字（隨字體大小） */
   const pd = document.getElementById('purpose-desc');
   const pdp = document.getElementById('purpose-desc-print');
@@ -4967,7 +4967,7 @@ window.addEventListener('beforeprint', () => {
     pdp.style.fontSize = fz + 'px';
     pdp.style.lineHeight = lh;
   }
-  /* v4.4.37 採購品名 / 規格：依文字長度縮字以塞進 5 行 */
+  /* v4.4.38 採購品名 / 規格：依文字長度縮字以塞進 5 行 */
   document.querySelectorAll('#items-body textarea[data-c="name"], #items-body textarea[data-c="spec"]').forEach(ta => {
     const len = (ta.value || '').length;
     let fz = 12, lh = 1.4;
@@ -4983,7 +4983,7 @@ window.addEventListener('beforeprint', () => {
 window.addEventListener('afterprint', () => {
   document.querySelectorAll('#items-body tr.print-compact')
     .forEach(tr => tr.classList.remove('print-compact'));
-  /* v4.4.37 還原 採購品名/規格 textarea 字體（替身 div 不需 reset，螢幕 display:none） */
+  /* v4.4.38 還原 採購品名/規格 textarea 字體（替身 div 不需 reset，螢幕 display:none） */
   document.querySelectorAll('#items-body textarea[data-c="name"], #items-body textarea[data-c="spec"]').forEach(ta => {
     if ('printOrigFz' in ta.dataset) {
       ta.style.fontSize   = ta.dataset.printOrigFz;
