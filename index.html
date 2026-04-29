@@ -237,6 +237,8 @@ body.sb-resizing * { pointer-events: none !important; }
 .fta { border: none; background: transparent; font-family: inherit;
        font-size: inherit; outline: none; width: 100%; resize: none;
        overflow: hidden; line-height: 1.45; }
+/* v4.4.34 用途說明列印替身：螢幕隱藏，列印時顯示（見 @media print） */
+#purpose-desc-print { display: none; }
 .fsel {
   border: 1.5px solid #1565c0; border-radius: 4px;
   background: #eef4fd; color: #111;
@@ -932,14 +934,21 @@ body.sb-resizing * { pointer-events: none !important; }
   .it td.td-name textarea, .it td.td-spec textarea {
     overflow: visible !important; height: auto !important;
   }
-  /* v4.4.33 用途說明 / 其他說明事項：列印時全文展開但保留 min-height 視覺一致 */
-  #purpose-desc, #notes {
+  /* v4.4.34 用途說明列印改用 div 顯示（textarea 在列印時瀏覽器會吃字） */
+  #purpose-desc { display: none !important; }
+  #purpose-desc-print {
+    display: block !important;
+    font-size: 13.5px !important; line-height: 1.5 !important;
+    min-height: 18mm !important;
+    white-space: pre-wrap !important; word-break: break-word !important;
+    color: #000 !important;
+    font-family: inherit;
+  }
+  /* notes 欄位仍維持 textarea 但放寬限制 */
+  #notes {
     overflow: visible !important; height: auto !important;
     white-space: pre-wrap !important; word-break: break-word !important;
   }
-  /* v4.4.33 用途說明列印預設字體放大 12.5px → 13.5px（短文時看起來與螢幕一致）；
-     min-height 保留 18mm 讓空白單據視覺不縮水 */
-  #purpose-desc { font-size: 13.5px !important; line-height: 1.5 !important; min-height: 18mm !important; }
   /* Lower section flex-fills remaining space */
   #lower-section { flex: 1; display: flex; flex-direction: column; }
   .lower-wrap { flex: 1; }
@@ -966,7 +975,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.33</div>
+      <div id="sb-version">v4.4.34</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1117,6 +1126,8 @@ body.sb-resizing * { pointer-events: none !important; }
               <span class="cell-lbl">用途說明</span>
               <textarea class="fta" id="purpose-desc" rows="4"
                         style="font-size:12.5px; min-height:18mm; width:100%;"></textarea>
+              <!-- v4.4.34 列印專用 div：textarea 在列印時瀏覽器會吃字，改用 div 顯示 -->
+              <div id="purpose-desc-print" aria-hidden="true"></div>
             </div>
             <!-- 請購單專屬：交貨日期 / 交貨地點 -->
             <div id="delivery-fields" style="width:38mm; padding:2mm; display:flex; flex-direction:column; gap:2mm; justify-content:center;">
@@ -4897,31 +4908,24 @@ window.addEventListener('beforeprint', () => {
       if (!nm && !pr) tr.classList.add('print-compact');
     });
   }
-  /* v4.4.33 用途說明字體依文字長度動態縮小（基準 13.5px，短文不縮）；
-     門檻提高，避免短文被誤縮 */
+  /* v4.4.34 用途說明：把 textarea 內容同步到列印替身 div，並依文字長度調整字體 */
   const pd = document.getElementById('purpose-desc');
-  if (pd) {
+  const pdp = document.getElementById('purpose-desc-print');
+  if (pd && pdp) {
+    pdp.textContent = pd.value || '';
     const len = (pd.value || '').length;
     let fz = 13.5, lh = 1.5;
     if (len > 260)      { fz = 11; lh = 1.30; }
     else if (len > 180) { fz = 12; lh = 1.40; }
     else if (len > 110) { fz = 13; lh = 1.45; }
-    pd.dataset.printOrigFz = pd.style.fontSize || '';
-    pd.dataset.printOrigLh = pd.style.lineHeight || '';
-    pd.style.fontSize = fz + 'px';
-    pd.style.lineHeight = lh;
+    pdp.style.fontSize = fz + 'px';
+    pdp.style.lineHeight = lh;
   }
 });
 window.addEventListener('afterprint', () => {
   document.querySelectorAll('#items-body tr.print-compact')
     .forEach(tr => tr.classList.remove('print-compact'));
-  const pd = document.getElementById('purpose-desc');
-  if (pd && 'printOrigFz' in pd.dataset) {
-    pd.style.fontSize   = pd.dataset.printOrigFz;
-    pd.style.lineHeight = pd.dataset.printOrigLh;
-    delete pd.dataset.printOrigFz;
-    delete pd.dataset.printOrigLh;
-  }
+  /* v4.4.34 替身 div 不需 reset（螢幕本就 display:none） */
 });
 </script>
 
