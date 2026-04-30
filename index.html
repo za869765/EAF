@@ -344,8 +344,8 @@ body.sb-resizing * { pointer-events: none !important; }
   text-align: left; resize: none; overflow: hidden;
   padding: 0; margin: 0; display: block;
   line-height: 1.4;
-  /* v4.4.38 預設 5 行高（autoResize 會放大但不會縮小於 min-height） */
-  min-height: 7em;
+  /* v4.4.40 螢幕上 1 行高就好，列印時才強制 5 行高（@media print 覆蓋） */
+  min-height: 1.4em;
   overflow-wrap: break-word; word-break: break-word;
   ime-mode: active;   /* Firefox：聚焦時啟動輸入法 */
 }
@@ -952,9 +952,10 @@ body.sb-resizing * { pointer-events: none !important; }
     overflow: visible !important; height: auto !important;
     white-space: pre-wrap !important; word-break: break-word !important;
   }
-  /* v4.4.38 採購品名/規格列印限制 5 行內，超過由 JS 縮字 */
+  /* v4.4.40 列印 採購品名/規格：強制 5 行高，超過由 JS 縮字（螢幕版已縮為 1 行） */
   .it td.td-name textarea, .it td.td-spec textarea {
-    max-height: 5em !important; overflow: hidden !important;
+    min-height: 7em !important;
+    max-height: 7em !important; overflow: hidden !important;
   }
   /* Lower section flex-fills remaining space */
   #lower-section { flex: 1; display: flex; flex-direction: column; }
@@ -982,7 +983,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.39</div>
+      <div id="sb-version">v4.4.40</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
