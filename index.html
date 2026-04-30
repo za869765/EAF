@@ -952,16 +952,18 @@ body.sb-resizing * { pointer-events: none !important; }
     overflow: visible !important; height: auto !important;
     white-space: pre-wrap !important; word-break: break-word !important;
   }
-  /* v4.4.40 列印 採購品名/規格：強制 5 行高，超過由 JS 縮字（螢幕版已縮為 1 行） */
+  /* v4.4.41 列印 採購品名/規格：依內容自然高（移除 7em 強制，避免擠掉受款人）；
+     超過 5 行才 JS 縮字（max-height 5em 由 v4.4.38 邏輯處理） */
   .it td.td-name textarea, .it td.td-spec textarea {
-    min-height: 7em !important;
-    max-height: 7em !important; overflow: hidden !important;
+    max-height: 5em !important; overflow: hidden !important;
   }
   /* Lower section flex-fills remaining space */
-  #lower-section { flex: 1; display: flex; flex-direction: column; }
-  .lower-wrap { flex: 1; }
+  #lower-section { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .lower-wrap { flex: 1; min-height: 0; }
   .lower-left { height: 100%; }
   .bs tr.sig-box td { height: 32mm; }
+  /* v4.4.41 受款人列印行：絕不被擠掉 */
+  #payee-print-line { flex-shrink: 0 !important; }
   /* 頁尾留白：列印時顯示，供手寫備註用 */
   #print-footer { display: block !important; height: 16mm; flex-shrink: 0; }
 }
@@ -983,7 +985,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.40</div>
+      <div id="sb-version">v4.4.41</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
