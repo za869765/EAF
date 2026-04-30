@@ -957,9 +957,10 @@ body.sb-resizing * { pointer-events: none !important; }
   .it td.td-name textarea, .it td.td-spec textarea {
     max-height: 5em !important; overflow: hidden !important;
   }
-  /* Lower section flex-fills remaining space */
-  #lower-section { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .lower-wrap { flex: 1; min-height: 0; }
+  /* Lower section flex-fills remaining space
+     v4.4.42 拿掉 min-height: 0（會讓 items table 內容溢出到 payee 區造成重疊） */
+  #lower-section { flex: 1; display: flex; flex-direction: column; }
+  .lower-wrap { flex: 1; }
   .lower-left { height: 100%; }
   .bs tr.sig-box td { height: 32mm; }
   /* v4.4.41 受款人列印行：絕不被擠掉 */
@@ -985,7 +986,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.41</div>
+      <div id="sb-version">v4.4.42</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -4942,18 +4943,17 @@ function updatePayeeSectionVisibility() {
 loadPayees();
 
 /* v4.2.24 列印前智慧偵測：多筆受款人時 (>=2) 自動縮小空行，空間讓給受款人資訊；
-   afterprint 還原（避免影響螢幕編輯） */
+   afterprint 還原（避免影響螢幕編輯）
+   v4.4.42 改為「不論幾筆受款人，列印時空白明細列一律自動縮小」 — 讓受款人那行有空間，
+   表格內容也不會空白佔版。請購單 / 動支單 共用此邏輯 */
 window.addEventListener('beforeprint', () => {
-  const cnt = (_payeeCards || []).filter(c => c.name || c.bank || c.acctNo).length;
-  if (cnt >= 2) {
-    document.querySelectorAll('#items-body tr').forEach(tr => {
-      const nmEl = tr.querySelector('[data-c="name"]');
-      const prEl = tr.querySelector('[data-c="price"]');
-      const nm = (nmEl && nmEl.value || '').trim();
-      const pr = (prEl && prEl.value || '').trim();
-      if (!nm && !pr) tr.classList.add('print-compact');
-    });
-  }
+  document.querySelectorAll('#items-body tr').forEach(tr => {
+    const nmEl = tr.querySelector('[data-c="name"]');
+    const prEl = tr.querySelector('[data-c="price"]');
+    const nm = (nmEl && nmEl.value || '').trim();
+    const pr = (prEl && prEl.value || '').trim();
+    if (!nm && !pr) tr.classList.add('print-compact');
+  });
   /* v4.4.38 用途說明：同步至列印替身 div，依文字長度縮字以塞進 5 行（max-height:24mm）
      用途說明區寬度 ~26mm，每行約 7-12 字（隨字體大小） */
   const pd = document.getElementById('purpose-desc');
