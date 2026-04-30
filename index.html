@@ -293,7 +293,7 @@ body.sb-resizing * { pointer-events: none !important; }
 .sg { width: 100%; border-collapse: collapse; border-top: none; }
 .sg td {
   border: 1px solid #333; text-align: center;
-  vertical-align: top; font-size: 11px; padding: 2mm 1mm; height: 36mm;
+  vertical-align: top; font-size: 11px; padding: 2mm 1mm; height: 30mm;
 }
 /* Slash overlay for cells that are N/A */
 .sg td.slash {
@@ -936,13 +936,14 @@ body.sb-resizing * { pointer-events: none !important; }
   .it td.td-name textarea, .it td.td-spec textarea {
     overflow: visible !important; height: auto !important;
   }
-  /* v4.4.38 用途說明列印改用 div 顯示，限制 5 行內，超過由 JS 自動縮字 */
+  /* v4.4.43 用途說明列印：max-height 24mm→32mm（核章縮 6mm 後騰出來的空間），
+     超長文字由 JS 自動縮字（含新增 7px / 6.5px 兩級） */
   #purpose-desc { display: none !important; }
   #purpose-desc-print {
     display: block !important;
     line-height: 1.45 !important;
     min-height: 18mm !important;
-    max-height: 24mm !important; overflow: hidden !important;
+    max-height: 32mm !important; overflow: hidden !important;
     white-space: pre-wrap !important; word-break: break-word !important;
     color: #000 !important;
     font-family: inherit;
@@ -986,7 +987,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.42</div>
+      <div id="sb-version">v4.4.43</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -4961,8 +4962,11 @@ window.addEventListener('beforeprint', () => {
   if (pd && pdp) {
     pdp.textContent = pd.value || '';
     const len = (pd.value || '').length;
+    /* v4.4.43 階梯細化 + 新增 7px / 6.5px 級距，配合 max-height 32mm 處理超長文字 */
     let fz = 13.5, lh = 1.5;
-    if (len > 200)      { fz = 8;    lh = 1.20; }
+    if (len > 320)      { fz = 6.5;  lh = 1.10; }
+    else if (len > 250) { fz = 7;    lh = 1.15; }
+    else if (len > 200) { fz = 8;    lh = 1.20; }
     else if (len > 140) { fz = 9;    lh = 1.25; }
     else if (len > 90)  { fz = 10;   lh = 1.30; }
     else if (len > 55)  { fz = 11;   lh = 1.35; }
