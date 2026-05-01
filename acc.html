@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.46</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.47</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -6431,6 +6431,8 @@ const BANK_ACCOUNTS = [
   { code:'11010202', name:'保管款專戶',       bank:'佳里區農會', acctNo:'00069160094275', initKey:'acc_bank_custody_init', color:'hd-blue',   elId:'bank-custody' },
   { code:'11010203', name:'健保款暫存專戶',   bank:'中華郵政',   acctNo:'31033281',       initKey:'acc_bank_health_init',  color:'hd-purple', elId:'bank-health'  },
 ];
+/* 年初結轉傳票（每年第 1 號轉帳傳票，把上年度期末餘額轉入本年度），需排除避免與 localStorage 期初雙計 */
+function isYearOpeningVoucher(vno){ return /^\d{3}300001$/.test(String(vno||'')); }
 function renderBankDeposit(){
   const {y, m, ym, label} = getYm();
   const yearMode = document.getElementById('bank-year-mode')?.checked;
@@ -6444,7 +6446,8 @@ function renderBankDeposit(){
   let grandTotal = 0;
   const cards = BANK_ACCOUNTS.map(acct => {
     const initVal = +(localStorage.getItem(acct.initKey) || 0);
-    const allRows = AccV2.entries({ subjectPrefix: acct.code });
+    const allRows = AccV2.entries({ subjectPrefix: acct.code })
+      .filter(e => !isYearOpeningVoucher(e.voucher_no));
     const cumRows = allRows.filter(e => e.ym && String(e.ym) <= ym);
     const curRows = yearMode
       ? allRows.filter(e => e.ym && String(e.ym).startsWith(y))
@@ -6456,18 +6459,21 @@ function renderBankDeposit(){
     const el = document.getElementById(acct.elId);
     if(el) el.textContent = fmt(endBal);
     const monthSummary = [];
-    for(let mo = 1; mo <= 12; mo++){
+    const maxMo = Math.max(Number(m), ...allRows.map(e => Number(String(e.ym||'').slice(-2)) || 0));
+    for(let mo = 1; mo <= maxMo; mo++){
       const moYm = y + String(mo).padStart(2,'0');
       const moRows = allRows.filter(e => e.ym === moYm);
-      if(!moRows.length && mo > Number(m)) continue;
       const moD = moRows.reduce((s,e) => s + (e.debit||0), 0);
       const moC = moRows.reduce((s,e) => s + (e.credit||0), 0);
       const prevCum = allRows.filter(e => e.ym && String(e.ym) < moYm)
         .reduce((s,e) => s + (e.debit||0) - (e.credit||0), 0);
       monthSummary.push({ mo, ym: moYm, debit: moD, credit: moC, endBal: initVal + prevCum + moD - moC });
     }
+    /* 月份倒排：最近月份在上 */
+    monthSummary.reverse();
+    /* 明細也倒排：日期由近到遠 */
     const entries = [...curRows].sort((a,b) =>
-      (a.make_date||'').localeCompare(b.make_date||'') || (a.voucher_no||'').localeCompare(b.voucher_no||'') || a.seq - b.seq
+      (b.make_date||'').localeCompare(a.make_date||'') || (b.voucher_no||'').localeCompare(a.voucher_no||'') || b.seq - a.seq
     );
     return { acct, initVal, endBal, cumDebit, cumCredit, monthSummary, entries };
   });
@@ -6522,12 +6528,12 @@ function renderBankDeposit(){
               <th style="padding:4px 10px;text-align:right;width:120px;">月底餘額</th>
             </tr></thead>
             <tbody>
+              ${msRows}
               <tr style="background:#e8f5e9;">
                 <td style="padding:5px 10px;font-weight:700;color:#1b5e20;">期初</td>
                 <td colspan="2" style="padding:5px 10px;color:#546e7a;font-size:11px;">114年度結轉期初餘額</td>
                 <td style="padding:5px 10px;text-align:right;font-weight:700;color:var(--near-black,#141413);font-variant-numeric:tabular-nums;">${fmt(c.initVal)}</td>
               </tr>
-              ${msRows}
             </tbody>
           </table>
         </div>
