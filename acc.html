@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.45</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.46</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -430,6 +430,7 @@ window.addEventListener('storage', (ev) => {
   <button class="tab-btn" onclick="switchTab('payable',this)">💰 應付費用</button>
   <button class="tab-btn" onclick="switchTab('custodial',this)">🏦 代收款</button>
   <button class="tab-btn" onclick="switchTab('surplus',this)">💰 累積賸餘</button>
+  <button class="tab-btn" onclick="switchTab('bank',this)">🏧 銀行存款</button>
   <button class="tab-btn" onclick="switchTab('history',this)">📜 歷史變更資料</button>
 </div>
 
@@ -1509,6 +1510,41 @@ window.addEventListener('storage', (ev) => {
 </div><!-- /tab-surplus -->
 
 <!-- ══════════════════════════════════════════
+     TAB：銀行存款（110102 三專戶）
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-bank">
+  <div class="toolbar" style="gap:8px;">
+    <span style="font-size:13px;font-weight:600;color:#1e2a38;">110102 銀行存款明細</span>
+    <label style="margin-left:auto;font-size:11px;color:var(--olive-gray,#5e5d59);display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" id="bank-year-mode" onchange="renderBankDeposit()"> 顯示整年
+    </label>
+  </div>
+  <div class="balance-banner">
+    <div class="bb-item">
+      <div class="bb-num" id="bank-total">0</div>
+      <div class="bb-label">銀行存款合計</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" id="bank-medical">0</div>
+      <div class="bb-label">11010201 醫療基金專戶</div>
+    </div>
+    <div class="bb-item">
+      <div class="bb-num" id="bank-custody">0</div>
+      <div class="bb-label">11010202 保管款專戶</div>
+    </div>
+    <div class="bb-item">
+      <div class="bb-num" id="bank-health">0</div>
+      <div class="bb-label">11010203 健保款暫存專戶</div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:#78909c;padding:0 2px 10px;">
+    💡 銀行存款 — 從收入傳票（借方=存入）與支出傳票（貸方=提出）彙整｜<span id="bank-cutoff-hint"></span>
+  </div>
+  <div id="bank-sections"></div>
+</div><!-- /tab-bank -->
+
+<!-- ══════════════════════════════════════════
      TAB：歷史變更資料
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-history">
@@ -1775,6 +1811,7 @@ async function switchTab(name, btn){
     property:  ()=>{ updateDeprBalance(); renderDeprSchedule(); },
     income:    ()=> renderImportedVouchers('收入'),
     expense:   ()=> renderImportedVouchers('支出'),
+    bank:      ()=> renderBankDeposit(),
     history:   ()=> renderChangeHistory(),
   };
   if(TAB_RENDERS[name]) TAB_RENDERS[name]();
@@ -1807,6 +1844,7 @@ function onYmChange(){
   renderSurplusTab();
   renderImportedVouchers('收入');
   renderImportedVouchers('支出');
+  renderBankDeposit();
   /* v4.4.29 bug #16 (v4.4.29 修復 round-1 review):
      原本想「切 ym 時刷新 history tab」，但 renderChangeHistory / 後端 history endpoint
      都沒有 ym filter（依 voucher_no 過濾），無 ym 切換意義 → 拿掉避免無謂 API 呼叫。
@@ -6386,6 +6424,134 @@ function renderSurplusTab(){
 }
 
 /* ════════════════════════════════════════════
+   銀行存款 110102 — 從收入/支出傳票彙整三專戶餘額
+   ════════════════════════════════════════════ */
+const BANK_ACCOUNTS = [
+  { code:'11010201', name:'醫療基金專戶',     bank:'佳里區農會', acctNo:'00069160065012', initKey:'acc_bank_medical_init', color:'hd-green',  elId:'bank-medical' },
+  { code:'11010202', name:'保管款專戶',       bank:'佳里區農會', acctNo:'00069160094275', initKey:'acc_bank_custody_init', color:'hd-blue',   elId:'bank-custody' },
+  { code:'11010203', name:'健保款暫存專戶',   bank:'中華郵政',   acctNo:'31033281',       initKey:'acc_bank_health_init',  color:'hd-purple', elId:'bank-health'  },
+];
+function renderBankDeposit(){
+  const {y, m, ym, label} = getYm();
+  const yearMode = document.getElementById('bank-year-mode')?.checked;
+  const sec = document.getElementById('bank-sections');
+  if(!sec) return;
+  const hintEl = document.getElementById('bank-cutoff-hint');
+  if(hintEl){
+    const lastDay = new Date(Number(y)+1911, Number(m), 0).getDate();
+    hintEl.textContent = `截至 ${y} 年 ${m} 月 ${lastDay} 日`;
+  }
+  let grandTotal = 0;
+  const cards = BANK_ACCOUNTS.map(acct => {
+    const initVal = +(localStorage.getItem(acct.initKey) || 0);
+    const allRows = AccV2.entries({ subjectPrefix: acct.code });
+    const cumRows = allRows.filter(e => e.ym && String(e.ym) <= ym);
+    const curRows = yearMode
+      ? allRows.filter(e => e.ym && String(e.ym).startsWith(y))
+      : allRows.filter(e => e.ym === ym);
+    const cumDebit  = cumRows.reduce((s,e) => s + (e.debit||0), 0);
+    const cumCredit = cumRows.reduce((s,e) => s + (e.credit||0), 0);
+    const endBal = initVal + cumDebit - cumCredit;
+    grandTotal += endBal;
+    const el = document.getElementById(acct.elId);
+    if(el) el.textContent = fmt(endBal);
+    const monthSummary = [];
+    for(let mo = 1; mo <= 12; mo++){
+      const moYm = y + String(mo).padStart(2,'0');
+      const moRows = allRows.filter(e => e.ym === moYm);
+      if(!moRows.length && mo > Number(m)) continue;
+      const moD = moRows.reduce((s,e) => s + (e.debit||0), 0);
+      const moC = moRows.reduce((s,e) => s + (e.credit||0), 0);
+      const prevCum = allRows.filter(e => e.ym && String(e.ym) < moYm)
+        .reduce((s,e) => s + (e.debit||0) - (e.credit||0), 0);
+      monthSummary.push({ mo, ym: moYm, debit: moD, credit: moC, endBal: initVal + prevCum + moD - moC });
+    }
+    const entries = [...curRows].sort((a,b) =>
+      (a.make_date||'').localeCompare(b.make_date||'') || (a.voucher_no||'').localeCompare(b.voucher_no||'') || a.seq - b.seq
+    );
+    return { acct, initVal, endBal, cumDebit, cumCredit, monthSummary, entries };
+  });
+  const totalEl = document.getElementById('bank-total');
+  if(totalEl) totalEl.textContent = fmt(grandTotal);
+  if(cards.every(c => !c.entries.length && !c.monthSummary.length)){
+    sec.innerHTML = '<div class="card"><div class="card-bd" style="text-align:center;padding:32px;color:#78909c;">📭 尚無銀行存款分錄 —— 請至「月底結算」匯入收入/支出傳票 Excel</div></div>';
+    return;
+  }
+  sec.innerHTML = cards.map(c => {
+    const a = c.acct;
+    const msRows = c.monthSummary.map((ms,i) => {
+      const isCur = ms.ym === ym;
+      const bg = isCur ? 'background:var(--warm-sand,#e8e6dc);font-weight:600;' : (i%2 ? 'background:var(--ivory,#faf9f5);' : '');
+      return `<tr style="${bg}">
+        <td style="padding:5px 10px;color:var(--olive-gray,#5e5d59);">${y}/${String(ms.mo).padStart(2,'0')}</td>
+        <td style="padding:5px 10px;text-align:right;color:#1565c0;font-variant-numeric:tabular-nums;">${ms.debit ? fmt(ms.debit) : '<span style="color:var(--ink-3,#c8ccd0);">—</span>'}</td>
+        <td style="padding:5px 10px;text-align:right;color:#c62828;font-variant-numeric:tabular-nums;">${ms.credit ? fmt(ms.credit) : '<span style="color:var(--ink-3,#c8ccd0);">—</span>'}</td>
+        <td style="padding:5px 10px;text-align:right;font-weight:600;color:var(--near-black,#141413);font-variant-numeric:tabular-nums;">${fmt(ms.endBal)}</td>
+      </tr>`;
+    }).join('');
+    const detailRows = c.entries.map((e,i) => {
+      const vtChip = e.voucher_type ? `<span class="acc-chip vt">${e.voucher_type}</span>` : '';
+      return `<tr style="${i%2?'background:var(--ivory,#faf9f5);':''}">
+        <td style="padding:5px 10px;color:var(--olive-gray,#5e5d59);white-space:nowrap;font-size:11px;">${e.make_date||''}</td>
+        <td style="padding:5px 10px;color:var(--terracotta,#c96442);font-size:11px;white-space:nowrap;">${(e.voucher_no||'')}#${e.seq}</td>
+        <td style="padding:5px 10px;font-size:11px;">${vtChip}${(e.description||'').replace(/</g,'&lt;')}</td>
+        <td style="padding:5px 10px;text-align:right;color:#1565c0;font-weight:${e.debit?'600':'400'};font-variant-numeric:tabular-nums;">${e.debit ? fmt(e.debit) : ''}</td>
+        <td style="padding:5px 10px;text-align:right;color:#c62828;font-weight:${e.credit?'600':'400'};font-variant-numeric:tabular-nums;">${e.credit ? fmt(e.credit) : ''}</td>
+      </tr>`;
+    }).join('');
+    const periodLabel = yearMode ? `${y} 年度` : label;
+    const periodD = c.entries.reduce((s,e) => s + (e.debit||0), 0);
+    const periodC = c.entries.reduce((s,e) => s + (e.credit||0), 0);
+    return `<div class="card" style="margin-bottom:16px;">
+      <div class="card-hd ${a.color}">
+        🏧 ${a.code}　${a.name}
+        <span style="margin-left:auto;font-size:12px;">
+          ${a.bank}　${a.acctNo}　｜　餘額 ${fmt(c.endBal)}
+        </span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:0;">
+        <div style="flex:1;min-width:300px;">
+          <div style="background:var(--warm-sand,#e8e6dc);padding:5px 12px;font-size:11px;font-weight:600;color:var(--charcoal-warm,#4d4c48);border-bottom:1px solid var(--border-warm,#e8e6dc);">
+            ${y} 年度月別彙總
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:var(--ivory,#faf9f5);color:var(--olive-gray,#5e5d59);font-size:11px;">
+              <th style="padding:4px 10px;text-align:left;width:70px;">年月</th>
+              <th style="padding:4px 10px;text-align:right;width:100px;">借（存入）</th>
+              <th style="padding:4px 10px;text-align:right;width:100px;">貸（提出）</th>
+              <th style="padding:4px 10px;text-align:right;width:120px;">月底餘額</th>
+            </tr></thead>
+            <tbody>
+              <tr style="background:#e8f5e9;">
+                <td style="padding:5px 10px;font-weight:700;color:#1b5e20;">期初</td>
+                <td colspan="2" style="padding:5px 10px;color:#546e7a;font-size:11px;">114年度結轉期初餘額</td>
+                <td style="padding:5px 10px;text-align:right;font-weight:700;color:var(--near-black,#141413);font-variant-numeric:tabular-nums;">${fmt(c.initVal)}</td>
+              </tr>
+              ${msRows}
+            </tbody>
+          </table>
+        </div>
+        <div style="flex:2;min-width:400px;border-left:1px solid var(--border-warm,#e8e6dc);">
+          <div style="background:var(--warm-sand,#e8e6dc);padding:5px 12px;font-size:11px;font-weight:600;color:var(--charcoal-warm,#4d4c48);border-bottom:1px solid var(--border-warm,#e8e6dc);">
+            ${periodLabel} 傳票明細　（${c.entries.length} 筆｜借 ${fmt(periodD)}｜貸 ${fmt(periodC)}）
+          </div>
+          ${c.entries.length ? `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+            <thead><tr style="background:var(--ivory,#faf9f5);color:var(--olive-gray,#5e5d59);font-size:11px;">
+              <th style="padding:4px 10px;text-align:left;width:80px;">日期</th>
+              <th style="padding:4px 10px;text-align:left;width:110px;">傳票#序</th>
+              <th style="padding:4px 10px;text-align:left;">摘要</th>
+              <th style="padding:4px 10px;text-align:right;width:100px;">借方</th>
+              <th style="padding:4px 10px;text-align:right;width:100px;">貸方</th>
+            </tr></thead>
+            <tbody>${detailRows}</tbody>
+          </table>` : `<div style="padding:24px;text-align:center;color:#78909c;">📭 ${periodLabel} 無分錄</div>`}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ════════════════════════════════════════════
    v4.4.29 收入 / 支出 / 轉帳 傳票 — 匯入版 (acc_voucher_entries) 唯讀呈現
    ════════════════════════════════════════════ */
 function renderImportedVouchers(type){
@@ -7776,6 +7942,8 @@ function logout(){
   renderCustodial();
   // 累積賸餘分頁
   renderSurplusTab();
+  // 銀行存款分頁
+  renderBankDeposit();
   // 備抵折讓：期初餘額 input 初始化 + 動態渲染
   initAllowInitInp();
   renderAllowLedger();
