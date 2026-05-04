@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.64</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.65</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -417,7 +417,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.64</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.65</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -2046,11 +2046,15 @@ function updateCalcTable(){
         .filter(r=>r.purposeCode!=='1501' && r.purposeCode!=='2713')
         .reduce((s,r)=>s+r.amount, 0);
   let totalExp = _manualExp;
-  let _voucherExp = 0, _voucherCount = 0;
+  let _voucherExp = 0, _voucherCount = 0, _voucherDebit = 0, _voucherCredit = 0;
   if(window.AccV2 && typeof AccV2.entries === 'function'){
     const ymKey = curYm();
     const exp510 = AccV2.entries({ ym: ymKey, subjectPrefix:'510601' });
-    _voucherExp = exp510.reduce((s,e)=>s+(+e.debit||0), 0);
+    /* v4.4.65：對齊明細分類帳 = 借方 − 貸方（淨額），符合收支餘絀表「實際數」算法。
+       例 4月：借方 105,678 − 貸方 7（盤盈）= 105,671 與報表完全一致 */
+    _voucherDebit  = exp510.reduce((s,e)=>s+(+e.debit ||0), 0);
+    _voucherCredit = exp510.reduce((s,e)=>s+(+e.credit||0), 0);
+    _voucherExp = _voucherDebit - _voucherCredit;
     _voucherCount = exp510.length;
   }
   /* v4.4.62：改為「合計」加總（不取最大）
@@ -2061,10 +2065,10 @@ function updateCalcTable(){
   if(_el) _el.textContent = fmt(totalExp);
   const _bk = document.getElementById('expense-510601-breakdown');
   if(_bk){
-    if(_voucherExp > 0 && _manualExp > 0){
-      _bk.textContent = `🔢 合計 ${fmt(totalExp)} = 月結手動 ${fmt(_manualExp)}（折舊/薪資/代扣/領用...） + 已匯入傳票 ${fmt(_voucherExp)}（${_voucherCount} 筆採購類）`;
-    } else if(_voucherExp > 0){
-      _bk.textContent = `📥 自所有傳票 510601 借方加總 = ${fmt(_voucherExp)} 元（${_voucherCount} 筆分錄）`;
+    if(_voucherExp !== 0 && _manualExp > 0){
+      _bk.textContent = `🔢 合計 ${fmt(totalExp)} = 月結手動 ${fmt(_manualExp)} + 傳票淨額 ${fmt(_voucherExp)}（借 ${fmt(_voucherDebit)} − 貸 ${fmt(_voucherCredit)}，${_voucherCount} 筆）`;
+    } else if(_voucherExp !== 0){
+      _bk.textContent = `📥 傳票 510601 淨額 = 借 ${fmt(_voucherDebit)} − 貸 ${fmt(_voucherCredit)} = ${fmt(_voucherExp)} 元（${_voucherCount} 筆）`;
     } else if(_manualExp > 0){
       _bk.textContent = `✏️ 月底結算手動輸入加總 = ${fmt(_manualExp)} 元（折舊+薪資+代扣+藥品+衛材+績效+動支+...）`;
     } else {
@@ -2188,8 +2192,8 @@ function updateCalcTable(){
     _bonus? `績效獎金  ${fmt(_bonus)}` : null,
     _other? `其他支出傳票  ${fmt(_other)}` : null,
     _picker?`動支單  ${fmt(_picker)}` : null,
-    _voucherExp ? `─ 已匯入傳票 510601 借方加總 ${fmt(_voucherExp)}（${_voucherCount} 筆採購類）─` : null,
-    `🔢 合計 = ${fmt(totalExp)}（月結手動 + 已匯入傳票）`,
+    _voucherExp !== 0 ? `─ 已匯入傳票 510601 淨額 ${fmt(_voucherExp)}（借 ${fmt(_voucherDebit)} − 貸 ${fmt(_voucherCredit)}，${_voucherCount} 筆）─` : null,
+    `🔢 合計 = ${fmt(totalExp)}（月結手動 + 傳票淨額）`,
     hExp ? `−衛保拆出  ${fmt(hExp)}` : null,
   ]);
   setTip('ct-net', [
