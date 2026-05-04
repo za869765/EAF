@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.65</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.66</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -417,7 +417,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.65</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.66</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -2057,10 +2057,10 @@ function updateCalcTable(){
     _voucherExp = _voucherDebit - _voucherCredit;
     _voucherCount = exp510.length;
   }
-  /* v4.4.62：改為「合計」加總（不取最大）
-     月結手動項目（折舊/薪資/代扣/領用/盤損/績效）= 月結自己產出的轉帳傳票，不會在 FNWFRX0090 採購類；
-     voucher 借方 = FNWFRX0090 已匯入的採購相關 510601；兩者互斥，加總 = 完整支出 */
-  totalExp = _manualExp + _voucherExp;
+  /* v4.4.66：voucher 已匯入時，FNWFRX0090 已包含月結手動項目（折舊/薪資/代扣/領用/盤盈損 etc.）
+     → 純用 voucher net（借−貸）反映完整 510601 含盤盈損抵扣，避免雙倍計算 manual
+     voucher 未匯入時 → 退回 manual（含 picker 動支單）作為 best-effort 估算 */
+  totalExp = (_voucherCount > 0) ? _voucherExp : _manualExp;
   const _el = document.getElementById('expense-510601-total');
   if(_el) _el.textContent = fmt(totalExp);
   const _bk = document.getElementById('expense-510601-breakdown');
