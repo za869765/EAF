@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.56</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.57</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -372,6 +372,14 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
     position: fixed; max-height: 85vh; }
   #app-modal-box { min-width: 0 !important; width: 92vw; max-width: 92vw; }
 }
+/* v4.4.57：獎勵金計算表 醫療折讓欄行內切換按鈕（門診⇄衛保） */
+.alloc-btn{display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;border:1px solid #cfd8dc;border-radius:3px;
+  background:#fff;color:#90a4ae;font-size:11px;cursor:pointer;
+  margin-right:4px;vertical-align:middle;padding:0;line-height:1;
+  transition:all .15s;}
+.alloc-btn:hover{border-color:#1565c0;color:#1565c0;background:#e3f2fd;}
+.alloc-btn.active{border-color:#43a047;color:#43a047;background:#f1f8e9;font-weight:700;}
 </style>
 </head>
 <script>
@@ -409,7 +417,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.56</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.57</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -579,7 +587,10 @@ window.addEventListener('storage', (ev) => {
         <tr>
           <td style="border:1px solid #cfd8dc; padding:4px 6px; background:#eceff1; font-weight:700; color:#37474f;">門診醫療</td>
           <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#1565c0; font-weight:700;" id="ct-inc">—</td>
-          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#78909c;" id="ct-disc">-</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 4px; text-align:right; color:#78909c;" id="ct-disc">
+            <button class="alloc-btn" id="ct-alloc-m" onclick="toggleDiscAlloc()" title="改列衛生保健">⇄</button>
+            <span id="ct-disc-val">-</span>
+          </td>
           <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#1565c0; font-weight:700;" id="ct-noncov">—</td>
           <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#78909c;" id="ct-reject">0</td>
           <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#c62828; font-weight:700;" id="ct-exp">—</td>
@@ -592,7 +603,10 @@ window.addEventListener('storage', (ev) => {
         <tr>
           <td style="border:1px solid #cfd8dc; padding:4px 6px; background:#eceff1; font-weight:700; color:#37474f;">衛生保健</td>
           <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#1565c0; font-weight:700;" id="ct-h-inc">-</td>
-          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#78909c;" id="ct-h-disc">-</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 4px; text-align:right; color:#78909c;" id="ct-h-disc">
+            <button class="alloc-btn" id="ct-alloc-h" onclick="toggleDiscAlloc()" title="改列門診醫療">⇄</button>
+            <span id="ct-h-disc-val">-</span>
+          </td>
           <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right;" id="ct-h-noncov">-</td>
           <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right;" id="ct-h-reject">-</td>
           <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#c62828; font-weight:700;" id="ct-h-exp">-</td>
@@ -662,8 +676,8 @@ window.addEventListener('storage', (ev) => {
       <div id="discount-advisor" style="margin-top:6px;font-size:12px;line-height:1.6;"></div>
     </div>
     <div class="discount-inputs">
-      <!-- ver4.4.31：「改列衛生保健」cb 移至前面（折讓歸屬選擇是先決條件） -->
-      <label class="toggle-row" title="預設折讓全記入「門診醫療」C4；勾選後改全記入「衛生保健」C5">
+      <!-- v4.4.57：「改列衛生保健」cb 隱藏，改在獎勵金計算表「醫療折讓」欄位用 ⇄ 行內鈕互補切換 100% 全額 -->
+      <label class="toggle-row" style="display:none;" title="（已改用獎勵金計算表內 ⇄ 鈕切換）">
         <input type="checkbox" id="discount-allocate-health" onchange="calcReminders();saveMonthData();">
         改列衛生保健
       </label>
@@ -1892,6 +1906,14 @@ function calcBonus(){
 /* ════════════════════════════════════════════
    醫療折讓
 ════════════════════════════════════════════ */
+/* v4.4.57：⇄ 行內鈕，互補切換 100% 折讓金額（門診醫療 ↔ 衛生保健） */
+function toggleDiscAlloc(){
+  const cb = document.getElementById('discount-allocate-health');
+  if(!cb) return;
+  cb.checked = !cb.checked;
+  calcReminders();
+  if(typeof saveMonthData === 'function') saveMonthData();
+}
 function onDiscountToggle(){
   const needed = document.getElementById('discount-needed').checked;
   const wrap = document.getElementById('discount-rate-wrap');
@@ -1901,15 +1923,11 @@ function onDiscountToggle(){
   document.getElementById('discount-title').textContent = needed
     ? '⚠️ 本月需提列醫療折讓'
     : '✅ 本月不需提列醫療折讓';
-  // v4.4.54：勾選提列時，金額用「掛帳金額 × 折讓率」（依衛生局 SOP 第 5 節 醫療折讓金額計算公式）
-  //   基本數額（AR × 折讓率 × 1.5）僅作為「是否需要提列」的門檻判斷，不是提列金額
-  // v4.4.56：勾選時重新從 advisor 計算最新值，避免 cache 過時造成「強制提列」變 0 元
+  // v4.4.57：勾選提列時直接從當下 totalInc × rate 計算 provision，不再呼叫 advisor 避免遞迴
   if(needed){
-    if(typeof updateDiscountAdvisor === 'function') updateDiscountAdvisor();
     const rate = (typeof getAllowRate === 'function') ? getAllowRate() : 0;
     const totalInc = pnum(document.getElementById('inc-total')?.value || 0);
-    const liveProvision = Math.round(totalInc * rate);
-    const provision = liveProvision || ((STATE.allowance && STATE.allowance.lastProvision) || 0);
+    const provision = Math.round(totalInc * rate);
     if(STATE.allowance) STATE.allowance.lastProvision = provision;
     const inp = document.getElementById('discount-amount-input');
     const disp = document.getElementById('discount-amount-display');
@@ -1972,19 +1990,21 @@ function updateDiscountAdvisor(){
         : `<span style="color:#c62828;font-weight:600;">⚠️ 備折餘額 &lt; 基本數額 → 自動提列 ${provision.toLocaleString()} 元（掛帳 × 折讓率）</span>`}
       <span style="color:#90a4ae;font-size:11px;margin-left:8px;">（可事後手動覆蓋）</span>
     </div>`;
-  // 自動同步 checkbox：足夠 → 不勾；不足 → 勾選（提列「掛帳×折讓率」）
+  /* v4.4.57：advisor 只「建議」不「強制」
+     - 不足 → cb 還沒勾才自動勾（建議提列）
+     - 足夠 → 不主動取消使用者勾選（讓「強制提列」可運作）
+     使用者可隨時手動勾/退勾，advisor 不會回頭改動 */
   const cb = document.getElementById('discount-needed');
   if(!cb) return;
-  if(sufficient){
-    if(cb.checked){ cb.checked = false; onDiscountToggle(); }
-  } else {
-    if(!cb.checked){ cb.checked = true; onDiscountToggle(); }
-    else {
-      const inp = document.getElementById('discount-amount-input');
-      if(inp) inp.value = String(provision);
-      STATE.month.discount = { needed: true, amount: provision };
-      calcReminders();
-    }
+  if(!sufficient && !cb.checked){
+    cb.checked = true;
+    onDiscountToggle();
+  } else if(cb.checked){
+    /* 已勾選（不論強制或建議）→ 同步當下 provision 到輸入框 */
+    const inp = document.getElementById('discount-amount-input');
+    if(inp) inp.value = String(provision);
+    STATE.month.discount = { needed: true, amount: provision };
+    calcReminders();
   }
 }
 
@@ -2082,15 +2102,22 @@ function updateCalcTable(){
 
   // 門診醫療 row
   /* bug #27: ct-disc 顯示門診分攤折讓 mDisc，不再顯示總折讓 disc */
-  s('ct-inc',mInc); s('ct-disc',mDisc); s('ct-noncov',noncov); s('ct-reject',reject);
+  /* v4.4.57: ct-disc 內含 ⇄ 切換鈕 + ct-disc-val 顯示金額 */
+  s('ct-inc',mInc); s('ct-disc-val',mDisc); s('ct-noncov',noncov); s('ct-reject',reject);
   s('ct-exp',mExp); s('ct-net',mNet); s('ct-fund5',mFund5);
   s('ct-bureau',mBureau); s('ct-doctor',mDoctor); s('ct-staff',mStaff);
 
   // 衛生保健 row
   /* bug #27: ct-h-disc 顯示衛保分攤折讓 hDisc，不再硬寫 0 */
-  s('ct-h-inc',hInc); s('ct-h-disc',hDisc); s('ct-h-noncov',0); s('ct-h-reject',0);
+  s('ct-h-inc',hInc); s('ct-h-disc-val',hDisc); s('ct-h-noncov',0); s('ct-h-reject',0);
   s('ct-h-exp',hExp); s('ct-h-net',hNet2); s('ct-h-fund5',hFund5);
   s('ct-h-bureau',hBureau); s('ct-h-doctor',hDoctor); s('ct-h-staff',hStaff);
+
+  /* v4.4.57: 同步 ⇄ 按鈕的 active 狀態（顯示折讓目前 100% 落在哪一列） */
+  const _allocM = document.getElementById('ct-alloc-m');
+  const _allocH = document.getElementById('ct-alloc-h');
+  if(_allocM) _allocM.classList.toggle('active', !_toHealth);
+  if(_allocH) _allocH.classList.toggle('active',  _toHealth);
 
   // 小計 row
   const sNet = mNet + hNet2;
