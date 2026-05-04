@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.57</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.58</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -417,7 +417,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.57</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.58</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -1707,12 +1707,14 @@ async function loadPickerData(){
     const curSal = pnum(salEl?.value);
     const curDed = pnum(dedEl?.value);
     if(curSal===0 && curDed===0){
-      // 依 desc 判斷：含「代扣」→ 代扣款；其餘 → 薪資實領
+      /* v4.4.58：嚴謹分類 — 只有 desc 含「薪資/薪水」才歸薪資實領；
+         其餘（健保/勞保/勞退/補助/扣款/扣繳/雜項...）一律歸補助代扣款。
+         避免「健保+勞保+勞退費用」被錯歸到薪資而合併成單一 21,099 列。 */
       let autoSal=0, autoDed=0;
       temp2713.forEach(r=>{
-        const d=(r.desc+r.purposeDesc).toLowerCase();
-        if(d.includes('代扣')||d.includes('扣')) autoDed+=r.amount;
-        else autoSal+=r.amount;
+        const d = String(r.desc||'') + String(r.purposeDesc||'');
+        if(d.includes('薪資') || d.includes('薪水')) autoSal += r.amount;
+        else autoDed += r.amount;
       });
       if(autoSal>0 && salEl) salEl.value=fmt(autoSal);
       if(autoDed>0 && dedEl) dedEl.value=fmt(autoDed);
@@ -2053,20 +2055,21 @@ function updateCalcTable(){
      目前 E4 (申復剔除) 欄位 UI 尚未實作 (需 C16/F24，acc.html 沒對應 input)，
      暫以 0 保留佔位，但把符號改成 + 讓未來接上 input 時公式正確。 */
   const reject    = 0;
-  /* v4.4.55：支出部份優先從「支出傳票」分頁的 510601 門診醫療成本 entries 推導
-     不靠手動加總或月結保存狀態，確保「離開頁面沒存」也能從 D1 即時抓 */
+  /* v4.4.55：支出部份優先從匯入傳票的 510601 門診醫療成本 entries 推導
+     v4.4.58：用「借方」總和（不扣 credit），符合會計人員實際對帳習慣
+     v4.4.59：不限 voucher type — 同時涵蓋支出傳票、轉帳傳票（含臨時人員/折舊/盤損等）
+              避免轉帳傳票之 510601 借方（如臨時人員 21,099）被漏算 */
   let totalExp = pnum(document.getElementById('expense-510601-total')?.textContent);
   if(window.AccV2 && typeof AccV2.entries === 'function'){
     const ymKey = curYm();
-    const exp510 = AccV2.entries({ type:'支出', ym: ymKey, subjectPrefix:'510601' });
-    const fromVoucher = exp510.reduce((s,e)=>s+(e.debit||0)-(e.credit||0), 0);
+    const exp510 = AccV2.entries({ ym: ymKey, subjectPrefix:'510601' });   // 不限 type
+    const fromVoucher = exp510.reduce((s,e)=>s+(+e.debit||0), 0);
     if(fromVoucher > 0){
       totalExp = fromVoucher;
-      /* 同步覆寫 510601 卡片數字與說明，讓使用者看到資料來源 */
       const _el = document.getElementById('expense-510601-total');
       if(_el) _el.textContent = fmt(totalExp);
       const _bk = document.getElementById('expense-510601-breakdown');
-      if(_bk) _bk.textContent = `📥 自「支出傳票」510601 門診醫療成本 自動推導 = ${fmt(totalExp)} 元（${exp510.length} 筆分錄）`;
+      if(_bk) _bk.textContent = `📥 自所有傳票 510601 門診醫療成本 借方加總 = ${fmt(totalExp)} 元（${exp510.length} 筆分錄，含支出+轉帳）`;
     }
   }
 
