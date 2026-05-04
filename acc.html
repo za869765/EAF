@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.53</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.54</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -409,7 +409,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.53</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.54</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -1309,10 +1309,11 @@ window.addEventListener('storage', (ev) => {
   <div style="background:#fff8f0; border:1px solid #ffcc80; border-radius:8px; padding:10px 14px; margin-bottom:12px; font-size:12px; line-height:1.9; color:#4e342e;">
     <div style="font-weight:700; color:#bf360c; margin-bottom:4px;">📋 備折提列規則提醒（115/4 起適用）</div>
     <div>
-      <b>基本數額</b> ＝ 未核定月份申請數 × 折讓率 × <b>1.5</b>
+      <b>📐 提列金額</b> ＝ <b>當月掛帳金額 × 折讓率</b>（SOP 第 5 節範例：315,397×0.0892=28,133）<br>
+      <b>🚦 基本數額（門檻判斷用）</b> ＝ 未核定月份申請數 × 折讓率 × <b>1.5</b>
       &nbsp;｜&nbsp; 折讓率採 <b>前年度（114年）剔除率</b><br>
       ✅ 備折餘額 &gt; 基本數額 → <span style="color:#2e7d32; font-weight:600;">不需提列</span><br>
-      ⚠️ 備折餘額 &lt; 基本數額 → <span style="color:#c62828; font-weight:600;">提列差額</span>（借 510615 / 貸 110306）<br>
+      ⚠️ 備折餘額 &lt; 基本數額 → <span style="color:#c62828; font-weight:600;">提列「掛帳×折讓率」</span>（借 510615 / 貸 110306）<br>
       🏆 獎勵金基礎 ＝ (醫療收入 − 醫療成本) × 95%；餘 5% 留存醫療基金
     </div>
   </div>
@@ -1898,17 +1899,18 @@ function onDiscountToggle(){
   document.getElementById('discount-title').textContent = needed
     ? '⚠️ 本月需提列醫療折讓'
     : '✅ 本月不需提列醫療折讓';
-  // ver4.4.30：勾選即用「基本數額」自動提列；不勾則 0
+  // v4.4.54：勾選提列時，金額用「掛帳金額 × 折讓率」（依衛生局 SOP 第 5 節 醫療折讓金額計算公式）
+  //   基本數額（AR × 折讓率 × 1.5）僅作為「是否需要提列」的門檻判斷，不是提列金額
   if(needed){
-    const basic = (STATE.allowance && STATE.allowance.lastBasic) || 0;
+    const provision = (STATE.allowance && STATE.allowance.lastProvision) || 0;
     const inp = document.getElementById('discount-amount-input');
     const disp = document.getElementById('discount-amount-display');
-    if(inp) inp.value = String(basic);
-    if(disp) disp.textContent = basic.toLocaleString();
-    STATE.month.discount = { needed: true, amount: basic };
-    document.getElementById('discount-hint').textContent = basic > 0
-      ? `將提列 ${basic.toLocaleString()} 元（基本數額）→ 四格分配金額已依公式調降`
-      : '尚未設定折讓率或 AR 餘額為 0';
+    if(inp) inp.value = String(provision);
+    if(disp) disp.textContent = provision.toLocaleString();
+    STATE.month.discount = { needed: true, amount: provision };
+    document.getElementById('discount-hint').textContent = provision > 0
+      ? `將提列 ${provision.toLocaleString()} 元（掛帳 × 折讓率）→ 四格分配金額已依公式調降`
+      : '尚未設定折讓率或本月無掛帳金額';
     calcReminders();
   } else {
     STATE.month.discount = { needed: false, amount: 0 };
@@ -1935,28 +1937,34 @@ function updateDiscountAdvisor(){
     : [];
   const arBal = arEntries.reduce((s,e)=>s+(e.debit||0)-(e.credit||0), 0);
   const allowBal = (STATE && STATE.allowance && STATE.allowance.currentBalance) || 0;
+  /* v4.4.54：依衛生局 SOP 拆兩個概念
+     基本數額（門檻判斷用）= AR × 折讓率 × 1.5
+     提列金額（實際入帳）  = 當月掛帳金額 × 折讓率（SOP 第 5 節範例 315,397×0.0892=28,133）
+     門檻判斷：備折 ≥ 基本數額 → 不提列；備折 < 基本數額 → 提列「掛帳×折讓率」金額 */
   const basic = Math.round(arBal * rate * 1.5);
+  const totalInc = pnum(document.getElementById('inc-total')?.value || 0);
+  const provision = Math.round(totalInc * rate);
   const sufficient = allowBal >= basic;
-  const diff = Math.max(0, basic - allowBal);
   const ratePct = (rate*100).toFixed(2) + '%';
-  // ver4.4.30：保存 basic 給 onDiscountToggle 與 display 使用
-  if(STATE.allowance) STATE.allowance.lastBasic = basic;
+  // 保存兩個值給 onDiscountToggle 使用
+  if(STATE.allowance){ STATE.allowance.lastBasic = basic; STATE.allowance.lastProvision = provision; }
   const _disp = document.getElementById('discount-amount-display');
-  if(_disp) _disp.textContent = basic.toLocaleString();
+  if(_disp) _disp.textContent = provision.toLocaleString();
   adv.innerHTML = `
-    <div style="display:flex;gap:16px;flex-wrap:wrap;">
-      <span>📊 AR 餘額 <b>${arBal.toLocaleString()}</b></span>
-      <span>× 折讓率 <b>${ratePct}</b> × 1.5 = 基本數額 <b style="color:#ff8a65;">${basic.toLocaleString()}</b></span>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:baseline;">
+      <span style="font-weight:600;color:#1565c0;">💰 提列金額：掛帳 <b>${totalInc.toLocaleString()}</b> × 折讓率 <b>${ratePct}</b> = <b style="color:#1565c0;">${provision.toLocaleString()}</b> 元</span>
+    </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:3px;font-size:11px;color:#78909c;">
+      <span>🚦 門檻判斷：AR <b>${arBal.toLocaleString()}</b> × <b>${ratePct}</b> × 1.5 = 基本數額 <b style="color:#ff8a65;">${basic.toLocaleString()}</b></span>
       <span>備折餘額 <b style="color:#66bb6a;">${allowBal.toLocaleString()}</b></span>
     </div>
     <div style="margin-top:4px;">
       ${sufficient
         ? `<span style="color:#2e7d32;font-weight:600;">✅ 備折餘額 ≥ 基本數額 → 自動設為「不提列」</span>`
-        : `<span style="color:#c62828;font-weight:600;">⚠️ 差額 ${diff.toLocaleString()} 元 → 自動提列</span>`}
+        : `<span style="color:#c62828;font-weight:600;">⚠️ 備折餘額 &lt; 基本數額 → 自動提列 ${provision.toLocaleString()} 元（掛帳 × 折讓率）</span>`}
       <span style="color:#90a4ae;font-size:11px;margin-left:8px;">（可事後手動覆蓋）</span>
     </div>`;
-  // ver4.4.30：自動同步 checkbox（不再自動填入差額；勾選後 onDiscountToggle 會用 basic）
-  // 系統建議：足夠 → 不勾；不足 → 勾選（強制提列基本數額）
+  // 自動同步 checkbox：足夠 → 不勾；不足 → 勾選（提列「掛帳×折讓率」）
   const cb = document.getElementById('discount-needed');
   if(!cb) return;
   if(sufficient){
@@ -1964,10 +1972,9 @@ function updateDiscountAdvisor(){
   } else {
     if(!cb.checked){ cb.checked = true; onDiscountToggle(); }
     else {
-      // 已勾選 → 同步 basic（advisor 重算時保持最新）
       const inp = document.getElementById('discount-amount-input');
-      if(inp) inp.value = String(basic);
-      STATE.month.discount = { needed: true, amount: basic };
+      if(inp) inp.value = String(provision);
+      STATE.month.discount = { needed: true, amount: provision };
       calcReminders();
     }
   }
