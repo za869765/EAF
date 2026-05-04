@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.54</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.55</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -409,7 +409,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.54</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.55</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -2025,7 +2025,22 @@ function updateCalcTable(){
      目前 E4 (申復剔除) 欄位 UI 尚未實作 (需 C16/F24，acc.html 沒對應 input)，
      暫以 0 保留佔位，但把符號改成 + 讓未來接上 input 時公式正確。 */
   const reject    = 0;
-  const totalExp  = pnum(document.getElementById('expense-510601-total')?.textContent);
+  /* v4.4.55：支出部份優先從「支出傳票」分頁的 510601 門診醫療成本 entries 推導
+     不靠手動加總或月結保存狀態，確保「離開頁面沒存」也能從 D1 即時抓 */
+  let totalExp = pnum(document.getElementById('expense-510601-total')?.textContent);
+  if(window.AccV2 && typeof AccV2.entries === 'function'){
+    const ymKey = curYm();
+    const exp510 = AccV2.entries({ type:'支出', ym: ymKey, subjectPrefix:'510601' });
+    const fromVoucher = exp510.reduce((s,e)=>s+(e.debit||0)-(e.credit||0), 0);
+    if(fromVoucher > 0){
+      totalExp = fromVoucher;
+      /* 同步覆寫 510601 卡片數字與說明，讓使用者看到資料來源 */
+      const _el = document.getElementById('expense-510601-total');
+      if(_el) _el.textContent = fmt(totalExp);
+      const _bk = document.getElementById('expense-510601-breakdown');
+      if(_bk) _bk.textContent = `📥 自「支出傳票」510601 門診醫療成本 自動推導 = ${fmt(totalExp)} 元（${exp510.length} 筆分錄）`;
+    }
+  }
 
   // ── 衛生保健拆分 ──
   const hInc      = pnum(document.getElementById('h-inc')?.value);
