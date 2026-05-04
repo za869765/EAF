@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.55</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.56</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -409,7 +409,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.55</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.56</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -664,11 +664,11 @@ window.addEventListener('storage', (ev) => {
     <div class="discount-inputs">
       <!-- ver4.4.31：「改列衛生保健」cb 移至前面（折讓歸屬選擇是先決條件） -->
       <label class="toggle-row" title="預設折讓全記入「門診醫療」C4；勾選後改全記入「衛生保健」C5">
-        <input type="checkbox" id="discount-allocate-health" onchange="calcReminders()">
+        <input type="checkbox" id="discount-allocate-health" onchange="calcReminders();saveMonthData();">
         改列衛生保健
       </label>
       <label class="toggle-row" title="勾選即手動覆蓋系統判斷，強制本月按基本數額提列">
-        <input type="checkbox" id="discount-needed" onchange="onDiscountToggle()">
+        <input type="checkbox" id="discount-needed" onchange="onDiscountToggle();saveMonthData();">
         強制提列
       </label>
       <!-- ver4.4.30：移除手動輸入金額，改自動帶入「基本數額」 -->
@@ -1865,6 +1865,8 @@ function calcIncome(){
   // 掛帳合計 = 健保+NIIS（對應 Excel 掛帳金額欄）
   document.getElementById('inc-total').value = fmt(hi+c+f+r);
   calcReminders();
+  /* v4.4.56：掛帳改變時連帶重算折讓提列 advisor（提列金額 = 掛帳 × 折讓率） */
+  if(typeof updateDiscountAdvisor === 'function') updateDiscountAdvisor();
 }
 function calcOther(){
   const a=pnum(document.getElementById('inc-lab').value);
@@ -1901,15 +1903,21 @@ function onDiscountToggle(){
     : '✅ 本月不需提列醫療折讓';
   // v4.4.54：勾選提列時，金額用「掛帳金額 × 折讓率」（依衛生局 SOP 第 5 節 醫療折讓金額計算公式）
   //   基本數額（AR × 折讓率 × 1.5）僅作為「是否需要提列」的門檻判斷，不是提列金額
+  // v4.4.56：勾選時重新從 advisor 計算最新值，避免 cache 過時造成「強制提列」變 0 元
   if(needed){
-    const provision = (STATE.allowance && STATE.allowance.lastProvision) || 0;
+    if(typeof updateDiscountAdvisor === 'function') updateDiscountAdvisor();
+    const rate = (typeof getAllowRate === 'function') ? getAllowRate() : 0;
+    const totalInc = pnum(document.getElementById('inc-total')?.value || 0);
+    const liveProvision = Math.round(totalInc * rate);
+    const provision = liveProvision || ((STATE.allowance && STATE.allowance.lastProvision) || 0);
+    if(STATE.allowance) STATE.allowance.lastProvision = provision;
     const inp = document.getElementById('discount-amount-input');
     const disp = document.getElementById('discount-amount-display');
     if(inp) inp.value = String(provision);
     if(disp) disp.textContent = provision.toLocaleString();
     STATE.month.discount = { needed: true, amount: provision };
     document.getElementById('discount-hint').textContent = provision > 0
-      ? `將提列 ${provision.toLocaleString()} 元（掛帳 × 折讓率）→ 四格分配金額已依公式調降`
+      ? `將提列 ${provision.toLocaleString()} 元（掛帳 ${totalInc.toLocaleString()} × 折讓率 ${(rate*100).toFixed(2)}%）→ 四格分配金額已依公式調降`
       : '尚未設定折讓率或本月無掛帳金額';
     calcReminders();
   } else {
@@ -7615,6 +7623,7 @@ function saveMonthData(){
     discount: {
       needed: document.getElementById('discount-needed').checked,
       amount: document.getElementById('discount-amount-input')?.value||'',
+      allocateHealth: document.getElementById('discount-allocate-health')?.checked || false,
     },
     expense: {
       depr:         document.getElementById('exp-depr').value,
@@ -7730,6 +7739,8 @@ async function loadMonthData(){
       }
       if(d.discount){
         document.getElementById('discount-needed').checked = d.discount.needed;
+        const dah = document.getElementById('discount-allocate-health');
+        if(dah) dah.checked = !!d.discount.allocateHealth;
         const dai = document.getElementById('discount-amount-input');
         if(dai) dai.value = d.discount.amount||'';
         onDiscountToggle();
