@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.52</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.53</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -409,7 +409,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.52</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.53</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -838,8 +838,8 @@ window.addEventListener('storage', (ev) => {
       </div>
       <div class="input-grid">
         <div class="input-group">
-          <label>藥品領用金額</label>
-          <input class="num-in" id="exp-drug" type="text" placeholder="0" oninput="calcDrug(); checkDrugEntered()">
+          <label>藥品領用金額 <span style="font-size:10px;color:#90a4ae;">（自動帶入當月藥品明細帳「領用」合計）</span></label>
+          <input class="num-in auto" id="exp-drug" type="text" placeholder="0" readonly title="此欄唯讀 — 自動從醫療用品庫存頁面 藥品明細帳 抓當月領用合計">
           <div class="hint" id="drug-hint">上月期末：<span id="inv-drug-prevbal">—</span></div>
         </div>
         <div class="input-group">
@@ -857,13 +857,13 @@ window.addEventListener('storage', (ev) => {
       <div class="section-title" style="margin-top:14px;">📦 藥品盤盈 / 盤損（帳目校正）</div>
       <div class="input-grid">
         <div class="input-group">
-          <label>報表藥品實際金額</label>
-          <input class="num-in" id="inv-drug-real" type="text" placeholder="輸入藥庫報表數" oninput="calcInv()">
+          <label>報表藥品實際金額 <span style="font-size:10px;color:#90a4ae;">（自動帶入當月藥品期末＝帳面±盤盈/盤損）</span></label>
+          <input class="num-in auto" id="inv-drug-real" type="text" placeholder="—" readonly title="此欄唯讀 — 自動從醫療用品庫存頁面 藥品明細帳 抓當月期末（含盤盈/盤損）">
           <div class="hint">當月帳面：<span id="inv-drug-curbal">—</span></div>
         </div>
         <div class="input-group">
-          <label>報表衛材實際金額</label>
-          <input class="num-in" id="inv-supply-real" type="text" placeholder="輸入藥庫報表數" oninput="calcInv()">
+          <label>報表衛材實際金額 <span style="font-size:10px;color:#90a4ae;">（自動帶入當月衛材期末＝帳面±盤盈/盤損）</span></label>
+          <input class="num-in auto" id="inv-supply-real" type="text" placeholder="—" readonly title="此欄唯讀 — 自動從醫療用品庫存頁面 衛材明細帳 抓當月期末（含盤盈/盤損）">
           <div class="hint">當月帳面：<span id="inv-supply-curbal">—</span></div>
         </div>
         <div class="input-group">
@@ -2149,26 +2149,48 @@ let _invCloseLocked  = true;
 /* ════════════════════════════════════════════
    支出計算
 ════════════════════════════════════════════ */
-/* v4.4.51：衛材領用金額直接抓「醫療用品庫存」當月衛材明細帳的「領用」合計，唯讀 */
-function syncSupplyUsageFromLedger(){
+/* v4.4.53：月底結算的「領用 / 報表實際金額」全部從醫療用品庫存頁面當月明細自動帶入，唯讀。
+   - 藥品/衛材領用金額 = 該月明細帳「領用」加總
+   - 報表藥品/衛材實際金額 = 該月含盤盈/盤損後的期末（getInvMonthBal）
+   讓 ledger 成為唯一資料來源，避免雙頭輸入造成不一致 */
+function syncMonthFromInvLedger(){
   const ym = curYm();
-  const rows = loadInvLedger('supply').filter(r => !r.voided && String(r.ym)===ym && r.type==='領用');
-  const sum  = Math.round(rows.reduce((a,r)=>a+(+r.amt||0), 0));
-  const inp  = document.getElementById('exp-supply');
-  if(inp){
-    /* 0 顯示空白，避免覆蓋使用者視覺 */
-    inp.value = sum>0 ? fmt(sum) : '';
+  const sumUsage = (type) => {
+    const rows = loadInvLedger(type).filter(r => !r.voided && String(r.ym)===ym && r.type==='領用');
+    return Math.round(rows.reduce((a,r)=>a+(+r.amt||0), 0));
+  };
+  const drugUse   = sumUsage('drug');
+  const supplyUse = sumUsage('supply');
+  const drugInp   = document.getElementById('exp-drug');
+  const supplyInp = document.getElementById('exp-supply');
+  if(drugInp)   drugInp.value   = drugUse>0   ? fmt(drugUse)   : '';
+  if(supplyInp) supplyInp.value = supplyUse>0 ? fmt(supplyUse) : '';
+
+  /* 報表實際金額 = 該月含盤盈/盤損後期末（getInvMonthBal）— 沒任何明細時保持空白避免誤判 */
+  if(typeof getInvMonthBal === 'function'){
+    const dRows = loadInvLedger('drug').filter(r => !r.voided && String(r.ym)===ym);
+    const sRows = loadInvLedger('supply').filter(r => !r.voided && String(r.ym)===ym);
+    const drugFinal   = dRows.length ? Math.round(getInvMonthBal('drug',   ym)) : 0;
+    const supplyFinal = sRows.length ? Math.round(getInvMonthBal('supply', ym)) : 0;
+    const drugReal   = document.getElementById('inv-drug-real');
+    const supplyReal = document.getElementById('inv-supply-real');
+    if(drugReal)   drugReal.value   = drugFinal>0   ? fmt(drugFinal)   : '';
+    if(supplyReal) supplyReal.value = supplyFinal>0 ? fmt(supplyFinal) : '';
   }
 }
+/* 別名保留向後相容（v4.4.51 引入） */
+function syncSupplyUsageFromLedger(){ syncMonthFromInvLedger(); }
 function calcDrug(){
-  /* v4.4.51：每次計算前先把衛材領用同步成「醫療用品庫存」當月領用合計 */
-  syncSupplyUsageFromLedger();
+  /* v4.4.53：每次重算前先從庫存帳同步「藥品/衛材領用 + 報表實際金額」 */
+  syncMonthFromInvLedger();
   const d=pnum(document.getElementById('exp-drug').value);
   const s=pnum(document.getElementById('exp-supply').value);
   document.getElementById('exp-drug-total').value = fmt(d+s);
   calcExpenseTotal();
 }
 function calcInv(){
+  /* v4.4.53：先從庫存帳同步報表實際金額 */
+  syncMonthFromInvLedger();
   const drugRealRaw   = document.getElementById('inv-drug-real').value;
   const supplyRealRaw = document.getElementById('inv-supply-real').value;
   /* 帳面結存 = 前月期末 + 進貨 - 領用/報廢，不含盤損/盈，才能正確算出盤損/盈差距 */
@@ -6942,17 +6964,18 @@ function renderInvLedger(type){
     STATE.inventory.supply.balance=bal;
     const e=document.getElementById('inv-supply-bal'); if(e) e.textContent=fmt(bal);
     const rc=document.getElementById('rc-supply'); if(rc) rc.textContent=fmt(bal);
-    /* v4.4.51：衛材明細帳變動 → 月底結算的衛材領用同步重抓 */
-    if(typeof syncSupplyUsageFromLedger === 'function'){
-      syncSupplyUsageFromLedger();
-      const dInp = document.getElementById('exp-drug');
-      const sInp = document.getElementById('exp-supply');
-      if(dInp && sInp){
-        const tot = pnum(dInp.value) + pnum(sInp.value);
-        const totEl = document.getElementById('exp-drug-total');
-        if(totEl) totEl.value = fmt(tot);
-      }
+  }
+  /* v4.4.53：藥品/衛材明細帳變動 → 月底結算 領用 + 報表實際金額同步重抓並重算合計/差額 */
+  if(typeof syncMonthFromInvLedger === 'function'){
+    syncMonthFromInvLedger();
+    const dInp = document.getElementById('exp-drug');
+    const sInp = document.getElementById('exp-supply');
+    if(dInp && sInp){
+      const tot = pnum(dInp.value) + pnum(sInp.value);
+      const totEl = document.getElementById('exp-drug-total');
+      if(totEl) totEl.value = fmt(tot);
     }
+    if(typeof calcInv === 'function') calcInv();
   }
   updateInvTotal();
   renderMonthlyClose(type);
