@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.62</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.4.63</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -417,7 +417,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.62</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.4.63</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -2856,19 +2856,21 @@ function generateVouchers(){
     const diff = totalBook - totalReal;
     const amt = Math.round(Math.abs(diff));   /* 傳票整數，小數差距四捨五入 */
     if(amt > 0){
-      const isLoss = diff > 0;
-      vouchers.push({ group:isLoss?'藥品盤損':'藥品盤盈',
-        type: isLoss?'debit':'credit',
-        subject: isLoss?'510601 門診醫療成本':'110404 醫療用品',
-        purpose: '3303 藥品',
-        desc: `${yymm}${isLoss?'藥品盤損':'藥品盤盈'}${fmt(amt)}元`,
-        dr: isLoss?amt:0, cr: isLoss?0:amt });
-      vouchers.push({ group:'',
-        type: isLoss?'credit':'debit',
-        subject: isLoss?'110404 醫療用品':'510601 門診醫療成本',
-        purpose: isLoss?'':'3303 藥品',
-        desc: `${yymm}${isLoss?'藥品盤損':'藥品盤盈'}${fmt(amt)}元`,
-        dr: isLoss?0:amt, cr: isLoss?amt:0 });
+      const isLoss = diff > 0;   /* true=盤損（帳面>實有，成本+），false=盤盈（帳面<實有，成本−）*/
+      if(isLoss){
+        /* 盤損：借 510601 門診醫療成本 / 貸 110404 醫療用品 */
+        vouchers.push({ group:'藥品盤損', type:'debit',  subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品',
+                        desc:`${yymm}藥品盤損${fmt(amt)}元`, dr:amt, cr:0 });
+        vouchers.push({ group:'',         type:'credit', subject:'110404 醫療用品',     subAccount:'', purpose:'',
+                        desc:`${yymm}藥品盤損${fmt(amt)}元`, dr:0, cr:amt });
+      } else {
+        /* v4.4.63 修：盤盈正確分錄為 借 110404 醫療用品 / 貸 510601 門診醫療成本（成本減少）
+           原舊版 v4.2.0 寫反為 借 510601 / 貸 110404 → 4 月 7 元盤盈被當盤損入帳，510601 多算 7、110404 少算 14 */
+        vouchers.push({ group:'藥品盤盈', type:'debit',  subject:'110404 醫療用品',     subAccount:'', purpose:'',
+                        desc:`${yymm}藥品盤盈${fmt(amt)}元`, dr:amt, cr:0 });
+        vouchers.push({ group:'',         type:'credit', subject:'510601 門診醫療成本', subAccount:'', purpose:'3303 藥品',
+                        desc:`${yymm}藥品盤盈${fmt(amt)}元`, dr:0, cr:amt });
+      }
     }
   }
 
