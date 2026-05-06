@@ -792,7 +792,7 @@ body.sb-resizing * { pointer-events: none !important; }
     page-break-inside: avoid;
   }
   #payee-print-line:empty { display: none !important; }
-  /* v4.4.70 受款人第二頁明細（form-page 外的兄弟元素，可正常換頁列印） */
+  /* v4.4.71 受款人第二頁明細（form-page 外的兄弟元素，可正常換頁列印） */
   #payee-print-line-page2 { display: none !important; }
   #payee-print-line-page2:not(:empty) {
     display: block !important;
@@ -1025,7 +1025,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.70</div>
+      <div id="sb-version">v4.4.71</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1297,10 +1297,22 @@ body.sb-resizing * { pointer-events: none !important; }
           <div id="row-btns">
             <button id="add-row-btn" onclick="addRow()">＋ 新增明細列</button>
             <button id="del-row-btn" onclick="delRow()">－ 減少明細列</button>
+            <button id="copy-items-btn" type="button" onclick="copyItemsName()"
+                    title="把所有列的「動支說明 / 採購品名」複製成多行文字"
+                    style="margin-left:10px; padding:3px 10px; font-size:11.5px; cursor:pointer;
+                           border:1px solid #aaa; border-radius:4px; background:#f5f5f5; color:#333;">📋 複製動支說明</button>
           </div>
         </td>
         <td class="lower-right">
-          <div class="notes-lbl">其他說明事項</div>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+            <div class="notes-lbl">其他說明事項</div>
+            <button id="copy-notes-btn" type="button"
+                    onclick="const t=document.getElementById('notes').value; if(!t.trim()){showToast('其他說明事項為空');return;} navigator.clipboard?.writeText(t).then(()=>showCopyPopup(t,{label:'其他說明事項已複製'})).catch(()=>{document.getElementById('notes').select();showToast('請按 Ctrl+C 複製');})"
+                    title="複製其他說明事項"
+                    style="padding:1px 7px; font-size:11px; cursor:pointer;
+                           border:1px solid #aaa; border-radius:4px;
+                           background:#f5f5f5; color:#333;">📋 複製</button>
+          </div>
           <textarea class="fta" id="notes"
                     style="min-height:52mm; font-size:11px;" rows="14"></textarea>
         </td>
@@ -1332,7 +1344,15 @@ body.sb-resizing * { pointer-events: none !important; }
 
     <!-- ══ 受款人資訊 v4.2.23 多筆卡片版 ══ -->
     <section id="payee-section" style="display:none;">
-      <div class="payee-title">💳 受款人資訊</div>
+      <div class="payee-title">
+        💳 受款人資訊
+        <button id="copy-payee-btn" type="button"
+                onclick="copyPayeeInfo()"
+                title="複製受款人資訊（戶名 / 銀行 / 帳號）"
+                style="margin-left:10px; padding:2px 9px; font-size:12px; cursor:pointer;
+                       border:1px solid #aaa; border-radius:4px;
+                       background:#f5f5f5; color:#333; vertical-align:middle;">📋 複製</button>
+      </div>
       <button type="button" id="payee-edit-btn" onclick="openPayeeEditMode()" style="float:right; margin-top:-28px; padding:4px 12px; background:#1565c0; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">✎ 修改受款人</button>
       <div class="payee-row">
         <label class="payee-lbl">類別</label>
@@ -1379,7 +1399,7 @@ body.sb-resizing * { pointer-events: none !important; }
 
   </div><!-- /#form-page -->
 
-  <!-- v4.4.70 受款人多到放不下時的第二頁明細（form-page 外，可換頁） -->
+  <!-- v4.4.71 受款人多到放不下時的第二頁明細（form-page 外，可換頁） -->
   <div id="payee-print-line-page2"></div>
 
   <!-- 新建受款人 Modal (v4.2.31 放大版，銀行搜尋拆分獨立彈窗) -->
@@ -2467,26 +2487,10 @@ function generateItemRows() {
   for (let i = 0; i < rowCount; i++) appendRow(i);
 }
 
-/* ── 數量欄 Tab → 同列單位欄（讓 lang="zh-TW" 提示 IME 切中文） ── */
-function qtyTabToUnit(e, rowIdx) {
-  if (e.key !== 'Tab' || e.shiftKey) return;
-  const unit = document.querySelector(`[data-r="${rowIdx}"][data-c="unit"]`);
-  if (!unit) return;
-  e.preventDefault();
-  unit.focus();
-  unit.select();
-}
-
-/* ── 金額欄 Tab → 下一列動支說明／採購品名，並以程式化 focus 帶動輸入法切換提示 ── */
-function priceTabToNextName(e, rowIdx) {
-  if (e.key !== 'Tab' || e.shiftKey) return;
-  const next = document.querySelector(`[data-r="${rowIdx + 1}"][data-c="name"]`);
-  if (!next) return;          /* 最後一列：讓瀏覽器預設 Tab 行為（跳出表格） */
-  e.preventDefault();
-  next.focus();               /* 明確 focus：讓 lang="zh-TW" 屬性有機會通知輸入法 */
-  const len = next.value.length;
-  next.setSelectionRange(len, len);  /* 游標移至末尾，符合輸入習慣 */
-}
+/* v4.4.71：Tab 導航統一改由 initTableArrowNav 內的 keydown handler 處理
+   舊的 qtyTabToUnit / priceTabToNextName 為 noop（避免 row HTML 內 inline onkeydown 報錯） */
+function qtyTabToUnit() { /* deprecated v4.4.71 — 由 generic Tab handler 處理 */ }
+function priceTabToNextName() { /* deprecated v4.4.71 */ }
 
 function appendRow(i) {
   const tr = document.createElement('tr');
@@ -4266,6 +4270,31 @@ function showCopyPopup(no, opts = {}) {
       else target.setSelectionRange(0, 0);
     }
   });
+
+  /* v4.4.71 統一 Tab / Shift+Tab：所有 items table 欄位都能像 Excel 跳格 */
+  document.addEventListener('keydown', function (e) {
+    if (e.isComposing || e.key !== 'Tab') return;
+    const el = e.target;
+    const r = parseInt(el.dataset.r);
+    const c = el.dataset.c;
+    if (isNaN(r) || !c) return;
+    const cols = COLS[formType] || [];
+    const colIdx = cols.indexOf(c);
+    if (colIdx === -1) return;
+
+    let tR = r, tColIdx = e.shiftKey ? colIdx - 1 : colIdx + 1;
+    if (tColIdx >= cols.length) { tR++; tColIdx = 0; }
+    if (tColIdx < 0) { tR--; tColIdx = cols.length - 1; }
+    /* 表格頭尾：讓瀏覽器預設 Tab 行為帶你跳出表格（往受款人區或往金額/抬頭） */
+    if (tR < 0 || tR >= rowCount) return;
+    e.preventDefault();
+    const target = document.querySelector(`[data-r="${tR}"][data-c="${cols[tColIdx]}"]`);
+    if (!target) return;
+    target.focus();
+    /* 進新格全選文字（符合 Excel 直接覆寫的習慣） */
+    if (target.select) target.select();
+    else if (target.setSelectionRange) target.setSelectionRange(0, target.value.length);
+  });
 })();
 
 /* ══════════════════════════════════
@@ -4907,6 +4936,47 @@ function getPayeeData() {
   return arr.length ? arr[0] : null;
 }
 
+/* v4.4.71 複製受款人資訊（戶名 / 銀行 / 帳號 多筆換行） */
+function copyPayeeInfo() {
+  const type = document.getElementById('payee-type')?.value || '';
+  if (!type) { showToast('未選擇受款人類別'); return; }
+  if (type === 'bill') {
+    const txt = '受款人資訊：憑繳費單 / 匯費';
+    navigator.clipboard?.writeText(txt).then(()=>showCopyPopup(txt,{label:'已複製'})).catch(()=>showToast('複製失敗'));
+    return;
+  }
+  const cards = (typeof _payeeCards !== 'undefined' ? _payeeCards : []).filter(c => c.name || c.bank || c.acctNo);
+  if (!cards.length) { showToast('受款人資訊為空'); return; }
+  const lines = cards.map((c, i) => {
+    let bankCode = '', bankName = c.bank || '';
+    const m = (c.bank||'').match(/^(\d{7})[\s-]+(.+)$/);
+    if (m) { bankCode = m[1]; bankName = m[2].trim(); }
+    const parts = [];
+    if (cards.length > 1) parts.push(`#${i+1}`);
+    if (c.name)             parts.push(`戶名：${c.name}`);
+    if (bankCode||bankName) parts.push(`銀行：${bankCode}${bankCode?' ':''}${bankName}`);
+    if (c.acctNo)           parts.push(`帳號：${c.acctNo}`);
+    return parts.join('　');
+  });
+  const _reason = (document.getElementById('payee-reason')?.value || '').trim();
+  if (type === 'employee' && _reason) lines.push(`代墊原因：${_reason}`);
+  const txt = lines.join('\n');
+  navigator.clipboard?.writeText(txt)
+    .then(()=>showCopyPopup(txt.split('\n')[0]+(lines.length>1?` 等 ${lines.length} 筆`:''),{label:'受款人資訊已複製'}))
+    .catch(()=>showToast('複製失敗，請手動選取'));
+}
+
+/* v4.4.71 複製明細表所有列「動支說明 / 採購品名」 */
+function copyItemsName() {
+  const cells = document.querySelectorAll('#items-body [data-c="name"]');
+  const lines = Array.from(cells).map(c => (c.value || '').trim()).filter(s => s);
+  if (!lines.length) { showToast('明細表為空'); return; }
+  const txt = lines.join('\n');
+  navigator.clipboard?.writeText(txt)
+    .then(()=>showCopyPopup(lines[0]+(lines.length>1?` 等 ${lines.length} 行`:''),{label:'動支說明已複製'}))
+    .catch(()=>showToast('複製失敗'));
+}
+
 /* v4.2.23 還原受款人（優先 payees 陣列，否則退回單筆 payee） */
 function setPayeesData(payees, legacyPayee) {
   const sel = document.getElementById('payee-type');
@@ -4946,7 +5016,7 @@ function setPayeesData(payees, legacyPayee) {
 function setPayeeData(payee) { setPayeesData(null, payee); }
 
 /* v4.2.23 列印用受款人資訊：每張卡一列
-   v4.4.70 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出 */
+   v4.4.71 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出 */
 const PAYEE_PAGE1_OVERFLOW_THRESHOLD = 4;
 function updatePayeePrintLine() {
   const line  = document.getElementById('payee-print-line');
