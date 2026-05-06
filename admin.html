@@ -995,6 +995,8 @@ function renderPayeesAdmin() {
       (p.acctNo||'').toLowerCase().includes(kw)
     );
   }
+  /* v4.4.71 依戶名降序排列（zh-Hant locale） */
+  list.sort((a, b) => (b.name || '').localeCompare(a.name || '', 'zh-Hant'));
   const tbody = document.getElementById('payees-tbody');
   if (!list.length) {
     tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color:#888;">（無資料）</td></tr>';
