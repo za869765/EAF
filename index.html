@@ -1352,12 +1352,11 @@ body.sb-resizing * { pointer-events: none !important; }
     <section id="payee-section" style="display:none;">
       <div class="payee-title">
         💳 受款人資訊
-        <button id="copy-payee-btn" type="button"
-                onclick="copyPayeeInfo()"
-                title="複製受款人資訊（戶名 / 銀行 / 帳號）"
-                style="margin-left:10px; padding:2px 9px; font-size:12px; cursor:pointer;
-                       border:1px solid #aaa; border-radius:4px;
-                       background:#f5f5f5; color:#333; vertical-align:middle;">📋 複製</button>
+        <span style="margin-left:10px; vertical-align:middle; display:inline-flex; gap:4px;">
+          <button type="button" onclick="copyPayeeName()" title="複製戶名" style="padding:2px 9px; font-size:12px; cursor:pointer; border:1px solid #aaa; border-radius:4px; background:#f5f5f5; color:#333;">📋 戶名</button>
+          <button type="button" onclick="copyPayeeBankCode()" title="複製銀行代號（7 位）" style="padding:2px 9px; font-size:12px; cursor:pointer; border:1px solid #aaa; border-radius:4px; background:#f5f5f5; color:#333;">📋 銀行代號</button>
+          <button type="button" onclick="copyPayeeAcctNo()" title="複製帳號" style="padding:2px 9px; font-size:12px; cursor:pointer; border:1px solid #aaa; border-radius:4px; background:#f5f5f5; color:#333;">📋 帳號</button>
+        </span>
       </div>
       <button type="button" id="payee-edit-btn" onclick="openPayeeEditMode()" style="float:right; margin-top:-28px; padding:4px 12px; background:#1565c0; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">✎ 修改受款人</button>
       <div class="payee-row">
@@ -5098,6 +5097,60 @@ async function savePayeeEditDb() {
   }
 }
 
+/* v4.4.72b 從歷史單據掃描受款人，補回受款人庫漏的（修復過去 PATCH 401 fallback 流失的資料） */
+async function recoverPayeesFromRecords() {
+  if (!confirm('將掃描所有歷史單據裡用過的受款人，把受款人庫裡漏的補回去（標記為 isNew）。\n\n大量單據會跑數秒。是否繼續？')) return;
+  showToast('🔁 開始掃描歷史單據…');
+  try {
+    const allRecs = await fetch('/api/records?all=1').then(r => r.json());
+    const curPayees = await fetch('/api/payees').then(r => r.json());
+    const existKey = new Set(curPayees.map(p => `${p.name||''}||${p.acctNo||''}||${p.bank||''}`));
+    const fromRecords = new Map();
+    for (const rec of allRecs) {
+      const list = [];
+      if (Array.isArray(rec.payees)) list.push(...rec.payees);
+      if (rec.payee && typeof rec.payee === 'object') list.push(rec.payee);
+      for (const p of list) {
+        if (!p) continue;
+        const name = (p.name || '').trim();
+        const acctNo = (p.acctNo || p.acctno || '').trim();
+        const bank = (p.bank || '').trim();
+        if (!name || p.type === 'bill') continue;
+        if (!acctNo && !bank) continue;
+        const k = `${name}||${acctNo}||${bank}`;
+        if (!fromRecords.has(k)) {
+          const dt = rec.applyDateRoc || rec.applyDate || (rec.savedAt||'').substring(0,10);
+          fromRecords.set(k, { name, acctNo, bank, createdAt: dt });
+        }
+      }
+    }
+    const missing = [];
+    for (const [k, p] of fromRecords) if (!existKey.has(k)) missing.push(p);
+    if (missing.length === 0) {
+      showToast('✓ 受款人庫已是最新（無缺漏）');
+      return;
+    }
+    let success = 0, fail = 0;
+    for (const p of missing) {
+      try {
+        const r = await fetch('/api/payees', {
+          method: 'PATCH',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ name: p.name, acctNo: p.acctNo, bank: p.bank, isNew: true, createdAt: p.createdAt || '' })
+        });
+        const d = await r.json();
+        if (r.ok && d.ok) success++; else fail++;
+      } catch (_) { fail++; }
+    }
+    await loadPayees();
+    renderPayeeDb();
+    if (fail === 0) showToast(`✓ 已補回 ${success} 筆缺漏受款人`);
+    else showToast(`⚠ 補回 ${success} 筆，失敗 ${fail} 筆`);
+  } catch (e) {
+    showToast('✗ 掃描失敗：' + e.message);
+  }
+}
+
 async function dbPayeeToggleFrozen(btn, freeze) {
   const key = btn.dataset.key;
   const p = (PAYEES||[]).find(x => `${x.name||''}||${x.acctNo||''}||${x.bank||''}` === key);
@@ -5120,34 +5173,37 @@ async function dbPayeeToggleFrozen(btn, freeze) {
   }
 }
 
-/* v4.4.72 複製受款人資訊（戶名 / 銀行 / 帳號 多筆換行） */
-function copyPayeeInfo() {
-  const type = document.getElementById('payee-type')?.value || '';
-  if (!type) { showToast('未選擇受款人類別'); return; }
-  if (type === 'bill') {
-    const txt = '受款人資訊：憑繳費單 / 匯費';
-    navigator.clipboard?.writeText(txt).then(()=>showCopyPopup(txt,{label:'已複製'})).catch(()=>showToast('複製失敗'));
-    return;
-  }
-  const cards = (typeof _payeeCards !== 'undefined' ? _payeeCards : []).filter(c => c.name || c.bank || c.acctNo);
-  if (!cards.length) { showToast('受款人資訊為空'); return; }
-  const lines = cards.map((c, i) => {
-    let bankCode = '', bankName = c.bank || '';
-    const m = (c.bank||'').match(/^(\d{7})[\s-]+(.+)$/);
-    if (m) { bankCode = m[1]; bankName = m[2].trim(); }
-    const parts = [];
-    if (cards.length > 1) parts.push(`#${i+1}`);
-    if (c.name)             parts.push(`戶名：${c.name}`);
-    if (bankCode||bankName) parts.push(`銀行：${bankCode}${bankCode?' ':''}${bankName}`);
-    if (c.acctNo)           parts.push(`帳號：${c.acctNo}`);
-    return parts.join('　');
-  });
-  const _reason = (document.getElementById('payee-reason')?.value || '').trim();
-  if (type === 'employee' && _reason) lines.push(`代墊原因：${_reason}`);
-  const txt = lines.join('\n');
+/* v4.4.72 受款人資訊複製拆三顆鈕：戶名 / 銀行代號 / 帳號 */
+function _payeeCopyCards() {
+  return (typeof _payeeCards !== 'undefined' ? _payeeCards : [])
+    .filter(c => c.name || c.bank || c.acctNo);
+}
+function _bankCodeOf(c) {
+  const m = (c.bank || '').match(/^(\d{7})/);
+  return m ? m[1] : '';
+}
+function _doPayeeCopy(values, emptyMsg, label) {
+  const list = values.filter(s => s);
+  if (!list.length) { showToast(emptyMsg); return; }
+  const txt = list.join('\n');
   navigator.clipboard?.writeText(txt)
-    .then(()=>showCopyPopup(txt.split('\n')[0]+(lines.length>1?` 等 ${lines.length} 筆`:''),{label:'受款人資訊已複製'}))
-    .catch(()=>showToast('複製失敗，請手動選取'));
+    .then(() => showCopyPopup(list[0] + (list.length > 1 ? ` 等 ${list.length} 筆` : ''), { label }))
+    .catch(() => showToast('複製失敗，請手動選取'));
+}
+function copyPayeeName() {
+  const cards = _payeeCopyCards();
+  if (!cards.length) { showToast('受款人資訊為空'); return; }
+  _doPayeeCopy(cards.map(c => c.name || ''), '沒有戶名可複製', '戶名已複製');
+}
+function copyPayeeBankCode() {
+  const cards = _payeeCopyCards();
+  if (!cards.length) { showToast('受款人資訊為空'); return; }
+  _doPayeeCopy(cards.map(_bankCodeOf), '沒有銀行代號可複製', '銀行代號已複製');
+}
+function copyPayeeAcctNo() {
+  const cards = _payeeCopyCards();
+  if (!cards.length) { showToast('受款人資訊為空'); return; }
+  _doPayeeCopy(cards.map(c => c.acctNo || ''), '沒有帳號可複製', '帳號已複製');
 }
 
 /* v4.4.72 複製明細表所有列「動支說明 / 採購品名」 */
@@ -5433,6 +5489,8 @@ window.addEventListener('afterprint', () => {
     <div style="padding:10px 18px; border-bottom:1px solid #eee; display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:#f5f5f5;">
       <button class="btn" onclick="reloadPayeeDb()" style="padding:5px 12px; background:#607d8b; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">🔄 重新載入</button>
       <button class="btn" onclick="dbPayeeAdd()" style="padding:5px 12px; background:#2e7d32; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">＋ 新增受款人</button>
+      <button class="btn" onclick="recoverPayeesFromRecords()" title="掃描歷史單據裡的受款人，把 D1 受款人庫裡漏的補回去"
+              style="padding:5px 12px; background:#ef6c00; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">🔁 從歷史單據補回</button>
       <input id="db-payee-kw" type="text" placeholder="🔍 關鍵字（戶名/銀行/帳號）" oninput="renderPayeeDb()"
              style="flex:1; min-width:240px; padding:5px 10px; border:1px solid #b0bec5; border-radius:4px; font-size:13px;">
       <select id="db-payee-filter" onchange="renderPayeeDb()" style="padding:5px 10px; border:1px solid #b0bec5; border-radius:4px; font-size:13px;">
