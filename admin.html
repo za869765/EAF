@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v4.4.79</title>
+<title>管理者入口 — 動支單系統 v4.4.80</title>
 <link rel="stylesheet" href="design.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -393,7 +393,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.4.79</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.4.80</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -410,7 +410,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.4.79</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.4.80</span>
     <button id="maint-btn" onclick="toggleMaintenance()" style="padding:4px 14px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;"></button>
     <a class="link-btn" href="/acc.html" style="background:#1b5e20;">📒 會計帳務</a>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
@@ -669,6 +669,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
           <thead>
             <tr style="background:#eceff1; text-align:left;">
               <th style="padding:8px 10px;">戶名</th>
+              <th style="padding:8px 10px;">代號</th>
               <th style="padding:8px 10px;">存款帳號</th>
               <th style="padding:8px 10px;">存款銀行</th>
               <th style="padding:8px 10px;">最後匯款 / 建立</th>
@@ -676,7 +677,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
               <th style="padding:8px 10px;">操作</th>
             </tr>
           </thead>
-          <tbody id="payees-tbody"><tr><td colspan="6" style="padding:20px; text-align:center; color:#888;">載入中…</td></tr></tbody>
+          <tbody id="payees-tbody"><tr><td colspan="7" style="padding:20px; text-align:center; color:#888;">載入中…</td></tr></tbody>
         </table>
       </div>
       <div id="payees-summary" style="margin-top:10px; font-size:12px; color:#546e7a;"></div>
@@ -687,6 +688,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
       <div style="background:#fff; width:460px; max-width:92vw; border-radius:8px; padding:22px 24px; box-shadow:0 8px 32px rgba(0,0,0,.3);">
         <h3 id="pe-title" style="margin:0 0 14px; color:#1e2a38;">新增受款人</h3>
         <div style="margin-bottom:10px;"><label style="display:block; font-size:12px; color:#546e7a; margin-bottom:3px;">戶名</label><input id="pe-name" type="text" style="width:100%; padding:6px 10px; border:1px solid #b0bec5; border-radius:4px;"></div>
+        <div style="margin-bottom:10px;"><label style="display:block; font-size:12px; color:#546e7a; margin-bottom:3px;">受款人代號 <span style="color:#c62828;">*</span> （統編 8 碼 / 身分證 10 碼）</label><input id="pe-code" type="text" placeholder="例：54376691 或 A123456789" style="width:100%; padding:6px 10px; border:1px solid #b0bec5; border-radius:4px; font-family:Consolas, monospace;"></div>
         <div style="margin-bottom:10px;"><label style="display:block; font-size:12px; color:#546e7a; margin-bottom:3px;">存款銀行</label><input id="pe-bank" type="text" placeholder="例：8050123-臺灣銀行" style="width:100%; padding:6px 10px; border:1px solid #b0bec5; border-radius:4px;"></div>
         <div style="margin-bottom:10px;"><label style="display:block; font-size:12px; color:#546e7a; margin-bottom:3px;">存款帳號</label><input id="pe-acct" type="text" style="width:100%; padding:6px 10px; border:1px solid #b0bec5; border-radius:4px;"></div>
         <div style="margin-bottom:10px;"><label style="display:block; font-size:12px; color:#546e7a; margin-bottom:3px;">最後匯款 / 建立（民國年日期，7碼）</label><input id="pe-date" type="text" placeholder="例：1150410" style="width:100%; padding:6px 10px; border:1px solid #b0bec5; border-radius:4px;"></div>
@@ -995,11 +997,11 @@ function renderPayeesAdmin() {
       (p.acctNo||'').toLowerCase().includes(kw)
     );
   }
-  /* v4.4.79 依戶名降序排列（zh-Hant locale） */
+  /* v4.4.80 依戶名降序排列（zh-Hant locale） */
   list.sort((a, b) => (b.name || '').localeCompare(a.name || '', 'zh-Hant'));
   const tbody = document.getElementById('payees-tbody');
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color:#888;">（無資料）</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:#888;">（無資料）</td></tr>';
   } else {
     tbody.innerHTML = list.map(p => {
       const key = `${p.name||''}||${p.acctNo||''}||${p.bank||''}`;
@@ -1018,8 +1020,12 @@ function renderPayeesAdmin() {
       const toggleBtn = p.frozen
         ? `<button class="btn btn-payee-toggle" data-key="${_payeeEsc(key)}" data-freeze="0" style="background:#ff9800; color:#fff; padding:3px 10px; font-size:12px;">🔄 還原</button>`
         : `<button class="btn btn-payee-toggle" data-key="${_payeeEsc(key)}" data-freeze="1" style="background:#607d8b; color:#fff; padding:3px 10px; font-size:12px;">🧊 凍結</button>`;
+      const codeCell = p.code
+        ? `<span style="font-family:monospace;">${_payeeEsc(p.code)}</span>`
+        : '<span style="color:#bbb;">—</span>';
       return `<tr style="${rowStyle}">
         <td style="padding:6px 10px;">${_payeeEsc(p.name)}${frozenBadge}</td>
+        <td style="padding:6px 10px;">${codeCell}</td>
         <td style="padding:6px 10px; font-family:monospace;">${_payeeEsc(p.acctNo)}</td>
         <td style="padding:6px 10px;">${_payeeEsc(p.bank)}</td>
         <td style="padding:6px 10px;">${dateCell}</td>
@@ -1045,6 +1051,7 @@ function openPayeeEdit(key) {
   const p = key ? PAYEES_ADMIN.find(x => `${x.name||''}||${x.acctNo||''}||${x.bank||''}` === key) : null;
   document.getElementById('pe-title').textContent = p ? '編輯受款人' : '新增受款人';
   document.getElementById('pe-name').value = p ? (p.name||'') : '';
+  document.getElementById('pe-code').value = p ? (p.code||'') : '';
   document.getElementById('pe-bank').value = p ? (p.bank||'') : '';
   document.getElementById('pe-acct').value = p ? (p.acctNo||'') : '';
   document.getElementById('pe-date').value = p ? (p.lastTransferDate || p.createdAt || '') : '';
@@ -1057,10 +1064,16 @@ function closePayeeEdit() {
 
 async function savePayeeEdit() {
   const name = document.getElementById('pe-name').value.trim();
+  const code = document.getElementById('pe-code').value.trim();
   const bank = document.getElementById('pe-bank').value.trim();
   const acct = document.getElementById('pe-acct').value.trim();
   const date = document.getElementById('pe-date').value.trim();
   if (!name) { alert('請輸入戶名'); return; }
+  /* v4.4.80：新增時必填 code（編輯時可保留空，漸進補回） */
+  if (!_payeeEditKey && !code) { alert('新增受款人必須填代號（統編或身分證字號）'); return; }
+  if (code && !/^\d{8}$/.test(code) && !/^[A-Z][1-2]\d{8}$/.test(code) && !/^[A-Z]\d{9}$/.test(code)) {
+    alert('代號格式：8 碼數字（統編）或 身分證字號（A123456789）'); return;
+  }
   if (!PASS) { alert('請先登入'); return; }
 
   let list = PAYEES_ADMIN.slice();
@@ -1069,8 +1082,12 @@ async function savePayeeEdit() {
     list = list.filter(x => `${x.name||''}||${x.acctNo||''}||${x.bank||''}` !== _payeeEditKey);
   }
   const existing = _payeeEditKey ? PAYEES_ADMIN.find(x => `${x.name||''}||${x.acctNo||''}||${x.bank||''}` === _payeeEditKey) : null;
+  /* v4.4.80：spread existing → 保留 code、frozen 等所有未在 modal 暴露的欄位
+     再覆寫 user 在 modal 改的 name/bank/acctNo/code/date */
   const newRec = {
+    ...(existing || {}),
     name, bank, acctNo: acct,
+    code: code || (existing?.code || ''),
     lastTransferDate: (existing && !existing.isNew) ? date : (existing?.lastTransferDate || ''),
     createdAt: (existing && existing.isNew) ? date : (existing?.createdAt || (_payeeEditKey ? '' : date)),
     isNew: existing ? !!existing.isNew : true
@@ -1128,7 +1145,14 @@ function importPayeesJson(ev) {
     try {
       const data = JSON.parse(e.target.result);
       if (!Array.isArray(data)) throw new Error('非陣列格式');
-      if (!confirm(`即將匯入 ${data.length} 筆，將覆蓋目前資料。繼續？`)) { ev.target.value = ''; return; }
+      const curCount = PAYEES_ADMIN.length;
+      const curWithCode = PAYEES_ADMIN.filter(p => p.code).length;
+      const newWithCode = data.filter(p => p.code).length;
+      const msg = `即將匯入 ${data.length} 筆，將整包覆蓋目前 ${curCount} 筆。\n\n` +
+                  `⚠️ 受款人代號：目前 ${curWithCode} 筆有代號 → 匯入後變成 ${newWithCode} 筆有代號。` +
+                  (curWithCode > newWithCode ? '\n\n（會減少 ${curWithCode - newWithCode} 筆代號 — 若 JSON 來源是舊備份請取消）' : '') +
+                  '\n\n繼續？';
+      if (!confirm(msg)) { ev.target.value = ''; return; }
       const r = await fetch('/api/payees', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-Admin-Pass': PASS },
