@@ -792,7 +792,7 @@ body.sb-resizing * { pointer-events: none !important; }
     page-break-inside: avoid;
   }
   #payee-print-line:empty { display: none !important; }
-  /* v4.4.71 受款人第二頁明細（form-page 外的兄弟元素，可正常換頁列印） */
+  /* v4.4.72 受款人第二頁明細（form-page 外的兄弟元素，可正常換頁列印） */
   #payee-print-line-page2 { display: none !important; }
   #payee-print-line-page2:not(:empty) {
     display: block !important;
@@ -1025,7 +1025,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.71</div>
+      <div id="sb-version">v4.4.72</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1033,7 +1033,13 @@ body.sb-resizing * { pointer-events: none !important; }
       <button class="new-btn" id="new-expense"  onclick="newForm('expense')"><span style="font-size:20px;">🧾</span>新增動支單</button>
     </div>
   </div>
-  <div id="sync-status">● 連線中…<span id="online-count"></span></div>
+  <div id="sync-status">
+    ● 連線中…<span id="online-count"></span>
+    <button id="open-payee-db-btn" type="button" onclick="openPayeeDb()"
+            title="瀏覽 / 新增 / 凍結 受款人資料庫"
+            style="margin-left:8px; padding:2px 8px; font-size:10px; cursor:pointer;
+                   background:#1565c0; color:#fff; border:none; border-radius:3px;">💳 受款人資料庫</button>
+  </div>
   <div style="font-size:10px; color:#4a6278; padding:5px 14px 2px; flex-shrink:0;">📋 動支單/🛒請購單申請紀錄</div>
   <div id="sidebar-filter">
     <div class="sf-row">
@@ -1399,7 +1405,7 @@ body.sb-resizing * { pointer-events: none !important; }
 
   </div><!-- /#form-page -->
 
-  <!-- v4.4.71 受款人多到放不下時的第二頁明細（form-page 外，可換頁） -->
+  <!-- v4.4.72 受款人多到放不下時的第二頁明細（form-page 外，可換頁） -->
   <div id="payee-print-line-page2"></div>
 
   <!-- 新建受款人 Modal (v4.2.31 放大版，銀行搜尋拆分獨立彈窗) -->
@@ -2487,10 +2493,10 @@ function generateItemRows() {
   for (let i = 0; i < rowCount; i++) appendRow(i);
 }
 
-/* v4.4.71：Tab 導航統一改由 initTableArrowNav 內的 keydown handler 處理
+/* v4.4.72：Tab 導航統一改由 initTableArrowNav 內的 keydown handler 處理
    舊的 qtyTabToUnit / priceTabToNextName 為 noop（避免 row HTML 內 inline onkeydown 報錯） */
-function qtyTabToUnit() { /* deprecated v4.4.71 — 由 generic Tab handler 處理 */ }
-function priceTabToNextName() { /* deprecated v4.4.71 */ }
+function qtyTabToUnit() { /* deprecated v4.4.72 — 由 generic Tab handler 處理 */ }
+function priceTabToNextName() { /* deprecated v4.4.72 */ }
 
 function appendRow(i) {
   const tr = document.createElement('tr');
@@ -4271,7 +4277,7 @@ function showCopyPopup(no, opts = {}) {
     }
   });
 
-  /* v4.4.71 統一 Tab / Shift+Tab：所有 items table 欄位都能像 Excel 跳格 */
+  /* v4.4.72 統一 Tab / Shift+Tab：所有 items table 欄位都能像 Excel 跳格 */
   document.addEventListener('keydown', function (e) {
     if (e.isComposing || e.key !== 'Tab') return;
     const el = e.target;
@@ -4936,7 +4942,183 @@ function getPayeeData() {
   return arr.length ? arr[0] : null;
 }
 
-/* v4.4.71 複製受款人資訊（戶名 / 銀行 / 帳號 多筆換行） */
+/* ══════════════════════════════════════════════════
+   v4.4.72 受款人資料庫 Modal — 一般使用者可新增/編輯/凍結/解凍
+   ══════════════════════════════════════════════════ */
+let _dbPayeeEditKey = null; // null = 新增；非空 = 編輯既有
+
+function openPayeeDb() {
+  document.getElementById('payee-db-modal').style.display = 'flex';
+  document.getElementById('db-payee-kw').value = '';
+  document.getElementById('db-payee-filter').value = 'active';
+  reloadPayeeDb();
+}
+function closePayeeDb() {
+  document.getElementById('payee-db-modal').style.display = 'none';
+}
+
+async function reloadPayeeDb() {
+  await loadPayees();        // 重新從 /api/payees 取，更新 PAYEES 全域
+  renderPayeeDb();
+}
+
+function renderPayeeDb() {
+  const kw = (document.getElementById('db-payee-kw').value || '').trim().toLowerCase();
+  const filter = document.getElementById('db-payee-filter').value;
+  let list = (PAYEES || []).slice();
+  if (filter === 'active')      list = list.filter(p => !p.frozen);
+  else if (filter === 'frozen') list = list.filter(p => p.frozen);
+  else if (filter === 'isNew')  list = list.filter(p => p.isNew);
+  else if (filter === 'nonghui')list = list.filter(p => (p.bank||'').includes(NONGHUI_KW));
+  else if (filter === 'vendor') list = list.filter(p => !(p.bank||'').includes(NONGHUI_KW));
+  if (kw) {
+    list = list.filter(p =>
+      (p.name||'').toLowerCase().includes(kw) ||
+      (p.bank||'').toLowerCase().includes(kw) ||
+      (p.acctNo||'').toLowerCase().includes(kw)
+    );
+  }
+  list.sort((a, b) => (b.name||'').localeCompare(a.name||'', 'zh-Hant'));
+
+  const tb = document.getElementById('db-payee-tbody');
+  if (!list.length) {
+    tb.innerHTML = '<tr><td colspan="6" style="padding:24px; text-align:center; color:#999;">（無資料）</td></tr>';
+  } else {
+    tb.innerHTML = list.map(p => {
+      const dateCell = p.isNew
+        ? `<span style="color:#e65100; font-weight:bold;">🆕 ${esc(p.createdAt||'—')}</span>`
+        : esc(p.lastTransferDate || '—');
+      const source = p.isNew ? '頁面新建' : 'CSV 匯入';
+      const frozenBadge = p.frozen
+        ? '<span style="display:inline-block; margin-left:6px; padding:1px 6px; background:#78909c; color:#fff; border-radius:3px; font-size:11px;">🧊 凍結</span>'
+        : '';
+      const rowStyle = p.frozen
+        ? 'border-top:1px solid #eee; background:#f5f5f5; color:#9e9e9e;'
+        : 'border-top:1px solid #eee;';
+      const key = `${p.name||''}||${p.acctNo||''}||${p.bank||''}`;
+      const toggleBtn = p.frozen
+        ? `<button data-key="${esc(key)}" onclick="dbPayeeToggleFrozen(this,false)" style="background:#ff9800; color:#fff; border:none; padding:3px 10px; font-size:12px; border-radius:3px; cursor:pointer;">🔄 還原</button>`
+        : `<button data-key="${esc(key)}" onclick="dbPayeeToggleFrozen(this,true)" style="background:#607d8b; color:#fff; border:none; padding:3px 10px; font-size:12px; border-radius:3px; cursor:pointer;">🧊 凍結</button>`;
+      return `<tr style="${rowStyle}">
+        <td style="padding:6px 10px;">${esc(p.name)}${frozenBadge}</td>
+        <td style="padding:6px 10px; font-family:Consolas, monospace;">${esc(p.acctNo)}</td>
+        <td style="padding:6px 10px;">${esc(p.bank)}</td>
+        <td style="padding:6px 10px;">${dateCell}</td>
+        <td style="padding:6px 10px; color:#666;">${source}</td>
+        <td style="padding:6px 10px; white-space:nowrap;">
+          <button data-key="${esc(key)}" onclick="dbPayeeEdit(this)" style="background:#e0e0e0; border:1px solid #aaa; padding:3px 10px; font-size:12px; border-radius:3px; cursor:pointer; margin-right:4px;">✏️ 編輯</button>
+          ${toggleBtn}
+        </td>
+      </tr>`;
+    }).join('');
+  }
+  const total = (PAYEES||[]).length;
+  const newCount = (PAYEES||[]).filter(p => p.isNew).length;
+  const frozenCount = (PAYEES||[]).filter(p => p.frozen).length;
+  document.getElementById('db-payee-summary').textContent =
+    `共 ${total} 筆（新建 ${newCount}、凍結 ${frozenCount}），目前顯示 ${list.length} 筆`;
+}
+
+function dbPayeeAdd() {
+  _dbPayeeEditKey = null;
+  document.getElementById('db-payee-edit-title').textContent = '＋ 新增受款人';
+  document.getElementById('db-pe-name').value = '';
+  document.getElementById('db-pe-bank').value = '';
+  document.getElementById('db-pe-acct').value = '';
+  document.getElementById('db-pe-warn').style.display = 'none';
+  document.getElementById('payee-db-edit-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('db-pe-name').focus(), 50);
+}
+
+function dbPayeeEdit(btn) {
+  const key = btn.dataset.key;
+  const p = (PAYEES||[]).find(x => `${x.name||''}||${x.acctNo||''}||${x.bank||''}` === key);
+  if (!p) { showToast('找不到該筆受款人'); return; }
+  _dbPayeeEditKey = key;
+  document.getElementById('db-payee-edit-title').textContent = '✏️ 編輯受款人';
+  document.getElementById('db-pe-name').value = p.name || '';
+  document.getElementById('db-pe-bank').value = p.bank || '';
+  document.getElementById('db-pe-acct').value = p.acctNo || '';
+  document.getElementById('db-pe-warn').style.display = 'none';
+  document.getElementById('payee-db-edit-modal').style.display = 'flex';
+}
+
+function closePayeeEditDb() {
+  document.getElementById('payee-db-edit-modal').style.display = 'none';
+}
+
+async function savePayeeEditDb() {
+  const name = document.getElementById('db-pe-name').value.trim();
+  const bank = document.getElementById('db-pe-bank').value.trim();
+  const acct = document.getElementById('db-pe-acct').value.trim();
+  const warn = document.getElementById('db-pe-warn');
+  if (!name) { warn.textContent = '⚠ 戶名必填'; warn.style.display = ''; return; }
+  if (!bank && !acct) { warn.textContent = '⚠ 至少要填銀行或帳號'; warn.style.display = ''; return; }
+
+  // 檢查重複（除了自己）
+  const newKey = `${name}||${acct}||${bank}`;
+  if ((PAYEES||[]).some(p => `${p.name||''}||${p.acctNo||''}||${p.bank||''}` === newKey && newKey !== _dbPayeeEditKey)) {
+    warn.textContent = '⚠ 已有相同戶名+銀行+帳號的紀錄';
+    warn.style.display = '';
+    return;
+  }
+
+  try {
+    if (_dbPayeeEditKey && _dbPayeeEditKey !== newKey) {
+      // 改了 key 欄位 → 後端 PATCH key 邏輯找不到舊 row，會新增一筆 → 需要先把舊的標凍結（軟刪）
+      const oldP = (PAYEES||[]).find(x => `${x.name||''}||${x.acctNo||''}||${x.bank||''}` === _dbPayeeEditKey);
+      if (oldP) {
+        await fetch('/api/payees', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: oldP.name, acctNo: oldP.acctNo, bank: oldP.bank, frozen: true })
+        });
+      }
+    }
+    const today = new Date();
+    const roc = `${today.getFullYear()-1911}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+    const payload = { name, bank, acctNo: acct };
+    if (!_dbPayeeEditKey) { payload.createdAt = roc; payload.isNew = true; }
+    const r = await fetch('/api/payees', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) { warn.textContent = '⚠ 儲存失敗：' + (d.error || r.status); warn.style.display = ''; return; }
+    closePayeeEditDb();
+    showToast(_dbPayeeEditKey ? '✓ 已更新受款人' : '✓ 已新增受款人');
+    await loadPayees();
+    renderPayeeDb();
+  } catch (e) {
+    warn.textContent = '⚠ 連線錯誤：' + e.message;
+    warn.style.display = '';
+  }
+}
+
+async function dbPayeeToggleFrozen(btn, freeze) {
+  const key = btn.dataset.key;
+  const p = (PAYEES||[]).find(x => `${x.name||''}||${x.acctNo||''}||${x.bank||''}` === key);
+  if (!p) return;
+  const action = freeze ? '凍結' : '還原';
+  if (!confirm(`確定要${action}「${p.name}」？`)) return;
+  try {
+    const r = await fetch('/api/payees', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: p.name, acctNo: p.acctNo, bank: p.bank, frozen: freeze })
+    });
+    const d = await r.json();
+    if (!r.ok || !d.ok) { showToast(`✗ ${action}失敗：${d.error||r.status}`); return; }
+    showToast(`✓ 已${action} ${p.name}`);
+    await loadPayees();
+    renderPayeeDb();
+  } catch (e) {
+    showToast(`✗ 連線錯誤：${e.message}`);
+  }
+}
+
+/* v4.4.72 複製受款人資訊（戶名 / 銀行 / 帳號 多筆換行） */
 function copyPayeeInfo() {
   const type = document.getElementById('payee-type')?.value || '';
   if (!type) { showToast('未選擇受款人類別'); return; }
@@ -4966,7 +5148,7 @@ function copyPayeeInfo() {
     .catch(()=>showToast('複製失敗，請手動選取'));
 }
 
-/* v4.4.71 複製明細表所有列「動支說明 / 採購品名」 */
+/* v4.4.72 複製明細表所有列「動支說明 / 採購品名」 */
 function copyItemsName() {
   const cells = document.querySelectorAll('#items-body [data-c="name"]');
   const lines = Array.from(cells).map(c => (c.value || '').trim()).filter(s => s);
@@ -5016,7 +5198,7 @@ function setPayeesData(payees, legacyPayee) {
 function setPayeeData(payee) { setPayeesData(null, payee); }
 
 /* v4.2.23 列印用受款人資訊：每張卡一列
-   v4.4.71 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出 */
+   v4.4.72 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出 */
 const PAYEE_PAGE1_OVERFLOW_THRESHOLD = 4;
 function updatePayeePrintLine() {
   const line  = document.getElementById('payee-print-line');
@@ -5235,6 +5417,63 @@ window.addEventListener('afterprint', () => {
     <div class="scm-btns">
       <button class="scm-cancel" onclick="closeSaveConfirm()">✕ 取消</button>
       <button class="scm-ok"     onclick="doSave()">✓ 確定存檔</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ v4.4.72 受款人資料庫 Modal ══ -->
+<div id="payee-db-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:8500; align-items:center; justify-content:center;">
+  <div style="background:#fff; width:96%; max-width:1200px; max-height:90vh; border-radius:8px; display:flex; flex-direction:column; overflow:hidden;">
+    <div style="padding:12px 18px; border-bottom:1px solid #e0e0e0; display:flex; justify-content:space-between; align-items:center; background:#37474f; color:#fff;">
+      <h3 style="margin:0; font-size:16px;">💳 受款人資料庫</h3>
+      <button type="button" onclick="closePayeeDb()" style="background:transparent; color:#fff; border:none; font-size:20px; cursor:pointer; padding:0 6px;">✕</button>
+    </div>
+    <div style="padding:10px 18px; border-bottom:1px solid #eee; display:flex; gap:8px; flex-wrap:wrap; align-items:center; background:#f5f5f5;">
+      <button class="btn" onclick="reloadPayeeDb()" style="padding:5px 12px; background:#607d8b; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">🔄 重新載入</button>
+      <button class="btn" onclick="dbPayeeAdd()" style="padding:5px 12px; background:#2e7d32; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">＋ 新增受款人</button>
+      <input id="db-payee-kw" type="text" placeholder="🔍 關鍵字（戶名/銀行/帳號）" oninput="renderPayeeDb()"
+             style="flex:1; min-width:240px; padding:5px 10px; border:1px solid #b0bec5; border-radius:4px; font-size:13px;">
+      <select id="db-payee-filter" onchange="renderPayeeDb()" style="padding:5px 10px; border:1px solid #b0bec5; border-radius:4px; font-size:13px;">
+        <option value="active">僅未凍結</option>
+        <option value="all">全部（含凍結）</option>
+        <option value="frozen">僅凍結</option>
+        <option value="isNew">僅新建</option>
+        <option value="nonghui">佳里區農會</option>
+        <option value="vendor">非農會</option>
+      </select>
+    </div>
+    <div style="overflow:auto; flex:1;">
+      <table style="width:100%; border-collapse:collapse; font-size:13px;">
+        <thead style="position:sticky; top:0; background:#eceff1;">
+          <tr>
+            <th style="padding:8px 10px; text-align:left; border-bottom:2px solid #b0bec5;">戶名</th>
+            <th style="padding:8px 10px; text-align:left; border-bottom:2px solid #b0bec5;">存款帳號</th>
+            <th style="padding:8px 10px; text-align:left; border-bottom:2px solid #b0bec5;">存款銀行</th>
+            <th style="padding:8px 10px; text-align:left; border-bottom:2px solid #b0bec5;">最後匯款 / 建立</th>
+            <th style="padding:8px 10px; text-align:left; border-bottom:2px solid #b0bec5;">來源</th>
+            <th style="padding:8px 10px; text-align:left; border-bottom:2px solid #b0bec5;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="db-payee-tbody"></tbody>
+      </table>
+    </div>
+    <div id="db-payee-summary" style="padding:6px 18px; background:#fafafa; border-top:1px solid #eee; font-size:11px; color:#666;"></div>
+  </div>
+</div>
+
+<!-- ══ v4.4.72 受款人 編輯 / 新增 子 Modal ══ -->
+<div id="payee-db-edit-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:9500; align-items:center; justify-content:center;">
+  <div style="background:#fff; width:92%; max-width:560px; border-radius:8px; padding:18px 22px;">
+    <h3 id="db-payee-edit-title" style="margin:0 0 14px; padding-bottom:8px; border-bottom:1px solid #e0e0e0; color:#1565c0; font-size:16px;">編輯受款人</h3>
+    <div style="display:grid; grid-template-columns:auto 1fr; gap:10px 14px; align-items:center; font-size:13px;">
+      <label>戶名</label><input id="db-pe-name" type="text" style="padding:6px 10px; border:1px solid #b0bec5; border-radius:4px;">
+      <label>存款銀行</label><input id="db-pe-bank" type="text" placeholder="例：0040118-臺灣銀行高雄分行" style="padding:6px 10px; border:1px solid #b0bec5; border-radius:4px;">
+      <label>存款帳號</label><input id="db-pe-acct" type="text" style="padding:6px 10px; border:1px solid #b0bec5; border-radius:4px; font-family:Consolas, monospace;">
+    </div>
+    <div id="db-pe-warn" style="margin-top:10px; font-size:12px; color:#c62828; display:none;"></div>
+    <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px; padding-top:12px; border-top:1px solid #e0e0e0;">
+      <button onclick="closePayeeEditDb()" style="padding:6px 14px; background:#e0e0e0; border:none; border-radius:4px; cursor:pointer;">取消</button>
+      <button onclick="savePayeeEditDb()" style="padding:6px 14px; background:#1565c0; color:#fff; border:none; border-radius:4px; cursor:pointer;">💾 儲存</button>
     </div>
   </div>
 </div>
