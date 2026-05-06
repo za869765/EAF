@@ -1824,7 +1824,9 @@ async function apiPatch(id, patch) {
 function setSyncStatus(msg, cls) {
   const el = document.getElementById('sync-status');
   const onlineSpan = document.getElementById('online-count');
-  const saved = onlineSpan ? onlineSpan.outerHTML : '';
+  /* v4.4.72 連同 open-payee-db-btn 一起保留，避免 innerHTML 覆寫把它擦掉 */
+  const dbBtn = document.getElementById('open-payee-db-btn');
+  const saved = (onlineSpan ? onlineSpan.outerHTML : '') + (dbBtn ? dbBtn.outerHTML : '');
   el.innerHTML = esc(msg) + saved;
   el.className = cls || '';
 }
