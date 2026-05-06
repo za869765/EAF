@@ -778,6 +778,7 @@ body.sb-resizing * { pointer-events: none !important; }
 
 /* 列印專用單行受款人 (v4.2.22) */
 #payee-print-line { display: none; }
+#payee-print-line-page2 { display: none; }
 @media print {
   #payee-section, #new-payee-modal { display: none !important; }
   #payee-print-line {
@@ -791,6 +792,37 @@ body.sb-resizing * { pointer-events: none !important; }
     page-break-inside: avoid;
   }
   #payee-print-line:empty { display: none !important; }
+  /* v4.4.69 受款人第二頁明細（form-page 外的兄弟元素，可正常換頁列印） */
+  #payee-print-line-page2 { display: none !important; }
+  #payee-print-line-page2:not(:empty) {
+    display: block !important;
+    page-break-before: always !important;
+    break-before: page !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+    padding: 8mm 8mm 0;
+    font-family: "標楷體","DFKai-SB","BiauKai","KaiTi",serif;
+  }
+  #payee-print-line-page2 .pl-title-page2 {
+    font-weight: bold; font-size: 18px;
+    border-bottom: 2px solid #000; padding-bottom: 3mm; margin-bottom: 4mm;
+  }
+  #payee-print-line-page2 .pl-row {
+    display: block; margin-bottom: 2mm; font-size: 14px; line-height: 1.8;
+    padding-bottom: 1mm; border-bottom: 1px dashed #999;
+  }
+  #payee-print-line-page2 .pl-idx { font-weight: bold; color: #000; margin-right: 4px; }
+  #payee-print-line-page2 .pl-lbl { font-weight: bold; color: #000; }
+  #payee-print-line-page2 .payee-new-mark {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    display: inline-block;
+    background: #000 !important; color: #fff !important;
+    border: 1.5px solid #000 !important;
+    padding: 1px 10px !important;
+    font-weight: bold !important; font-size: 14px !important;
+    margin-left: 8px;
+  }
   /* v4.2.22 放大列印字體 + 子標籤 */
   #payee-print-line { font-size: 14px !important; line-height: 1.7; }
   #payee-print-line .pl-title { font-weight: bold; font-size: 15px; margin-right: 6px; }
@@ -993,7 +1025,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.68</div>
+      <div id="sb-version">v4.4.69</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1337,6 +1369,9 @@ body.sb-resizing * { pointer-events: none !important; }
     <div id="print-footer"></div>
 
   </div><!-- /#form-page -->
+
+  <!-- v4.4.69 受款人多到放不下時的第二頁明細（form-page 外，可換頁） -->
+  <div id="payee-print-line-page2"></div>
 
   <!-- 新建受款人 Modal (v4.2.31 放大版，銀行搜尋拆分獨立彈窗) -->
   <div id="new-payee-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9000; align-items:center; justify-content:center;">
@@ -4901,16 +4936,22 @@ function setPayeesData(payees, legacyPayee) {
 /* 舊版相容 */
 function setPayeeData(payee) { setPayeesData(null, payee); }
 
-/* v4.2.23 列印用受款人資訊：每張卡一列 */
+/* v4.2.23 列印用受款人資訊：每張卡一列
+   v4.4.69 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出 */
+const PAYEE_PAGE1_OVERFLOW_THRESHOLD = 4;
 function updatePayeePrintLine() {
-  const line = document.getElementById('payee-print-line');
+  const line  = document.getElementById('payee-print-line');
+  const page2 = document.getElementById('payee-print-line-page2');
   if (!line) return;
+  if (page2) page2.innerHTML = '';
   const type = document.getElementById('payee-type')?.value || '';
   if (!type) { line.innerHTML = ''; return; }
   if (type === 'bill') { line.innerHTML = '<span class="pl-title">受款人資訊：</span>　憑繳費單 / 匯費'; return; }
   const cards = _payeeCards.filter(c => c.name || c.bank || c.acctNo);
   if (!cards.length) { line.innerHTML = ''; return; }
-  const rows = cards.map((c, i) => {
+
+  // 把單張卡片格式化成一個 <div class="pl-row">…</div>
+  const formatCard = (c, i, total) => {
     let bankCode = '', bankName = c.bank || '';
     const m = (c.bank||'').match(/^(\d{7})[\s-]+(.+)$/);
     if (m) { bankCode = m[1]; bankName = m[2].trim(); }
@@ -4919,9 +4960,10 @@ function updatePayeePrintLine() {
     if (c.name)             parts.push(`<span class="pl-lbl">戶名：</span>${esc(c.name)}`);
     if (bankCode||bankName) parts.push(`<span class="pl-lbl">銀行：</span>${esc(bankCode)}　${esc(bankName)}`);
     if (c.acctNo)           parts.push(`<span class="pl-lbl">帳號：</span>${esc(c.acctNo)}`);
-    const idx = cards.length > 1 ? `<span class="pl-idx">#${i+1}</span>　` : '';
+    const idx = total > 1 ? `<span class="pl-idx">#${i+1}</span>　` : '';
     return `<div class="pl-row">${idx}${parts.join('　　')}${newMark}</div>`;
-  }).join('');
+  };
+
   /* v4.2.31 代墊原因（有填寫才加）；v4.2.35 末端加「職章：」提示列印後蓋章 */
   const _reason = (document.getElementById('payee-reason')?.value || '').trim();
   const _reasonHtml = (type === 'employee' && _reason)
@@ -4936,7 +4978,24 @@ function updatePayeePrintLine() {
         `<span class="pl-lbl">帳號：</span>${esc(c.acctNo||c.acctno||'—')}` +
         `</div>`).join('')
     : '';
-  line.innerHTML = `<span class="pl-title">受款人資訊：</span>${_prevHtml}${rows}${_reasonHtml}`;
+
+  if (cards.length >= PAYEE_PAGE1_OVERFLOW_THRESHOLD && page2) {
+    /* page 1：只放摘要（前 2 筆名字 + 共 N 筆，明細見次頁） */
+    const preview = cards.slice(0, 2)
+      .map(c => `<span class="pl-lbl">${esc(c.name || '—')}</span>`).join('、');
+    line.innerHTML =
+      `<span class="pl-title">受款人資訊：</span>共 ${cards.length} 筆（${preview} 等），明細見次頁` +
+      _reasonHtml;
+    /* page 2：完整列表（含前次受款人 strike-through） */
+    const allRows = cards.map((c, i) => formatCard(c, i, cards.length)).join('');
+    page2.innerHTML =
+      `<div class="pl-title-page2">受款人資訊明細（共 ${cards.length} 筆）</div>` +
+      _prevHtml + allRows;
+  } else {
+    /* 量不多：一樣放在 page 1 inline */
+    const rows = cards.map((c, i) => formatCard(c, i, cards.length)).join('');
+    line.innerHTML = `<span class="pl-title">受款人資訊：</span>${_prevHtml}${rows}${_reasonHtml}`;
+  }
 }
 
 /* v4.2.22 請購單 / 動支單 皆顯示受款人資訊 */
