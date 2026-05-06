@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>採購(費用動支)申請單 － 臺南市佳里區衛生所</title>
-<!-- v4.4.80 hotfix：補載 SheetJS（v4.4.73 起的匯出/匯入會計系統 XLSX 依賴） -->
+<!-- v4.4.81 hotfix：補載 SheetJS（v4.4.73 起的匯出/匯入會計系統 XLSX 依賴） -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
 <link rel="stylesheet" href="eaf-tokens.css?v=4.4.31">
@@ -662,7 +662,7 @@ body.sb-resizing * { pointer-events: none !important; }
   font-size: 14px; font-weight: bold; color: #1e2a38;
   border-bottom: 1.5px solid #42a5f5; padding-bottom: 4px; margin-bottom: 8px;
 }
-/* v4.4.80 受款人卡片 附記事項 + 統一發票區塊 */
+/* v4.4.81 受款人卡片 附記事項 + 統一發票區塊 */
 #payee-section .pc-extra-row {
   display: flex; align-items: center; gap: 8px;
   margin-top: 6px; padding-top: 6px; border-top: 1px dashed #cfdde7;
@@ -817,7 +817,7 @@ body.sb-resizing * { pointer-events: none !important; }
     page-break-inside: avoid;
   }
   #payee-print-line:empty { display: none !important; }
-  /* v4.4.80 受款人第二頁明細（form-page 外的兄弟元素，可正常換頁列印） */
+  /* v4.4.81 受款人第二頁明細（form-page 外的兄弟元素，可正常換頁列印） */
   #payee-print-line-page2 { display: none !important; }
   #payee-print-line-page2:not(:empty) {
     display: block !important;
@@ -1050,7 +1050,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.80</div>
+      <div id="sb-version">v4.4.81</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1429,7 +1429,7 @@ body.sb-resizing * { pointer-events: none !important; }
 
   </div><!-- /#form-page -->
 
-  <!-- v4.4.80 受款人多到放不下時的第二頁明細（form-page 外，可換頁） -->
+  <!-- v4.4.81 受款人多到放不下時的第二頁明細（form-page 外，可換頁） -->
   <div id="payee-print-line-page2"></div>
 
   <!-- 新建受款人 Modal (v4.2.31 放大版，銀行搜尋拆分獨立彈窗) -->
@@ -1459,7 +1459,7 @@ body.sb-resizing * { pointer-events: none !important; }
         <input id="np-name" type="text" style="flex:1; height:42px; padding:8px 14px; border:1.5px solid #ccc; border-radius:6px; font-size:15px;">
       </div>
 
-      <!-- 4) v4.4.80 受款人代號（必填）：統編 8 碼 或 身分證 10 碼 -->
+      <!-- 4) v4.4.81 受款人代號（必填）：統編 8 碼 或 身分證 10 碼 -->
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
         <label style="width:90px; font-size:15px; font-weight:600; color:#333; flex-shrink:0;">受款人代號 <span style="color:#c62828;">*</span></label>
         <input id="np-code" type="text" placeholder="統一編號 8 碼  或  身分證字號（A123456789）" style="flex:1; height:42px; padding:8px 14px; border:1.5px solid #ccc; border-radius:6px; font-size:15px; font-family:Consolas, monospace;">
@@ -1854,7 +1854,7 @@ async function apiPatch(id, patch) {
 function setSyncStatus(msg, cls) {
   const el = document.getElementById('sync-status');
   const onlineSpan = document.getElementById('online-count');
-  /* v4.4.80 連同 open-payee-db-btn 一起保留，避免 innerHTML 覆寫把它擦掉 */
+  /* v4.4.81 連同 open-payee-db-btn 一起保留，避免 innerHTML 覆寫把它擦掉 */
   const dbBtn = document.getElementById('open-payee-db-btn');
   const saved = (onlineSpan ? onlineSpan.outerHTML : '') + (dbBtn ? dbBtn.outerHTML : '');
   el.innerHTML = esc(msg) + saved;
@@ -2525,10 +2525,10 @@ function generateItemRows() {
   for (let i = 0; i < rowCount; i++) appendRow(i);
 }
 
-/* v4.4.80：Tab 導航統一改由 initTableArrowNav 內的 keydown handler 處理
+/* v4.4.81：Tab 導航統一改由 initTableArrowNav 內的 keydown handler 處理
    舊的 qtyTabToUnit / priceTabToNextName 為 noop（避免 row HTML 內 inline onkeydown 報錯） */
-function qtyTabToUnit() { /* deprecated v4.4.80 — 由 generic Tab handler 處理 */ }
-function priceTabToNextName() { /* deprecated v4.4.80 */ }
+function qtyTabToUnit() { /* deprecated v4.4.81 — 由 generic Tab handler 處理 */ }
+function priceTabToNextName() { /* deprecated v4.4.81 */ }
 
 function appendRow(i) {
   const tr = document.createElement('tr');
@@ -3375,7 +3375,7 @@ function validateForm() {
     if (Math.max(0, total) === 0) errors.push('合計金額不得為 $0');
   }
 
-  /* v4.4.80 受款人卡片：選 2.統一發票 時，發票號碼/日期/金額 三格必填 */
+  /* v4.4.81 受款人卡片：選 2.統一發票 時，發票號碼/日期/金額 三格必填 */
   if (typeof _payeeCards !== 'undefined' && Array.isArray(_payeeCards)) {
     _payeeCards.forEach((c, idx) => {
       if ((c.receiptType||'1') !== '2') return;
@@ -4322,7 +4322,7 @@ function showCopyPopup(no, opts = {}) {
     }
   });
 
-  /* v4.4.80 統一 Tab / Shift+Tab：所有 items table 欄位都能像 Excel 跳格 */
+  /* v4.4.81 統一 Tab / Shift+Tab：所有 items table 欄位都能像 Excel 跳格 */
   document.addEventListener('keydown', function (e) {
     if (e.isComposing || e.key !== 'Tab') return;
     const el = e.target;
@@ -4662,9 +4662,12 @@ function renderPayeeCards() {
       const newMark = card.isNew ? '　<span style="color:#e65100; font-weight:bold;">★新受款人</span>' : '';
       /* v4.2.33 鎖定模式的「變更」改為觸發 openPayeeEditMode() */
       const unpickFn = _isLockedForm ? 'openPayeeEditMode()' : `unpickPayeeCard(${i})`;
-      /* v4.4.80 附記事項 + 統一發票條件欄位 */
+      /* v4.4.81 附記事項 + 統一發票條件欄位
+         v4.4.81：input 改用 readonly（不是 disabled），讓 editSaved() 既有的
+                  「移除 input readonly」流程能在「已存檔未列印修改狀態」下解鎖 */
       const rcpt = card.receiptType || '1';
-      const dis = _isLockedForm ? 'disabled' : '';
+      const selDis = _isLockedForm ? 'disabled' : '';   // select 必須用 disabled
+      const inpRO = _isLockedForm ? 'readonly' : '';     // input 用 readonly 才會被 editSaved 解鎖
       const showInv = rcpt === '2';
       return `<div class="payee-card" data-idx="${i}">
         <div class="pc-header"><span class="pc-title">受款人 #${i+1}</span>${removeBtn}</div>
@@ -4674,18 +4677,18 @@ function renderPayeeCards() {
         </div>
         <div class="pc-extra-row">
           <label class="pc-extra-lbl">附記事項：</label>
-          <select class="pc-receipt-type" ${dis} onchange="_payeeCardField(${i}, 'receiptType', this.value); _togglePcInvoice(${i}, this.value);">
+          <select class="pc-receipt-type" ${selDis} onchange="_payeeCardField(${i}, 'receiptType', this.value); _togglePcInvoice(${i}, this.value);">
             <option value="0" ${rcpt==='0'?'selected':''}>0.其他相關書據</option>
             <option value="1" ${rcpt==='1'?'selected':''}>1.普通收據</option>
             <option value="2" ${rcpt==='2'?'selected':''}>2.統一發票</option>
           </select>
         </div>
         <div class="pc-invoice-row" data-pc-inv="${i}" style="display:${showInv?'flex':'none'}">
-          <input class="pc-inv-no" placeholder="發票號碼 *" value="${esc(card.invoiceNo||'')}" ${dis}
+          <input class="pc-inv-no" placeholder="發票號碼 *" value="${esc(card.invoiceNo||'')}" ${inpRO}
                  oninput="_payeeCardField(${i}, 'invoiceNo', this.value)">
-          <input class="pc-inv-date" placeholder="發票日期 民國 yyy/mm/dd *" value="${esc(card.invoiceDate||'')}" ${dis}
+          <input class="pc-inv-date" placeholder="發票日期 民國 yyy/mm/dd *" value="${esc(card.invoiceDate||'')}" ${inpRO}
                  oninput="_payeeCardField(${i}, 'invoiceDate', this.value)">
-          <input class="pc-inv-amt" placeholder="發票金額 *" value="${esc(card.invoiceAmount||'')}" ${dis}
+          <input class="pc-inv-amt" placeholder="發票金額 *" value="${esc(card.invoiceAmount||'')}" ${inpRO}
                  oninput="_payeeCardField(${i}, 'invoiceAmount', this.value)">
         </div>
       </div>`;
@@ -4711,7 +4714,7 @@ function _payeeCardKwChange(i, val) {
   renderPayeeCardList(i);
 }
 
-/* v4.4.80 受款人卡片附記事項/發票欄位 generic state setter */
+/* v4.4.81 受款人卡片附記事項/發票欄位 generic state setter */
 function _payeeCardField(i, key, val) {
   if (!_payeeCards[i]) return;
   _payeeCards[i][key] = val;
@@ -4785,7 +4788,7 @@ function _pickPayeeFromBox(i, k) {
   const p = box?._filtered?.[k];
   if (!p) return;
   if (p._placeholder) { openNewPayeeModalForCard(i, p.name); return; }
-  /* v4.4.80：保留原本附記事項與發票資訊（避免使用者在「變更」時靜默丟資料） */
+  /* v4.4.81：保留原本附記事項與發票資訊（避免使用者在「變更」時靜默丟資料） */
   const prev = _payeeCards[i] || {};
   const hadInvoice = prev.receiptType === '2' && (prev.invoiceNo || prev.invoiceDate || prev.invoiceAmount);
   _payeeCards[i] = {
@@ -4803,7 +4806,7 @@ function _pickPayeeFromBox(i, k) {
 
 function unpickPayeeCard(i) {
   if (!_payeeCards[i]) return;
-  /* v4.4.80：清空時若帶有統一發票資訊，提示一聲避免使用者誤以為資料還在 */
+  /* v4.4.81：清空時若帶有統一發票資訊，提示一聲避免使用者誤以為資料還在 */
   const prev = _payeeCards[i];
   const hadInvoice = prev.receiptType === '2' && (prev.invoiceNo || prev.invoiceDate || prev.invoiceAmount);
   _payeeCards[i] = { name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'', receiptType:'1' };
@@ -4882,7 +4885,7 @@ function openNewPayeeModal(prefillName) {
   document.getElementById('np-name').value = prefillName || '';
   document.getElementById('np-bank').value = '';
   document.getElementById('np-acct').value = '';
-  /* v4.4.80 重置代號欄 */
+  /* v4.4.81 重置代號欄 */
   const npCode = document.getElementById('np-code');
   if (npCode) npCode.value = '';
   document.getElementById('np-bank-text').textContent = '（尚未選擇）';
@@ -4983,7 +4986,7 @@ async function submitNewPayee() {
   if (!bank) { showToast('✗ 請先選擇存款銀行（點「🔍 選擇銀行」）'); return; }
   if (!acct) { showToast('✗ 請輸入存款帳號'); return; }
   if (!name) { showToast('✗ 請輸入戶名'); return; }
-  /* v4.4.80 受款人代號必填 + 格式檢查（統編 8 碼 / 身分證或居留證 10 碼） */
+  /* v4.4.81 受款人代號必填 + 格式檢查（統編 8 碼 / 身分證或居留證 10 碼） */
   if (!code) { showToast('✗ 請輸入受款人代號（統編或身分證字號）'); return; }
   if (!/^\d{8}$/.test(code) && !/^[A-Z][1-2]\d{8}$/.test(code) && !/^[A-Z]\d{9}$/.test(code)) {
     showToast('✗ 代號格式：8 碼數字（統編）或 身分證字號（A123456789）');
@@ -5045,7 +5048,7 @@ function getPayeesData() {
     .filter(c => c.name || c.bank || c.acctNo)
     .map(c => {
       const o = { type, bank: c.bank||'', acctNo: c.acctNo||'', name: c.name||'', isNew: !!c.isNew };
-      /* v4.4.80 附記事項與發票資訊 */
+      /* v4.4.81 附記事項與發票資訊 */
       const rcpt = c.receiptType || '1';
       o.receiptType = rcpt;
       if (rcpt === '2') {
@@ -5063,7 +5066,7 @@ function getPayeeData() {
 }
 
 /* ══════════════════════════════════════════════════
-   v4.4.80 受款人資料庫 Modal — 一般使用者可新增/編輯/凍結/解凍
+   v4.4.81 受款人資料庫 Modal — 一般使用者可新增/編輯/凍結/解凍
    ══════════════════════════════════════════════════ */
 let _dbPayeeEditKey = null; // null = 新增；非空 = 編輯既有
 
@@ -5098,7 +5101,7 @@ function renderPayeeDb() {
       (p.acctNo||'').toLowerCase().includes(kw)
     );
   }
-  /* v4.4.80 多欄排序：戶名 / 代號 / 存款銀行 / 存款帳號 / 最後匯款·建立 */
+  /* v4.4.81 多欄排序：戶名 / 代號 / 存款銀行 / 存款帳號 / 最後匯款·建立 */
   const sortKey = document.getElementById('db-payee-sort')?.value || 'name-desc';
   const _zhCmp = (a, b) => (a||'').localeCompare(b||'', 'zh-Hant');
   const _emptyLast = (val, asc) => {
@@ -5202,7 +5205,7 @@ async function savePayeeEditDb() {
   const warn = document.getElementById('db-pe-warn');
   if (!name) { warn.textContent = '⚠ 戶名必填'; warn.style.display = ''; return; }
   if (!bank && !acct) { warn.textContent = '⚠ 至少要填銀行或帳號'; warn.style.display = ''; return; }
-  /* v4.4.80 受款人代號：新增時必填；編輯時可保留空白（既有 23 筆無代號漸進補回） */
+  /* v4.4.81 受款人代號：新增時必填；編輯時可保留空白（既有 23 筆無代號漸進補回） */
   if (!_dbPayeeEditKey && !code) {
     warn.textContent = '⚠ 新增受款人必須填代號（統一編號 或 身分證字號）';
     warn.style.display = '';
@@ -5257,7 +5260,7 @@ async function savePayeeEditDb() {
   }
 }
 
-/* v4.4.80 匯入會計系統「受(繳)款人匯出」XLSX，把代號/統編寫入 EAF 受款人庫
+/* v4.4.81 匯入會計系統「受(繳)款人匯出」XLSX，把代號/統編寫入 EAF 受款人庫
    配對 key：戶名 + 帳號（最可靠）；fallback 戶名相同但帳號不同先跳過讓人工處理 */
 async function importPayeeCodesFromXlsx(event) {
   const file = event.target.files?.[0];
@@ -5358,7 +5361,7 @@ async function importPayeeCodesFromXlsx(event) {
   }
 }
 
-/* v4.4.80 匯出會計系統相容 XLSX（FNWFCX0030 格式：受款人匯入 + 發票明細）
+/* v4.4.81 匯出會計系統相容 XLSX（FNWFCX0030 格式：受款人匯入 + 發票明細）
    - Sheet 1「受款人匯入」：受款人主檔（戶名/銀行/帳號/代號 等）— 每筆一行
    - Sheet 2「發票明細」：自動掃 cachedRecords 裡所有 receiptType='2' 的 payees，
                        把發票號碼/日期/金額/受款人對照寫成 sheet 2 一行一筆
@@ -5393,7 +5396,7 @@ function exportPayeesToXlsx() {
       });
     }
   }
-  /* v4.4.80 受款人 → 該受款人對應的發票 seq 陣列（多發票多列複製用） */
+  /* v4.4.81 受款人 → 該受款人對應的發票 seq 陣列（多發票多列複製用） */
   const invSeqsByKey = new Map();
   for (const r of invoiceRows) {
     if (!invSeqsByKey.has(r.payeeKey)) invSeqsByKey.set(r.payeeKey, []);
@@ -5401,7 +5404,7 @@ function exportPayeesToXlsx() {
   }
 
   /* === Sheet 1「受款人匯入」===
-     v4.4.80：同一受款人若對應 N 張發票 → 該主檔行複製 N 列，每列各填獨立 V 欄
+     v4.4.81：同一受款人若對應 N 張發票 → 該主檔行複製 N 列，每列各填獨立 V 欄
      讓會計系統能一對一比對 sheet 2 的每張發票 */
   const headers1 = [
     '受款人代碼','受款人序號','受款人名稱','地址','郵遞區號','電話',
@@ -5478,7 +5481,7 @@ function exportPayeesToXlsx() {
   const fname = `${roc}_受款人匯入_${list.length}筆_發票${invoiceRows.length}張.xlsx`;
   XLSX.writeFile(wb, fname);
 
-  /* v4.4.80 Fix #4：發票對應的受款人若 code 為空，會計系統會 reject 該列 → toast 警告 */
+  /* v4.4.81 Fix #4：發票對應的受款人若 code 為空，會計系統會 reject 該列 → toast 警告 */
   const invoicesNoCode = invoiceRows.filter(r => !r.payeeCode).length;
   const noCode = list.filter(p => !p.code).length;
   let warn = '';
@@ -5492,7 +5495,7 @@ function exportPayeesToXlsx() {
   }
 }
 
-/* v4.4.80b 從歷史單據掃描受款人，補回受款人庫漏的（修復過去 PATCH 401 fallback 流失的資料） */
+/* v4.4.81b 從歷史單據掃描受款人，補回受款人庫漏的（修復過去 PATCH 401 fallback 流失的資料） */
 async function recoverPayeesFromRecords() {
   if (!confirm('將掃描所有歷史單據裡用過的受款人，把受款人庫裡漏的補回去（標記為 isNew）。\n\n大量單據會跑數秒。是否繼續？')) return;
   showToast('🔁 開始掃描歷史單據…');
@@ -5568,7 +5571,7 @@ async function dbPayeeToggleFrozen(btn, freeze) {
   }
 }
 
-/* v4.4.80 受款人資訊複製拆三顆鈕：戶名 / 銀行代號 / 帳號 */
+/* v4.4.81 受款人資訊複製拆三顆鈕：戶名 / 銀行代號 / 帳號 */
 function _payeeCopyCards() {
   return (typeof _payeeCards !== 'undefined' ? _payeeCards : [])
     .filter(c => c.name || c.bank || c.acctNo);
@@ -5601,7 +5604,7 @@ function copyPayeeAcctNo() {
   _doPayeeCopy(cards.map(c => c.acctNo || ''), '沒有帳號可複製', '帳號已複製');
 }
 
-/* v4.4.80 複製明細表所有列「動支說明 / 採購品名」 */
+/* v4.4.81 複製明細表所有列「動支說明 / 採購品名」 */
 function copyItemsName() {
   const cells = document.querySelectorAll('#items-body [data-c="name"]');
   const lines = Array.from(cells).map(c => (c.value || '').trim()).filter(s => s);
@@ -5642,7 +5645,7 @@ function setPayeesData(payees, legacyPayee) {
     .map(p => ({
       name: p.name||'', bank: p.bank||'', acctNo: p.acctNo||'',
       isNew: !!p.isNew, expanded: !(p.name||p.bank||p.acctNo), kw: '',
-      /* v4.4.80 還原附記事項與發票資訊（無則預設普通收據） */
+      /* v4.4.81 還原附記事項與發票資訊（無則預設普通收據） */
       receiptType: p.receiptType || '1',
       invoiceNo: p.invoiceNo || '',
       invoiceDate: p.invoiceDate || '',
@@ -5656,7 +5659,7 @@ function setPayeesData(payees, legacyPayee) {
 function setPayeeData(payee) { setPayeesData(null, payee); }
 
 /* v4.2.23 列印用受款人資訊：每張卡一列
-   v4.4.80 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出 */
+   v4.4.81 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出 */
 const PAYEE_PAGE1_OVERFLOW_THRESHOLD = 4;
 function updatePayeePrintLine() {
   const line  = document.getElementById('payee-print-line');
@@ -5670,7 +5673,7 @@ function updatePayeePrintLine() {
   if (!cards.length) { line.innerHTML = ''; return; }
 
   // 把單張卡片格式化成一個 <div class="pl-row">…</div>
-  // v4.4.80：列印頁仍只印戶名/銀行/帳號；附記事項與發票資訊只供螢幕檢視 + 匯出 + 複製，列印頁不出現
+  // v4.4.81：列印頁仍只印戶名/銀行/帳號；附記事項與發票資訊只供螢幕檢視 + 匯出 + 複製，列印頁不出現
   const formatCard = (c, i, total) => {
     let bankCode = '', bankName = c.bank || '';
     const m = (c.bank||'').match(/^(\d{7})[\s-]+(.+)$/);
@@ -5880,7 +5883,7 @@ window.addEventListener('afterprint', () => {
   </div>
 </div>
 
-<!-- ══ v4.4.80 受款人資料庫 Modal ══ -->
+<!-- ══ v4.4.81 受款人資料庫 Modal ══ -->
 <div id="payee-db-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:8500; align-items:center; justify-content:center;">
   <div style="background:#fff; width:96%; max-width:1200px; max-height:90vh; border-radius:8px; display:flex; flex-direction:column; overflow:hidden;">
     <div style="padding:12px 18px; border-bottom:1px solid #e0e0e0; display:flex; justify-content:space-between; align-items:center; background:#37474f; color:#fff;">
@@ -5941,7 +5944,7 @@ window.addEventListener('afterprint', () => {
   </div>
 </div>
 
-<!-- ══ v4.4.80 受款人 編輯 / 新增 子 Modal ══ -->
+<!-- ══ v4.4.81 受款人 編輯 / 新增 子 Modal ══ -->
 <div id="payee-db-edit-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:9500; align-items:center; justify-content:center;">
   <div style="background:#fff; width:92%; max-width:560px; border-radius:8px; padding:18px 22px;">
     <h3 id="db-payee-edit-title" style="margin:0 0 14px; padding-bottom:8px; border-bottom:1px solid #e0e0e0; color:#1565c0; font-size:16px;">編輯受款人</h3>
