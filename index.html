@@ -792,7 +792,7 @@ body.sb-resizing * { pointer-events: none !important; }
     page-break-inside: avoid;
   }
   #payee-print-line:empty { display: none !important; }
-  /* v4.4.74 受款人第二頁明細（form-page 外的兄弟元素，可正常換頁列印） */
+  /* v4.4.75 受款人第二頁明細（form-page 外的兄弟元素，可正常換頁列印） */
   #payee-print-line-page2 { display: none !important; }
   #payee-print-line-page2:not(:empty) {
     display: block !important;
@@ -1025,7 +1025,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.74</div>
+      <div id="sb-version">v4.4.75</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1404,7 +1404,7 @@ body.sb-resizing * { pointer-events: none !important; }
 
   </div><!-- /#form-page -->
 
-  <!-- v4.4.74 受款人多到放不下時的第二頁明細（form-page 外，可換頁） -->
+  <!-- v4.4.75 受款人多到放不下時的第二頁明細（form-page 外，可換頁） -->
   <div id="payee-print-line-page2"></div>
 
   <!-- 新建受款人 Modal (v4.2.31 放大版，銀行搜尋拆分獨立彈窗) -->
@@ -1432,6 +1432,12 @@ body.sb-resizing * { pointer-events: none !important; }
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
         <label style="width:90px; font-size:15px; font-weight:600; color:#333; flex-shrink:0;">戶名</label>
         <input id="np-name" type="text" style="flex:1; height:42px; padding:8px 14px; border:1.5px solid #ccc; border-radius:6px; font-size:15px;">
+      </div>
+
+      <!-- 4) v4.4.75 受款人代號（必填）：統編 8 碼 或 身分證 10 碼 -->
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
+        <label style="width:90px; font-size:15px; font-weight:600; color:#333; flex-shrink:0;">受款人代號 <span style="color:#c62828;">*</span></label>
+        <input id="np-code" type="text" placeholder="統一編號 8 碼  或  身分證字號（A123456789）" style="flex:1; height:42px; padding:8px 14px; border:1.5px solid #ccc; border-radius:6px; font-size:15px; font-family:Consolas, monospace;">
       </div>
 
       <div id="np-dup-warn" style="display:none; margin:14px 0; padding:12px 16px; background:#fff3e0; border-left:4px solid #ff9800; border-radius:6px; font-size:14px; color:#e65100;"></div>
@@ -1823,7 +1829,7 @@ async function apiPatch(id, patch) {
 function setSyncStatus(msg, cls) {
   const el = document.getElementById('sync-status');
   const onlineSpan = document.getElementById('online-count');
-  /* v4.4.74 連同 open-payee-db-btn 一起保留，避免 innerHTML 覆寫把它擦掉 */
+  /* v4.4.75 連同 open-payee-db-btn 一起保留，避免 innerHTML 覆寫把它擦掉 */
   const dbBtn = document.getElementById('open-payee-db-btn');
   const saved = (onlineSpan ? onlineSpan.outerHTML : '') + (dbBtn ? dbBtn.outerHTML : '');
   el.innerHTML = esc(msg) + saved;
@@ -2494,10 +2500,10 @@ function generateItemRows() {
   for (let i = 0; i < rowCount; i++) appendRow(i);
 }
 
-/* v4.4.74：Tab 導航統一改由 initTableArrowNav 內的 keydown handler 處理
+/* v4.4.75：Tab 導航統一改由 initTableArrowNav 內的 keydown handler 處理
    舊的 qtyTabToUnit / priceTabToNextName 為 noop（避免 row HTML 內 inline onkeydown 報錯） */
-function qtyTabToUnit() { /* deprecated v4.4.74 — 由 generic Tab handler 處理 */ }
-function priceTabToNextName() { /* deprecated v4.4.74 */ }
+function qtyTabToUnit() { /* deprecated v4.4.75 — 由 generic Tab handler 處理 */ }
+function priceTabToNextName() { /* deprecated v4.4.75 */ }
 
 function appendRow(i) {
   const tr = document.createElement('tr');
@@ -4278,7 +4284,7 @@ function showCopyPopup(no, opts = {}) {
     }
   });
 
-  /* v4.4.74 統一 Tab / Shift+Tab：所有 items table 欄位都能像 Excel 跳格 */
+  /* v4.4.75 統一 Tab / Shift+Tab：所有 items table 欄位都能像 Excel 跳格 */
   document.addEventListener('keydown', function (e) {
     if (e.isComposing || e.key !== 'Tab') return;
     const el = e.target;
@@ -4784,6 +4790,9 @@ function openNewPayeeModal(prefillName) {
   document.getElementById('np-name').value = prefillName || '';
   document.getElementById('np-bank').value = '';
   document.getElementById('np-acct').value = '';
+  /* v4.4.75 重置代號欄 */
+  const npCode = document.getElementById('np-code');
+  if (npCode) npCode.value = '';
   document.getElementById('np-bank-text').textContent = '（尚未選擇）';
   document.getElementById('np-bank-text').style.color = '#aaa';
   document.getElementById('np-dup-warn').style.display = 'none';
@@ -4877,10 +4886,17 @@ async function submitNewPayee() {
   const name = document.getElementById('np-name').value.trim();
   const bank = document.getElementById('np-bank').value.trim();
   const acct = document.getElementById('np-acct').value.trim();
+  const code = (document.getElementById('np-code')?.value || '').trim();
   /* v4.2.31 三欄必填驗證（存款銀行必須由搜尋選取） */
   if (!bank) { showToast('✗ 請先選擇存款銀行（點「🔍 選擇銀行」）'); return; }
   if (!acct) { showToast('✗ 請輸入存款帳號'); return; }
   if (!name) { showToast('✗ 請輸入戶名'); return; }
+  /* v4.4.75 受款人代號必填 + 格式檢查（統編 8 碼 / 身分證或居留證 10 碼） */
+  if (!code) { showToast('✗ 請輸入受款人代號（統編或身分證字號）'); return; }
+  if (!/^\d{8}$/.test(code) && !/^[A-Z][1-2]\d{8}$/.test(code) && !/^[A-Z]\d{9}$/.test(code)) {
+    showToast('✗ 代號格式：8 碼數字（統編）或 身分證字號（A123456789）');
+    return;
+  }
   /* v4.2.23 員工/代墊類別阻止重複戶名（避免自動帶入時歧義） */
   const curType = document.getElementById('payee-type').value;
   if (curType === 'employee' && EMPLOYEE_LIST.includes(name)) {
@@ -4892,7 +4908,7 @@ async function submitNewPayee() {
   }
   const today = new Date();
   const roc = `${today.getFullYear()-1911}${pad(today.getMonth()+1)}${pad(today.getDate())}`;
-  const newPayee = { name, bank, acctNo: acct, createdAt: roc, isNew: true };
+  const newPayee = { name, bank, acctNo: acct, code, createdAt: roc, isNew: true };
   /* 直接 PATCH upsert — 需管理密碼；未登入時僅本地暫存 */
   try {
     const pass = localStorage.getItem('eaf_admin_pass') || '';
@@ -4944,7 +4960,7 @@ function getPayeeData() {
 }
 
 /* ══════════════════════════════════════════════════
-   v4.4.74 受款人資料庫 Modal — 一般使用者可新增/編輯/凍結/解凍
+   v4.4.75 受款人資料庫 Modal — 一般使用者可新增/編輯/凍結/解凍
    ══════════════════════════════════════════════════ */
 let _dbPayeeEditKey = null; // null = 新增；非空 = 編輯既有
 
@@ -5062,7 +5078,13 @@ async function savePayeeEditDb() {
   const warn = document.getElementById('db-pe-warn');
   if (!name) { warn.textContent = '⚠ 戶名必填'; warn.style.display = ''; return; }
   if (!bank && !acct) { warn.textContent = '⚠ 至少要填銀行或帳號'; warn.style.display = ''; return; }
-  /* 受款人代號簡單格式檢查（可空）：8 碼純數字（統編）或 1 字母+9 碼（身分證） */
+  /* v4.4.75 受款人代號：新增時必填；編輯時可保留空白（既有 23 筆無代號漸進補回） */
+  if (!_dbPayeeEditKey && !code) {
+    warn.textContent = '⚠ 新增受款人必須填代號（統一編號 或 身分證字號）';
+    warn.style.display = '';
+    return;
+  }
+  /* 代號格式檢查（有填才檢查）：8 碼純數字（統編）或 1 字母+9 碼（身分證/居留證） */
   if (code && !/^\d{8}$/.test(code) && !/^[A-Z][1-2]\d{8}$/.test(code) && !/^[A-Z]\d{9}$/.test(code)) {
     warn.textContent = '⚠ 代號格式：8 碼數字（統編）或 身分證字號（A123456789）';
     warn.style.display = '';
@@ -5111,7 +5133,7 @@ async function savePayeeEditDb() {
   }
 }
 
-/* v4.4.74 匯入會計系統「受(繳)款人匯出」XLSX，把代號/統編寫入 EAF 受款人庫
+/* v4.4.75 匯入會計系統「受(繳)款人匯出」XLSX，把代號/統編寫入 EAF 受款人庫
    配對 key：戶名 + 帳號（最可靠）；fallback 戶名相同但帳號不同先跳過讓人工處理 */
 async function importPayeeCodesFromXlsx(event) {
   const file = event.target.files?.[0];
@@ -5212,7 +5234,7 @@ async function importPayeeCodesFromXlsx(event) {
   }
 }
 
-/* v4.4.74 匯出受款人為會計系統相容 XLSX（FNWFCX0030 格式：受款人匯入 + 發票明細）
+/* v4.4.75 匯出受款人為會計系統相容 XLSX（FNWFCX0030 格式：受款人匯入 + 發票明細）
    只填入靜態主檔欄位（A 受款人代碼、C 受款人名稱、G 戶名、H 帳號、I 銀行代號、J 銀行名稱、S 統編）
    交易性欄位（金額/日期/支出用途/支票相關）保留空白讓會計人員填 */
 function exportPayeesToXlsx() {
@@ -5282,7 +5304,7 @@ function exportPayeesToXlsx() {
   showToast(`✓ 已匯出 ${list.length} 筆${noCode ? `（${noCode} 筆缺代號）` : ''}`);
 }
 
-/* v4.4.74b 從歷史單據掃描受款人，補回受款人庫漏的（修復過去 PATCH 401 fallback 流失的資料） */
+/* v4.4.75b 從歷史單據掃描受款人，補回受款人庫漏的（修復過去 PATCH 401 fallback 流失的資料） */
 async function recoverPayeesFromRecords() {
   if (!confirm('將掃描所有歷史單據裡用過的受款人，把受款人庫裡漏的補回去（標記為 isNew）。\n\n大量單據會跑數秒。是否繼續？')) return;
   showToast('🔁 開始掃描歷史單據…');
@@ -5358,7 +5380,7 @@ async function dbPayeeToggleFrozen(btn, freeze) {
   }
 }
 
-/* v4.4.74 受款人資訊複製拆三顆鈕：戶名 / 銀行代號 / 帳號 */
+/* v4.4.75 受款人資訊複製拆三顆鈕：戶名 / 銀行代號 / 帳號 */
 function _payeeCopyCards() {
   return (typeof _payeeCards !== 'undefined' ? _payeeCards : [])
     .filter(c => c.name || c.bank || c.acctNo);
@@ -5391,7 +5413,7 @@ function copyPayeeAcctNo() {
   _doPayeeCopy(cards.map(c => c.acctNo || ''), '沒有帳號可複製', '帳號已複製');
 }
 
-/* v4.4.74 複製明細表所有列「動支說明 / 採購品名」 */
+/* v4.4.75 複製明細表所有列「動支說明 / 採購品名」 */
 function copyItemsName() {
   const cells = document.querySelectorAll('#items-body [data-c="name"]');
   const lines = Array.from(cells).map(c => (c.value || '').trim()).filter(s => s);
@@ -5441,7 +5463,7 @@ function setPayeesData(payees, legacyPayee) {
 function setPayeeData(payee) { setPayeesData(null, payee); }
 
 /* v4.2.23 列印用受款人資訊：每張卡一列
-   v4.4.74 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出 */
+   v4.4.75 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出 */
 const PAYEE_PAGE1_OVERFLOW_THRESHOLD = 4;
 function updatePayeePrintLine() {
   const line  = document.getElementById('payee-print-line');
@@ -5664,7 +5686,7 @@ window.addEventListener('afterprint', () => {
   </div>
 </div>
 
-<!-- ══ v4.4.74 受款人資料庫 Modal ══ -->
+<!-- ══ v4.4.75 受款人資料庫 Modal ══ -->
 <div id="payee-db-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:8500; align-items:center; justify-content:center;">
   <div style="background:#fff; width:96%; max-width:1200px; max-height:90vh; border-radius:8px; display:flex; flex-direction:column; overflow:hidden;">
     <div style="padding:12px 18px; border-bottom:1px solid #e0e0e0; display:flex; justify-content:space-between; align-items:center; background:#37474f; color:#fff;">
@@ -5712,7 +5734,7 @@ window.addEventListener('afterprint', () => {
   </div>
 </div>
 
-<!-- ══ v4.4.74 受款人 編輯 / 新增 子 Modal ══ -->
+<!-- ══ v4.4.75 受款人 編輯 / 新增 子 Modal ══ -->
 <div id="payee-db-edit-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:9500; align-items:center; justify-content:center;">
   <div style="background:#fff; width:92%; max-width:560px; border-radius:8px; padding:18px 22px;">
     <h3 id="db-payee-edit-title" style="margin:0 0 14px; padding-bottom:8px; border-bottom:1px solid #e0e0e0; color:#1565c0; font-size:16px;">編輯受款人</h3>
