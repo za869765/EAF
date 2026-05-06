@@ -5592,8 +5592,7 @@ function updatePayeePrintLine() {
   if (!cards.length) { line.innerHTML = ''; return; }
 
   // 把單張卡片格式化成一個 <div class="pl-row">…</div>
-  // v4.4.77：附記事項（=收據別）與統一發票三欄一起印，讓會計看紙本即可知收據型態
-  const RECEIPT_LBL = { '0':'其他相關書據', '1':'普通收據', '2':'統一發票' };
+  // v4.4.77：列印頁仍只印戶名/銀行/帳號；附記事項與發票資訊只供螢幕檢視 + 匯出 + 複製，列印頁不出現
   const formatCard = (c, i, total) => {
     let bankCode = '', bankName = c.bank || '';
     const m = (c.bank||'').match(/^(\d{7})[\s-]+(.+)$/);
@@ -5604,23 +5603,7 @@ function updatePayeePrintLine() {
     if (bankCode||bankName) parts.push(`<span class="pl-lbl">銀行：</span>${esc(bankCode)}　${esc(bankName)}`);
     if (c.acctNo)           parts.push(`<span class="pl-lbl">帳號：</span>${esc(c.acctNo)}`);
     const idx = total > 1 ? `<span class="pl-idx">#${i+1}</span>　` : '';
-    let html = `<div class="pl-row">${idx}${parts.join('　　')}${newMark}</div>`;
-    /* 附記事項：1.普通收據預設不另列以節省空間；0/2 必列 */
-    const rcpt = c.receiptType || '1';
-    if (rcpt !== '1') {
-      const rcptLine = `<div class="pl-row" style="margin-left:14px;">${total > 1 ? '<span class="pl-idx">▸</span>　' : ''}<span class="pl-lbl">附記事項：</span>${esc(RECEIPT_LBL[rcpt] || rcpt)}</div>`;
-      html += rcptLine;
-      if (rcpt === '2') {
-        const invParts = [];
-        if (c.invoiceNo)     invParts.push(`<span class="pl-lbl">號碼：</span>${esc(c.invoiceNo)}`);
-        if (c.invoiceDate)   invParts.push(`<span class="pl-lbl">日期：</span>${esc(c.invoiceDate)}`);
-        if (c.invoiceAmount) invParts.push(`<span class="pl-lbl">金額：</span>$${esc(c.invoiceAmount)}`);
-        if (invParts.length) {
-          html += `<div class="pl-row" style="margin-left:14px;">${total > 1 ? '<span class="pl-idx">　</span>　' : ''}${invParts.join('　　')}</div>`;
-        }
-      }
-    }
-    return html;
+    return `<div class="pl-row">${idx}${parts.join('　　')}${newMark}</div>`;
   };
 
   /* v4.2.31 代墊原因（有填寫才加）；v4.2.35 末端加「職章：」提示列印後蓋章 */
