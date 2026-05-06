@@ -792,7 +792,7 @@ body.sb-resizing * { pointer-events: none !important; }
     page-break-inside: avoid;
   }
   #payee-print-line:empty { display: none !important; }
-  /* v4.4.69 受款人第二頁明細（form-page 外的兄弟元素，可正常換頁列印） */
+  /* v4.4.70 受款人第二頁明細（form-page 外的兄弟元素，可正常換頁列印） */
   #payee-print-line-page2 { display: none !important; }
   #payee-print-line-page2:not(:empty) {
     display: block !important;
@@ -868,7 +868,7 @@ body.sb-resizing * { pointer-events: none !important; }
   #app  { display: block; }
   #sidebar, #sidebar-resizer, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns,
   #row-lecturer, #row-acct-type, #row-income50-type, #row-item-type,
-  #row-budget-info, #exempt-wrap, #copy-no-btn,
+  #row-budget-info, #exempt-wrap, #copy-no-btn, #copy-purpose-btn,
   .date-picker-btn { display: none !important; }
   /* 隱藏未選擇的佔位文字 */
   #main-acct-lbl[data-ph="1"] { visibility: hidden; }
@@ -1025,7 +1025,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.69</div>
+      <div id="sb-version">v4.4.70</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1178,7 +1178,16 @@ body.sb-resizing * { pointer-events: none !important; }
         <td style="padding:0;">
           <div style="display:flex; height:100%;">
             <div style="flex:1; padding:2mm 2mm 2mm 2mm; border-right:1px solid #ccc;">
-              <span class="cell-lbl">用途說明</span>
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+                <span class="cell-lbl">用途說明</span>
+                <button id="copy-purpose-btn"
+                        type="button"
+                        onclick="const t=document.getElementById('purpose-desc').value; if(!t.trim()){showToast('用途說明為空');return;} navigator.clipboard?.writeText(t).then(()=>showCopyPopup(t,{label:'用途說明已複製'})).catch(()=>{document.getElementById('purpose-desc').select();showToast('請按 Ctrl+C 複製');})"
+                        title="複製用途說明"
+                        style="padding:1px 7px; font-size:11px; cursor:pointer;
+                               border:1px solid #aaa; border-radius:4px;
+                               background:#f5f5f5; color:#333;">📋 複製</button>
+              </div>
               <textarea class="fta" id="purpose-desc" rows="5"
                         style="font-size:12.5px; min-height:20mm; width:100%;"></textarea>
               <!-- v4.4.38 列印專用 div：textarea 在列印時瀏覽器會吃字，改用 div 顯示 -->
@@ -1370,7 +1379,7 @@ body.sb-resizing * { pointer-events: none !important; }
 
   </div><!-- /#form-page -->
 
-  <!-- v4.4.69 受款人多到放不下時的第二頁明細（form-page 外，可換頁） -->
+  <!-- v4.4.70 受款人多到放不下時的第二頁明細（form-page 外，可換頁） -->
   <div id="payee-print-line-page2"></div>
 
   <!-- 新建受款人 Modal (v4.2.31 放大版，銀行搜尋拆分獨立彈窗) -->
@@ -4937,7 +4946,7 @@ function setPayeesData(payees, legacyPayee) {
 function setPayeeData(payee) { setPayeesData(null, payee); }
 
 /* v4.2.23 列印用受款人資訊：每張卡一列
-   v4.4.69 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出 */
+   v4.4.70 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出 */
 const PAYEE_PAGE1_OVERFLOW_THRESHOLD = 4;
 function updatePayeePrintLine() {
   const line  = document.getElementById('payee-print-line');
