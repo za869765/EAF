@@ -1050,7 +1050,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.87</div>
+      <div id="sb-version">v4.4.88</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1305,8 +1305,8 @@ body.sb-resizing * { pointer-events: none !important; }
             <thead id="items-thead">
               <tr>
                 <th rowspan="2" style="width:30%;">採購品名</th>
-                <th rowspan="2" style="width:20%;">規格（樣式）</th>
-                <th rowspan="2" style="width:8%;">數量</th>
+                <th rowspan="2" style="width:18%;">規格（樣式）</th>
+                <th rowspan="2" style="width:10%;">數量</th>
                 <th rowspan="2" style="width:8%;">單位</th>
                 <th colspan="2">預估金額</th>
               </tr>
@@ -1750,8 +1750,8 @@ function applyType(type, { regen = true } = {}) {
   document.getElementById('items-thead').innerHTML = isPurchase
     ? `<tr>
          <th rowspan="2" style="width:30%;">採購品名</th>
-         <th rowspan="2" style="width:20%;">規格（樣式）</th>
-         <th rowspan="2" style="width:8%;">數量</th>
+         <th rowspan="2" style="width:18%;">規格（樣式）</th>
+         <th rowspan="2" style="width:10%;">數量</th>
          <th rowspan="2" style="width:8%;">單位</th>
          <th colspan="2">預估金額</th>
        </tr>
