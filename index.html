@@ -241,6 +241,8 @@ body.sb-resizing * { pointer-events: none !important; }
        overflow: hidden; line-height: 1.45; }
 /* v4.4.38 用途說明列印替身：螢幕隱藏，列印時顯示（見 @media print） */
 #purpose-desc-print { display: none; }
+/* v4.4.89 交貨地點列印替身：input 列印會吃字，改用 div */
+#delivery-place-print { display: none; }
 .fsel {
   border: 1.5px solid #1565c0; border-radius: 4px;
   background: #eef4fd; color: #111;
@@ -1011,6 +1013,20 @@ body.sb-resizing * { pointer-events: none !important; }
     color: #000 !important;
     font-family: inherit;
   }
+  /* v4.4.89 交貨地點列印替身：input 列印吃字（28mm 寬塞 9 字 11.5px 會切到「衛生所」）
+     改用 div 並讓字距/字級依長度自動縮，beforeprint 寫入 input.value */
+  #delivery-place { display: none !important; }
+  #delivery-place-print {
+    display: block !important;
+    width: 100% !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+    color: #000 !important;
+    font-family: inherit;
+    border-bottom: 1px solid #555;
+    line-height: 1.3 !important;
+    padding-bottom: 0.3mm;
+  }
   /* notes 欄位仍維持 textarea 但放寬限制 */
   #notes {
     overflow: visible !important; height: auto !important;
@@ -1050,7 +1066,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.88</div>
+      <div id="sb-version">v4.4.89</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1242,6 +1258,8 @@ body.sb-resizing * { pointer-events: none !important; }
                 <input class="fi" id="delivery-place" type="text"
                        value="臺南市佳里區衛生所"
                        style="font-size:11.5px; width:100%;">
+                <!-- v4.4.89 列印替身：input 列印會吃字，改用 div 顯示（仿 v4.4.38 用途說明） -->
+                <div id="delivery-place-print" aria-hidden="true"></div>
               </div>
             </div>
           </div>
@@ -2123,14 +2141,15 @@ function onBpChange() {
   document.getElementById('row-acct-type').style.display = 'none';
   document.getElementById('row-income50-type').style.display = 'none';
   /* 款項用途切換：特定業務計畫才顯示，且重設為非講師費 */
-  if (!_suppressAutoFill) { isLecturer = ''; }
+  /* v4.4.89 鎖定狀態下改科目時不重設講師費標記，避免破壞已存資料 */
+  if (!_suppressAutoFill && !isFormLocked()) { isLecturer = ''; }
   document.getElementById('lect-yes').classList.remove('active');
   document.getElementById('lect-no').classList.add('active');
   document.getElementById('lect-bonus').classList.remove('active');
   updateLecturerRow();
   updateCashierNote();
   /* BP 切換時：510601 + 2706 → 填入匯費無收據；離開時清除 */
-  if (!_suppressAutoFill) {
+  if (!_suppressAutoFill && !isFormLocked()) {
     const purposeCode = document.getElementById('sel-purpose').value;
     const notesEl = document.getElementById('notes');
     if (bpCode === '510601' && purposeCode === '2706') {
@@ -2205,6 +2224,10 @@ const ITEM_TYPE_PURPOSES = ['3201','3298'];
 let itemType = 'consumable';   /* consumable | nonconsumable | property */
 
 let _suppressAutoFill = false;   /* 載入已存記錄時抑制自動填入 */
+/* v4.4.89 helper：表單是否處於鎖定狀態（已存檔/已列印）。鎖定下不該觸發任何自動清/填邏輯 */
+function isFormLocked() {
+  return document.getElementById('form-page')?.classList.contains('locked') || false;
+}
 let _auto2706Bill = false;       /* 2706 自動帶入「憑繳費單/匯費」旗標 */
 /* v4.2.14: 鎖定狀態下預算科目變動偵測（只有真的跟 baseline 不同才顯示 💾 確認更新科目，
    並且把 _editingSaved 設為 true 防止使用者切換紀錄） */
@@ -2461,7 +2484,8 @@ function onPurposeChange() {
   updateCashierNote();
 
   /* 用途別 2706：第一列自動帶入預設值（請購單/動支單均適用；欄位空白時才觸發） */
-  if (!_suppressAutoFill && code === '2706') {
+  /* v4.4.89 鎖定狀態（已存檔/已列印）下改科目時不該重新自動帶值 */
+  if (!_suppressAutoFill && !isFormLocked() && code === '2706') {
     const nameEl   = qi(0, 'name');
     const priceEl  = qi(0, 'price');
     const _n2706   = getAutoText('item2706Name',  '檢附支出證明單');
@@ -2491,17 +2515,22 @@ function onPurposeChange() {
   }
 
   /* 離開 2706：若第一列仍是自動帶入的預設值則清除（使用者已修改過的不影響） */
-  if (!_suppressAutoFill && code !== '2706') {
+  /* v4.4.89 兩處修正：
+     (1) 鎖定狀態下絕不清空（使用者改科目只是為了修正分類，不該動 items）
+     (2) 清 qty/unit 必須 name+price 整套 match 才清，避免「數量剛好=1」被誤殺
+         （圖中連續章 1個 170元 鎖定後改用途別 → qty=1 被清、單位「個」留下、金額消失） */
+  if (!_suppressAutoFill && !isFormLocked() && code !== '2706') {
     const nameEl  = qi(0, 'name');
     const priceEl = qi(0, 'price');
     const nameMatch  = nameEl  && nameEl.value.trim()  === getAutoText('item2706Name',  '檢附支出證明單');
     const priceMatch = priceEl && priceEl.value.trim() === getAutoText('item2706Price', '30');
+    const fullMatch  = nameMatch && priceMatch;
     if (nameMatch)  nameEl.value  = '';
     if (priceMatch) priceEl.value = '';
     /* 同步清除自動填入的說明事項 */
     const notesEl = document.getElementById('notes');
     if (notesEl.value.trim() === getAutoText('transferFee', '匯費無收據')) notesEl.value = '';
-    if (formType === 'purchase') {
+    if (formType === 'purchase' && fullMatch) {
       const qtyEl  = qi(0, 'qty');
       const unitEl = qi(0, 'unit');
       if (qtyEl  && qtyEl.value.trim()  === '1') qtyEl.value  = '';
@@ -5934,6 +5963,21 @@ window.addEventListener('beforeprint', () => {
     const pr = (prEl && prEl.value || '').trim();
     if (!nm && !pr) tr.classList.add('print-compact');
   });
+  /* v4.4.89 交貨地點：input 列印會吃字，改寫進替身 div + 依字數縮字
+     寬度 ~28mm，11.5px ≈ 4mm/字 → 約 7 字滿，超過要縮 */
+  const dp  = document.getElementById('delivery-place');
+  const dpp = document.getElementById('delivery-place-print');
+  if (dp && dpp) {
+    const txt = dp.value || '';
+    dpp.textContent = txt;
+    const len = txt.length;
+    let fz = 11.5;
+    if (len > 14)      fz = 7.5;
+    else if (len > 12) fz = 8.5;
+    else if (len > 10) fz = 9.5;
+    else if (len > 8)  fz = 10.5;
+    dpp.style.fontSize = fz + 'px';
+  }
   /* v4.4.38 用途說明：同步至列印替身 div，依文字長度縮字以塞進 5 行（max-height:24mm）
      用途說明區寬度 ~26mm，每行約 7-12 字（隨字體大小） */
   const pd = document.getElementById('purpose-desc');
