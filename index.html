@@ -241,8 +241,13 @@ body.sb-resizing * { pointer-events: none !important; }
        overflow: hidden; line-height: 1.45; }
 /* v4.4.38 用途說明列印替身：螢幕隱藏，列印時顯示（見 @media print） */
 #purpose-desc-print { display: none; }
-/* v4.4.90 交貨地點列印替身：input 列印會吃字，改用 div */
+/* v4.4.91 交貨地點列印替身：input 列印會吃字，改用 div */
 #delivery-place-print { display: none; }
+/* v4.4.91 螢幕版交貨欄位拉寬，避免「臺南市佳里區衛生所」9 字被切到看不見前段；
+   @media print 不套，列印用 28mm 寬度配替身 div 維持原版面 */
+@media screen {
+  #delivery-fields { width: 50mm !important; }
+}
 .fsel {
   border: 1.5px solid #1565c0; border-radius: 4px;
   background: #eef4fd; color: #111;
@@ -1013,7 +1018,7 @@ body.sb-resizing * { pointer-events: none !important; }
     color: #000 !important;
     font-family: inherit;
   }
-  /* v4.4.90 交貨地點列印替身：input 列印吃字（28mm 寬塞 9 字 11.5px 會切到「衛生所」）
+  /* v4.4.91 交貨地點列印替身：input 列印吃字（28mm 寬塞 9 字 11.5px 會切到「衛生所」）
      改用 div 並讓字距/字級依長度自動縮，beforeprint 寫入 input.value */
   #delivery-place { display: none !important; }
   #delivery-place-print {
@@ -1037,7 +1042,7 @@ body.sb-resizing * { pointer-events: none !important; }
   .it td.td-name textarea, .it td.td-spec textarea {
     max-height: 5em !important; overflow: hidden !important;
   }
-  /* v4.4.90 採購品名很多筆時自動縮 row 高度，避免下方核章/受款人被擠出頁面
+  /* v4.4.91 採購品名很多筆時自動縮 row 高度，避免下方核章/受款人被擠出頁面
      階梯：≤7 行預設 10mm；8-10 行 tight 7mm；11+ very-tight 5mm
      beforeprint 算有內容列數套 class，afterprint 移除 */
   .it.print-tight tbody tr { min-height: 7mm !important; height: 7mm !important; }
@@ -1077,7 +1082,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.90</div>
+      <div id="sb-version">v4.4.91</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1269,7 +1274,7 @@ body.sb-resizing * { pointer-events: none !important; }
                 <input class="fi" id="delivery-place" type="text"
                        value="臺南市佳里區衛生所"
                        style="font-size:11.5px; width:100%;">
-                <!-- v4.4.90 列印替身：input 列印會吃字，改用 div 顯示（仿 v4.4.38 用途說明） -->
+                <!-- v4.4.91 列印替身：input 列印會吃字，改用 div 顯示（仿 v4.4.38 用途說明） -->
                 <div id="delivery-place-print" aria-hidden="true"></div>
               </div>
             </div>
@@ -2152,7 +2157,7 @@ function onBpChange() {
   document.getElementById('row-acct-type').style.display = 'none';
   document.getElementById('row-income50-type').style.display = 'none';
   /* 款項用途切換：特定業務計畫才顯示，且重設為非講師費 */
-  /* v4.4.90 鎖定狀態下改科目時不重設講師費標記，避免破壞已存資料 */
+  /* v4.4.91 鎖定狀態下改科目時不重設講師費標記，避免破壞已存資料 */
   if (!_suppressAutoFill && !isFormLocked()) { isLecturer = ''; }
   document.getElementById('lect-yes').classList.remove('active');
   document.getElementById('lect-no').classList.add('active');
@@ -2235,7 +2240,7 @@ const ITEM_TYPE_PURPOSES = ['3201','3298'];
 let itemType = 'consumable';   /* consumable | nonconsumable | property */
 
 let _suppressAutoFill = false;   /* 載入已存記錄時抑制自動填入 */
-/* v4.4.90 helper：表單是否處於鎖定狀態（已存檔/已列印）。鎖定下不該觸發任何自動清/填邏輯 */
+/* v4.4.91 helper：表單是否處於鎖定狀態（已存檔/已列印）。鎖定下不該觸發任何自動清/填邏輯 */
 function isFormLocked() {
   return document.getElementById('form-page')?.classList.contains('locked') || false;
 }
@@ -2495,7 +2500,7 @@ function onPurposeChange() {
   updateCashierNote();
 
   /* 用途別 2706：第一列自動帶入預設值（請購單/動支單均適用；欄位空白時才觸發） */
-  /* v4.4.90 鎖定狀態（已存檔/已列印）下改科目時不該重新自動帶值 */
+  /* v4.4.91 鎖定狀態（已存檔/已列印）下改科目時不該重新自動帶值 */
   if (!_suppressAutoFill && !isFormLocked() && code === '2706') {
     const nameEl   = qi(0, 'name');
     const priceEl  = qi(0, 'price');
@@ -2526,7 +2531,7 @@ function onPurposeChange() {
   }
 
   /* 離開 2706：若第一列仍是自動帶入的預設值則清除（使用者已修改過的不影響） */
-  /* v4.4.90 兩處修正：
+  /* v4.4.91 兩處修正：
      (1) 鎖定狀態下絕不清空（使用者改科目只是為了修正分類，不該動 items）
      (2) 清 qty/unit 必須 name+price 整套 match 才清，避免「數量剛好=1」被誤殺
          （圖中連續章 1個 170元 鎖定後改用途別 → qty=1 被清、單位「個」留下、金額消失） */
@@ -5890,9 +5895,10 @@ function setPayeesData(payees, legacyPayee) {
 function setPayeeData(payee) { setPayeesData(null, payee); }
 
 /* v4.2.23 列印用受款人資訊：每張卡一列
-   v4.4.86 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出 */
+   v4.4.86 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出
+   v4.4.91 加 forceOverflow：採購品名太多時即使受款人 < 4 也強制移到第二頁 */
 const PAYEE_PAGE1_OVERFLOW_THRESHOLD = 4;
-function updatePayeePrintLine() {
+function updatePayeePrintLine(forceOverflow = false) {
   const line  = document.getElementById('payee-print-line');
   const page2 = document.getElementById('payee-print-line-page2');
   if (!line) return;
@@ -5933,7 +5939,7 @@ function updatePayeePrintLine() {
         `</div>`).join('')
     : '';
 
-  if (cards.length >= PAYEE_PAGE1_OVERFLOW_THRESHOLD && page2) {
+  if ((cards.length >= PAYEE_PAGE1_OVERFLOW_THRESHOLD || forceOverflow) && page2) {
     /* page 1：只放摘要（前 2 筆名字 + 共 N 筆，明細見次頁） */
     const preview = cards.slice(0, 2)
       .map(c => `<span class="pl-lbl">${esc(c.name || '—')}</span>`).join('、');
@@ -5976,7 +5982,7 @@ window.addEventListener('beforeprint', () => {
     if (!nm && !pr) tr.classList.add('print-compact');
     else _filledCount++;
   });
-  /* v4.4.90 採購品名很多筆時自動套縮高 class（依「有內容列數」階梯）
+  /* v4.4.91 採購品名很多筆時自動套縮高 class（依「有內容列數」階梯）
      避免下方核章/受款人被擠出 A4 頁面外 */
   const _itTable = document.querySelector('.it');
   if (_itTable) {
@@ -5984,7 +5990,12 @@ window.addEventListener('beforeprint', () => {
     if (_filledCount >= 11)      _itTable.classList.add('print-very-tight');
     else if (_filledCount >= 8)  _itTable.classList.add('print-tight');
   }
-  /* v4.4.90 交貨地點：input 列印會吃字，改寫進替身 div + 依字數縮字
+  /* v4.4.91 採購品名 ≥ 11 行時受款人強制移到第二頁（即使只有 1-3 筆受款人）
+     避免擠在第一頁佔不到空間 */
+  if (_filledCount >= 11) {
+    try { updatePayeePrintLine(true); } catch (_e) {}
+  }
+  /* v4.4.91 交貨地點：input 列印會吃字，改寫進替身 div + 依字數縮字
      寬度 ~28mm，11.5px ≈ 4mm/字 → 約 7 字滿，超過要縮 */
   const dp  = document.getElementById('delivery-place');
   const dpp = document.getElementById('delivery-place-print');
@@ -6034,9 +6045,11 @@ window.addEventListener('beforeprint', () => {
 window.addEventListener('afterprint', () => {
   document.querySelectorAll('#items-body tr.print-compact')
     .forEach(tr => tr.classList.remove('print-compact'));
-  /* v4.4.90 還原 items table 縮高 class（避免影響螢幕編輯） */
+  /* v4.4.91 還原 items table 縮高 class（避免影響螢幕編輯） */
   const _itTable = document.querySelector('.it');
   if (_itTable) _itTable.classList.remove('print-tight', 'print-very-tight');
+  /* v4.4.91 還原受款人渲染（解除強制 overflow，恢復即時邏輯） */
+  try { updatePayeePrintLine(false); } catch (_e) {}
   /* v4.4.38 還原 採購品名/規格 textarea 字體（替身 div 不需 reset，螢幕 display:none） */
   document.querySelectorAll('#items-body textarea[data-c="name"], #items-body textarea[data-c="spec"]').forEach(ta => {
     if ('printOrigFz' in ta.dataset) {
