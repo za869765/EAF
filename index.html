@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>採購(費用動支)申請單 － 臺南市佳里區衛生所</title>
+<title>採購(費用動支)申請單 － 臺南市佳里區衛生所　</title>
 <!-- v4.4.86 hotfix：補載 SheetJS（v4.4.73 起的匯出/匯入會計系統 XLSX 依賴） -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -1087,7 +1087,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.92</div>
+      <div id="sb-version">v4.4.93</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1430,9 +1430,10 @@ body.sb-resizing * { pointer-events: none !important; }
         <label class="payee-lbl">類別</label>
         <select id="payee-type" onchange="onPayeeTypeChange()">
           <option value="">— 請選擇受款人資料 —</option>
-          <option value="vendor">匯款廠商</option>
+          <option value="vendor">非農會廠商</option>
           <option value="nonghui">農會廠商</option>
-          <option value="employee">員工/代墊</option>
+          <option value="employee">員工</option>
+          <option value="employee-advance">員工代墊</option>
           <option value="bill">憑繳費單 / 匯費</option>
         </select>
         <span id="payee-bill-label" style="display:none; margin-left:12px; color:#c62828; font-weight:bold;">憑繳費單 / 匯費</span>
@@ -1442,12 +1443,12 @@ body.sb-resizing * { pointer-events: none !important; }
       <div id="payees-add-row" style="display:none; margin-top:6px;">
         <button type="button" onclick="addPayeeCard()" style="padding:5px 14px; background:#fff; color:#1565c0; border:1.5px solid #1565c0; border-radius:4px; cursor:pointer; font-size:13px; font-weight:bold;">＋ 新增受款人</button>
       </div>
-      <!-- v4.2.31 代墊原因（僅員工/代墊類別顯示，選填） -->
+      <!-- v4.4.93 代墊原因（僅員工代墊類別顯示，必填） -->
       <!-- v4.4.29: 填過的文字自動記憶（localStorage），下拉可選之前用過的原因，不重複 -->
       <div id="row-payee-reason" class="payee-row" style="display:none; margin-top:10px;">
-        <label class="payee-lbl">代墊原因</label>
+        <label class="payee-lbl">代墊原因 <span style="color:#c62828;">*</span></label>
         <input type="text" id="payee-reason" list="payee-reason-history"
-               placeholder="選填，有填寫時列印才會顯示；下拉可選之前用過的原因"
+               placeholder="必填，列印與會計系統皆會顯示；下拉可選之前用過的原因"
                autocomplete="off"
                style="flex:1;"
                oninput="updatePayeePrintLine()"
@@ -1625,6 +1626,8 @@ const API = '/api/records';
       if (r2.ok) CFG = await r2.json();
     } catch(_) {}
   }
+  /* v4.4.93 補齊 purpose.useExpense / usePurchase 預設旗標（D1 未同步含旗標版本時的相容） */
+  _normalizeSubjects(CFG);
 
   _maintenance = !!CFG.settings?.maintenance;
   if (_maintenance) setSyncStatus('● 維修中，暫停存檔功能', 'err');
@@ -1739,10 +1742,13 @@ async function toggleType() {
     }
   }
 
-  /* ③ 用途別在新類型下不存在 → 提示 */
+  /* ③ 用途別在新類型下不存在 → 提示（v4.4.93 改讀 purpose.useExpense/usePurchase） */
   if (curPurCode) {
-    const purLost = (targetType === 'purchase' && EXPENSE_ONLY_PURPOSES.includes(curPurCode)) ||
-                    (targetType === 'expense'  && PURCHASE_ONLY_PURPOSES.includes(curPurCode));
+    const mainCode = document.getElementById('sel-main')?.value || '';
+    const curMain  = CFG.mainAccounts.find(a => a.code === mainCode);
+    const curBp    = curMain ? curMain.businessPlans.find(b => b.code === curBpCode) : null;
+    const curPur   = curBp ? curBp.purposes.find(p => p.code === curPurCode) : null;
+    const purLost  = curPur && !_purposeAllows(curPur, targetType);
     if (purLost) {
       showAlert(`${targetLabel} 沒有「${curPurName}」用途別，請重新選擇。`, '⚠️');
     }
@@ -1755,11 +1761,12 @@ function applyType(type, { regen = true } = {}) {
   const isPurchase = type === 'purchase';
   /* v4.2.17: 僅 動支單 顯示受款人資訊區塊 */
   if (typeof updatePayeeSectionVisibility === 'function') updatePayeeSectionVisibility();
-  /* v4.2.23: 切換單據類型時同步更新「🪄 從動支說明自動帶入」按鈕可見性 */
+  /* v4.2.23 / v4.4.93: 切換單據類型時同步更新「🪄 從動支說明自動帶入」按鈕可見性
+     v4.4.93: 自動帶入擴大到 vendor / nonghui / employee / employee-advance；bill 不適用 */
   const _autoBtn = document.getElementById('payee-auto-btn');
   if (_autoBtn) {
     const _pt = document.getElementById('payee-type')?.value || '';
-    _autoBtn.style.display = (_pt === 'employee' && type === 'expense') ? '' : 'none';
+    _autoBtn.style.display = (AUTOFILL_PAYEE_TYPES.includes(_pt) && type === 'expense') ? '' : 'none';
   }
 
   /* 徽章 */
@@ -2136,12 +2143,8 @@ function onBpChange() {
   const pRow = document.getElementById('row-purpose');
   pSel.innerHTML = '';
   if (bp && bp.purposes.length > 0) {
-    const isExp = formType === 'expense';
-    const validPurps = bp.purposes.filter(p => {
-      if (!isExp && EXPENSE_ONLY_PURPOSES.includes(p.code))  return false;
-      if ( isExp && PURCHASE_ONLY_PURPOSES.includes(p.code)) return false;
-      return true;
-    });
+    /* v4.4.93 依 purpose.useExpense / usePurchase 過濾；掩蔽（兩者皆 false）不出現 */
+    const validPurps = bp.purposes.filter(p => _purposeAllows(p, formType));
     if (validPurps.length === 0) {
       pRow.style.display = 'none';
     } else if (validPurps.length === 1) {
@@ -2185,15 +2188,39 @@ function onBpChange() {
 /* 人員類別：用途別 1301/1501 → 固定顯示「兼任人員」 */
 const PERSONNEL_CODES = ['1301', '1501'];
 
-/* 僅限動支單的用途別代碼（請購單不得選用） */
-const EXPENSE_ONLY_PURPOSES = [
-  '1301','1501','2102','2104','2202','2204',
-  '2301','2305','2706','2707',
-  '2713','2802','7103'
-];
+/* v4.4.93 受款人「員工系列」類別（適用智慧自動行為、同名警告、bank/acctNo 必填驗證、人數一致性檢查） */
+const EMPLOYEE_PAYEE_TYPES = ['employee', 'employee-advance'];
+/* v4.4.93 可使用「🪄 從動支說明自動帶入」的受款人類別（bill 不適用） */
+const AUTOFILL_PAYEE_TYPES = ['vendor', 'nonghui', 'employee', 'employee-advance'];
 
-/* 僅限請購單的用途別代碼（動支單不得選用） */
-const PURCHASE_ONLY_PURPOSES = ['2401','3106','3201','3206','3298'];
+/* v4.4.93 用途別使用範圍改由 subjects.json 每筆 purpose 上的 useExpense / usePurchase 旗標決定；
+   未定義時預設為 true（向後相容）。掩蔽 = 兩者皆 false。 */
+function _purposeAllows(p, formType) {
+  if (!p) return false;
+  if (formType === 'expense')  return p.useExpense  !== false;
+  if (formType === 'purchase') return p.usePurchase !== false;
+  return true;
+}
+function _purposeHidden(p) {
+  return p && p.useExpense === false && p.usePurchase === false;
+}
+
+/* v4.4.93 boot-up 一次性 normalize：D1 還沒同步含旗標的 subjects.json 之前，
+   依舊版「動支限定 / 請購限定」常數清單為缺旗標的 purpose 補預設值。
+   注意：2305、2713 已改為兩者皆可（不再列入 EXPENSE_ONLY）。 */
+const _LEGACY_EXPENSE_ONLY  = ['1301','1501','2102','2104','2202','2204','2301','2706','2707','2802','7103'];
+const _LEGACY_PURCHASE_ONLY = ['2401','3106','3201','3206','3298'];
+function _normalizeSubjects(cfg) {
+  if (!cfg || !Array.isArray(cfg.mainAccounts)) return;
+  cfg.mainAccounts.forEach(a => {
+    (a.businessPlans || []).forEach(bp => {
+      (bp.purposes || []).forEach(p => {
+        if (typeof p.useExpense  !== 'boolean') p.useExpense  = !_LEGACY_PURCHASE_ONLY.includes(p.code);
+        if (typeof p.usePurchase !== 'boolean') p.usePurchase = !_LEGACY_EXPENSE_ONLY.includes(p.code);
+      });
+    });
+  });
+}
 
 /* 講師費顯示業務計畫代碼清單 */
 const LECTURER_BP_CODES  = ['21020311','21020312','21020313','21020321','21020322'];
@@ -2887,7 +2914,7 @@ function getFormData() {
     /* v4.2.23 多筆受款人：payees 陣列為主資料；payee 保留第一筆供舊代碼相容讀取 */
     payees: (typeof getPayeesData === 'function') ? getPayeesData() : [],
     payee:  (typeof getPayeeData  === 'function') ? getPayeeData()  : null,
-    /* v4.2.31 代墊原因（僅員工/代墊類別有意義） */
+    /* v4.2.31 / v4.4.93 代墊原因（僅員工代墊類別有意義） */
     payeeReason: (document.getElementById('payee-reason')?.value || '').trim(),
     prevPayees: _loadedPrevPayees,
   };
@@ -2982,7 +3009,7 @@ function validatePayeeBeforeSave(data) {
   if (data.voided) return true;
   const pType = document.getElementById('payee-type')?.value || '';
   if (!pType) {
-    showAlert('請先選擇受款人資料<br><br>（類別：匯款廠商 / 農會廠商 / 員工/代墊 / 憑繳費單 / 匯費）', '⚠️');
+    showAlert('請先選擇受款人資料<br><br>（類別：非農會廠商 / 農會廠商 / 員工 / 員工代墊 / 憑繳費單 / 匯費）', '⚠️');
     document.getElementById('payee-type')?.focus();
     return false;
   }
@@ -2999,24 +3026,33 @@ function validatePayeeBeforeSave(data) {
     showAlert('有受款人缺戶名，請補齊或移除該張卡片', '⚠️');
     return false;
   }
-  /* v4.2.25 bug#5：員工/代墊類別，每張卡 bank 與 acctNo 不能全空（允許任一有值） */
-  if (pType === 'employee') {
+  /* v4.2.25 bug#5 / v4.4.93：員工 / 員工代墊類別，每張卡 bank 與 acctNo 不能全空（允許任一有值） */
+  if (EMPLOYEE_PAYEE_TYPES.includes(pType)) {
     const noAcct = filled.filter(p => !(p.bank || '').trim() && !(p.acctNo || '').trim());
     if (noAcct.length) {
-      showAlert('員工/代墊必須補齊銀行或帳號，請移除或補齊不完整的卡片', '⚠️');
+      showAlert('員工 / 員工代墊必須補齊銀行或帳號，請移除或補齊不完整的卡片', '⚠️');
+      return false;
+    }
+  }
+  /* v4.4.93 員工代墊類別：代墊原因必填 */
+  if (pType === 'employee-advance') {
+    const reason = (data.payeeReason || '').trim();
+    if (!reason) {
+      showAlert('員工代墊必須填寫「代墊原因」', '⚠️');
+      document.getElementById('payee-reason')?.focus();
       return false;
     }
   }
   return true;
 }
 
-/* v4.2.23 人數不一致善意提醒（非強制）：僅動支單+員工/代墊
+/* v4.2.23 / v4.4.93 人數不一致善意提醒（非強制）：僅動支單 + 員工 / 員工代墊
    計算動支說明中「完全符合 EMPLOYEE_LIST」的人名數，與受款人卡片數比對。*/
 async function _confirmItemPayeeCountMismatch(data) {
   if (data.voided) return true;
   if (data.formType !== 'expense') return true;
   const pType = document.getElementById('payee-type')?.value || '';
-  if (pType !== 'employee') return true;
+  if (!EMPLOYEE_PAYEE_TYPES.includes(pType)) return true;
   const names = [];
   (data.items || []).forEach(it => {
     const v = (it.name || '').trim();
@@ -4418,7 +4454,7 @@ async function loadBanks() {
   } catch (_) { /* ignore */ }
 }
 loadBanks();
-/* 員工/代墊 清單 (含離職但尚有剩款) */
+/* 員工 / 員工代墊 清單 (含離職但尚有剩款) */
 const EMPLOYEE_LIST = [
   '黃瑞培','王聖捷','鍾宜珍','呂佳卉','李侞蓁','鄭兆鑫','蔡錦慧',
   '顏詩瑋','陳翊瑄','蔡沛汝','黃俊琛','黎欣妮','方雪雲','侯晏筑'
@@ -4449,7 +4485,8 @@ function _payeeFilteredByType(type) {
     const f = frozen.filter(p => (p.bank||'').includes(NONGHUI_KW)).map(p => ({...p, _frozen:true}));
     return [...a, ...f];
   }
-  if (type === 'employee') {
+  /* v4.4.93 employee / employee-advance 共用員工清單候選 */
+  if (EMPLOYEE_PAYEE_TYPES.includes(type)) {
     /* 員工清單 + 已存在 active PAYEES 中對應名字的帳號資料 */
     const result = [];
     EMPLOYEE_LIST.forEach(name => {
@@ -4518,10 +4555,13 @@ function onPayeeTypeChange() {
   billLabel.style.display = 'none';
   container.style.display = '';
   addRow.style.display    = '';
-  /* 自動帶入：僅 動支單 + 員工/代墊 */
-  autoBtn.style.display = (type === 'employee' && _currentFormTypeExp()) ? '' : 'none';
-  /* v4.2.31 代墊原因：僅員工/代墊顯示 */
-  if (reasonRow) reasonRow.style.display = (type === 'employee') ? '' : 'none';
+  /* v4.4.93 自動帶入：動支單 + (非農會廠商/農會廠商/員工/員工代墊) */
+  autoBtn.style.display = (AUTOFILL_PAYEE_TYPES.includes(type) && _currentFormTypeExp()) ? '' : 'none';
+  /* v4.4.93 代墊原因：僅員工代墊顯示且必填 */
+  if (reasonRow) {
+    reasonRow.style.display = (type === 'employee-advance') ? '' : 'none';
+    if (type !== 'employee-advance') document.getElementById('payee-reason').value = '';
+  }
   /* 起始一張空卡供挑選 */
   _payeeCards.push({ name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'' });
   renderPayeeCards();
@@ -4908,27 +4948,49 @@ function removePayeeCard(i) {
   updatePayeePrintLine();
 }
 
-/* 🪄 自動帶入（僅動支單 + 員工/代墊 + 動支說明裡的名字與 EMPLOYEE_LIST 完全相符）
-   員工/代墊類別不允許同名多帳戶，若 PAYEES 中出現同名多筆則警告並不自動帶入該名 */
+/* 🪄 v4.4.93 自動帶入（通用版）
+   - 動支單 + (非農會廠商/農會廠商/員工/員工代墊) 四種類別可用；bill 不適用
+   - 來源：動支說明中的名字（data-c="name"）與「此類別的候選清單」完全相符
+     - employee / employee-advance → EMPLOYEE_LIST（佳里所員工名單）
+     - vendor → 非農會 PAYEES 的戶名
+     - nonghui → 農會 PAYEES 的戶名
+   - 同名多筆 → ambiguous，留空卡讓使用者手動挑
+   - 完全不在清單裡 → missing，留名字+空帳號（廠商需手動新建） */
 function autoFillEmployeePayees() {
   if (!_currentFormTypeExp()) { showToast('ℹ️ 僅動支單支援此功能'); return; }
-  if (document.getElementById('payee-type').value !== 'employee') return;
+  const type = document.getElementById('payee-type').value;
+  if (!AUTOFILL_PAYEE_TYPES.includes(type)) return;
+
+  const active = PAYEES.filter(p => !p.frozen);
+  /* 依 type 取候選名字清單與可用 PAYEES 範圍 */
+  let candidateNames = [];
+  let scopedActive = active;
+  if (EMPLOYEE_PAYEE_TYPES.includes(type)) {
+    candidateNames = EMPLOYEE_LIST.slice();
+  } else if (type === 'vendor') {
+    scopedActive = active.filter(p => !(p.bank||'').includes(NONGHUI_KW));
+    candidateNames = [...new Set(scopedActive.map(p => p.name).filter(Boolean))];
+  } else if (type === 'nonghui') {
+    scopedActive = active.filter(p => (p.bank||'').includes(NONGHUI_KW));
+    candidateNames = [...new Set(scopedActive.map(p => p.name).filter(Boolean))];
+  }
+
   const names = [];
   document.querySelectorAll('#items-body tr [data-c="name"]').forEach(el => {
     const v = (el.value || '').trim();
     if (!v) return;
-    if (EMPLOYEE_LIST.includes(v) && !names.includes(v)) names.push(v);
+    if (candidateNames.includes(v) && !names.includes(v)) names.push(v);
   });
   if (!names.length) {
-    showToast('ℹ️ 動支說明未發現員工清單中的名字（需完全相符）');
+    const hint = EMPLOYEE_PAYEE_TYPES.includes(type) ? '員工清單' : (type === 'nonghui' ? '農會廠商清單' : '非農會廠商清單');
+    showToast(`ℹ️ 動支說明未發現${hint}中的名字（需完全相符）`);
     return;
   }
-  const active = PAYEES.filter(p => !p.frozen);
   const cards = [];
   const ambiguous = [];
   const missing = [];
   names.forEach(nm => {
-    const matches = active.filter(x => x.name === nm);
+    const matches = scopedActive.filter(x => x.name === nm);
     if (matches.length === 1) {
       const p = matches[0];
       cards.push({ name:p.name, bank:p.bank||'', acctNo:p.acctNo||'', isNew:!!p.isNew, expanded:false, kw:'' });
@@ -5068,9 +5130,9 @@ async function submitNewPayee() {
     showToast('✗ 代號格式：8 碼數字（統編）或 身分證字號（A123456789）');
     return;
   }
-  /* v4.2.23 員工/代墊類別阻止重複戶名（避免自動帶入時歧義） */
+  /* v4.2.23 / v4.4.93 員工 / 員工代墊類別阻止重複戶名（避免自動帶入時歧義） */
   const curType = document.getElementById('payee-type').value;
-  if (curType === 'employee' && EMPLOYEE_LIST.includes(name)) {
+  if (EMPLOYEE_PAYEE_TYPES.includes(curType) && EMPLOYEE_LIST.includes(name)) {
     const exists = PAYEES.filter(p => p.name === name && !p.frozen);
     if (exists.length) {
       showAlert(`員工「${esc(name)}」已有帳戶資料，不可重複建立。<br>若需修改請到後台「受款人管理」分頁。`, '⚠️');
@@ -5876,11 +5938,12 @@ function setPayeesData(payees, legacyPayee) {
   billLabel.style.display = 'none';
   container.style.display = '';
   addRow.style.display = '';
-  autoBtn.style.display = (t === 'employee' && _currentFormTypeExp()) ? '' : 'none';
-  /* v4.2.31 代墊原因 */
+  /* v4.4.93 自動帶入：4 種受款人類別 */
+  autoBtn.style.display = (AUTOFILL_PAYEE_TYPES.includes(t) && _currentFormTypeExp()) ? '' : 'none';
+  /* v4.4.93 代墊原因：僅員工代墊顯示 */
   const _rr = document.getElementById('row-payee-reason');
   const _ri = document.getElementById('payee-reason');
-  if (_rr) _rr.style.display = (t === 'employee') ? '' : 'none';
+  if (_rr) _rr.style.display = (t === 'employee-advance') ? '' : 'none';
   _payeeCards = list
     .filter(p => p && p.type !== 'bill')
     .map(p => ({
@@ -5929,9 +5992,9 @@ function updatePayeePrintLine(forceOverflow = false) {
     return `<div class="pl-row">${idx}${parts.join('　　')}${newMark}</div>`;
   };
 
-  /* v4.2.31 代墊原因（有填寫才加）；v4.2.35 末端加「職章：」提示列印後蓋章 */
+  /* v4.2.31 / v4.4.93 代墊原因：僅員工代墊類別顯示；末端加「職章：」提示列印後蓋章 */
   const _reason = (document.getElementById('payee-reason')?.value || '').trim();
-  const _reasonHtml = (type === 'employee' && _reason)
+  const _reasonHtml = (type === 'employee-advance' && _reason)
     ? `<div class="pl-row" style="margin-top:4px;"><span class="pl-lbl">代墊原因：</span>${esc(_reason)}　<span class="pl-lbl">職章：</span></div>`
     : '';
   /* v4.2.33 前次受款人（刪除線） */

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v4.4.92</title>
+<title>管理者入口 — 動支單系統 v4.4.93</title>
 <link rel="stylesheet" href="design.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -118,6 +118,14 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 }
 .purpose-tag .del { cursor: pointer; color: #90a4ae; font-size: 10px; }
 .purpose-tag .del:hover { color: #e53935; }
+/* v4.4.93 使用範圍標記 */
+.purpose-tag.form-exp-only  { background:#fff3e0; color:#e65100; }
+.purpose-tag.form-pur-only  { background:#e8f5e9; color:#2e7d32; }
+.purpose-tag.form-hidden    { background:#eceff1; color:#90a4ae; text-decoration:line-through; opacity:0.75; }
+.purpose-tag .scope-badge {
+  font-size:9px; font-weight:700; padding:0 4px; border-radius:6px;
+  background:rgba(0,0,0,0.08); margin-right:2px;
+}
 .add-purpose-btn {
   background: #f5f5f5; color: #546e7a; border: 1px dashed #b0bec5;
   border-radius: 12px; padding: 2px 8px; font-size: 11px; cursor: pointer;
@@ -393,7 +401,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.4.92</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.4.93</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -410,7 +418,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.4.92</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.4.93</span>
     <button id="maint-btn" onclick="toggleMaintenance()" style="padding:4px 14px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;"></button>
     <a class="link-btn" href="/acc.html" style="background:#1b5e20;">📒 會計帳務</a>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
@@ -1187,6 +1195,7 @@ async function loadSubjects() {
       if (r2.ok) data = await r2.json();
     }
     subjects = data || { settings:{ orgName:'臺南市佳里區衛生所', exemptThreshold:10000 }, mainAccounts:[] };
+    _normalizeSubjects(subjects); /* v4.4.93 補齊缺旗標的 useExpense/usePurchase */
     renderTree();
     fillSettings();
     setMsg('subj-msg', '✓ 載入完成', false);
@@ -1337,12 +1346,21 @@ function renderTree() {
     (acct.businessPlans || []).forEach((bp, bi) => {
       const row = document.createElement('div');
       row.className = 'bp-row';
-      const purposeHtml = (bp.purposes || []).map((p, pi) =>
-        `<span class="purpose-tag">
+      const purposeHtml = (bp.purposes || []).map((p, pi) => {
+        /* v4.4.93 使用範圍視覺標記 */
+        const useExp = p.useExpense  !== false;
+        const usePur = p.usePurchase !== false;
+        let cls = '', badge = '', title = '請購單 / 動支單 皆可選';
+        if (!useExp && !usePur) { cls = 'form-hidden';   badge = '掩蔽'; title = '掩蔽：請購單 / 動支單 皆不顯示'; }
+        else if ( useExp && !usePur) { cls = 'form-exp-only'; badge = '支';   title = '僅動支單可選'; }
+        else if (!useExp &&  usePur) { cls = 'form-pur-only'; badge = '請';   title = '僅請購單可選'; }
+        const badgeHtml = badge ? `<span class="scope-badge" title="${title}">${badge}</span>` : '';
+        return `<span class="purpose-tag ${cls}" title="${title}">
            <span class="edit-p" onclick="editPurpose(${ai},${bi},${pi})" title="編輯" style="cursor:pointer; color:#1565c0; margin-right:2px;">✏</span>
-           ${esc(p.code)} ${esc(p.name)}
+           ${badgeHtml}${esc(p.code)} ${esc(p.name)}
            <span class="del" onclick="delPurpose(${ai},${bi},${pi})" title="刪除">✕</span>
-         </span>`).join('') +
+         </span>`;
+      }).join('') +
         `<button class="add-purpose-btn" onclick="addPurpose(${ai},${bi})">＋ 用途別</button>`;
 
       row.innerHTML = `
@@ -1431,27 +1449,75 @@ async function delBp(ai, bi) {
 }
 
 /* ── Purpose CRUD ── */
+/* v4.4.93 boot-up 一次性 normalize：D1 還沒同步含旗標的 subjects.json 之前，
+   依舊版「動支限定 / 請購限定」常數清單為缺旗標的 purpose 補預設值。
+   注意：2305、2713 已改為兩者皆可（不再列入 EXPENSE_ONLY）。 */
+const _LEGACY_EXPENSE_ONLY  = ['1301','1501','2102','2104','2202','2204','2301','2706','2707','2802','7103'];
+const _LEGACY_PURCHASE_ONLY = ['2401','3106','3201','3206','3298'];
+function _normalizeSubjects(cfg) {
+  if (!cfg || !Array.isArray(cfg.mainAccounts)) return;
+  cfg.mainAccounts.forEach(a => {
+    (a.businessPlans || []).forEach(bp => {
+      (bp.purposes || []).forEach(p => {
+        if (typeof p.useExpense  !== 'boolean') p.useExpense  = !_LEGACY_PURCHASE_ONLY.includes(p.code);
+        if (typeof p.usePurchase !== 'boolean') p.usePurchase = !_LEGACY_EXPENSE_ONLY.includes(p.code);
+      });
+    });
+  });
+}
+
+/* v4.4.93 使用範圍勾選 HTML 片段 */
+function _purposeScopeHtml(useExp, usePur) {
+  const eChk = useExp ? 'checked' : '';
+  const pChk = usePur ? 'checked' : '';
+  return `<div class="m-row" style="align-items:flex-start;">
+    <label style="padding-top:2px;">使用範圍</label>
+    <div style="flex:1; display:flex; flex-direction:column; gap:6px; font-size:13px;">
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="checkbox" id="m-use-expense"  ${eChk}> 動支單可選
+      </label>
+      <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+        <input type="checkbox" id="m-use-purchase" ${pChk}> 請購單可選
+      </label>
+      <div style="font-size:11px; color:#90a4ae;">⚠️ 兩者皆不勾 = <strong>掩蔽</strong>，舊式科目選單上不出現、不會被拉選</div>
+    </div>
+  </div>`;
+}
+function _readPurposeScope() {
+  return {
+    useExpense:  document.getElementById('m-use-expense')?.checked  ?? true,
+    usePurchase: document.getElementById('m-use-purchase')?.checked ?? true,
+  };
+}
+
 function addPurpose(ai, bi) {
   openModal('新增用途別',
     `<div class="m-row"><label>用途別代碼</label><input id="m-code" placeholder="例：2706"></div>
-     <div class="m-row"><label>用途別名稱</label><input id="m-name" placeholder="例：護理人員訓練費"></div>`,
+     <div class="m-row"><label>用途別名稱</label><input id="m-name" placeholder="例：護理人員訓練費"></div>
+     ${_purposeScopeHtml(true, true)}`,
     () => {
       const code = v('m-code'), name = v('m-name');
       if (!code || !name) { showAdminAlert('請填入代碼和名稱'); return false; }
-      subjects.mainAccounts[ai].businessPlans[bi].purposes.push({ code, name });
+      const { useExpense, usePurchase } = _readPurposeScope();
+      subjects.mainAccounts[ai].businessPlans[bi].purposes.push({ code, name, useExpense, usePurchase });
       renderTree(); setMsg('subj-msg', '已新增，請記得儲存', false);
     });
 }
 
 function editPurpose(ai, bi, pi) {
   const p = subjects.mainAccounts[ai].businessPlans[bi].purposes[pi];
+  /* v4.4.93 未定義 useExpense/usePurchase 時預設兩者皆 true */
+  const useExp = p.useExpense  !== false;
+  const usePur = p.usePurchase !== false;
   openModal('編輯用途別',
     `<div class="m-row"><label>用途別代碼</label><input id="m-code" value="${esc(p.code)}"></div>
-     <div class="m-row"><label>用途別名稱</label><input id="m-name" value="${esc(p.name)}"></div>`,
+     <div class="m-row"><label>用途別名稱</label><input id="m-name" value="${esc(p.name)}"></div>
+     ${_purposeScopeHtml(useExp, usePur)}`,
     () => {
       const code = v('m-code'), name = v('m-name');
       if (!code || !name) { showAdminAlert('請填入代碼和名稱'); return false; }
-      subjects.mainAccounts[ai].businessPlans[bi].purposes[pi] = { code, name };
+      const { useExpense, usePurchase } = _readPurposeScope();
+      subjects.mainAccounts[ai].businessPlans[bi].purposes[pi] = { code, name, useExpense, usePurchase };
       renderTree(); setMsg('subj-msg', '已修改，請記得儲存', false);
     });
 }
