@@ -29,7 +29,7 @@
             { "code": "2706", "name": "佣金、匯費、經理費及手續費", "useExpense": true,  "usePurchase": false },
             { "code": "2707", "name": "代理（辦）費",              "useExpense": true,  "usePurchase": false },
             { "code": "2711", "name": "義（志）工服務費",          "useExpense": true,  "usePurchase": true  },
-            { "code": "2713", "name": "計時與計件人員酬金",        "useExpense": true,  "usePurchase": true  },
+            { "code": "2713", "name": "計時人員酬金",              "useExpense": true,  "usePurchase": true  },
             { "code": "2802", "name": "專技人員酬金",              "useExpense": true,  "usePurchase": false },
             { "code": "2807", "name": "委託檢驗（定）試驗認證費",  "useExpense": true,  "usePurchase": true  },
             { "code": "2810", "name": "電腦軟體服務費",            "useExpense": true,  "usePurchase": true  },
