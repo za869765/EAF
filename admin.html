@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v4.4.99</title>
+<title>管理者入口 — 動支單系統 v4.4.100</title>
 <link rel="stylesheet" href="design.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -401,7 +401,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.4.99</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.4.100</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -418,7 +418,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.4.99</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.4.100</span>
     <button id="maint-btn" onclick="toggleMaintenance()" style="padding:4px 14px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;"></button>
     <a class="link-btn" href="/acc.html" style="background:#1b5e20;">📒 會計帳務</a>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
@@ -524,6 +524,45 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
                style="flex:1; max-width:400px; padding:5px 10px; border:1px solid #90a4ae; border-radius:4px; font-size:12px; font-family:inherit;">
         <button onclick="document.getElementById('rec-filter').value='';applyRecFilter()"
                 style="padding:4px 10px; font-size:12px; cursor:pointer; border:1px solid #90a4ae; border-radius:4px; background:#eceff1; color:#37474f;">✕ 清除</button>
+      </div>
+
+      <!-- v4.4.100 分類 dropdown 篩選 -->
+      <div style="display:flex; align-items:center; gap:6px; margin:4px 0; flex-wrap:wrap;">
+        <span style="font-size:12px; color:#546e7a; white-space:nowrap;">🏷 分類：</span>
+        <select id="flt-acct"       onchange="applyRecFilter()" style="padding:4px 8px; border:1px solid #90a4ae; border-radius:4px; font-size:12px; font-family:inherit; min-width:130px;">
+          <option value="">主科目（全部）</option>
+        </select>
+        <select id="flt-bp"         onchange="applyRecFilter()" style="padding:4px 8px; border:1px solid #90a4ae; border-radius:4px; font-size:12px; font-family:inherit; min-width:140px;">
+          <option value="">業務計畫（全部）</option>
+        </select>
+        <select id="flt-payeeType"  onchange="applyRecFilter()" style="padding:4px 8px; border:1px solid #90a4ae; border-radius:4px; font-size:12px; font-family:inherit; min-width:130px;">
+          <option value="">受款人類別（全部）</option>
+          <option value="vendor">匯款廠商</option>
+          <option value="nonghui">農會廠商</option>
+          <option value="employee">員工</option>
+          <option value="employee-advance">代墊</option>
+          <option value="bill">繳費單</option>
+        </select>
+        <select id="flt-payeeName"  onchange="applyRecFilter()" style="padding:4px 8px; border:1px solid #90a4ae; border-radius:4px; font-size:12px; font-family:inherit; min-width:140px;">
+          <option value="">受款人（全部）</option>
+        </select>
+        <button onclick="clearRecFilters()"
+                style="padding:4px 10px; font-size:12px; cursor:pointer; border:1px solid #90a4ae; border-radius:4px; background:#eceff1; color:#37474f;">✕ 清除分類</button>
+      </div>
+
+      <!-- v4.4.100 分群顯示 + 一鍵勾選 -->
+      <div style="display:flex; align-items:center; gap:6px; margin:4px 0; flex-wrap:wrap;">
+        <span style="font-size:12px; color:#546e7a; white-space:nowrap;">📂 分群：</span>
+        <select id="grp-mode" onchange="applyGroupBy()" style="padding:4px 8px; border:1px solid #90a4ae; border-radius:4px; font-size:12px; font-family:inherit;">
+          <option value="">不分群</option>
+          <option value="acct">按主科目</option>
+          <option value="bp">按業務計畫</option>
+          <option value="payeeType">按受款人類別</option>
+        </select>
+        <button onclick="selectVisible(false)"
+                style="padding:4px 12px; font-size:12px; cursor:pointer; border:1px solid #4527a0; border-radius:4px; background:#ede7f6; color:#4527a0; font-weight:600;">✓ 勾選顯示中</button>
+        <button onclick="selectVisible(true)"
+                style="padding:4px 12px; font-size:12px; cursor:pointer; border:1px solid #90a4ae; border-radius:4px; background:#fce4ec; color:#b71c1c;">✕ 取消顯示中</button>
       </div>
 
       <table class="rec-table" id="rec-table">
@@ -1543,6 +1582,10 @@ async function delPurpose(ai, bi, pi) {
   renderTree(); setMsg('subj-msg', '已刪除，請記得儲存', false);
 }
 
+/* v4.4.100 批次列印用：暫存當前 records / 分群模式 / 分群序號 */
+let _recCache = [];
+let _grpCounter = 0;
+
 /* ════════════════════
    RECORDS
    ════════════════════ */
@@ -1619,6 +1662,12 @@ async function loadRecords() {
                        onclick="toggleLock('${rec.id}',true,'${esc(rec.voucherNo||'')}')">🔒 鎖定</button>`
             }
           </td>`;
+        /* v4.4.100 dataset 給分類 dropdown filter 用 */
+        tr.dataset.acct = rec.acctName || '';
+        tr.dataset.bp   = rec.bpLabel ? bpLabelName(rec.bpLabel) : '';
+        const _payees = Array.isArray(rec.payees) ? rec.payees : (rec.payee ? [rec.payee] : []);
+        tr.dataset.payeeTypes = '|' + _payees.map(p => p && p.type ? p.type : '').filter(Boolean).join('|') + '|';
+        tr.dataset.payeeNames = '|' + _payees.map(p => p && p.name ? p.name : '').filter(Boolean).join('|') + '|';
         /* hover 預覽 */
         tr.addEventListener('mouseenter', e => showRecPreview(e, rec));
         tr.addEventListener('mousemove',  e => positionPreview(e));
@@ -1626,6 +1675,11 @@ async function loadRecords() {
         tbody.appendChild(tr);
       });
     }
+    /* v4.4.100 _recCache 給分群 re-render 用；buildFilterDropdowns 重建下拉選項 */
+    _recCache = records;
+    buildFilterDropdowns();
+    /* v4.4.100 若有 grp-mode，re-render with group headers */
+    applyGroupBy();
     /* 重建後重置勾選計數與全選框 */
     const masterCb = document.querySelector('#rec-table thead input[type=checkbox]');
     if (masterCb) masterCb.checked = false;
@@ -1637,13 +1691,47 @@ async function loadRecords() {
 }
 
 function applyRecFilter() {
-  const kw = (document.getElementById('rec-filter')?.value || '').trim().toLowerCase();
-  const rows = document.querySelectorAll('#rec-table tbody tr');
-  rows.forEach(tr => {
-    if (!kw) { tr.style.display = ''; return; }
-    const text = tr.textContent.toLowerCase();
-    tr.style.display = text.includes(kw) ? '' : 'none';
+  const kw     = (document.getElementById('rec-filter')?.value || '').trim().toLowerCase();
+  const fAcct  = document.getElementById('flt-acct')?.value || '';
+  const fBp    = document.getElementById('flt-bp')?.value || '';
+  const fPType = document.getElementById('flt-payeeType')?.value || '';
+  const fPName = document.getElementById('flt-payeeName')?.value || '';
+
+  /* 記每個 group key 是否有可見 record，最後用來決定 group header 顯示 */
+  const groupHasVisible = {};
+
+  document.querySelectorAll('#rec-table tbody tr').forEach(tr => {
+    if (tr.classList.contains('group-header')) return;   /* header 最後處理 */
+    let show = true;
+    if (kw) {
+      const text = tr.textContent.toLowerCase();
+      if (!text.includes(kw)) show = false;
+    }
+    if (show && fAcct  && tr.dataset.acct !== fAcct) show = false;
+    if (show && fBp    && tr.dataset.bp   !== fBp)   show = false;
+    if (show && fPType && !(tr.dataset.payeeTypes||'').includes('|' + fPType + '|')) show = false;
+    if (show && fPName && !(tr.dataset.payeeNames||'').includes('|' + fPName + '|')) show = false;
+    tr.style.display = show ? '' : 'none';
+    const gk = tr.dataset.groupKey;
+    if (gk !== undefined) {
+      if (show) groupHasVisible[gk] = true;
+      else if (groupHasVisible[gk] === undefined) groupHasVisible[gk] = false;
+    }
   });
+
+  document.querySelectorAll('#rec-table tbody tr.group-header').forEach(hdr => {
+    const gk = hdr.dataset.groupKey || '';
+    hdr.style.display = groupHasVisible[gk] === false ? 'none' : '';
+  });
+}
+
+/* v4.4.100 ✕ 清除分類：重設四個 dropdown */
+function clearRecFilters() {
+  ['flt-acct','flt-bp','flt-payeeType','flt-payeeName'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  applyRecFilter();
 }
 
 async function exportCSV() {
@@ -1878,6 +1966,112 @@ function batchPrint() {
   const ids = checked.map(cb => cb.dataset.id).filter(Boolean);
   if (!ids.length) { showAdminAlert('無法取得選取紀錄的 id。'); return; }
   window.open('/batch-print.html?ids=' + encodeURIComponent(ids.join(',')), '_blank');
+}
+
+/* v4.4.100 從 _recCache 抽 distinct 重建 dropdown options（主科目/業務計畫/受款人） */
+function buildFilterDropdowns() {
+  const acctSet  = new Set();
+  const bpSet    = new Set();
+  const nameSet  = new Set();
+  _recCache.forEach(r => {
+    if (r.acctName) acctSet.add(r.acctName);
+    if (r.bpLabel)  bpSet.add(bpLabelName(r.bpLabel));
+    const payees = Array.isArray(r.payees) ? r.payees : (r.payee ? [r.payee] : []);
+    payees.forEach(p => { if (p && p.name) nameSet.add(p.name); });
+  });
+  const fill = (id, items, allLabel) => {
+    const sel = document.getElementById(id); if (!sel) return;
+    const prev = sel.value;
+    sel.innerHTML = `<option value="">${allLabel}</option>` +
+      [...items].sort((a,b)=>a.localeCompare(b,'zh-Hant')).map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    if ([...items].includes(prev)) sel.value = prev;   /* 保留先前選擇 */
+  };
+  fill('flt-acct',      acctSet, '主科目（全部）');
+  fill('flt-bp',        bpSet,   '業務計畫（全部）');
+  fill('flt-payeeName', nameSet, '受款人（全部）');
+}
+
+/* v4.4.100 分群模式切換：依 _grpMode 重排 tbody 並插入 group header rows */
+function applyGroupBy() {
+  const mode = document.getElementById('grp-mode')?.value || '';
+  const tbody = document.getElementById('records-body');
+  if (!tbody) return;
+
+  /* 1. 移除既有 group-header rows */
+  tbody.querySelectorAll('tr.group-header').forEach(t => t.remove());
+  /* 2. 清掉 record rows 上的 groupKey 標記 */
+  tbody.querySelectorAll('tr[data-group-key]').forEach(t => { delete t.dataset.groupKey; });
+
+  if (!mode) { applyRecFilter(); return; }
+
+  /* 3. 算 group key 並 collect rows */
+  const PAYEE_TYPE_LABEL = { vendor:'匯款廠商', nonghui:'農會廠商', employee:'員工', 'employee-advance':'代墊', bill:'繳費單' };
+  const rows = [...tbody.querySelectorAll('tr')].filter(t => !t.classList.contains('group-header'));
+  function keyOf(tr) {
+    if (mode === 'acct') return tr.dataset.acct || '（未分類）';
+    if (mode === 'bp')   return tr.dataset.bp   || '（未分類）';
+    if (mode === 'payeeType') {
+      const types = (tr.dataset.payeeTypes||'').split('|').filter(Boolean);
+      if (!types.length) return '（無受款人）';
+      return types.map(t => PAYEE_TYPE_LABEL[t] || t).join(' / ');
+    }
+    return '';
+  }
+  /* 4. 按 group key 重新排序（同群保留原序，即憑證號 DESC） */
+  const orderedKeys = [];
+  const grouped = {};
+  rows.forEach(tr => {
+    const k = keyOf(tr);
+    if (!(k in grouped)) { grouped[k] = []; orderedKeys.push(k); }
+    grouped[k].push(tr);
+  });
+  orderedKeys.sort((a,b) => a.localeCompare(b, 'zh-Hant'));
+
+  /* 5. 重排：先清空 tbody，再依群序 append header + records */
+  tbody.innerHTML = '';
+  orderedKeys.forEach(k => {
+    const gid = 'g' + (++_grpCounter);
+    const count = grouped[k].length;
+    const hdr = document.createElement('tr');
+    hdr.className = 'group-header';
+    hdr.dataset.groupKey = k;
+    hdr.innerHTML = `
+      <td colspan="10" style="background:#e3f2fd; color:#1565c0; font-weight:600; padding:8px 12px; font-size:13px;">
+        📂 ${esc(k)} <span style="color:#546e7a; font-weight:400;">— ${count} 筆</span>
+        <button onclick="toggleGroupSel('${gid}', false)" style="margin-left:14px; padding:3px 10px; font-size:11px; cursor:pointer; border:1px solid #1565c0; border-radius:4px; background:#fff; color:#1565c0;">✓ 全選此群</button>
+        <button onclick="toggleGroupSel('${gid}', true)"  style="margin-left:4px;  padding:3px 10px; font-size:11px; cursor:pointer; border:1px solid #90a4ae; border-radius:4px; background:#fff; color:#546e7a;">✕ 取消此群</button>
+      </td>`;
+    hdr.dataset.gid = gid;
+    tbody.appendChild(hdr);
+    grouped[k].forEach(tr => { tr.dataset.groupKey = k; tr.dataset.gid = gid; tbody.appendChild(tr); });
+  });
+  applyRecFilter();
+}
+
+/* v4.4.100 全選/取消某分群所有 record rows */
+function toggleGroupSel(gid, uncheck) {
+  const rows = document.querySelectorAll(`#rec-table tbody tr[data-gid="${gid}"]:not(.group-header)`);
+  let cnt = 0;
+  rows.forEach(tr => {
+    if (tr.style.display === 'none') return;   /* 只動可見的 */
+    const cb = tr.querySelector('input[type=checkbox]');
+    if (cb) { cb.checked = !uncheck; cnt++; }
+  });
+  updateSelCount('rec-table');
+  setMsg('rec-msg', uncheck ? `✕ 已取消此群 ${cnt} 筆` : `✓ 已勾選此群 ${cnt} 筆`, false);
+}
+
+/* v4.4.100 一鍵勾選/取消「顯示中」所有 record rows */
+function selectVisible(uncheck) {
+  const rows = document.querySelectorAll('#rec-table tbody tr:not(.group-header)');
+  let cnt = 0;
+  rows.forEach(tr => {
+    if (tr.style.display === 'none') return;
+    const cb = tr.querySelector('input[type=checkbox]');
+    if (cb) { cb.checked = !uncheck; cnt++; }
+  });
+  updateSelCount('rec-table');
+  setMsg('rec-msg', uncheck ? `✕ 已取消顯示中 ${cnt} 筆` : `✓ 已勾選顯示中 ${cnt} 筆`, false);
 }
 
 /* 紀錄列 hover 預覽卡片（懶初始化，避免 body 尚未就緒） */
