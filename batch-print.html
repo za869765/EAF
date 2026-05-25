@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EAF 批次列印 v4.4.99</title>
+<link rel="stylesheet" href="design.css">
+<link rel="stylesheet" href="eaf-tokens.css">
+<style>
+  /* batch-print 自身樣式：螢幕顯示進度，列印時隱藏 */
+  body { font-family:'Microsoft JhengHei','標楷體',sans-serif; margin:0; padding:0; background:#eceff1; }
+  #progress {
+    position:fixed; top:14px; right:14px; z-index:9999;
+    background:#1976d2; color:#fff; padding:10px 18px;
+    border-radius:8px; font-size:14px; font-weight:600;
+    box-shadow:0 4px 14px rgba(0,0,0,0.25);
+  }
+  #progress.done { background:#2e7d32; }
+  #progress.err  { background:#c62828; }
+  #fail-msg {
+    margin:80px 30px 20px; padding:14px 18px;
+    background:#ffebee; color:#c62828; border:1px solid #ef9a9a;
+    border-radius:6px; white-space:pre-line; font-size:13px;
+  }
+  #frames-stage {
+    position:absolute; left:-99999px; top:0; visibility:hidden;
+  }
+  #print-area {
+    padding:20px 0;
+  }
+  #print-area > #form-page,
+  #print-area > .form-page-clone {
+    margin:10px auto 18px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.15);
+    background:#fff;
+  }
+  #print-area > .form-page-clone:not(:last-child) {
+    page-break-after: always;
+  }
+  @media print {
+    body { background:#fff; margin:0; padding:0; }
+    #progress, #frames-stage, #fail-msg { display:none !important; }
+    #print-area { padding:0; }
+    #print-area > .form-page-clone {
+      margin:0; box-shadow:none; page-break-after: always;
+    }
+    #print-area > .form-page-clone:last-child { page-break-after: auto; }
+  }
+</style>
+</head>
+<body>
+
+<div id="progress">⏳ 準備中…</div>
+<div id="fail-msg" style="display:none;"></div>
+
+<div id="frames-stage"></div>
+<div id="print-area"></div>
+
+<script>
+(async function() {
+  const prog     = document.getElementById('progress');
+  const stage    = document.getElementById('frames-stage');
+  const printArea= document.getElementById('print-area');
+  const failMsg  = document.getElementById('fail-msg');
+
+  function setProg(text, cls) {
+    prog.textContent = text;
+    prog.className = cls || '';
+  }
+  function appendFail(line) {
+    failMsg.style.display = '';
+    failMsg.textContent += (failMsg.textContent ? '\n' : '') + line;
+  }
+
+  /* 解析 ids query */
+  const params = new URLSearchParams(location.search);
+  const idsRaw = params.get('ids') || '';
+  const ids = idsRaw.split(',').filter(Boolean);
+  if (!ids.length) {
+    setProg('✗ 未提供 ids 參數', 'err');
+    appendFail('用法：batch-print.html?ids=1,2,3');
+    return;
+  }
+
+  /* 1. fetch / 抽 <style> 注入（讓 form-page 樣式可用） */
+  setProg('⏳ 載入樣式…');
+  try {
+    const html = await fetch('/').then(r => r.text());
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('style').forEach(s => document.head.appendChild(s.cloneNode(true)));
+  } catch (e) {
+    console.warn('抓 index style 失敗（樣式可能不全）', e);
+  }
+
+  /* 2. 為每筆 id 起 iframe → loadRecord → importNode form-page */
+  let ok = 0;
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    setProg(`⏳ 渲染中 (${i + 1}/${ids.length})…`);
+
+    let iframe = null;
+    try {
+      iframe = document.createElement('iframe');
+      iframe.src = '/';
+      iframe.style.cssText = 'width:210mm;height:297mm;border:none;';
+      stage.appendChild(iframe);
+
+      /* 等 iframe load */
+      await new Promise((resolve, reject) => {
+        iframe.onload  = resolve;
+        iframe.onerror = () => reject(new Error('iframe onerror'));
+        setTimeout(() => reject(new Error('iframe load timeout')), 15000);
+      });
+
+      const win = iframe.contentWindow;
+
+      /* polling: cachedRecords 載入完成 */
+      const t0 = Date.now();
+      while (!Array.isArray(win.cachedRecords) || win.cachedRecords.length === 0) {
+        if (Date.now() - t0 > 12000) throw new Error('cachedRecords 載入超時');
+        await new Promise(r => setTimeout(r, 100));
+      }
+
+      /* 比對 id 找出原型別（D1 通常為 number，URL 一律為 string） */
+      const numId = parseInt(id, 10);
+      const rec = win.cachedRecords.find(r => r.id === numId || r.id === id || String(r.id) === id);
+      if (!rec) throw new Error(`找不到 id=${id}`);
+
+      /* 呼叫內部 loadRecord — 會 fillForm + lockForm + 設 baseline */
+      await win.loadRecord(rec.id);
+
+      /* 兩次 rAF + 100ms 緩衝確保 onChange handlers 都跑完 */
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+      await new Promise(r => setTimeout(r, 120));
+
+      /* importNode form-page 到主文件 */
+      const fp = iframe.contentDocument.getElementById('form-page');
+      if (!fp) throw new Error('form-page 元素不存在');
+      const cloned = document.importNode(fp, true);
+      cloned.id = '';                       /* 避免主文件多筆 id 重複 */
+      cloned.classList.add('form-page-clone');
+      printArea.appendChild(cloned);
+      ok++;
+    } catch (e) {
+      console.error('渲染失敗 id=' + id, e);
+      appendFail(`✗ id=${id}: ${e.message}`);
+    } finally {
+      if (iframe) iframe.remove();
+    }
+  }
+
+  if (ok === 0) {
+    setProg('✗ 全部失敗', 'err');
+    return;
+  }
+
+  setProg(`✓ ${ok}/${ids.length} 筆已就緒`, 'done');
+  await new Promise(r => setTimeout(r, 400));
+  window.print();
+})();
+</script>
+
+</body>
+</html>
