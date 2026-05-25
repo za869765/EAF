@@ -1087,7 +1087,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.4.97</div>
+      <div id="sb-version">v4.4.98</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1215,6 +1215,12 @@ body.sb-resizing * { pointer-events: none !important; }
             <button class="lect-btn active" id="lect-no" onclick="setLecturer('')"      style="display:none;">非講師/應診費</button>
             <button class="lect-btn" id="lect-bonus" onclick="setLecturer('bonus')"    style="display:none;">獎勵金</button>
             <button class="lect-btn" id="lect-promo" onclick="setLecturer('promo')"    style="display:none;">宣導品</button>
+          </div>
+          <!-- v4.4.98 保管款專戶 + 21020321 代收款 + 09 各項補助費 → 款項類型 -->
+          <div class="bp-row" id="row-custody-09" style="display:none;">
+            <label>款項類型：</label>
+            <button class="lect-btn" id="cust09-overtime" onclick="setCustody09Type('overtime')">不休假加班費</button>
+            <button class="lect-btn" id="cust09-vacation" onclick="setCustody09Type('vacation')">國內休假補助費</button>
           </div>
           <div class="bp-row" id="row-tax-doc" style="display:none;">
             <label>憑證類型：</label>
@@ -2227,6 +2233,7 @@ const LECTURER_BP_CODES  = ['21020311','21020312','21020313','21020321','2102032
 const XUANDAO_BP_CODES   = ['21020311','21020312','21020313','21020319','21020321','21020322'];
 let isLecturer      = '';   /* '' = 非講師費, 'lecturer' = 講師費, 'bonus' = 獎勵金 */
 let taxDocType4501  = '';   /* '' = 發票(預設) / 'receipt' = 收據 */
+let custody09Type   = '';   /* v4.4.98 21020321/09: '' = 未選 / 'overtime' = 不休假加班費 / 'vacation' = 國內休假補助費 */
 
 /* 款項用途列顯示邏輯：21020321 需 purposeCode=99 才顯示 */
 function updateLecturerRow() {
@@ -2244,6 +2251,14 @@ function updateLecturerRow() {
   document.getElementById('lect-promo').style.display = isXuandao ? '' : 'none';
   /* 4501 憑證類型列 */
   document.getElementById('row-tax-doc').style.display = purposeCode === '4501' ? '' : 'none';
+  /* v4.4.98 21020321 + 09 各項補助費 → 款項類型按鈕（不休假加班費 / 國內休假補助費） */
+  const isCustody09 = bpCode === '21020321' && purposeCode === '09';
+  document.getElementById('row-custody-09').style.display = isCustody09 ? '' : 'none';
+  if (!isCustody09 && !_suppressAutoFill && !isFormLocked()) {
+    custody09Type = '';
+    document.getElementById('cust09-overtime').classList.remove('active');
+    document.getElementById('cust09-vacation').classList.remove('active');
+  }
 }
 
 /* 出納單位格斜線觸發：業務計畫 / 用途別 */
@@ -2291,13 +2306,15 @@ function _checkSubjectDirty() {
     bp:       document.getElementById('sel-bp').value,
     purpose:  document.getElementById('sel-purpose').value,
     lecturer: isLecturer,
-    taxDoc:   taxDocType4501
+    taxDoc:   taxDocType4501,
+    custody09: custody09Type
   };
-  const dirty = cur.main     !== _subjectBaseline.main     ||
-                cur.bp       !== _subjectBaseline.bp       ||
-                cur.purpose  !== _subjectBaseline.purpose  ||
-                cur.lecturer !== _subjectBaseline.lecturer ||
-                cur.taxDoc   !== _subjectBaseline.taxDoc;
+  const dirty = cur.main      !== _subjectBaseline.main      ||
+                cur.bp        !== _subjectBaseline.bp        ||
+                cur.purpose   !== _subjectBaseline.purpose   ||
+                cur.lecturer  !== _subjectBaseline.lecturer  ||
+                cur.taxDoc    !== _subjectBaseline.taxDoc    ||
+                cur.custody09 !== _subjectBaseline.custody09;
   _setBtn('save-btn', dirty ? '' : 'none');
   if (dirty) {
     document.getElementById('cancel-btn').innerHTML = '↩ 放棄修改';
@@ -2323,6 +2340,15 @@ function setTaxDoc(val) {
   taxDocType4501 = val;
   document.getElementById('taxdoc-invoice').classList.toggle('active', val === '');
   document.getElementById('taxdoc-receipt').classList.toggle('active', val === 'receipt');
+  updateCashierNote();
+  _checkSubjectDirty();
+}
+
+/* v4.4.98 21020321/09 款項類型：互斥單選，再點同鍵則取消（兩個皆未選時出納格按 21020321 規則畫斜線） */
+function setCustody09Type(val) {
+  custody09Type = (custody09Type === val) ? '' : val;
+  document.getElementById('cust09-overtime').classList.toggle('active', custody09Type === 'overtime');
+  document.getElementById('cust09-vacation').classList.toggle('active', custody09Type === 'vacation');
   updateCashierNote();
   _checkSubjectDirty();
 }
@@ -2427,7 +2453,10 @@ function updateCashierNote() {
   const _tOt    = getAutoText('overtime',    '當月未逾46小時得免列計所得');
   const _acctNM = { '財/社團法人':_t92, '診所/檢驗所':_t9a, '醫療門診診所/檢驗所':_t9a, 'HPV':_t9a, '個人':_t50 };
   let note = '';
-  if (ACCT_TYPE_CONFIG[purposeCode] && acctType) {
+  if (bpCode === '21020321' && purposeCode === '09' && custody09Type === 'vacation') {
+    /* v4.4.98 國內休假補助費 → 列計50所得；不休假加班費('overtime') note 留空，沿用 21020321 斜線規則 */
+    note = _t50;
+  } else if (ACCT_TYPE_CONFIG[purposeCode] && acctType) {
     note = ACCT_SLASH_TYPES.has(acctType) ? '' : (_acctNM[acctType] || '');
   } else if (purposeCode === '1501') {
     note = income50Type === '費用' ? '' : _t50nhi;
@@ -2893,6 +2922,7 @@ function getFormData() {
     lecturerType  : isLecturer || 'non-lecturer',
     isLecturer    : isLecturer,
     taxDocType4501: taxDocType4501,
+    custody09Type,
     acctType,
     income50Type,
     itemType,
@@ -2939,6 +2969,10 @@ function fillForm(rec) {
   document.getElementById('lect-promo').classList.toggle('active', isLecturer === 'promo');
   document.getElementById('taxdoc-invoice').classList.toggle('active', taxDocType4501 === '');
   document.getElementById('taxdoc-receipt').classList.toggle('active', taxDocType4501 === 'receipt');
+  /* v4.4.98 還原 21020321/09 款項類型 */
+  custody09Type = rec.custody09Type || '';
+  document.getElementById('cust09-overtime').classList.toggle('active', custody09Type === 'overtime');
+  document.getElementById('cust09-vacation').classList.toggle('active', custody09Type === 'vacation');
   /* 還原帳戶類別狀態 */
   if (rec.acctType && ACCT_TYPE_CONFIG[rec.purposeCode]) {
     setAcctType(rec.acctType);   /* setAcctType 已呼叫 updateIncome50Row */
@@ -3145,11 +3179,12 @@ async function saveRecord() {
           if (el) { el.removeAttribute('disabled'); el.removeAttribute('readonly'); }
         });
         _subjectBaseline = {
-          main:     data.acctCode    || '',
-          bp:       data.bpCode      || '',
-          purpose:  data.purposeCode || '',
-          lecturer: data.isLecturer  || '',
-          taxDoc:   data.taxDocType4501 || ''
+          main:      data.acctCode    || '',
+          bp:        data.bpCode      || '',
+          purpose:   data.purposeCode || '',
+          lecturer:  data.isLecturer  || '',
+          taxDoc:    data.taxDocType4501 || '',
+          custody09: data.custody09Type || ''
         };
         document.getElementById('save-btn').innerHTML = isUnclassified ? '💾 補登存檔' : '💾 確認更新科目';
         _setBtn('save-btn', isUnclassified ? '' : 'none');
@@ -3233,11 +3268,12 @@ async function loadRecord(id) {
       const _blLecturer = (rec.lecturerType === 'lecturer' || rec.lecturerType === 'bonus' || rec.lecturerType === 'promo')
                           ? rec.lecturerType : (rec.isLecturer || '');
       _subjectBaseline = {
-        main:     rec.acctCode    || '',
-        bp:       rec.bpCode      || '',
-        purpose:  rec.purposeCode || '',
-        lecturer: _blLecturer,
-        taxDoc:   rec.taxDocType4501 || ''
+        main:      rec.acctCode    || '',
+        bp:        rec.bpCode      || '',
+        purpose:   rec.purposeCode || '',
+        lecturer:  _blLecturer,
+        taxDoc:    rec.taxDocType4501 || '',
+        custody09: rec.custody09Type || ''
       };
       document.getElementById('save-btn').innerHTML = isUnclassified ? '💾 補登存檔' : '💾 確認更新科目';
       _setBtn('save-btn', isUnclassified ? '' : 'none');
@@ -4126,6 +4162,7 @@ function newForm(type, opts) {
   income50Type = '';
   itemType = 'consumable';
   acctType = '';
+  custody09Type = '';
   _foldNoteApplied = false;
   _prevNotesBeforeFold = '';
   /* v4.4.38 受款人區塊：開新單一律清空（避免從別張單繼承受款人卡片） */
