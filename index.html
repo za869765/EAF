@@ -900,6 +900,7 @@ body.sb-resizing * { pointer-events: none !important; }
   #app  { display: block; }
   #sidebar, #sidebar-resizer, #actions, #toast, #add-row-btn, #del-row-btn, #row-btns,
   #row-lecturer, #row-acct-type, #row-income50-type, #row-item-type,
+  #row-custody-09, #row-tax-doc,
   #row-budget-info, #exempt-wrap, #copy-no-btn, #copy-purpose-btn,
   .date-picker-btn { display: none !important; }
   /* 隱藏未選擇的佔位文字 */
@@ -1087,7 +1088,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.5.0</div>
+      <div id="sb-version">v4.5.1</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1499,7 +1500,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <!-- 2) 存款帳號 -->
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
         <label style="width:90px; font-size:15px; font-weight:600; color:#333; flex-shrink:0;">存款帳號</label>
-        <input id="np-acct" type="text" style="flex:1; height:42px; padding:8px 14px; border:1.5px solid #ccc; border-radius:6px; font-size:15px;">
+        <input id="np-acct" type="text" oninput="_jialieAcctFilter(this)" style="flex:1; height:42px; padding:8px 14px; border:1.5px solid #ccc; border-radius:6px; font-size:15px;">
       </div>
 
       <!-- 3) 戶名 -->
@@ -4478,7 +4479,13 @@ async function loadBanks() {
   if (BANKS.length) return;
   try {
     const r = await fetch('/banks.json');
-    if (r.ok) BANKS = await r.json();
+    if (r.ok) {
+      BANKS = await r.json();
+      /* v4.5.1 strip「南農中心所屬會員」前綴（115 筆 6180xxx），顯示+存入+列印全乾淨 */
+      BANKS.forEach(b => {
+        if (b.name) b.name = b.name.replace(/^南農中心所屬會員/, '');
+      });
+    }
   } catch (_) { /* ignore */ }
 }
 loadBanks();
@@ -5109,9 +5116,27 @@ function pickBankFromSearch(idx) {
   document.getElementById('np-bank').value = composed;
   document.getElementById('np-bank-text').textContent = composed;
   document.getElementById('np-bank-text').style.color = '#1b5e20';
+  /* v4.5.1 佳里區農會（6180069）只能填末 9 碼數字 */
+  const acctEl = document.getElementById('np-acct');
+  if (b.code === '6180069') {
+    acctEl.maxLength = 9;
+    acctEl.placeholder = '佳里區農會：只需填末 9 碼數字';
+    acctEl.value = acctEl.value.replace(/\D/g, '').slice(0, 9);
+  } else {
+    acctEl.removeAttribute('maxLength');
+    acctEl.placeholder = '';
+  }
   closeBankSearchModal();
   _checkPayeeDup();
-  setTimeout(() => document.getElementById('np-acct').focus(), 30);
+  setTimeout(() => acctEl.focus(), 30);
+}
+/* v4.5.1 佳里區農會帳號即時過濾：純數字 ≤ 9 碼；其他銀行不影響 */
+function _jialieAcctFilter(el) {
+  const bankCode = (document.getElementById('np-bank').value || '').split('-')[0];
+  if (bankCode === '6180069') {
+    el.value = el.value.replace(/\D/g, '').slice(0, 9);
+  }
+  _checkPayeeDup();
 }
 /* 保留向下相容（若有其他呼叫） */
 function renderBankList() { renderBankSearchList(); }
@@ -5152,6 +5177,11 @@ async function submitNewPayee() {
   if (!bank) { showToast('✗ 請先選擇存款銀行（點「🔍 選擇銀行」）'); return; }
   if (!acct) { showToast('✗ 請輸入存款帳號'); return; }
   if (!name) { showToast('✗ 請輸入戶名'); return; }
+  /* v4.5.1 佳里區農會（6180069）帳號限 9 碼數字 */
+  if (bank.startsWith('6180069') && !/^\d{9}$/.test(acct)) {
+    showToast('✗ 佳里區農會帳號限 9 碼數字');
+    return;
+  }
   /* v4.4.86 受款人代號必填 + 格式檢查（統編 8 碼 / 身分證或居留證 10 碼） */
   if (!code) { showToast('✗ 請輸入受款人代號（統編或身分證字號）'); return; }
   if (!/^\d{8}$/.test(code) && !/^[A-Z][1-2]\d{8}$/.test(code) && !/^[A-Z]\d{9}$/.test(code)) {
