@@ -1088,7 +1088,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.5.1</div>
+      <div id="sb-version">v4.5.2</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -2571,7 +2571,7 @@ function onPurposeChange() {
     const _n2706   = getAutoText('item2706Name',  '檢附支出證明單');
     const _p2706   = getAutoText('item2706Price', '30');
     if (nameEl  && !nameEl.value.trim())  nameEl.value  = _n2706;
-    if (priceEl && !priceEl.value.trim()) priceEl.value = _p2706;
+    if (priceEl && !priceEl.value.trim()) { priceEl.value = _p2706; _fmtPriceBlur(priceEl); }
     if (formType === 'purchase') {
       const qtyEl  = qi(0, 'qty');
       const unitEl = qi(0, 'unit');
@@ -2603,7 +2603,8 @@ function onPurposeChange() {
     const nameEl  = qi(0, 'name');
     const priceEl = qi(0, 'price');
     const nameMatch  = nameEl  && nameEl.value.trim()  === getAutoText('item2706Name',  '檢附支出證明單');
-    const priceMatch = priceEl && priceEl.value.trim() === getAutoText('item2706Price', '30');
+    /* v4.5.2 priceEl 已套千分位顯示，比較前先 strip 逗點 */
+    const priceMatch = priceEl && priceEl.value.trim().replace(/,/g,'') === getAutoText('item2706Price', '30');
     const fullMatch  = nameMatch && priceMatch;
     if (nameMatch)  nameEl.value  = '';
     if (priceMatch) priceEl.value = '';
@@ -2651,6 +2652,7 @@ function appendRow(i) {
         <input type="text" inputmode="decimal" data-r="${i}" data-c="price"
                style="text-align:right; width:100%;"
                oninput="validateExpenseAmt(this,${i})"
+               onblur="_fmtPriceBlur(this)" onfocus="_fmtPriceFocus(this)"
                onkeydown="priceTabToNextName(event,${i})"></td>`;
   } else {
     tr.innerHTML = `
@@ -2660,6 +2662,7 @@ function appendRow(i) {
       <td style="text-align:center;"><input type="text" data-r="${i}" data-c="unit" lang="zh-TW" style="text-align:center; ime-mode:active;"></td>
       <td class="td-r"><input type="text" inputmode="decimal" data-r="${i}" data-c="price" style="text-align:right;"
                oninput="validatePrice(this,${i})"
+               onblur="_fmtPriceBlur(this)" onfocus="_fmtPriceFocus(this)"
                onkeydown="priceTabToNextName(event,${i})"></td>
       <td class="td-r" id="sub${i}" style="padding-right:3mm;"></td>`;
   }
@@ -2715,7 +2718,8 @@ function closeAlert() {
 }
 
 function validatePrice(el, i) {
-  const raw = el.value.trim();
+  /* v4.5.2 strip 千分位逗點再驗證 */
+  const raw = el.value.trim().replace(/,/g, '');
   if (raw === '-') return;   /* 允許輸入中的負號前綴 */
   if (raw !== '' && isNaN(Number(raw))) {
     showAlert('單價請輸入數字\n（例如：100、-480、1500）', '🔢');
@@ -2750,7 +2754,8 @@ function calcRow(i) {
 }
 
 function validateExpenseAmt(el, i) {
-  const raw = el.value.trim();
+  /* v4.5.2 strip 千分位逗點再驗證 */
+  const raw = el.value.trim().replace(/,/g, '');
   if (raw === '-') return;   /* 允許輸入中的負號前綴 */
   if (raw !== '' && isNaN(Number(raw))) {
     showAlert('金額請輸入數字\n（例如：500、-200、1200）', '🔢');
@@ -3007,6 +3012,8 @@ function fillForm(rec) {
     }
   }
   calcTotal();
+  /* v4.5.2 載入舊紀錄後：所有單價/金額 input 自動套千分位顯示 */
+  document.querySelectorAll('[data-c="price"]').forEach(_fmtPriceBlur);
   /* 載入既有紀錄：還原 notes（calcTotal 不再即時修改 notes） */
   document.getElementById('notes').value = rec.notes || '';
   _foldNoteApplied = false;
@@ -3871,6 +3878,8 @@ async function confirmSave() {
       nextSlot++;
     }
     calcTotal();
+    /* v4.5.2 程式設定 price value 後同步千分位化（避免淨額/扣繳列顯示成純數字） */
+    document.querySelectorAll('[data-c="price"]').forEach(_fmtPriceBlur);
 
     /* 在其他說明事項補充文字 */
     const noteText = result.deductions
@@ -3928,6 +3937,8 @@ function revertDeductRows() {
   _savedDeductSlots = [];
   _deductRowsAdded  = 0;
   calcTotal();
+  /* v4.5.2 還原扣繳前狀態後同步千分位化 */
+  document.querySelectorAll('[data-c="price"]').forEach(_fmtPriceBlur);
   document.getElementById('notes').value = _prevNotes;
 }
 
@@ -4219,9 +4230,24 @@ async function clearForm() {
    UTILS
    ══════════════════════ */
 function qi(r,c)  { return document.querySelector(`[data-r="${r}"][data-c="${c}"]`); }
-function qv(r,c)  { return qi(r,c)?.value||''; }
+/* v4.5.2 數值欄位（單價/金額）讀取時自動 strip 千分位逗點 */
+function qv(r,c)  {
+  const v = qi(r,c)?.value || '';
+  return c === 'price' ? v.replace(/,/g, '') : v;
+}
 function autoResize(el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; }
 function fmtN(n)  { return Number(n).toLocaleString('zh-TW'); }
+/* v4.5.2 單價/金額 input 失焦自動千分位、聚焦解格式（純數字以利編輯） */
+function _fmtPriceBlur(el) {
+  if (!el) return;
+  const raw = (el.value || '').replace(/,/g, '').trim();
+  if (raw === '' || isNaN(Number(raw))) return;
+  el.value = Number(raw).toLocaleString('zh-TW');
+}
+function _fmtPriceFocus(el) {
+  if (!el) return;
+  el.value = (el.value || '').replace(/,/g, '');
+}
 
 function updateBudgetInfo() {
   const purposeCode = document.getElementById('sel-purpose').value;
