@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.6.0</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.5.3</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -313,7 +313,7 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
 .pub-save-btn { padding:3px 12px; border:1px solid #2e7d32; border-radius:4px; background:#e8f5e9; color:#1b5e20; font-size:11px; cursor:pointer; font-family:inherit; }
 .pub-del-btn { background:#ffebee; border:1px solid #ef9a9a; border-radius:3px; cursor:pointer; font-size:10px; padding:1px 5px; color:#c62828; }
 @media print {
-  #top-bar, #ym-bar, #ym-global-bar, #tab-nav, .toolbar, #tab-voucher, #tab-inventory, #tab-property, #tab-allowance { display:none !important; }
+  #top-bar, #ym-bar, #ym-global-bar, #tab-nav, .toolbar, #tab-work, #tab-voucher, #tab-inventory, #tab-property, #tab-allowance { display:none !important; }
   #tab-public { display:block !important; }
   .pub-add-row, .pub-add-btn, .pub-save-btn, .pub-del-btn, .pub-foot button { display:none !important; }
 }
@@ -417,7 +417,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.6.0</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.5.3</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -427,6 +427,7 @@ window.addEventListener('storage', (ev) => {
 <!-- ── Tab Nav ── -->
 <div id="tab-nav">
   <button class="tab-btn active" onclick="switchTab('home',this)">🏠 首頁</button>
+  <button class="tab-btn" onclick="switchTab('work',this)">🔔 月底結算</button>
   <button class="tab-btn" onclick="switchTab('voucher',this)">📄 轉帳傳票</button>
   <button class="tab-btn" onclick="switchTab('bank',this)">🏧 銀行存款</button>
   <button class="tab-btn" onclick="switchTab('income',this)">📥 收入傳票</button>
@@ -463,10 +464,6 @@ window.addEventListener('storage', (ev) => {
 </div>
 
 <div id="content">
-
-<!-- 傳票匯入：input + 結果框（由頂列「📥 傳票匯入」鈕觸發；獨立於任何分頁） -->
-<input type="file" id="acc-entries-upload" accept=".xlsx,.xls" onchange="onAccEntriesUpload(this)" style="display:none;">
-<div id="acc-entries-result" style="display:none; margin:6px 0; font-size:12px;"></div>
 
 <!-- ══════════════════════════════════════════
      TAB 0：首頁
@@ -524,22 +521,458 @@ window.addEventListener('storage', (ev) => {
     </div>
   </div>
 
+  <!-- 獎勵金分配 -->
+  <div style="font-size:11px; font-weight:700; color:#546e7a; margin:12px 0 4px; letter-spacing:1px;">▌ <span id="rc-bonus-year">115</span>年度獎勵金分配累積</div>
+  <div class="reminder-grid">
+    <div class="r-card rc-orange">
+      <div class="r-num" id="rc-bureau">—</div>
+      <div class="r-label">🏛️ 繳局統籌款</div>
+      <div class="r-sub" id="rc-bureau-sub">繳局＋醫師＋員工，全掛繳局</div>
+    </div>
+    <div class="r-card rc-blue">
+      <div class="r-num" id="rc-fund5">—</div>
+      <div class="r-label">💰 醫療作業基金 5%</div>
+      <div class="r-sub">年度累積</div>
+    </div>
+  </div>
+
 </div>
+
+<!-- ══════════════════════════════════════════
+     TAB 1：月底結算
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-work">
+  <div style="padding:6px 0 2px;">
+    <span id="work-month-title" style="font-weight:700; font-size:14px; color:#1e2a38;">115 年 3 月 月底結算</span>
+  </div>
+
+  <!-- ── 傳票明細匯入（每月一次，直接 upsert 進 D1，重複不重計） ── -->
+  <div style="margin:8px 0 14px; background:#fff; border:2px solid #ab47bc; border-radius:8px; padding:10px 14px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+      <div>
+        <div style="font-weight:700; font-size:13px; color:#4a148c;">📥 傳票明細匯入（FNWFRX0090_*.xlsx）</div>
+        <div style="font-size:11px; color:#78909c; margin-top:2px;">收入/支出 傳票每月從會計系統匯出一次 → 選檔後自動解析 + 上傳到 D1；唯一鍵 (傳票編號, 分錄序號) 重複匯入零重複計算</div>
+      </div>
+      <label style="display:inline-flex; align-items:center; gap:6px; background:#f3e5f5; border:2px dashed #ab47bc; border-radius:8px; padding:8px 16px; cursor:pointer; font-size:13px; font-weight:600; color:#6a1b9a;">
+        📎 選擇 Excel 檔
+        <input type="file" id="acc-entries-upload" accept=".xlsx,.xls" onchange="onAccEntriesUpload(this)" style="display:none;">
+      </label>
+    </div>
+    <div id="acc-entries-result" style="display:none; margin-top:10px; font-size:12px;"></div>
+  </div>
+
+  <!-- ── 獎勵金計算表預覽 ── -->
+  <div style="margin:8px 0 14px; overflow-x:auto; border:2px solid #78909c; border-radius:8px;">
+    <div style="background:#37474f; color:#fff; padding:6px 14px; font-size:13px; font-weight:700; display:flex; align-items:center; justify-content:space-between;">
+      <span>📊 獎勵金計算表預覽（自動帶入）</span>
+      <span id="calc-ym-badge" style="background:#e8f5e9; color:#1b5e20; border-radius:4px; padding:2px 10px; font-size:12px;">115年3月</span>
+    </div>
+    <table style="border-collapse:collapse; font-size:11.5px; width:100%; min-width:920px;">
+      <thead>
+        <tr style="background:#546e7a; color:#fff;">
+          <th style="border:1px solid #455a64; padding:5px 6px; text-align:center; width:68px;">收入部份</th>
+          <th style="border:1px solid #455a64; padding:5px 6px; text-align:center;">掛帳金額</th>
+          <th style="border:1px solid #455a64; padding:5px 6px; text-align:center;">醫療折讓</th>
+          <th style="border:1px solid #455a64; padding:5px 6px; text-align:center; line-height:1.3;">健保不給付<br>部分負擔<br>及其他款項</th>
+          <th style="border:1px solid #455a64; padding:5px 6px; text-align:center; line-height:1.3;">健保申復/剔除<br>無法沖帳金額</th>
+          <th style="border:1px solid #455a64; padding:5px 6px; text-align:center;">支出部份</th>
+          <th style="border:1px solid #455a64; padding:5px 6px; text-align:center; line-height:1.3;">獎前收支<br>淨餘數</th>
+          <th style="border:1px solid #455a64; padding:5px 6px; text-align:center; line-height:1.3;">醫療作業<br>基金5%</th>
+          <th style="border:1px solid #455a64; padding:5px 6px; text-align:center;">繳局統籌款</th>
+          <th style="border:1px solid #455a64; padding:5px 6px; text-align:center;">醫師獎勵金</th>
+          <th style="border:1px solid #455a64; padding:5px 6px; text-align:center;">員工獎勵金</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="border:1px solid #cfd8dc; padding:4px 6px; background:#eceff1; font-weight:700; color:#37474f;">門診醫療</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#1565c0; font-weight:700;" id="ct-inc">—</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#78909c;" id="ct-disc">-</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#1565c0; font-weight:700;" id="ct-noncov">—</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#78909c;" id="ct-reject">0</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#c62828; font-weight:700;" id="ct-exp">—</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#1b5e20; font-weight:900; font-size:14px;" id="ct-net">—</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#e65100; font-weight:700;" id="ct-fund5">—</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#4527a0; font-weight:700;" id="ct-bureau">—</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#0d47a1; font-weight:700;" id="ct-doctor">—</td>
+          <td style="border:1px solid #cfd8dc; padding:4px 8px; text-align:right; color:#2e7d32; font-weight:700;" id="ct-staff">—</td>
+        </tr>
+        <!-- v4.4.59：衛生保健 row 移除（h-inc/h-exp 流向獨立衛生局結算，本表只顯示門診醫療）
+             以下 hidden tr 保留 ct-h-* 元素供 saveMonthData/updateCalcTable 不至於 NPE -->
+        <tr style="display:none;">
+          <td colspan="11">
+            <span id="ct-h-inc">-</span><span id="ct-h-disc">-</span><span id="ct-h-noncov">-</span>
+            <span id="ct-h-reject">-</span><span id="ct-h-exp">-</span><span id="ct-h-net">-</span>
+            <span id="ct-h-fund5">-</span><span id="ct-h-bureau">-</span><span id="ct-h-doctor">-</span>
+            <span id="ct-h-staff">-</span>
+          </td>
+        </tr>
+        <tr style="background:#b0bec5;">
+          <td style="border:1px solid #90a4ae; padding:5px 6px; font-weight:800; color:#1a237e;">小　計</td>
+          <td style="border:1px solid #90a4ae; padding:5px 8px; text-align:right; font-weight:800; color:#1a237e;" id="ct-inc-s">—</td>
+          <td style="border:1px solid #90a4ae; padding:5px 8px; text-align:right; font-weight:800; color:#1a237e;" id="ct-disc-s">-</td>
+          <td style="border:1px solid #90a4ae; padding:5px 8px; text-align:right; font-weight:800; color:#1a237e;" id="ct-noncov-s">—</td>
+          <td style="border:1px solid #90a4ae; padding:5px 8px; text-align:right; font-weight:800; color:#1a237e;" id="ct-reject-s">0</td>
+          <td style="border:1px solid #90a4ae; padding:5px 8px; text-align:right; font-weight:800; color:#c62828;" id="ct-exp-s">—</td>
+          <td style="border:1px solid #90a4ae; padding:5px 8px; text-align:right; font-weight:900; color:#b71c1c; font-size:14px;" id="ct-net-s">—</td>
+          <td style="border:1px solid #90a4ae; padding:5px 8px; text-align:right; font-weight:800; color:#e65100;" id="ct-fund5-s">—</td>
+          <td style="border:1px solid #90a4ae; padding:5px 8px; text-align:right; font-weight:800; color:#4527a0;" id="ct-bureau-s">—</td>
+          <td style="border:1px solid #90a4ae; padding:5px 8px; text-align:right; font-weight:800; color:#0d47a1;" id="ct-doctor-s">—</td>
+          <td style="border:1px solid #90a4ae; padding:5px 8px; text-align:right; font-weight:800; color:#2e7d32;" id="ct-staff-s">—</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="padding:4px 14px 6px; font-size:10px; color:#78909c; line-height:1.6;">
+      📌 獎前淨餘 = 掛帳 + 不給付 − 折讓 − 剔除 − 支出　｜　基金5% = 淨餘×5%　｜　門診醫療：繳局10%／醫師63%／員工27%　｜　衛生保健：繳局10%／醫師27%／員工63%（−加班費）
+    </div>
+  </div>
+
+  <!-- v4.4.59：衛生保健拆分容器移除（h-inc/h-exp/h-overtime/h-net 用 hidden 留 state，避免 saveMonthData/getElementById 失敗） -->
+  <div id="health-outreach-box" style="display:none;">
+    <input type="hidden" id="h-inc"      value="">
+    <input type="hidden" id="h-exp"      value="">
+    <input type="hidden" id="h-overtime" value="">
+    <input type="hidden" id="h-net"      value="">
+  </div>
+
+  <!-- 醫療折讓提醒 -->
+  <div class="discount-box warn" id="discount-box">
+    <span class="discount-icon">⚠️</span>
+    <div class="discount-text">
+      <strong id="discount-title">本月是否提列醫療折讓？</strong>
+      <p id="discount-hint">請確認備抵折讓餘額是否足夠，勾選後直接輸入提列金額</p>
+      <div id="discount-advisor" style="margin-top:6px;font-size:12px;line-height:1.6;"></div>
+    </div>
+    <div class="discount-inputs">
+      <!-- v4.4.61：「改列衛生保健」cb 完全移除（折讓固定歸門診醫療列） -->
+      <input type="hidden" id="discount-allocate-health" value="">
+
+      <label class="toggle-row" title="勾選即手動覆蓋系統判斷，強制本月按基本數額提列">
+        <input type="checkbox" id="discount-needed" onchange="onDiscountToggle();saveMonthData();">
+        強制提列
+      </label>
+      <!-- ver4.4.30：移除手動輸入金額，改自動帶入「基本數額」 -->
+      <div id="discount-rate-wrap" style="display:none; align-items:center; gap:6px; flex-wrap:wrap;">
+        <span style="font-size:11px; color:#546e7a;">將提列：</span>
+        <span id="discount-amount-display" style="font-size:13px; font-weight:700; color:#bf360c;">0</span>
+        <span style="font-size:11px; color:#546e7a;">元（系統自動依基本數額帶入）</span>
+        <input type="hidden" id="discount-amount-input" value="0">
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 收入輸入 ── -->
+  <div class="card" id="card-income">
+    <div class="card-hd hd-dark" style="display:flex; align-items:center;">
+      💰 收入端輸入 <span style="font-size:10px; font-weight:400; color:#90a4ae; margin-left:6px;">掛帳金額將自動加總</span>
+      <span style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+        <span class="sec-saved-ts" id="income-saved-ts"></span>
+        <button class="lock-sec-btn" id="income-lock-btn" onclick="toggleSectionLock('income')">🔓 解鎖中</button>
+      </span>
+    </div>
+    <div class="card-bd">
+      <div class="section-title">🏥 門診健保 &amp; NIIS疫苗接種 <span style="font-size:10px;background:#e3f2fd;color:#1565c0;border-radius:3px;padding:1px 8px;margin-left:6px;font-weight:400;">借 110305 應收醫療帳款</span></div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>A：門診健保掛帳</label>
+          <input class="num-in" id="inc-hi" type="text" placeholder="0" oninput="calcIncome()">
+        </div>
+        <div class="input-group">
+          <label>B1：新冠疫苗（NIIS）</label>
+          <input class="num-in" id="inc-covid" type="text" placeholder="0" oninput="calcIncome()">
+        </div>
+        <div class="input-group">
+          <label>B2：流感疫苗（NIIS）</label>
+          <input class="num-in" id="inc-flu" type="text" placeholder="0" oninput="calcIncome()">
+        </div>
+        <div class="input-group">
+          <label>B3：常規疫苗（NIIS）</label>
+          <input class="num-in" id="inc-routine" type="text" placeholder="0" oninput="calcIncome()">
+        </div>
+        <div class="input-group">
+          <label style="color:#1565c0;">掛帳金額合計（自動）</label>
+          <input class="num-in auto" id="inc-total" type="text" readonly>
+          <div class="hint">A + B1 + B2 + B3（對應 Excel 掛帳金額欄）</div>
+        </div>
+      </div>
+      <div class="section-title" style="margin-top:14px;">📊 門診健保收入分類（轉帳傳票用）</div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>藥品收入 <span style="font-size:10px;background:#f3e5f5;color:#6a1b9a;border-radius:2px;padding:0 4px;">貸 41060101</span></label>
+          <input class="num-in" id="inc-drug-revenue" type="text" placeholder="0" oninput="calcIncomeBreakdown()">
+        </div>
+        <div class="input-group">
+          <label>預防保健收入 <span style="font-size:10px;background:#f3e5f5;color:#6a1b9a;border-radius:2px;padding:0 4px;">貸 41060104</span></label>
+          <input class="num-in" id="inc-health-check" type="text" placeholder="0" oninput="calcIncomeBreakdown()">
+        </div>
+        <div class="input-group">
+          <label style="color:#1565c0;">門診收入（自動）<span style="font-size:10px;background:#f3e5f5;color:#6a1b9a;border-radius:2px;padding:0 4px;margin-left:4px;">貸 41060102</span></label>
+          <input class="num-in auto" id="inc-clinic-net" type="text" readonly>
+          <div class="hint">= A門診健保掛帳 − 藥品收入 − 預防保健</div>
+        </div>
+      </div>
+      <div class="section-title" style="margin-top:14px;">🧾 醫事服務 + 門診現金收入 <span style="font-size:11px;color:#d32f2f;font-weight:400;">(= 預估醫事服務收入 + 門診現金收入)</span> <span style="font-size:10px;background:#e3f2fd;color:#1565c0;border-radius:3px;padding:1px 8px;margin-left:6px;font-weight:400;">借 110305 應收醫療帳款</span></div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>A：預估醫事服務收入 <span style="font-size:10px;background:#f3e5f5;color:#6a1b9a;border-radius:2px;padding:0 4px;">貸 41060103</span></label>
+          <input class="num-in" id="inc-lab" type="text" placeholder="0" oninput="calcOther()">
+        </div>
+        <div class="input-group">
+          <label>B：門診現金收入 <span style="font-size:10px;background:#f3e5f5;color:#6a1b9a;border-radius:2px;padding:0 4px;">貸 41060102</span></label>
+          <input class="num-in" id="inc-copay" type="text" placeholder="0" oninput="calcOther()" onblur="saveMonthData()">
+        </div>
+        <!-- ver4.4.31：原 C：健保不給付欄合併進 B；保留 hidden input 給既有 calcOther / saveMonthData 使用 -->
+        <input type="hidden" id="inc-noncov" value="0">
+        <div class="input-group">
+          <label style="color:#1565c0;">小計（自動）</label>
+          <input class="num-in auto" id="inc-other-total" type="text" readonly>
+          <div class="hint">A + B</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 支出輸入 ── -->
+  <div class="card" id="card-expense">
+    <div class="card-hd hd-green" style="display:flex; align-items:center;">
+      💸 支出端輸入（醫療基金 510601 門診醫療成本）
+      <span style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+        <span class="sec-saved-ts" id="expense-saved-ts"></span>
+        <button class="lock-sec-btn" id="expense-lock-btn" onclick="toggleSectionLock('expense')">🔓 解鎖中</button>
+      </span>
+    </div>
+    <div class="card-bd">
+
+      <!-- 510601 合計（置頂） -->
+      <div style="background:linear-gradient(135deg,#e8f5e9,#f1f8e9); border:2px solid #4caf50; border-radius:10px; padding:10px 16px; margin-bottom:14px;">
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+          <div style="font-size:13px; color:#1b5e20; font-weight:700;">📊 510601 門診醫療成本 本月合計</div>
+          <div style="font-size:26px; font-weight:900; color:#2e7d32; letter-spacing:1px;" id="expense-510601-total">0</div>
+          <!-- 支出傳票補充（右側） -->
+          <div style="margin-left:auto; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span style="font-size:10px; background:#fce4ec; color:#c62828; border-radius:3px; padding:1px 7px; font-weight:600;">已付支出傳票（補充）</span>
+            <button onclick="importVoucherXlsx()" style="background:#1565c0; color:#fff; font-size:11px; font-weight:700; padding:4px 12px; border:none; border-radius:5px; cursor:pointer; white-space:nowrap;">📂 匯入 XLSX</button>
+            <input id="exp-other-voucher" type="text" placeholder="或手動輸入" style="width:100px; font-size:11px; border:1px solid #a5d6a7; border-radius:4px; padding:3px 6px; text-align:right;" oninput="calcExpenseTotal()">
+          </div>
+        </div>
+        <!-- 金額結構組成 -->
+        <div style="font-size:11px; color:#2e7d32; margin-top:6px; line-height:2;" id="expense-510601-breakdown">—</div>
+        <!-- 支出傳票匯入明細 -->
+        <div id="voucher-import-result" style="display:none; margin-top:6px; background:#e3f2fd; border:1px solid #90caf9; border-radius:6px; padding:7px 12px; font-size:11px; line-height:1.9;"></div>
+        <input type="hidden" id="exp-other-voucher-desc">
+      </div>
+
+      <!-- 未出帳動支單 -->
+      <div class="section-title">📋 動支單掛應付費用（當月）</div>
+      <div class="picker-trigger" onclick="openPicker()">
+        <span style="font-size:18px;">🔍</span>
+        <div class="ptxt">
+          <div style="font-weight:600; font-size:13px;">選擇當月動支單帶入傳票…</div>
+          <div style="font-size:11px; color:#90a4ae;">醫療基金 510601，排除臨時人員/績效獎金（有專屬欄位）</div>
+        </div>
+        <div class="pamt" id="picker-total">-</div>
+      </div>
+      <div class="picked-list" id="picked-list"></div>
+
+      <!-- 固定成本 -->
+      <div class="section-title" style="margin-top:14px;">🏚️ 固定成本（每月）</div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>
+            什項設備折舊
+            <button class="lock-btn locked" id="depr-lock-btn" onclick="toggleDeprLock()" style="margin-left:6px;">🔒 鎖定</button>
+          </label>
+          <input class="num-in locked" id="exp-depr" type="text" value="2,193" readonly>
+          <div class="hint" id="depr-hint">11503雜項設備折舊（預設鎖定）</div>
+        </div>
+        <div class="input-group">
+          <label style="color:#1565c0;">財產帳面淨值 <span id="depr-balance-label" style="font-weight:400; font-size:10px; color:#90a4ae;">（本月期末）</span></label>
+          <input class="num-in auto" id="exp-depr-balance" type="text" readonly>
+          <div class="hint" id="depr-balance-hint" style="color:#1565c0; font-weight:600;"></div>
+        </div>
+      </div>
+
+      <!-- 臨時人員薪資及代扣款（固定掛應付費用）-->
+      <div class="section-title" style="margin-top:14px;">
+        👥 臨時人員薪資及代扣款
+        <span style="font-size:10px; background:#e3f2fd; color:#1565c0; border-radius:3px; padding:1px 8px; margin-left:8px; font-weight:400;">固定 → 借 510601 門診醫療成本 / 貸 210205 應付費用 /03 員工款</span>
+      </div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>薪資實領合計 <span style="font-size:10px;color:#90a4ae;">（2713 計時與計件人員酬金）</span></label>
+          <input class="num-in" id="exp-temp-salary" type="text" placeholder="0">
+          <div class="hint">黎欣妮 + 方雪雲 薪資實領合計</div>
+        </div>
+        <div class="input-group">
+          <label>補助代扣款合計 <span style="font-size:10px;color:#90a4ae;">（2713 計時與計件人員酬金）</span></label>
+          <input class="num-in" id="exp-temp-deduct" type="text" placeholder="0">
+          <div class="hint">黎欣妮 + 方雪雲 各項補助代扣款合計</div>
+        </div>
+      </div>
+
+      <!-- 藥品領用 -->
+      <div class="section-title" style="margin-top:14px;">
+        💊 藥品領用
+        <span style="font-size:10px; background:#e8f5e9; color:#2e7d32; border-radius:3px; padding:1px 8px; margin-left:8px; font-weight:400;">領用：借 510601 / 貸 110404　｜　進貨：借 110404 / 貸 銀行</span>
+        <span id="drug-not-entered-badge" style="display:none; font-size:10px; background:#fff3e0; color:#e65100; border-radius:3px; padding:1px 8px; margin-left:8px; font-weight:600;">⚠️ 本月尚未輸入</span>
+      </div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>藥品領用金額 <span style="font-size:10px;color:#90a4ae;">（自動帶入當月藥品明細帳「領用」合計）</span></label>
+          <input class="num-in auto" id="exp-drug" type="text" placeholder="0" readonly title="此欄唯讀 — 自動從醫療用品庫存頁面 藥品明細帳 抓當月領用合計">
+          <div class="hint" id="drug-hint">上月期末：<span id="inv-drug-prevbal">—</span></div>
+        </div>
+        <div class="input-group">
+          <label>衛材領用金額 <span style="font-size:10px;color:#90a4ae;">（自動帶入當月衛材明細帳「領用」合計）</span></label>
+          <input class="num-in auto" id="exp-supply" type="text" placeholder="0" readonly title="此欄唯讀 — 自動從醫療用品庫存頁面 衛材明細帳 抓當月領用合計">
+          <div class="hint" id="supply-hint">上月期末：<span id="inv-supply-prevbal">—</span></div>
+        </div>
+        <div class="input-group">
+          <label style="color:#1565c0;">領用合計</label>
+          <input class="num-in auto" id="exp-drug-total" type="text" readonly>
+        </div>
+      </div>
+
+      <!-- 藥品盤盈損 -->
+      <div class="section-title" style="margin-top:14px;">📦 藥品盤盈 / 盤損（帳目校正）</div>
+      <div class="input-grid">
+        <div class="input-group">
+          <label>報表藥品實際金額 <span style="font-size:10px;color:#90a4ae;">（自動帶入當月藥品期末＝帳面±盤盈/盤損）</span></label>
+          <input class="num-in auto" id="inv-drug-real" type="text" placeholder="—" readonly title="此欄唯讀 — 自動從醫療用品庫存頁面 藥品明細帳 抓當月期末（含盤盈/盤損）">
+          <div class="hint">當月帳面：<span id="inv-drug-curbal">—</span></div>
+        </div>
+        <div class="input-group">
+          <label>報表衛材實際金額 <span style="font-size:10px;color:#90a4ae;">（自動帶入當月衛材期末＝帳面±盤盈/盤損）</span></label>
+          <input class="num-in auto" id="inv-supply-real" type="text" placeholder="—" readonly title="此欄唯讀 — 自動從醫療用品庫存頁面 衛材明細帳 抓當月期末（含盤盈/盤損）">
+          <div class="hint">當月帳面：<span id="inv-supply-curbal">—</span></div>
+        </div>
+        <div class="input-group">
+          <label style="color:#1565c0;">系統計算校正量</label>
+          <input class="num-in auto" id="inv-diff" type="text" readonly>
+          <div class="hint" id="inv-diff-hint">正數=盤損（增加成本），負數=盤盈</div>
+        </div>
+        <div class="input-group" style="grid-column:1/-1;">
+          <label style="color:#546e7a;">自動說明</label>
+          <input class="num-in auto" id="inv-note" type="text" readonly style="font-size:12px;color:#546e7a;font-weight:600;background:#f5f5f5;width:100%;">
+        </div>
+      </div>
+
+
+    </div>
+  </div>
+
+
+  <!-- ── 健保款補付/追扣 ── -->
+  <div class="card" id="card-adj">
+    <div class="card-hd hd-amber" style="display:flex; align-items:center;">
+      🏛️ 健保款補付 / 追扣 登錄
+      <span style="margin-left:auto; display:flex; align-items:center; gap:6px;">
+        <span class="sec-saved-ts" id="adj-saved-ts"></span>
+        <button class="lock-sec-btn" id="adj-lock-btn" onclick="toggleSectionLock('adj')">🔓 解鎖中</button>
+      </span>
+    </div>
+    <div class="card-bd">
+      <div class="table-wrap">
+      <table class="adj-table">
+        <thead>
+          <tr>
+            <th style="width:80px;">類型</th>
+            <th style="width:90px;">年月</th>
+            <th style="width:130px;">項目 / 金額</th>
+            <th>金額（元）/ 分配</th>
+            <th style="width:220px;">自動科目判斷</th>
+            <th style="width:30px;"></th>
+          </tr>
+        </thead>
+        <tbody id="adj-tbody">
+          <!-- 動態產生 -->
+        </tbody>
+      </table>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+        <button class="add-adj-btn" onclick="addAdj('sup')">＋ 當年補付</button>
+        <button class="add-adj-btn" onclick="addAdj('ded')">＋ 當年追扣</button>
+        <button class="add-adj-btn" onclick="addAdj('pysup')">＋ 以前年度補付</button>
+        <button class="add-adj-btn" onclick="addAdj('pyded')">＋ 以前年度追扣</button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ── 月度自我檢核（來源：115年第一場兼任會計研習 PPT）── -->
+  <div class="card" style="margin-top:14px; border-left:4px solid #42a5f5;">
+    <div class="card-hd" style="background:#e3f2fd; color:#0d47a1; font-size:12px; font-weight:700;">
+      ✅ 月度結帳自我檢核清單
+      <span style="font-weight:400; font-size:10px; margin-left:8px; color:#546e7a;">（每月底結帳前確認）</span>
+    </div>
+    <div class="card-bd" style="padding:10px 14px; font-size:12px; line-height:2; color:#37474f;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 20px;">
+        <div>☐ &nbsp;藥品領用金額已輸入並帶入傳票</div>
+        <div>☐ &nbsp;衛材領用金額已輸入並帶入傳票</div>
+        <div>☐ &nbsp;藥品盤盈/盤損差異已確認或清零</div>
+        <div>☐ &nbsp;財產折舊 2,193 元已列入傳票</div>
+        <div>☐ &nbsp;備抵折讓本月核銷金額已確認</div>
+        <div>☐ &nbsp;健保補付/追扣明細已登錄</div>
+        <div>☐ &nbsp;備折餘額已與基本數額比較（需提列？）</div>
+        <div>☐ &nbsp;轉帳傳票清單已列印/存檔</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 月底結算底部：直接產製傳票 -->
+  <div style="text-align:center; padding:16px 0 24px;">
+    <button onclick="preCheckVoucher()" style="background:#1e88e5; color:#fff; font-size:15px; font-weight:700; padding:12px 36px; border:none; border-radius:8px; cursor:pointer; letter-spacing:1px; box-shadow:0 2px 8px #1e88e566;">
+      ⚡ 製作轉帳傳票 &amp; 匯出 XLSX
+    </button>
+  </div>
+
+</div><!-- /tab-work -->
+
 
 <!-- ══════════════════════════════════════════
      TAB 2：轉帳傳票
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-voucher">
+  <!-- 傳票頁工具列 -->
   <div class="toolbar" style="flex-wrap:wrap; gap:8px; background:#263545; padding:7px 20px; border-bottom:2px solid #1e2a38;">
-    <span style="font-size:13px; font-weight:700; color:#fff;" id="voucher-title">轉帳傳票</span>
-    <span id="voucher-stat" style="font-size:11px; color:#90a4ae;"></span>
-    <label style="margin-left:auto;font-size:11px;color:#90a4ae;display:flex;align-items:center;gap:6px;">
-      <input type="checkbox" id="voucher-year-mode" onchange="renderImportedVouchers('轉帳')"> 顯示整年
-    </label>
+    <span style="font-size:13px; font-weight:700; color:#fff;" id="voucher-ym-title">115 年 3 月 轉帳傳票</span>
+    <span style="font-size:10px; color:#e65100; background:#fff3e0; border-radius:4px; padding:2px 7px; display:none;" id="voucher-src-badge"></span>
+    <button class="lock-sec-btn" id="voucher-lock-btn" onclick="toggleVoucherLock()">🔒 鎖定中</button>
+    <button class="btn btn-green" onclick="exportExcel()">📥 匯出 XLSX</button>
+    <button class="btn btn-gray" style="font-size:11px;" onclick="addManualVoucherRow()">＋ 手工新增列</button>
+    <button class="ym-action gen" style="padding:5px 14px; font-size:12px;" onclick="preCheckVoucher()">⚡ 製作轉帳傳票</button>
+    <span style="font-size:11px; color:#78909c;" id="voucher-count"></span>
   </div>
-  <div class="card"><div class="card-bd" style="padding:0;" id="voucher-body">
-    <div style="padding:24px;text-align:center;color:#78909c;">載入中…</div>
-  </div></div>
+  <div class="card">
+    <div class="card-hd hd-dark">📄 轉帳傳票清單 <span style="font-size:10px; font-weight:400; margin-left:6px; color:#90a4ae;">藍色=借方　紅色=貸方</span></div>
+    <div class="card-bd" style="padding:0;">
+      <div class="table-wrap">
+      <table class="voucher-table" id="voucher-table">
+        <thead>
+          <tr>
+            <th style="width:30px;">序</th>
+            <th style="width:80px;">製票日期</th>
+            <th style="width:36px;text-align:center;">借貸</th>
+            <th style="width:155px;">會計科目</th>
+            <th style="width:110px;">沖銷科目子目</th>
+            <th style="width:110px;">用途別科目</th>
+            <th>摘要</th>
+            <th style="width:85px; text-align:right;">借方金額</th>
+            <th style="width:85px; text-align:right;">貸方金額</th>
+            <th style="width:30px;"></th>
+          </tr>
+        </thead>
+        <tbody id="voucher-tbody">
+          <tr><td colspan="9" class="empty-msg">請先在「月底結算」輸入資料，再按「🔄 從月底結算產生」，或手工新增列</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex; justify-content:flex-end; gap:20px; font-size:13px; font-weight:700; padding: 6px 4px;">
+    <span>借方合計：<span id="total-debit" style="color:#1565c0;">0</span></span>
+    <span>貸方合計：<span id="total-credit" style="color:#c62828;">0</span></span>
+  </div>
 </div><!-- /tab-voucher -->
 
 <!-- ══════════════════════════════════════════
@@ -1342,6 +1775,10 @@ function showSaveMsg(msg='✓ 已儲存', ok=true){
    Tab 切換
 ════════════════════════════════════════════ */
 async function switchTab(name, btn){
+  /* v4.3.1：離開月底結算前問 dirty */
+  if (document.getElementById('tab-work')?.classList.contains('active') && name !== 'work' && window.__accPromptSaveAll) {
+    await window.__accPromptSaveAll();
+  }
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-btn') .forEach(b=>b.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
@@ -1360,7 +1797,6 @@ async function switchTab(name, btn){
     property:  ()=>{ updateDeprBalance(); renderDeprSchedule(); },
     income:    ()=> renderImportedVouchers('收入'),
     expense:   ()=> renderImportedVouchers('支出'),
-    voucher:   ()=> renderImportedVouchers('轉帳'),
     bank:      ()=> renderBankDeposit(),
     history:   ()=> renderChangeHistory(),
   };
@@ -1377,10 +1813,12 @@ function onYmChange(){
   if(globalLabel) globalLabel.textContent = `${label}`;
   const workTitle = document.getElementById('work-month-title');
   if(workTitle) workTitle.textContent = `${label} 月底結算`;
+  loadMonthData();
   updateDeprBalance();
   updatePrevMonthLabels();
-  // 傳票頁同步（改讀匯入版轉帳傳票）
-  renderImportedVouchers('轉帳');
+  checkDrugEntered();
+  // 傳票頁同步（重新載入該月儲存的傳票）
+  loadVoucherView();
   // 公務預算分頁（年度切換時重新渲染）
   renderPublicTab();
   // 其他顯示分頁同步（截至選定月份的累計資料）
@@ -1807,16 +2245,44 @@ function updateHomeDashboard(){
   const rcAllow = document.getElementById('rc-allowance');
   if(rcAllow) rcAllow.textContent = fmt(STATE.allowance?.currentBalance ?? 0);
 
-  // 累積賸餘（期初 + 本年度 330101 淨增加，直接從傳票，不依賴 surplus 分頁 DOM）
+  // 累積賸餘（期初 + 本年度增加）
   const surplusInit = +(localStorage.getItem('acc_surplus_init') || 3432043);
-  const surpRows = (window.AccV2 && AccV2.entries)
-    ? AccV2.entries({ yearPrefix:String(y), subjectPrefix:'330101' }).filter(e => !isYearOpeningVoucher(e.voucher_no))
-    : [];
-  const surpAdd = surpRows.reduce((s,e)=>s+(e.credit||0)-(e.debit||0),0);
+  const surpAdd = pnum(document.getElementById('surp-add')?.textContent);
   const rcSurplus = document.getElementById('rc-surplus');
   if(rcSurplus) rcSurplus.textContent = fmt(surplusInit + surpAdd);
   const rcSurpSub = document.getElementById('rc-surplus-sub');
-  if(rcSurpSub) rcSurpSub.textContent = `期初 ${fmt(surplusInit)}` + (surpAdd !== 0 ? ` ＋增加 ${fmt(surpAdd)}` : '');
+  if(rcSurpSub) rcSurpSub.textContent = `期初 ${fmt(surplusInit)}` + (surpAdd > 0 ? ` + 增加 ${fmt(surpAdd)}` : '');
+
+  // ── 年度獎勵金累積（從各月傳票讀取，115年全掛繳局統籌款） ──
+  const rcBonusYear = document.getElementById('rc-bonus-year');
+  if(rcBonusYear) rcBonusYear.textContent = y;
+  let sumBonus=0, sumFund5=0;
+  for(let mo=1; mo<=12; mo++){
+    const ymKey = y + String(mo).padStart(2,'0');
+    const vRaw = localStorage.getItem('acc_vouchers_'+ymKey);
+    if(vRaw){
+      try{
+        const vs = JSON.parse(vRaw);
+        let curG = '';
+        vs.forEach(v=>{
+          if(v.group) curG = v.group;
+          if(curG.includes('績效獎金') && v.type==='debit'){
+            sumBonus += v.dr||0;
+            const netApprox = Math.round((v.dr||0) / 0.95);
+            sumFund5 += netApprox - (v.dr||0);
+          }
+        });
+      }catch(e){}
+    }
+  }
+  const rcBureau = document.getElementById('rc-bureau');
+  const rcFund5  = document.getElementById('rc-fund5');
+  if(rcBureau){
+    rcBureau.textContent = sumBonus > 0 ? fmt(sumBonus) : '—';
+    const rcBSub = document.getElementById('rc-bureau-sub');
+    if(rcBSub && sumBonus > 0) rcBSub.textContent = `繳局＋醫師＋員工，全掛繳局統籌款`;
+  }
+  if(rcFund5) rcFund5.textContent = sumFund5 > 0 ? fmt(sumFund5) : '—';
 }
 
 let _invCloseLocked  = true;
@@ -1858,23 +2324,16 @@ function syncSupplyUsageFromLedger(){ syncMonthFromInvLedger(); }
 function calcDrug(){
   /* v4.4.53：每次重算前先從庫存帳同步「藥品/衛材領用 + 報表實際金額」 */
   syncMonthFromInvLedger();
-  const drugEl=document.getElementById('exp-drug');
-  const supplyEl=document.getElementById('exp-supply');
-  const totalEl=document.getElementById('exp-drug-total');
-  if(!drugEl||!supplyEl||!totalEl) return;   /* 月底結算移除後這些欄位不存在 → 不需計算 */
-  const d=pnum(drugEl.value);
-  const s=pnum(supplyEl.value);
-  totalEl.value = fmt(d+s);
+  const d=pnum(document.getElementById('exp-drug').value);
+  const s=pnum(document.getElementById('exp-supply').value);
+  document.getElementById('exp-drug-total').value = fmt(d+s);
   calcExpenseTotal();
 }
 function calcInv(){
   /* v4.4.53：先從庫存帳同步報表實際金額 */
   syncMonthFromInvLedger();
-  const drugRealEl   = document.getElementById('inv-drug-real');
-  const supplyRealEl = document.getElementById('inv-supply-real');
-  if(!drugRealEl||!supplyRealEl) return;   /* 月底結算移除後盤點欄位不存在 → 不需計算 */
-  const drugRealRaw   = drugRealEl.value;
-  const supplyRealRaw = supplyRealEl.value;
+  const drugRealRaw   = document.getElementById('inv-drug-real').value;
+  const supplyRealRaw = document.getElementById('inv-supply-real').value;
   /* 帳面結存 = 前月期末 + 進貨 - 領用/報廢，不含盤損/盈，才能正確算出盤損/盈差距 */
   const _ym2      = curYm();
   const drugBook   = getInvBookBal('drug',   _ym2);
@@ -3064,8 +3523,10 @@ async function cleanupBlankEntries(){
     alert(`🧹 已刪除 ${j.deleted} 筆假空白分錄`);
     await AccV2.refresh();
     renderPayable(); renderCustodial(); renderSurplusTab();
-    renderImportedVouchers('收入'); renderImportedVouchers('支出'); renderImportedVouchers('轉帳');
-    renderAllowLedger();
+    renderImportedVouchers('收入'); renderImportedVouchers('支出');
+    renderVouchers();
+    /* v4.4.29 #17 round-2 修：renderAllowLedger 必須先跑（設 _loaded 旗標），renderAllowanceRateAndAR 對帳才不誤報 */
+    renderAllowLedger(); updateDiscountAdvisor();
     renderAllowanceRateAndAR();
     renderChangeHistory();
   } catch(e){
@@ -3174,21 +3635,17 @@ function exportCustodialCsv(){
 function exportSurplusCsv(){
   const {y} = getYm();
   const initVal = +(localStorage.getItem('acc_surplus_init')||3432043);
-  /* v4.6.0：同 renderSurplusTab，從匯入傳票 330101 推導 */
-  const rows330 = (window.AccV2 && AccV2.entries)
-    ? AccV2.entries({ yearPrefix: String(y), subjectPrefix:'330101' }).filter(e => !isYearOpeningVoucher(e.voucher_no))
-    : [];
+  const yrRaw = localStorage.getItem('acc_yeardata_'+y);
+  let yd = {}; try{ yd = JSON.parse(yrRaw||'{}'); }catch(e){}
   let bal = initVal;
-  const rows = [['年月','摘要','本月增減','累計餘額']];
-  rows.push(['期初',`${+y-1}年度結轉 累積賸餘期初餘額`,'', initVal]);
+  const rows = [['年月','摘要','本月增加','累計餘額']];
+  rows.push(['期初','114年度結轉 累積賸餘期初餘額','', initVal]);
   for(let mo=1; mo<=12; mo++){
     const ymKey = y+String(mo).padStart(2,'0');
-    const moRows = rows330.filter(e => e.ym === ymKey);
-    const inc = moRows.reduce((s,e)=>s+(e.credit||0),0);
-    const dec = moRows.reduce((s,e)=>s+(e.debit ||0),0);
-    if(inc===0 && dec===0 && mo>3) continue;
-    if(inc>0){ bal += inc; rows.push([`${y}/${String(mo).padStart(2,'0')}`, `${mo}月 醫療作業基金5%提撥`, inc, bal]); }
-    if(dec>0){ bal -= dec; rows.push([`${y}/${String(mo).padStart(2,'0')}`, `${mo}月 解繳市庫`, -dec, bal]); }
+    const d = yd[ymKey]; const amt = d&&d.fund5?+d.fund5:0;
+    if(amt===0 && mo>3) continue;
+    bal += amt;
+    rows.push([`${y}/${String(mo).padStart(2,'0')}`, amt>0?`${mo}月獎前收支淨餘數×5%醫療作業基金提撥`:'（無資料）', amt>0?amt:'', bal]);
   }
   downloadCsv(`累積賸餘_${y}年.csv`, rows);
 }
@@ -3579,6 +4036,7 @@ function renderAllowLedger(){
   if(el('rc-allowance')) el('rc-allowance').textContent = fmt(bal);
   if(el('al-provision')) el('al-provision').textContent = fmt(provision);
   if(el('al-settled'))   el('al-settled').textContent   = fmt(settled);
+  if(typeof updateDiscountAdvisor === 'function') updateDiscountAdvisor();
 }
 function recalcAllowLedger(){ renderAllowLedger(); }   /* 向後相容 */
 
@@ -5529,8 +5987,10 @@ async function onAccEntriesUpload(inp){
     alert(`✅ 匯入完成（${out.length} 筆）\n\n${lines.join('\n')}\n\n合計：新增 ${totalAdd}，更新 ${totalUpd}，略過 ${totalSkip}`);
     await AccV2.refresh();
     renderPayable(); renderCustodial(); renderSurplusTab();
-    renderImportedVouchers('收入'); renderImportedVouchers('支出'); renderImportedVouchers('轉帳');
-    renderAllowLedger();
+    renderImportedVouchers('收入'); renderImportedVouchers('支出');
+    renderVouchers();
+    /* v4.4.29 #17 round-2 修：同上，renderAllowLedger 必須先跑 */
+    renderAllowLedger(); updateDiscountAdvisor();
     renderAllowanceRateAndAR();
     updateHomeDashboard();
   } catch (e) {
@@ -6105,43 +6565,42 @@ function renderCustodial(){
 function renderSurplusTab(){
   const initVal = +(localStorage.getItem('acc_surplus_init') || 3432043);
   const {y} = getYm();
+  const yrRaw = localStorage.getItem('acc_yeardata_'+y);
+  let yd = {};
+  if(yrRaw) try{ yd = JSON.parse(yrRaw); }catch(e){}
   const tbody = document.getElementById('surplus-tbody');
   if(!tbody) return;
-  /* v4.6.0：改從匯入傳票推導 330101（排除年初結轉傳票，避免與期初雙計）；
-     330101 借貸語意：貸=5%提撥(增)、借=解繳市庫(減) */
-  const rows330 = (window.AccV2 && AccV2.entries)
-    ? AccV2.entries({ yearPrefix: String(y), subjectPrefix:'330101' }).filter(e => !isYearOpeningVoucher(e.voucher_no))
-    : [];
   let bal = initVal;
   let totalAdd = 0;
   let rows = `<tr style="background:#e8f5e9;">
     <td style="padding:6px 10px;font-weight:700;color:#1b5e20;">期初</td>
-    <td style="padding:6px 10px;color:#546e7a;">${+y-1}年度結轉 累積賸餘期初餘額</td>
+    <td style="padding:6px 10px;color:#546e7a;">114年度結轉 累積賸餘期初餘額</td>
     <td style="padding:6px 10px;text-align:right;color:#90a4ae;">—</td>
     <td style="padding:6px 10px;text-align:right;font-weight:700;color:#1565c0;">${fmt(bal)}</td>
   </tr>`;
   for(let mo=1; mo<=12; mo++){
     const ymKey = y + String(mo).padStart(2,'0');
-    const moRows = rows330.filter(e => e.ym === ymKey);
-    const inc = moRows.reduce((s,e)=>s+(e.credit||0),0);   // 提撥（增）
-    const dec = moRows.reduce((s,e)=>s+(e.debit ||0),0);   // 解繳市庫（減）
-    if(inc === 0 && dec === 0 && mo > 3) continue;
-    if(inc > 0){
-      bal += inc; totalAdd += inc;
-      const bg = mo%2===0 ? 'background:#fafafa;' : '';
-      rows += `<tr style="${bg}">
-        <td style="padding:6px 10px;color:#546e7a;">${y}/${String(mo).padStart(2,'0')}</td>
-        <td style="padding:6px 10px;color:#333;font-size:11px;">${mo}月 醫療作業基金 5% 提撥（330101 貸）</td>
-        <td style="padding:6px 10px;text-align:right;font-weight:600;color:#1b5e20;">${fmt(inc)}</td>
-        <td style="padding:6px 10px;text-align:right;font-weight:700;color:#1565c0;">${fmt(bal)}</td>
-      </tr>`;
-    }
-    if(dec > 0){
-      bal -= dec; totalAdd -= dec;
+    const d = yd[ymKey];
+    const amt = d && d.fund5 ? +d.fund5 : 0;
+    if(amt === 0 && mo > 3) continue;
+    bal += amt;
+    totalAdd += amt;
+    const bg = mo%2===0 ? 'background:#fafafa;' : '';
+    rows += `<tr style="${bg}">
+      <td style="padding:6px 10px;color:#546e7a;">${y}/${String(mo).padStart(2,'0')}</td>
+      <td style="padding:6px 10px;color:#333;font-size:11px;">${amt>0?`${mo}月獎前收支淨餘數 × 5% 醫療作業基金提撥`:'（無資料）'}</td>
+      <td style="padding:6px 10px;text-align:right;font-weight:600;color:${amt>0?'#1b5e20':'#bdbdbd'};">${amt>0?fmt(amt):'—'}</td>
+      <td style="padding:6px 10px;text-align:right;font-weight:700;color:#1565c0;">${fmt(bal)}</td>
+    </tr>`;
+    // 解繳市庫（支出傳票沖銷）
+    const ded = d && d.surplusDeduct ? +d.surplusDeduct : 0;
+    if(ded > 0){
+      bal -= ded;
+      totalAdd -= ded;
       rows += `<tr style="background:#fce4ec;">
         <td style="padding:6px 10px;color:#b71c1c;">${y}/${String(mo).padStart(2,'0')}</td>
-        <td style="padding:6px 10px;color:#b71c1c;font-size:11px;">🔻 解繳市庫（330101 借）</td>
-        <td style="padding:6px 10px;text-align:right;font-weight:600;color:#b71c1c;">-${fmt(dec)}</td>
+        <td style="padding:6px 10px;color:#b71c1c;font-size:11px;">🔻 解繳市庫（支出傳票沖銷）</td>
+        <td style="padding:6px 10px;text-align:right;font-weight:600;color:#b71c1c;">-${fmt(ded)}</td>
         <td style="padding:6px 10px;text-align:right;font-weight:700;color:#1565c0;">${fmt(bal)}</td>
       </tr>`;
     }
@@ -6151,7 +6610,7 @@ function renderSurplusTab(){
   const addEl  = document.getElementById('surp-add');
   const balEl  = document.getElementById('surp-bal');
   if(initEl) initEl.textContent = fmt(initVal);
-  if(addEl)  addEl.textContent  = totalAdd !== 0 ? fmt(totalAdd) : '0';
+  if(addEl)  addEl.textContent  = totalAdd > 0 ? fmt(totalAdd) : '0';
   if(balEl)  balEl.textContent  = fmt(bal);
 }
 
@@ -6294,7 +6753,7 @@ function renderBankDeposit(){
    ════════════════════════════════════════════ */
 function renderImportedVouchers(type){
   const { y, ym, label } = getYm();
-  const key = type === '收入' ? 'income' : (type === '支出' ? 'expense' : (type === '轉帳' ? 'voucher' : null));
+  const key = type === '收入' ? 'income' : (type === '支出' ? 'expense' : null);
   if(!key) return;
   const yearMode = document.getElementById(key+'-year-mode')?.checked;
   const title = document.getElementById(key+'-title');
@@ -6313,10 +6772,10 @@ function renderImportedVouchers(type){
   const tC = rows.reduce((s,e)=>s+(e.credit||0),0);
   if(stat) stat.textContent = `${list.length} 張 ｜ ${rows.length} 筆分錄 ｜ 借 ${tD.toLocaleString()} ｜ 貸 ${tC.toLocaleString()}${tD===tC?' ✓':' ✗ 不平'}`;
   if(!list.length){
-    body.innerHTML = `<div style="padding:32px;text-align:center;color:#78909c;">📭 尚無${type}傳票 —— 請按頂列「📥 傳票匯入」上傳 FNWFRX0090 Excel</div>`;
+    body.innerHTML = `<div style="padding:32px;text-align:center;color:#78909c;">📭 尚無${type}傳票 —— 請至「月底結算」匯入 FNWFRX0090 Excel</div>`;
     return;
   }
-  const hd = type === '收入' ? 'hd-green' : (type === '支出' ? 'hd-red' : 'hd-dark');
+  const hd = type === '收入' ? 'hd-green' : 'hd-red';
   body.innerHTML = list.map(g=>{
     const gD = g.entries.reduce((s,e)=>s+(e.debit||0),0);
     const gC = g.entries.reduce((s,e)=>s+(e.credit||0),0);
@@ -7195,12 +7654,9 @@ function updateDeprBalance(){
   const prevBalDyn = getPropPrevMonthBal(y, m);
   STATE.property.currentBalance = prevBalDyn;
   const balance = prevBalDyn - depr;
-  const _deprBalEl = document.getElementById('exp-depr-balance');
-  if(_deprBalEl) _deprBalEl.value = fmt(balance);
-  const _deprLblEl = document.getElementById('depr-balance-label');
-  if(_deprLblEl) _deprLblEl.textContent = `（${y}年${m}月期末）`;
-  const _deprHintEl = document.getElementById('depr-balance-hint');
-  if(_deprHintEl) _deprHintEl.textContent  = `帳面淨值：${fmt(balance)} 元`;
+  document.getElementById('exp-depr-balance').value = fmt(balance);
+  document.getElementById('depr-balance-label').textContent = `（${y}年${m}月期末）`;
+  document.getElementById('depr-balance-hint').textContent  = `帳面淨值：${fmt(balance)} 元`;
   // 財產管理頁標籤 + 數值
   const curLabel  = document.getElementById('prop-cur-label');
   const prevLabel = document.getElementById('prop-prev-label');
@@ -7734,6 +8190,8 @@ function logout(){
   // 讀設定
   const raw = localStorage.getItem(LS.settings);
   if(raw) try{ Object.assign(STATE.settings, JSON.parse(raw)); } catch(e){}
+  // 折舊淨值顯示
+  document.getElementById('exp-depr-balance').value = fmt(STATE.property.currentBalance - STATE.property.monthlyDepr);
   /* 帳面庫存顯示 — 改由 updatePrevMonthLabels 在 renderInvLedger 後處理 */
   // 讀年度分配資料（localStorage）
   const {y} = getYm();
@@ -7741,6 +8199,8 @@ function logout(){
   if(yrRaw) try{ STATE.yearData = JSON.parse(yrRaw); } catch(e){}
   // 動支單資料（需在 loadMonthData 前載入，confirmPicker 才能正確還原選擇）
   await loadPickerData();
+  // 讀本月資料
+  loadMonthData();
   // 三格卡片（年度累積）
   updateHomeDashboard();  /* v4.3.1 修正：recalcYearTotals 已於 v3.7.0 改名，兩處呼叫一併修正，避免 init 崩潰導致 loadVoucherView 沒執行，畫面看起來像資料消失 */
   // 醫療用品合計
@@ -7748,6 +8208,10 @@ function logout(){
   // 財產帳面淨值自動計算 + 月份標籤
   updateDeprBalance();
   updatePrevMonthLabels();
+  // 藥品/衛材未輸入提醒
+  checkDrugEntered();
+  // 傳票頁：載入當月已儲存的傳票
+  loadVoucherView();
   // 公務預算分頁
   renderPublicTab();
   // v3.9.4: 全面重置Q1庫存明細帳（正確藥品/衛材期末結存）
@@ -7766,8 +8230,8 @@ function logout(){
   calcInv();
   // v4.4.0 先拉 AccV2 bootstrap（以伺服器 voucher_entries 為真實來源）
   await AccV2.ensure();
-  // v4.4.29 AccV2 就緒後重渲染三傳票（匯入版）
-  renderImportedVouchers('收入'); renderImportedVouchers('支出'); renderImportedVouchers('轉帳');
+  // v4.4.29 AccV2 就緒後重渲染轉帳傳票（F5 後優先顯示匯入版）
+  renderVouchers();
   // 應付費用分頁
   fixMar盤損();
   await migrateVoucher11503Full();
