@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.6.2</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.6.3</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -417,7 +417,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.6.2</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.6.3</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -594,6 +594,8 @@ window.addEventListener('storage', (ev) => {
       <div class="bb-label">合計結存（元）</div>
     </div>
   </div>
+
+  <div id="inv-recon" style="margin:0 0 12px;"></div>
 
   <div class="inventory-cols">
     <!-- 藥品 -->
@@ -1030,7 +1032,7 @@ window.addEventListener('storage', (ev) => {
     <div class="bb-divider"></div>
     <div class="bb-item">
       <div class="bb-num" id="surp-add">0</div>
-      <div class="bb-label">本年度增加（5%）</div>
+      <div class="bb-label">本年度淨增減</div>
     </div>
     <div class="bb-divider"></div>
     <div class="bb-item">
@@ -1038,9 +1040,10 @@ window.addEventListener('storage', (ev) => {
       <div class="bb-label">累計餘額</div>
     </div>
   </div>
-  <div style="font-size:11px;color:#78909c;padding:0 2px 10px;">
+  <div style="font-size:11px;color:#78909c;padding:0 2px 4px;">
     💡 330101 累積賸餘 — 每月可分配收入之 5% 依規定累積，不可分配給員工
   </div>
+  <div id="surp-provision-hint" style="font-size:11px;color:#8a6d3b;padding:0 2px 10px;line-height:1.7;"></div>
   <div class="card">
     <div class="card-hd hd-blue">💰 累積賸餘明細帳</div>
     <div class="card-bd" style="padding:0;">
@@ -1356,7 +1359,7 @@ async function switchTab(name, btn){
     custodial: ()=> renderCustodial(),
     surplus:   ()=> renderSurplusTab(),
     public:    ()=> renderPublicTab(),
-    inventory: ()=>{ renderInvLedger('drug'); renderInvLedger('supply'); },
+    inventory: ()=>{ renderInvLedger('drug'); renderInvLedger('supply'); renderInvVoucherRecon(); },
     property:  ()=>{ updateDeprBalance(); renderDeprSchedule(); },
     income:    ()=> renderImportedVouchers('收入'),
     expense:   ()=> renderImportedVouchers('支出'),
@@ -1386,6 +1389,7 @@ function onYmChange(){
   // 其他顯示分頁同步（截至選定月份的累計資料）
   renderInvLedger('drug');
   renderInvLedger('supply');
+  renderInvVoucherRecon();
   renderAllowLedger();
   renderPayable();
   renderCustodial();
@@ -6153,6 +6157,21 @@ function renderSurplusTab(){
   if(initEl) initEl.textContent = fmt(initVal);
   if(addEl)  addEl.textContent  = totalAdd !== 0 ? fmt(totalAdd) : '0';
   if(balEl)  balEl.textContent  = fmt(bal);
+  /* v4.6.3：5% 提撥概算提示（傳票若無提撥分錄，供對照參考） */
+  const provEl = document.getElementById('surp-provision-hint');
+  if(provEl){
+    const ent = (window.AccV2 && AccV2.entries) ? AccV2.entries : null;
+    if(ent){
+      const inc  = ent({ yearPrefix:String(y), subjectPrefix:'4106' }).reduce((s,e)=>s+(e.credit||0)-(e.debit||0),0);
+      const cost = ent({ yearPrefix:String(y), subjectPrefix:'510601' }).reduce((s,e)=>s+(e.debit||0)-(e.credit||0),0);
+      const net  = inc - cost;
+      const prov = Math.round(net*0.05);
+      const done = ent({ yearPrefix:String(y), subjectPrefix:'330101' }).filter(e=>!isYearOpeningVoucher(e.voucher_no)).reduce((s,e)=>s+(e.credit||0),0);
+      provEl.innerHTML = inc>0
+        ? `🧮 概算：${y}年度醫療收入 ${fmt(inc)} − 門診醫療成本 ${fmt(cost)} ＝ 淨餘 ${fmt(net)}，應提撥5% ≈ <b>${fmt(prov)}</b>　｜　傳票實際提撥（330101貸）<b>${fmt(done)}</b>${done===0?' ⚠️ 尚無提撥傳票':''}<br>※ 概算僅供參考，實際提撥金額以會計獎勵金計算表為準`
+        : '';
+    }
+  }
 }
 
 /* ════════════════════════════════════════════
@@ -6663,6 +6682,35 @@ function renderInvLedger(type){
   }
   updateInvTotal();
   renderMonthlyClose(type);
+}
+/* v4.6.3：醫療用品庫存 ↔ 傳票 110404 對帳（唯讀；傳票未分藥品/衛材，採合計層級對帳） */
+function renderInvVoucherRecon(){
+  const box = document.getElementById('inv-recon');
+  if(!box) return;
+  const { ym } = getYm();
+  const es = (window.AccV2 && AccV2.entries) ? AccV2.entries({ subjectPrefix:'110404' }) : [];
+  if(!es.length){ box.innerHTML=''; return; }
+  let cumD=0, cumC=0, openBal=0;
+  es.forEach(e=>{
+    if(e.ym && String(e.ym) > ym) return;   /* 截至選定月份 */
+    cumD += e.debit||0; cumC += e.credit||0;
+    if(isYearOpeningVoucher(e.voucher_no)) openBal += (e.debit||0)-(e.credit||0);
+  });
+  const voucherBal = cumD - cumC;            /* 傳票帳面庫存（藥品+衛材合計） */
+  const inFlow  = cumD - openBal;            /* 本期進貨/盤盈入帳 */
+  const outFlow = cumC;                      /* 本期領用/報廢/盤損 */
+  const drugBal   = (STATE.inventory && STATE.inventory.drug)   ? (STATE.inventory.drug.balance||0)   : 0;
+  const supplyBal = (STATE.inventory && STATE.inventory.supply) ? (STATE.inventory.supply.balance||0) : 0;
+  const manualBal = drugBal + supplyBal;
+  const diff = voucherBal - manualBal;
+  const ok = Math.abs(diff) < 1;
+  box.innerHTML = `<div class="card" style="border-left:4px solid ${ok?'#43a047':'#fb8c00'};">
+    <div class="card-bd" style="padding:10px 14px;font-size:12px;line-height:1.95;">
+      <b>🔗 傳票 110404 醫療用品 對帳</b>
+      <span style="font-size:11px;color:#90a4ae;">截至 ${ym.slice(0,3)}/${ym.slice(3)}；傳票未分藥品/衛材，以合計對帳</span><br>
+      傳票：期初結轉 <b>${fmt(openBal)}</b> ＋ 進貨/入帳 ${fmt(inFlow)} − 領用/報廢/盤損 ${fmt(outFlow)} ＝ 帳面庫存 <b style="color:#1565c0;">${fmt(voucherBal)}</b><br>
+      手動明細帳：藥品 ${fmt(drugBal)} ＋ 衛材 ${fmt(supplyBal)} ＝ <b style="color:#6a1b9a;">${fmt(manualBal)}</b>　｜　差異 <b style="color:${ok?'#43a047':'#e65100'};">${diff>0?'+':''}${fmt(diff)}</b>${ok?' ✓ 一致':' ⚠️ 手動帳可能未登齊（最新月份未補登，或衛材領用混在藥品傳票未拆登）'}
+    </div></div>`;
 }
 function invVoidToggle(btn, type){
   const tr = btn.closest('tr');
