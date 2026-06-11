@@ -1088,7 +1088,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.6.6</div>
+      <div id="sb-version">v4.6.7</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -6046,6 +6046,23 @@ function setPayeesData(payees, legacyPayee) {
 /* 舊版相容 */
 function setPayeeData(payee) { setPayeesData(null, payee); }
 
+/* v4.6.7 列印用：此受款人是否曾出現在其他已存（未作廢）動支單。
+   取代卡死的 isNew 旗標 —— 只有「從未用過」才在列印頁標「★ 新受款人 ★」，
+   解決舊受款人主檔 isNew 永遠清不掉、每張單都印標記的問題。
+   比對優先用帳號；無帳號時退回比對戶名。 */
+function _payeeUsedBefore(c) {
+  const acct = (c.acctNo || '').trim();
+  const nm   = (c.name   || '').trim();
+  if (!acct && !nm) return false;
+  return (cachedRecords || []).some(r => {
+    if (!r || r.voided || r.id === currentId) return false;
+    const list = Array.isArray(r.payees) ? r.payees : (r.payee ? [r.payee] : []);
+    return list.some(op => op && (acct
+      ? (op.acctNo || '').trim() === acct
+      : (op.name   || '').trim() === nm));
+  });
+}
+
 /* v4.2.23 列印用受款人資訊：每張卡一列
    v4.4.86 受款人 ≥ OVERFLOW_THRESHOLD 時，page 1 只放摘要，明細移到第二頁完整列出
    v4.4.92 加 forceOverflow：採購品名太多時即使受款人 < 4 也強制移到第二頁 */
@@ -6067,7 +6084,7 @@ function updatePayeePrintLine(forceOverflow = false) {
     let bankCode = '', bankName = c.bank || '';
     const m = (c.bank||'').match(/^(\d{7})[\s-]+(.+)$/);
     if (m) { bankCode = m[1]; bankName = m[2].trim(); }
-    const newMark = c.isNew ? '　<span class="payee-new-mark">★ 新受款人 ★</span>' : '';
+    const newMark = (c.isNew && !_payeeUsedBefore(c)) ? '　<span class="payee-new-mark">★ 新受款人 ★</span>' : '';
     const parts = [];
     if (c.name)             parts.push(`<span class="pl-lbl">戶名：</span>${esc(c.name)}`);
     if (bankCode||bankName) parts.push(`<span class="pl-lbl">銀行：</span>${esc(bankCode)}　${esc(bankName)}`);
