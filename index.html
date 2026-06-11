@@ -1088,7 +1088,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.6.7</div>
+      <div id="sb-version">v4.6.8</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -4516,7 +4516,9 @@ async function loadBanks() {
 }
 loadBanks();
 /* 員工 / 員工代墊 清單 (含離職但尚有剩款) */
-const EMPLOYEE_LIST = [
+/* v4.6.8 員工名單改存 D1（settings key=employee_list），由 admin「👥 員工名單」維護。
+   下方 14 人僅作為「D1 尚未建檔 / 離線 / API 失敗」時的後備；loadEmployees() 會以 D1 覆蓋。 */
+let EMPLOYEE_LIST = [
   '黃瑞培','王聖捷','鍾宜珍','呂佳卉','李侞蓁','鄭兆鑫','蔡錦慧',
   '顏詩瑋','陳翊瑄','蔡沛汝','黃俊琛','黎欣妮','方雪雲','侯晏筑'
 ];
@@ -4529,6 +4531,17 @@ async function loadPayees() {
       if (Array.isArray(d)) PAYEES = d;
     }
   } catch (_) { /* ignore */ }
+}
+
+/* v4.6.8 員工名單從 D1 載入（admin 可編輯）；D1 未建檔或失敗則沿用上方後備 14 人 */
+async function loadEmployees() {
+  try {
+    const r = await fetch('/api/employees');
+    if (r.ok) {
+      const d = await r.json();
+      if (Array.isArray(d) && d.length) EMPLOYEE_LIST = d;
+    }
+  } catch (_) { /* 保留後備名單 */ }
 }
 
 function _payeeFilteredByType(type) {
@@ -6134,8 +6147,9 @@ function updatePayeeSectionVisibility() {
   sec.style.display = '';
 }
 
-/* 啟動時載入 payees */
+/* 啟動時載入 payees + 員工名單 */
 loadPayees();
+loadEmployees();
 
 /* v4.2.24 列印前智慧偵測：多筆受款人時 (>=2) 自動縮小空行，空間讓給受款人資訊；
    afterprint 還原（避免影響螢幕編輯）

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v4.6.7</title>
+<title>管理者入口 — 動支單系統 v4.6.8</title>
 <link rel="stylesheet" href="design.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -401,7 +401,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.6.7</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.6.8</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -418,7 +418,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.6.7</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.6.8</span>
     <button id="maint-btn" onclick="toggleMaintenance()" style="padding:4px 14px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;"></button>
     <a class="link-btn" href="/acc.html" style="background:#1b5e20;">📒 會計帳務</a>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
@@ -715,6 +715,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
         <button class="btn btn-green" onclick="openPayeeEdit()">＋ 新增受款人</button>
         <button class="btn btn-blue" onclick="document.getElementById('payee-import-file').click()">📥 匯入 JSON</button>
         <input id="payee-import-file" type="file" accept=".json" style="display:none;" onchange="importPayeesJson(event)">
+        <button class="btn btn-gray" onclick="openEmployeeModal()" title="管理「員工 / 員工代墊」自動帶入名單">👥 員工名單</button>
         <input id="payees-kw" type="text" placeholder="🔍 關鍵字（戶名/銀行/帳號）" style="padding:5px 10px; border:1px solid #b0bec5; border-radius:4px; font-size:13px; min-width:240px;" oninput="renderPayeesAdmin()">
         <select id="payees-filter" style="padding:5px 10px; border:1px solid #b0bec5; border-radius:4px; font-size:13px;" onchange="renderPayeesAdmin()">
           <option value="active">☀️ 僅未凍結</option>
@@ -723,6 +724,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
           <option value="nonghui">含佳里區農會</option>
           <option value="vendor">其他銀行</option>
           <option value="isNew">僅新廠商</option>
+          <option value="emp">👥 員工名單</option>
         </select>
         <span id="payees-msg" class="toolbar-msg"></span>
       </div>
@@ -757,6 +759,20 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
         <div style="text-align:right; margin-top:16px;">
           <button type="button" onclick="closePayeeEdit()" style="margin-right:8px; padding:6px 16px; border:1px solid #999; background:#f5f5f5; border-radius:4px; cursor:pointer;">取消</button>
           <button type="button" onclick="savePayeeEdit()" style="padding:6px 16px; background:#2e7d32; color:#fff; border:none; border-radius:4px; cursor:pointer;">💾 儲存</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- v4.6.8 員工 / 員工代墊 名單管理 modal -->
+    <div id="employee-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9000; align-items:center; justify-content:center;">
+      <div style="background:#fff; width:420px; max-width:92vw; border-radius:8px; padding:22px 24px; box-shadow:0 8px 32px rgba(0,0,0,.3);">
+        <h3 style="margin:0 0 6px; color:#1e2a38;">👥 員工 / 員工代墊 名單</h3>
+        <p style="margin:0 0 12px; font-size:12px; color:#78909c; line-height:1.7;">一行一個姓名。此名單同時供「員工」與「員工代墊」兩類別的自動帶入與存檔人數提醒使用。儲存後，填單頁需重新整理才會套用。</p>
+        <textarea id="emp-textarea" rows="14" oninput="_updateEmpCount()" style="width:100%; padding:8px 10px; border:1px solid #b0bec5; border-radius:4px; font-size:14px; font-family:inherit; line-height:1.8; resize:vertical; box-sizing:border-box;" placeholder="王小明&#10;李小華"></textarea>
+        <div id="emp-count" style="font-size:12px; color:#546e7a; margin-top:6px;"></div>
+        <div style="text-align:right; margin-top:16px;">
+          <button type="button" onclick="closeEmployeeModal()" style="margin-right:8px; padding:6px 16px; border:1px solid #999; background:#f5f5f5; border-radius:4px; cursor:pointer;">取消</button>
+          <button type="button" onclick="saveEmployees()" style="padding:6px 16px; background:#2e7d32; color:#fff; border:none; border-radius:4px; cursor:pointer;">💾 儲存名單</button>
         </div>
       </div>
     </div>
@@ -1002,6 +1018,20 @@ function showTab(name) {
 let PAYEES_ADMIN = [];
 const PAYEE_NONGHUI_KW = '佳里區農會';
 
+/* ════ v4.6.8 員工 / 員工代墊 名單（D1 settings key=employee_list）════
+   DEFAULT_EMPLOYEES：D1 尚未建檔時的後備＋編輯框預填（與 index.html 後備同步） */
+const DEFAULT_EMPLOYEES = ['黃瑞培','王聖捷','鍾宜珍','呂佳卉','李侞蓁','鄭兆鑫','蔡錦慧','顏詩瑋','陳翊瑄','蔡沛汝','黃俊琛','黎欣妮','方雪雲','侯晏筑'];
+let EMPLOYEE_ROSTER = DEFAULT_EMPLOYEES.slice();
+async function loadEmployeeRoster() {
+  try {
+    const r = await fetch('/api/employees');
+    if (r.ok) {
+      const d = await r.json();
+      EMPLOYEE_ROSTER = (Array.isArray(d) && d.length) ? d : DEFAULT_EMPLOYEES.slice();
+    }
+  } catch (_) { /* 保留現值 */ }
+}
+
 function _payeeEsc(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 /* v4.2.31 bug#4：受款人列表用 event delegation（只綁一次） */
@@ -1028,6 +1058,7 @@ function _bindPayeesTbodyOnce() {
 
 async function loadPayeesAdmin() {
   setMsg('payees-msg', '⟳ 載入中…', false);
+  await loadEmployeeRoster();   /* v4.6.8 併載員工名單，供「員工名單」過濾／計數使用 */
   try {
     const r = await fetch('/api/payees');
     if (r.ok) {
@@ -1052,6 +1083,7 @@ function renderPayeesAdmin() {
   else if (filter === 'nonghui') list = list.filter(p => (p.bank||'').includes(PAYEE_NONGHUI_KW));
   else if (filter === 'vendor') list = list.filter(p => !(p.bank||'').includes(PAYEE_NONGHUI_KW));
   else if (filter === 'isNew') list = list.filter(p => p.isNew);
+  else if (filter === 'emp')   list = list.filter(p => EMPLOYEE_ROSTER.includes((p.name||'').trim()));
   if (kw) {
     list = list.filter(p =>
       (p.name||'').toLowerCase().includes(kw) ||
@@ -1167,6 +1199,43 @@ async function savePayeeEdit() {
     closePayeeEdit();
     await loadPayeesAdmin();
     setMsg('payees-msg', '✓ 已儲存', false);
+  } catch (e) {
+    alert('儲存失敗：' + e.message);
+  }
+}
+
+/* ════ v4.6.8 員工 / 員工代墊 名單管理 ════ */
+function _updateEmpCount() {
+  const n = (document.getElementById('emp-textarea').value || '')
+    .split('\n').map(s => s.trim()).filter(Boolean).length;
+  document.getElementById('emp-count').textContent = `共 ${n} 人`;
+}
+async function openEmployeeModal() {
+  await loadEmployeeRoster();
+  document.getElementById('emp-textarea').value = EMPLOYEE_ROSTER.join('\n');
+  _updateEmpCount();
+  document.getElementById('employee-modal').style.display = 'flex';
+}
+function closeEmployeeModal() {
+  document.getElementById('employee-modal').style.display = 'none';
+}
+async function saveEmployees() {
+  if (!PASS) { alert('請先登入'); return; }
+  const seen = new Set();
+  const names = (document.getElementById('emp-textarea').value || '')
+    .split('\n').map(s => s.trim())
+    .filter(n => n && !seen.has(n) && seen.add(n));
+  try {
+    const r = await fetch('/api/employees', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Pass': PASS },
+      body: JSON.stringify(names)
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    EMPLOYEE_ROSTER = names;
+    closeEmployeeModal();
+    renderPayeesAdmin();
+    setMsg('payees-msg', `✓ 已儲存員工名單（${names.length} 人）`, false);
   } catch (e) {
     alert('儲存失敗：' + e.message);
   }
