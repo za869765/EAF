@@ -1069,6 +1069,22 @@ body.sb-resizing * { pointer-events: none !important; }
   #payee-print-line { flex-shrink: 0 !important; }
   /* 頁尾留白：列印時顯示，供手寫備註用 */
   #print-footer { display: block !important; height: 16mm; flex-shrink: 0; }
+  /* v4.6.9 列印自適應壓縮級距（data-fit 1→3，逐級回收版面高度，確保受款人資訊不被裁切）
+     由 beforeprint 實測列印版面後動態套用；空白填充列維持 print-compact 不放大 */
+  #form-page[data-fit="1"] .bs tr.sig-box td { height: 22mm !important; }
+  #form-page[data-fit="1"] #print-footer { height: 8mm !important; }
+  #form-page[data-fit="2"] .bs tr.sig-box td { height: 16mm !important; }
+  #form-page[data-fit="2"] #print-footer { height: 4mm !important; }
+  #form-page[data-fit="2"] .it tbody tr:not(.print-compact) { min-height: 7mm !important; height: 7mm !important; }
+  #form-page[data-fit="2"] .it tbody tr:not(.print-compact) td { padding: 0.5mm 2mm !important; line-height: 1.2 !important; }
+  #form-page[data-fit="2"] .it tbody tr:not(.print-compact) textarea,
+  #form-page[data-fit="2"] .it tbody tr:not(.print-compact) input { min-height: 5mm !important; line-height: 1.2 !important; }
+  #form-page[data-fit="3"] .bs tr.sig-box td { height: 14mm !important; }
+  #form-page[data-fit="3"] #print-footer { height: 2mm !important; }
+  #form-page[data-fit="3"] .it tbody tr:not(.print-compact) { min-height: 5.5mm !important; height: 5.5mm !important; }
+  #form-page[data-fit="3"] .it tbody tr:not(.print-compact) td { padding: 0.3mm 2mm !important; line-height: 1.15 !important; }
+  #form-page[data-fit="3"] .it tbody tr:not(.print-compact) textarea,
+  #form-page[data-fit="3"] .it tbody tr:not(.print-compact) input { min-height: 4mm !important; line-height: 1.15 !important; }
 }
 </style>
 </head>
@@ -1088,7 +1104,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.6.8</div>
+      <div id="sb-version">v4.6.9</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -6147,6 +6163,61 @@ function updatePayeeSectionVisibility() {
   sec.style.display = '';
 }
 
+/* v4.6.9 列印自適應：實測「列印版面」高度，逐級壓縮直到受款人資訊完整落在第一頁。
+   做法：暫時把所有 @media print 規則改成 @media all，讓列印版面在螢幕上即時算得出來，
+   逐級套用 data-fit（縮核章框/頁尾留白 → 再縮明細列），仍放不下就把受款人明細移到第二頁。
+   量完即還原 mediaText（同步、未重繪，使用者無感），最終的 data-fit / 第二頁狀態保留給真正列印。
+   起因：原本依「有內容列數」的固定階梯無法涵蓋品名換行造成的列變高，請購單僅 3 筆就溢出裁掉受款人。 */
+function _fitPrintLayout() {
+  const fp = document.getElementById('form-page');
+  if (!fp) return;
+  const BUDGET_MM = 283;            // 一頁可用 285mm（297−上下各6mm），留 2mm 安全邊
+  const PX2MM = 25.4 / 96;
+  const flipped = [];
+  const setMeasureMode = on => {
+    if (on) {
+      for (const sheet of document.styleSheets) {
+        let rules; try { rules = sheet.cssRules; } catch (e) { continue; }
+        if (!rules) continue;
+        for (const r of rules) {
+          if (r.type === CSSRule.MEDIA_RULE && /print/.test(r.media.mediaText) && !/screen/.test(r.media.mediaText)) {
+            flipped.push([r, r.media.mediaText]);
+            try { r.media.mediaText = 'all'; } catch (e) {}
+          }
+        }
+      }
+    } else {
+      flipped.forEach(([r, t]) => { try { r.media.mediaText = t; } catch (e) {} });
+      flipped.length = 0;
+    }
+  };
+  const payeeBottomMM = () => {
+    void fp.offsetHeight;            // 強制 reflow，讓量測反映目前壓縮級
+    const line = document.getElementById('payee-print-line');
+    if (!line || !line.innerHTML) return 0;   // 無受款人資料 → 不需壓縮
+    const r = line.getBoundingClientRect();
+    if (!r.height) return 0;
+    return (r.bottom - fp.getBoundingClientRect().top) * PX2MM;
+  };
+  fp.removeAttribute('data-fit');
+  try { updatePayeePrintLine(false); } catch (e) {}
+  try {
+    setMeasureMode(true);
+    let fit = false;
+    for (const lv of ['', '1', '2', '3']) {
+      if (lv) fp.setAttribute('data-fit', lv); else fp.removeAttribute('data-fit');
+      if (payeeBottomMM() <= BUDGET_MM) { fit = true; break; }
+    }
+    if (!fit) {
+      /* 連最高壓縮級仍放不下（品項過多或大量換行）→ 受款人明細移到第二頁，保證完整列印；
+         第一頁維持最高壓縮級並只留受款人摘要短行 */
+      try { updatePayeePrintLine(true); } catch (e) {}
+    }
+  } finally {
+    setMeasureMode(false);
+  }
+}
+
 /* 啟動時載入 payees + 員工名單 */
 loadPayees();
 loadEmployees();
@@ -6156,36 +6227,15 @@ loadEmployees();
    v4.4.42 改為「不論幾筆受款人，列印時空白明細列一律自動縮小」 — 讓受款人那行有空間，
    表格內容也不會空白佔版。請購單 / 動支單 共用此邏輯 */
 window.addEventListener('beforeprint', () => {
-  let _filledCount = 0;
   document.querySelectorAll('#items-body tr').forEach(tr => {
     const nmEl = tr.querySelector('[data-c="name"]');
     const prEl = tr.querySelector('[data-c="price"]');
     const nm = (nmEl && nmEl.value || '').trim();
     const pr = (prEl && prEl.value || '').trim();
-    if (!nm && !pr) tr.classList.add('print-compact');
-    else _filledCount++;
+    tr.classList.toggle('print-compact', !nm && !pr);
   });
-  /* v4.4.92 採購品名很多筆時自動套縮高 class（依「有內容列數」階梯）
-     避免下方核章/受款人被擠出 A4 頁面外
-     同時套在 #form-page 讓 .bs (簽章區) + #print-footer (頁尾留白) 也跟著縮 */
-  const _itTable = document.querySelector('.it');
-  const _formPage = document.getElementById('form-page');
-  const _tightLevel = (_filledCount >= 11) ? 'print-very-tight'
-                    : (_filledCount >= 8)  ? 'print-tight'
-                    : '';
-  if (_itTable) {
-    _itTable.classList.remove('print-tight', 'print-very-tight');
-    if (_tightLevel) _itTable.classList.add(_tightLevel);
-  }
-  if (_formPage) {
-    _formPage.classList.remove('print-tight', 'print-very-tight');
-    if (_tightLevel) _formPage.classList.add(_tightLevel);
-  }
-  /* v4.4.92 採購品名 ≥ 11 行時受款人強制移到第二頁（即使只有 1-3 筆受款人）
-     避免擠在第一頁佔不到空間 */
-  if (_filledCount >= 11) {
-    try { updatePayeePrintLine(true); } catch (_e) {}
-  }
+  /* v4.6.9 受款人版面壓縮改由 _fitPrintLayout() 實測列印高度後決定（取代 v4.4.92 依列數的固定階梯，
+     原階梯無法涵蓋「品名換行 → 列變高」造成的溢出）；於本函式末端、所有替身字體縮放完成後呼叫 */
   /* v4.4.92 交貨地點：input 列印會吃字，改寫進替身 div + 依字數縮字
      寬度 ~28mm，11.5px ≈ 4mm/字 → 約 7 字滿，超過要縮 */
   const dp  = document.getElementById('delivery-place');
@@ -6232,6 +6282,8 @@ window.addEventListener('beforeprint', () => {
     ta.style.fontSize = fz + 'px';
     ta.style.lineHeight = lh;
   });
+  /* v4.6.9 替身字體縮放都完成後，再實測列印版面並自適應壓縮，確保受款人資訊完整列印 */
+  try { _fitPrintLayout(); } catch (_e) {}
 });
 window.addEventListener('afterprint', () => {
   document.querySelectorAll('#items-body tr.print-compact')
@@ -6241,7 +6293,10 @@ window.addEventListener('afterprint', () => {
   const _itTable = document.querySelector('.it');
   if (_itTable) _itTable.classList.remove('print-tight', 'print-very-tight');
   const _formPage = document.getElementById('form-page');
-  if (_formPage) _formPage.classList.remove('print-tight', 'print-very-tight');
+  if (_formPage) {
+    _formPage.classList.remove('print-tight', 'print-very-tight');
+    _formPage.removeAttribute('data-fit');   /* v4.6.9 還原自適應壓縮級 */
+  }
   /* v4.4.92 還原受款人渲染（解除強制 overflow，恢復即時邏輯） */
   try { updatePayeePrintLine(false); } catch (_e) {}
   /* v4.4.38 還原 採購品名/規格 textarea 字體（替身 div 不需 reset，螢幕 display:none） */
