@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.7.0</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.7.1</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -531,7 +531,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.7.0</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.7.1</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -709,6 +709,14 @@ window.addEventListener('storage', (ev) => {
       <div class="bb-label">合計結存（元）</div>
     </div>
   </div>
+
+  <!-- 藥品衛材庫存月報表（DPReport3）匯入：依官方盤點結存自動校正明細帳 -->
+  <div style="display:flex; align-items:center; gap:8px; margin:0 0 10px; flex-wrap:wrap;">
+    <input type="file" id="inv-report-upload" accept=".xls,.xlsx" multiple onchange="onInvReportUpload(this)" style="display:none;">
+    <button class="btn btn-blue" style="font-size:12px;" onclick="document.getElementById('inv-report-upload').click()">📊 匯入庫存月報表（校正結存）</button>
+    <span style="font-size:11px; color:#78909c;">上傳 DPReport3 藥品／衛材庫存月報表，自動把明細帳每月結存校正為官方盤點數（可一次多選、跨月份）</span>
+  </div>
+  <div id="inv-report-result" style="display:none; margin:0 0 12px; font-size:12px;"></div>
 
   <div id="inv-recon" style="margin:0 0 12px;"></div>
 
@@ -6988,6 +6996,105 @@ function renderInvVoucherRecon(){
       手動明細帳：藥品 ${fmt(drugBal)} ＋ 衛材 ${fmt(supplyBal)} ＝ <b style="color:#6a1b9a;">${fmt(manualBal)}</b>　｜　差異 <b style="color:${ok?'#43a047':'#e65100'};">${diff>0?'+':''}${fmt(diff)}</b>${ok?' ✓ 一致':' ⚠️ 手動帳可能未登齊（最新月份未補登，或衛材領用混在藥品傳票未拆登）'}
     </div></div>`;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   藥品衛材庫存月報表（DPReport3）匯入 → 依官方盤點結存校正明細帳（v4.7.1）
+   ─ 報表「本月結存金額」合計 = 該月官方盤點結存（藥品/衛材分開檔）
+   ─ 品項分類：藥品代號含英文字母 → 藥品；純數字代號 → 衛材
+   ─ 校正方式：逐月加一筆「盤盈/盤損」，使該月累計結存 = 報表結存
+   ─ 冪等：重匯先移除舊的月報表校正列再重建（依 desc 標記）
+   ════════════════════════════════════════════════════════════════ */
+const INV_REPORT_MARK = '［庫存月報表校正］';
+
+/* 累計結存（含年度期初，截至指定年月），供校正差額計算 */
+function invBalanceThroughRows(type, rows, ym){
+  let bal = getInvInit(type);
+  rows.filter(r => !r.voided && String(r.ym) <= String(ym))
+      .slice()
+      .sort((a,b)=> String(a.ym)===String(b.ym)
+        ? ((a.type==='期初'?0:1) - (b.type==='期初'?0:1))
+        : (String(a.ym) < String(b.ym) ? -1 : 1))
+      .forEach(r => { if(r.type==='期初') bal = r.amt; else bal += (INV_DIR[r.type] ?? 1) * r.amt; });
+  return bal;
+}
+
+async function onInvReportUpload(inp){
+  const files = [...(inp.files || [])];
+  inp.value = '';
+  const box = document.getElementById('inv-report-result');
+  if(!files.length) return;
+  if(box){ box.style.display = 'block'; box.innerHTML = '<span style="color:#78909c;">解析中…</span>'; }
+  const _n = s => Number(String(s==null?'':s).replace(/,/g,'').trim()) || 0;
+
+  const report = { drug:{}, supply:{} };   // report[type][ym] = 該月結存
+  const warnings = [];
+  for(const file of files){
+    let wb;
+    try{ wb = XLSX.read(await file.arrayBuffer(), { type:'array' }); }
+    catch(e){ warnings.push(`${file.name}：讀取失敗`); continue; }
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header:1, raw:false, defval:'' });
+    const head = rows.slice(0,4).map(r => r.map(x=>String(x)).join(' ')).join(' ');
+    const ymM = head.match(/起迄年月[:：]?\s*(\d{5,6})/);
+    if(!ymM){ warnings.push(`${file.name}：非庫存月報表（找不到起迄年月），略過`); continue; }
+    const ym = ymM[1];
+    let curCat = null, d = 0, s = 0, dn = 0, sn = 0;
+    for(const r of rows){
+      const code = String(r[0]||'').trim();
+      if(code.includes('合計')) break;
+      if(code && /^[A-Za-z0-9]/.test(code) && !/庫存|報表|代號|臺南|佳里|起迄|編號/.test(code))
+        curCat = /[A-Za-z]/.test(code) ? 'drug' : 'supply';
+      const unit = String(r[4]||'').trim();
+      if(curCat && unit && r[19] !== '' && !isNaN(_n(r[19]))){
+        if(curCat === 'drug'){ d += _n(r[19]); dn++; } else { s += _n(r[19]); sn++; }
+      }
+    }
+    if(dn){ report.drug[ym]   = (report.drug[ym]   || 0) + Math.round(d); }
+    if(sn){ report.supply[ym] = (report.supply[ym] || 0) + Math.round(s); }
+    if(!dn && !sn) warnings.push(`${file.name}（${ym}）：未讀到任何品項`);
+  }
+
+  /* 逐月套用校正（升冪；後月差額會納入前月校正） */
+  const applied = { drug:[], supply:[] };
+  const writes = [];
+  for(const type of ['drug','supply']){
+    const months = Object.keys(report[type]).sort();
+    if(!months.length) continue;
+    let kept = loadInvLedger(type).filter(r => !String(r.desc||'').startsWith(INV_REPORT_MARK));
+    for(const ym of months){
+      const target = report[type][ym];
+      const base = invBalanceThroughRows(type, kept, ym);
+      const delta = target - base;
+      if(delta !== 0){
+        kept.push({ ym, type: delta>0 ? '盤盈' : '盤損', amt: Math.abs(delta),
+          desc: `${INV_REPORT_MARK}結存校正至 ${fmt(target)}（${ym}，${delta>0?'+':''}${fmt(delta)}）`,
+          medId:'', voided:false });
+      }
+      applied[type].push({ ym, target, delta });
+    }
+    writes.push(accSave('acc_inv_'+type, kept));
+  }
+  await Promise.all(writes.map(p => Promise.resolve(p).catch(()=>false)));
+
+  renderInvLedger('drug'); renderInvLedger('supply');
+  if(typeof renderInvVoucherRecon === 'function') renderInvVoucherRecon();
+
+  /* 結果摘要 */
+  const nm = t => t==='drug' ? '💊 藥品' : '🩹 衛材';
+  let html = `<div class="card"><div class="card-bd" style="padding:10px 14px; line-height:1.85;">`
+    + `<b>📊 庫存月報表匯入完成</b>　<span style="color:#78909c;">（校正列標記「${INV_REPORT_MARK}」，可於明細帳作廢還原）</span><br>`;
+  for(const type of ['drug','supply']){
+    const list = applied[type];
+    if(!list.length) continue;
+    const last = list[list.length-1];
+    const adj = list.filter(a => a.delta !== 0).length;
+    html += `${nm(type)}：${list.length} 個月　→　最新（${last.ym}）結存校正為 <b>${fmt(last.target)}</b>　（加 ${adj} 筆盤盈/盤損校正）<br>`;
+  }
+  if(warnings.length) html += `<span style="color:#c0392b;">⚠️ ${warnings.join('；')}</span><br>`;
+  html += `</div></div>`;
+  if(box) box.innerHTML = html;
+}
+
 function invVoidToggle(btn, type){
   const tr = btn.closest('tr');
   const isVoided = tr.dataset.voided==='1';
