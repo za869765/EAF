@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.7.1</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.7.2</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -531,7 +531,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.7.1</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.7.2</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -5510,8 +5510,10 @@ function loadPayable(){
   /* v4.4.29 ym 截止過濾；v4.4.29 #9 補：算出被排除的「空 ym」筆數讓 UI 顯示 */
   let _emptyYmCount = 0;
   if(filterYm){
+    const filterY = String(filterYm).slice(0,3);   /* v4.7.2 年度隔離基準 */
     rows = rows.filter(e => {
       if (!e.ym) { _emptyYmCount++; return false; }
+      if (String(e.ym).slice(0,3) !== filterY) return false;  /* v4.7.2 僅本年度，避免匯入他年度傳票(如114)跨年污染毛額/明細 */
       return String(e.ym) <= filterYm;
     });
   }
@@ -6195,21 +6197,33 @@ function seedYearQ1Data(){
 const CUST_GROUPS_DEF = [
   { code:'21020301', name:'衛生所公務預算經費', color:'hd-blue',   note:'受委託代收公務預算撥款（僅顯示，實際明細在「公務預算」頁）' },
   { code:'21020302', name:'各業務差旅費',       color:'hd-teal',   note:'各業務出差旅費代收保管' },
+  { code:'21020303', name:'各業務加班費',       color:'hd-teal',   note:'各業務加班費代收保管' },
   { code:'21020311', name:'國健科',             color:'hd-green',  note:'國民健康署業務補助款代收保管' },
   { code:'21020312', name:'疾管科',             color:'hd-purple', note:'疾病管制署業務補助款代收保管' },
+  { code:'21020313', name:'心健科',             color:'hd-green',  note:'心理健康科業務補助款代收保管' },
   { code:'21020322', name:'長照科',             color:'hd-teal',   note:'長期照護科業務補助款代收保管' },
   { code:'21020321', name:'代收款（薪資相關）', color:'hd-amber',  note:'依保險別自動分卡：公保/退撫/公健/勞健/勞保/勞退' }
 ];
-/* 薪資相關 21020321 依 description 關鍵字自動分到 6 張卡片 */
+/* 薪資相關 21020321 分卡：v4.7.2 改以 sub_account（每筆都帶保險別「01公保費/02健保費-公保人員/
+   03健保費-勞保人員/04勞保費/05退撫基金/06勞工退休準備金」）為主判，description 僅作 fallback。
+   原本純靠 description 會讓年結轉（描述皆「上年度結轉本年度」）與部分繳費落錯卡，造成公健/勞健淨餘為負。 */
 const SALARY_BUCKETS = [
-  { key:'公保', name:'🔵 公保（公務人員保險）', test: d => /公保/.test(d) },
-  { key:'退撫', name:'🟤 退撫（退休撫卹基金）', test: d => /退撫/.test(d) },
-  { key:'公健', name:'🟢 公健（公保人員健保費）', test: d => /(公健|職員健保)/.test(d) },
-  { key:'勞健', name:'🟡 勞健（勞保人員健保費）', test: d => /(勞健|勞工健保)/.test(d) },
-  { key:'勞保', name:'🔴 勞保（勞工保險費）',   test: d => /勞保/.test(d) },
-  { key:'勞退', name:'🟠 勞退（勞工退休準備金）', test: d => /勞退/.test(d) },
-  { key:'其他', name:'⚪ 其他',                  test: ()=> true }
+  { key:'公保', name:'🔵 公保（公務人員保險）',   stest: s => /公保費/.test(s),                   test: d => /公保/.test(d) },
+  { key:'退撫', name:'🟤 退撫（退休撫卹基金）',   stest: s => /退撫/.test(s),                     test: d => /退撫/.test(d) },
+  { key:'公健', name:'🟢 公健（公保人員健保費）', stest: s => /健保費-公保人員|職員健保/.test(s), test: d => /(公健|職員健保)/.test(d) },
+  { key:'勞健', name:'🟡 勞健（勞保人員健保費）', stest: s => /健保費-勞保人員|勞工健保/.test(s), test: d => /(勞健|勞工健保)/.test(d) },
+  { key:'勞保', name:'🔴 勞保（勞工保險費）',     stest: s => /勞保費/.test(s),                   test: d => /勞保/.test(d) },
+  { key:'勞退', name:'🟠 勞退（勞工退休準備金）', stest: s => /勞工退休準備金/.test(s),           test: d => /勞退/.test(d) },
+  { key:'其他', name:'⚪ 其他',                    stest: ()=> false,                            test: ()=> true }
 ];
+/* 先用 sub_account 判保險別（最準，每筆都帶），沒中再退回描述關鍵字，皆無歸「其他」（代扣所得稅/二代健保/補助費/利息等） */
+function salaryBucketOf(e){
+  const s = String(e.sub_account||'');
+  for(const b of SALARY_BUCKETS){ if(b.key!=='其他' && b.stest(s)) return b; }
+  const d = String(e.description||'');
+  for(const b of SALARY_BUCKETS){ if(b.key!=='其他' && b.test(d)) return b; }
+  return SALARY_BUCKETS[SALARY_BUCKETS.length-1];
+}
 function loadCustodial(){
   const {ym: filterYm} = (typeof getYm === 'function') ? getYm() : {ym:''};
   const groups = CUST_GROUPS_DEF.map(g => ({
@@ -6224,8 +6238,10 @@ function loadCustodial(){
   /* v4.4.29 ym 截止過濾；v4.4.29 #9 補：算出被排除的「空 ym」筆數讓 UI 顯示 */
   let _emptyYmCount = 0;
   if(filterYm){
+    const filterY = String(filterYm).slice(0,3);   /* v4.7.2 年度隔離基準 */
     rows = rows.filter(e => {
       if (!e.ym) { _emptyYmCount++; return false; }
+      if (String(e.ym).slice(0,3) !== filterY) return false;  /* v4.7.2 僅本年度，避免匯入他年度傳票(如114)跨年污染 */
       return String(e.ym) <= filterYm;
     });
   }
@@ -6240,8 +6256,7 @@ function loadCustodial(){
     if(bal <= 0) return;
     let subKey;
     if(code === '21020321'){
-      const b = SALARY_BUCKETS.find(x => x.test(e.description||'')) || SALARY_BUCKETS[SALARY_BUCKETS.length-1];
-      subKey = b.key;
+      subKey = salaryBucketOf(e).key;
     } else {
       subKey = '_default';
     }
@@ -6257,7 +6272,7 @@ function loadCustodial(){
     if(!bal) return;
     let sub, subKey;
     if(code === '21020321'){
-      const b = SALARY_BUCKETS.find(x => x.test(e.description||'')) || SALARY_BUCKETS[SALARY_BUCKETS.length-1];
+      const b = salaryBucketOf(e);
       sub = g.subs.find(s => s.key === b.key);
       subKey = b.key;
     } else {
@@ -6482,7 +6497,7 @@ function renderBankDeposit(){
   const cards = BANK_ACCOUNTS.map(acct => {
     const initVal = +(localStorage.getItem(acct.initKey) || 0);
     const allRows = AccV2.entries({ subjectPrefix: acct.code })
-      .filter(e => !isYearOpeningVoucher(e.voucher_no));
+      .filter(e => !isYearOpeningVoucher(e.voucher_no) && String(e.ym||'').startsWith(y));  /* v4.7.2 年度隔離：僅本年度，避免跨年污染累積餘額 */
     const cumRows = allRows.filter(e => e.ym && String(e.ym) <= ym);
     const curRows = yearMode
       ? allRows.filter(e => e.ym && String(e.ym).startsWith(y))
@@ -6971,11 +6986,12 @@ function renderInvLedger(type){
 function renderInvVoucherRecon(){
   const box = document.getElementById('inv-recon');
   if(!box) return;
-  const { ym } = getYm();
+  const { y, ym } = getYm();
   const es = (window.AccV2 && AccV2.entries) ? AccV2.entries({ subjectPrefix:'110404' }) : [];
   if(!es.length){ box.innerHTML=''; return; }
   let cumD=0, cumC=0, openBal=0;
   es.forEach(e=>{
+    if(!String(e.ym||'').startsWith(String(y))) return;   /* v4.7.2 年度隔離：僅本年度，避免114期初/流水雙重計 */
     if(e.ym && String(e.ym) > ym) return;   /* 截至選定月份 */
     cumD += e.debit||0; cumC += e.credit||0;
     if(isYearOpeningVoucher(e.voucher_no)) openBal += (e.debit||0)-(e.credit||0);
