@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.6.9</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.7.0</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -380,6 +380,120 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
   transition:all .15s;}
 .alloc-btn:hover{border-color:#1565c0;color:#1565c0;background:#e3f2fd;}
 .alloc-btn.active{border-color:#43a047;color:#43a047;background:#f1f8e9;font-weight:700;}
+
+/* ══════════════════════════════════════════════════════════════
+   收支對帳試算（v4.7.0）— 整合自單檔工具「基金收支對帳試算」
+   樣式全部限縮於 #tab-recon；變數與元素選擇器皆加前綴，避免污染主程式
+   ══════════════════════════════════════════════════════════════ */
+#tab-recon{
+  --paper:#E9ECE8; --card:#FFFFFF; --card-2:#FBFCFA;
+  --ink:#14201B; --muted:#5A675D; --faint:#8A968C;
+  --line:#D6DBD4; --line-strong:#BFC7BC;
+  --ok:#1E7A52; --ok-soft:#E5F1EA; --ok-bd:#B9DCC8;
+  --warn:#A24E12; --warn-soft:#FBEDDE; --warn-bd:#E6C6A0;
+  --field:#F4F6F3;
+  --font-sans:"PingFang TC","Noto Sans TC","Microsoft JhengHei","Heiti TC",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"SF Mono",ui-monospace,"Roboto Mono","JetBrains Mono",Menlo,Consolas,"Courier New",monospace;
+  font-family:var(--font-sans); color:var(--ink); background:var(--paper);
+  line-height:1.55; -webkit-font-smoothing:antialiased; padding:22px 18px 40px; border-radius:10px;
+}
+#tab-recon *{box-sizing:border-box;}
+#tab-recon .wrap{max-width:1040px; margin:0 auto;}
+#tab-recon .mono{font-family:var(--font-mono); font-variant-numeric:tabular-nums; letter-spacing:-.01em;}
+#tab-recon header.top{border-top:3px solid var(--ink); padding-top:16px; margin-bottom:22px;}
+#tab-recon .kicker{font-size:12px; letter-spacing:.22em; color:var(--muted); margin-bottom:6px;}
+#tab-recon h1{font-size:26px; font-weight:800; margin:0 0 4px; letter-spacing:-.01em; color:var(--ink);}
+#tab-recon .sub{color:var(--muted); font-size:14.5px; max-width:640px;}
+#tab-recon .monthbar{display:flex; align-items:center; gap:10px; margin-top:14px; flex-wrap:wrap;}
+#tab-recon .monthbar label{font-size:13px; color:var(--muted);}
+#tab-recon .monthbar input{font-family:var(--font-mono); font-size:14px; padding:6px 10px; width:150px; border:1px solid var(--line-strong); border-radius:8px; background:var(--card); color:var(--ink);}
+#tab-recon .btns{margin-left:auto; display:flex; gap:8px; flex-wrap:wrap;}
+#tab-recon button.act{font-family:var(--font-sans); font-size:13px; font-weight:600; cursor:pointer; padding:7px 13px; border-radius:8px; border:1px solid var(--line-strong); background:var(--card); color:var(--ink); transition:.14s;}
+#tab-recon button.act:hover{border-color:var(--ink); background:var(--card-2);}
+#tab-recon button.act.primary{background:var(--ink); color:#fff; border-color:var(--ink);}
+#tab-recon button.act.primary:hover{background:#233229;}
+#tab-recon .grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+#tab-recon .panel{background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden;}
+#tab-recon .panel > h2{font-size:13px; font-weight:700; letter-spacing:.02em; margin:0; padding:12px 16px; background:var(--card-2); border-bottom:1px solid var(--line); display:flex; align-items:center; gap:8px; color:var(--ink);}
+#tab-recon .panel > h2 .tag{font-family:var(--font-mono); font-size:10.5px; font-weight:600; color:var(--muted); border:1px solid var(--line-strong); border-radius:5px; padding:1px 6px; margin-left:auto;}
+#tab-recon .rows{padding:8px 16px 14px;}
+#tab-recon .fld{display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px dashed var(--line);}
+#tab-recon .fld:last-child{border-bottom:0;}
+#tab-recon .fld .lbl{flex:1; min-width:0;}
+#tab-recon .fld .lbl .nm{font-size:14px;}
+#tab-recon .fld .lbl .hint{font-size:11.5px; color:var(--faint); margin-top:1px;}
+#tab-recon .fld input.num{font-family:var(--font-mono); font-variant-numeric:tabular-nums; text-align:right; font-size:15px; width:132px; padding:7px 11px; border:1px solid var(--line-strong); border-radius:8px; background:var(--field); color:var(--ink); transition:.12s;}
+#tab-recon .fld input.num:focus{outline:none; border-color:var(--ok); background:#fff; box-shadow:0 0 0 3px var(--ok-soft);}
+#tab-recon .fld .unit{font-size:12px; color:var(--faint); width:14px;}
+#tab-recon .verdict{margin:18px 0 2px; background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden;}
+#tab-recon .verdict .bar{padding:14px 18px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--line);}
+#tab-recon .chip{font-size:13px; font-weight:700; padding:5px 12px; border-radius:999px; white-space:nowrap;}
+#tab-recon .chip.ok{background:var(--ok-soft); color:var(--ok); border:1px solid var(--ok-bd);}
+#tab-recon .chip.warn{background:var(--warn-soft); color:var(--warn); border:1px solid var(--warn-bd);}
+#tab-recon .verdict .bar .msg{font-size:13.5px; color:var(--muted);}
+#tab-recon .eq{padding:20px 18px; display:flex; flex-wrap:wrap; align-items:flex-end; gap:14px 10px; font-family:var(--font-mono);}
+#tab-recon .term{display:flex; flex-direction:column; align-items:center; gap:4px;}
+#tab-recon .term .v{font-size:23px; font-weight:700; font-variant-numeric:tabular-nums; letter-spacing:-.02em;}
+#tab-recon .term .c{font-size:11px; color:var(--muted); font-family:var(--font-sans); white-space:nowrap;}
+#tab-recon .op{font-size:20px; color:var(--faint); padding-bottom:20px; font-weight:600;}
+#tab-recon .term.result .v{color:var(--ink);}
+#tab-recon .term.diff.nz .v{color:var(--warn);}
+#tab-recon .term.diff.nz .c{color:var(--warn); font-weight:600;}
+#tab-recon .term.zero{opacity:.34;}
+#tab-recon .cols{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;}
+#tab-recon .block{background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden;}
+#tab-recon .block h3{font-size:12.5px; font-weight:700; margin:0; padding:11px 16px; background:var(--card-2); border-bottom:1px solid var(--line); color:var(--ink);}
+#tab-recon .block .body{padding:6px 16px 12px;}
+#tab-recon .chk{display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px dashed var(--line); font-size:13.5px;}
+#tab-recon .chk:last-child{border-bottom:0;}
+#tab-recon .chk .ico{width:18px; height:18px; border-radius:50%; flex:none; display:grid; place-items:center; font-size:11px; font-weight:800; color:#fff;}
+#tab-recon .chk .ico.ok{background:var(--ok);}
+#tab-recon .chk .ico.warn{background:var(--warn);}
+#tab-recon .chk .txt{flex:1;}
+#tab-recon .chk .txt small{display:block; color:var(--faint); font-size:11px; margin-top:1px;}
+#tab-recon .chk .amt{font-family:var(--font-mono); font-variant-numeric:tabular-nums; font-size:13px; color:var(--muted);}
+#tab-recon .chk .amt.warn{color:var(--warn); font-weight:700;}
+#tab-recon table.brk{width:100%; border-collapse:collapse; font-size:13.5px;}
+#tab-recon table.brk td{padding:8px 0; border-bottom:1px dashed var(--line);}
+#tab-recon table.brk tr:last-child td{border-bottom:0;}
+#tab-recon table.brk td.r{text-align:right; font-family:var(--font-mono); font-variant-numeric:tabular-nums;}
+#tab-recon table.brk tr.tot td{font-weight:700; border-top:2px solid var(--line-strong); border-bottom:0; padding-top:10px;}
+#tab-recon table.brk td.pos{color:var(--warn);}
+#tab-recon .restate{margin-top:16px; border:1px solid var(--warn-bd); background:var(--warn-soft); border-radius:14px; overflow:hidden;}
+#tab-recon .restate.hidden{display:none;}
+#tab-recon .restate h3{font-size:12.5px; font-weight:700; margin:0; padding:11px 16px; background:#F6E3D0; border-bottom:1px solid var(--warn-bd); color:var(--warn);}
+#tab-recon .restate .body{padding:12px 16px;}
+#tab-recon .restate p.note{margin:0 0 10px; font-size:13px; color:#6E3F16;}
+#tab-recon table.rst{width:100%; border-collapse:collapse; font-size:13.5px; background:var(--card); border-radius:10px; overflow:hidden;}
+#tab-recon table.rst th,#tab-recon table.rst td{padding:8px 12px; border-bottom:1px solid var(--line); text-align:right;}
+#tab-recon table.rst th{background:var(--card-2); font-weight:600; font-size:12px; color:var(--muted);}
+#tab-recon table.rst td:first-child,#tab-recon table.rst th:first-child{text-align:left;}
+#tab-recon table.rst .num{font-family:var(--font-mono); font-variant-numeric:tabular-nums;}
+#tab-recon table.rst tr:last-child td{border-bottom:0;}
+#tab-recon table.rst .chg{color:var(--warn); font-weight:700;}
+#tab-recon .je{margin-top:12px; background:var(--card); border:1px dashed var(--warn-bd); border-radius:10px; padding:12px 14px; font-family:var(--font-mono); font-size:13.5px; line-height:1.9;}
+#tab-recon .je b{color:var(--warn);}
+#tab-recon details.doc{margin-top:20px; background:var(--card); border:1px solid var(--line); border-radius:14px; overflow:hidden;}
+#tab-recon details.doc > summary{cursor:pointer; padding:13px 16px; font-size:13px; font-weight:700; list-style:none; user-select:none;}
+#tab-recon details.doc > summary::-webkit-details-marker{display:none;}
+#tab-recon details.doc > summary::before{content:"▸ "; color:var(--faint);}
+#tab-recon details.doc[open] > summary::before{content:"▾ ";}
+#tab-recon details.doc .doc-body{padding:2px 18px 18px; font-size:13.5px; color:#33403A;}
+#tab-recon details.doc code{font-family:var(--font-mono); background:var(--field); padding:1px 5px; border-radius:4px; font-size:12.5px;}
+#tab-recon details.doc .idn{font-family:var(--font-mono); white-space:pre-wrap; background:var(--field); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:10px 0; font-size:12.5px; line-height:1.7; overflow-x:auto;}
+#tab-recon footer.ft{margin-top:26px; text-align:center; font-size:11.5px; color:var(--faint);}
+#tab-recon .overlay{position:fixed; inset:0; background:rgba(20,32,27,.42); display:none; place-items:center; z-index:5000; padding:18px;}
+#tab-recon .overlay.show{display:grid;}
+#tab-recon .dlg{background:var(--card); border-radius:14px; max-width:380px; width:100%; box-shadow:0 18px 50px rgba(0,0,0,.24); overflow:hidden; color:var(--ink);}
+#tab-recon .dlg .h{padding:16px 18px 4px; font-weight:700; font-size:15px;}
+#tab-recon .dlg .p{padding:0 18px 16px; color:var(--muted); font-size:13.5px;}
+#tab-recon .dlg .a{display:flex; gap:8px; padding:0 18px 18px; justify-content:flex-end;}
+@media (max-width:760px){
+  #tab-recon .grid,#tab-recon .cols{grid-template-columns:1fr;}
+  #tab-recon .fld input.num{width:120px;}
+  #tab-recon .eq{gap:10px 8px;}
+  #tab-recon .term .v{font-size:19px;}
+}
 </style>
 </head>
 <script>
@@ -417,7 +531,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.6.9</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.7.0</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -438,6 +552,7 @@ window.addEventListener('storage', (ev) => {
   <button class="tab-btn" onclick="switchTab('payable',this)">💰 應付費用</button>
   <button class="tab-btn" onclick="switchTab('custodial',this)">🏦 代收款</button>
   <button class="tab-btn" onclick="switchTab('surplus',this)">💰 累積賸餘</button>
+  <button class="tab-btn" onclick="switchTab('recon',this)">📐 收支對帳</button>
   <button class="tab-btn" onclick="switchTab('history',this)">📜 歷史變更資料</button>
 </div>
 
@@ -1105,6 +1220,165 @@ window.addEventListener('storage', (ev) => {
   </div></div>
 </div><!-- /tab-history -->
 
+<!-- ══════════════════════════════════════════
+     TAB：收支對帳試算（v4.7.0 — 整合自單檔工具「基金收支對帳試算」）
+     核對「收支餘絀表(本月實際數)」與「醫療獎勵金計算表(本月)」是否相符
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-recon">
+  <div class="wrap">
+    <header class="top">
+      <div class="kicker">佳里區衛生所 · 醫療作業基金</div>
+      <h1>基金收支對帳試算</h1>
+      <div class="sub">核對「收支餘絀表(本月實際數)」與「醫療獎勵金計算表(本月)」是否相符，自動標出收入誤列、成本不符與 5% 提撥差異。</div>
+      <div class="monthbar">
+        <label for="rcn-mon">對帳月份</label>
+        <input id="rcn-mon" class="mono" value="115年6月" spellcheck="false">
+        <div class="btns">
+          <button class="act" onclick="Recon.loadDemo()">載入 115年6月範例</button>
+          <button class="act" onclick="Recon.askClear()">清除</button>
+          <button class="act primary" onclick="window.print()">列印 / 存 PDF</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 輸入 -->
+    <div class="grid">
+      <section class="panel">
+        <h2>收支餘絀表（本月實際數）<span class="tag">FNWFRB0030</span></h2>
+        <div class="rows">
+          <div class="fld">
+            <div class="lbl"><div class="nm">門診醫療收入</div><div class="hint">餘絀表帳列數；含四小類合計</div></div>
+            <input class="num mono" id="rcn-A" inputmode="decimal"><span class="unit">元</span>
+          </div>
+          <div class="fld">
+            <div class="lbl"><div class="nm">醫療折讓</div><div class="hint">填正數（餘絀表以負數表示）· 兩表共用</div></div>
+            <input class="num mono" id="rcn-B" inputmode="decimal"><span class="unit">元</span>
+          </div>
+          <div class="fld">
+            <div class="lbl"><div class="nm">門診醫療成本</div><div class="hint">餘絀表帳列數；已含當月獎勵金</div></div>
+            <input class="num mono" id="rcn-C" inputmode="decimal"><span class="unit">元</span>
+          </div>
+          <div class="fld">
+            <div class="lbl"><div class="nm">利息收入（本月）</div><div class="hint">業務外；用於本期賸餘與更正試算</div></div>
+            <input class="num mono" id="rcn-INT" inputmode="decimal"><span class="unit">元</span>
+          </div>
+          <div class="fld">
+            <div class="lbl"><div class="nm">雜項收入（本月）</div><div class="hint">業務外</div></div>
+            <input class="num mono" id="rcn-MISC" inputmode="decimal"><span class="unit">元</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>醫療獎勵金計算表（本月小計）<span class="tag">11506</span></h2>
+        <div class="rows">
+          <div class="fld">
+            <div class="lbl"><div class="nm">掛帳金額</div><div class="hint">健保申報掛帳</div></div>
+            <input class="num mono" id="rcn-G" inputmode="decimal"><span class="unit">元</span>
+          </div>
+          <div class="fld">
+            <div class="lbl"><div class="nm">健保不給付、部分負擔及其他款項</div><div class="hint">自費/部分負擔/其他</div></div>
+            <input class="num mono" id="rcn-H" inputmode="decimal"><span class="unit">元</span>
+          </div>
+          <div class="fld">
+            <div class="lbl"><div class="nm">支出部份（獎勵金前成本）</div><div class="hint">獎勵金表「支出部份」小計</div></div>
+            <input class="num mono" id="rcn-E" inputmode="decimal"><span class="unit">元</span>
+          </div>
+          <div class="fld">
+            <div class="lbl"><div class="nm">醫療作業基金 5%</div><div class="hint">提撥保留數；帶入表列小計數</div></div>
+            <input class="num mono" id="rcn-F" inputmode="decimal"><span class="unit">元</span>
+          </div>
+          <div class="fld">
+            <div class="lbl"><div class="nm">繳局統籌款（調整後小計）</div><div class="hint">已抵加班費後之小計；可為負數</div></div>
+            <input class="num mono" id="rcn-Iadj" inputmode="decimal"><span class="unit">元</span>
+          </div>
+          <div class="fld">
+            <div class="lbl"><div class="nm">醫師獎勵金</div></div>
+            <input class="num mono" id="rcn-Dr" inputmode="decimal"><span class="unit">元</span>
+          </div>
+          <div class="fld">
+            <div class="lbl"><div class="nm">員工獎勵金</div></div>
+            <input class="num mono" id="rcn-Emp" inputmode="decimal"><span class="unit">元</span>
+          </div>
+          <div class="fld">
+            <div class="lbl"><div class="nm">衛生局加班費（抵繳統籌款）</div><div class="hint">行動醫院；抵繳繳局統籌款之數</div></div>
+            <input class="num mono" id="rcn-J" inputmode="decimal"><span class="unit">元</span>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 恆等式天平 -->
+    <section class="verdict">
+      <div class="bar">
+        <span class="chip" id="rcn-chip">—</span>
+        <span class="msg" id="rcn-verdictMsg">請輸入數字或載入範例。</span>
+      </div>
+      <div class="eq" id="rcn-eq"></div>
+    </section>
+
+    <!-- 檢核 + 拆解 -->
+    <div class="cols">
+      <div class="block">
+        <h3>逐項檢核</h3>
+        <div class="body" id="rcn-checks"></div>
+      </div>
+      <div class="block">
+        <h3>業務賸餘拆解</h3>
+        <div class="body">
+          <table class="brk" id="rcn-brk"></table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 更正試算 -->
+    <section class="restate hidden" id="rcn-restate">
+      <h3>更正試算 ── 收入認列差異視為非醫療收入誤列</h3>
+      <div class="body">
+        <p class="note" id="rcn-restateNote"></p>
+        <table class="rst" id="rcn-rstTable"></table>
+        <div class="je" id="rcn-je"></div>
+      </div>
+    </section>
+
+    <!-- 說明 -->
+    <details class="doc">
+      <summary>對帳邏輯說明（給 Claude Code / 交接用）</summary>
+      <div class="doc-body">
+        <p>本工具的所有檢核由一條恆等式推導，輸入項全部取自兩張現成報表：</p>
+        <div class="idn">業務賸餘(餘絀表)　=　收入認列差異 R　+　醫療作業基金5% F　+　加班費抵繳統籌款 J　−　成本認列差異 CD
+
+R  = (門診醫療收入 − 醫療折讓) − (掛帳金額 − 醫療折讓 + 健保不給付/部分負擔/其他)
+   = 門診醫療收入 − 掛帳金額 − 健保不給付/部分負擔/其他      → 應為 0
+CD = 門診醫療成本 − (支出部份 + 當月入成本獎勵金)             → 應為 0
+當月入成本獎勵金 M = 繳局統籌款(調整後) + 醫師獎勵金 + 員工獎勵金
+奬前收支淨餘數 P   = (掛帳金額 − 醫療折讓 + 健保不給付/部分負擔/其他) − 支出部份
+5% 檢核           : 醫療作業基金5% ≈ round(P × 5%)
+分配檢核          : (P − 5%) = 繳局統籌款(原始) + 醫師 + 員工，其中 繳局原始 = 調整後 + 加班費
+應有業務賸餘       = F + J     （R、CD 皆 0 時，基金實留即 5% + 加班費抵繳）</div>
+        <p><b>R ≠ 0</b>：門診醫療收入含非醫療項目（如公庫利息）誤列，或醫療收入短列 → 查收入傳票、重分類。<br>
+           <b>CD ≠ 0</b>：門診醫療成本與獎勵金表不一致（成本誤列或當月獎勵金入帳金額不符）。<br>
+           <b>5% / 分配檢核</b>：獎勵金表內部一致性。</p>
+        <p style="color:var(--muted)">115年6月實例：9,423 = 1,840(R) + 2,345(F) + 5,238(J) − 0(CD)；更正誤列利息 1,840 後 → 7,583 = 2,345 + 5,238。此差異僅為收入科目重分類，<b>本期賸餘與獎勵金分配數均不變</b>。</p>
+      </div>
+    </details>
+
+    <footer class="ft">整合自單檔工具 · 資料僅存於本機瀏覽器，不上傳 · 金額四捨五入至元</footer>
+  </div>
+
+  <!-- 清除確認 -->
+  <div class="overlay" id="rcn-ov">
+    <div class="dlg">
+      <div class="h">清除所有欄位？</div>
+      <div class="p">將清空目前輸入的全部數字，此動作無法復原。</div>
+      <div class="a">
+        <button class="act" onclick="Recon.closeOv()">取消</button>
+        <button class="act primary" onclick="Recon.doClear()">確定清除</button>
+      </div>
+    </div>
+  </div>
+</div><!-- /tab-recon -->
+
 </div><!-- /content -->
 
 
@@ -1346,7 +1620,7 @@ async function switchTab(name, btn){
   btn.classList.add('active');
   // 首頁不顯示年月選單
   const ymBar = document.getElementById('ym-global-bar');
-  if(ymBar) ymBar.style.display = name==='home' ? 'none' : 'flex';
+  if(ymBar) ymBar.style.display = (name==='home'||name==='recon') ? 'none' : 'flex';
   // 切換時重新渲染各分頁（避免 init 尚未完成時空白）
   const TAB_RENDERS = {
     allowance: ()=>{ renderAllowLedger(); renderAllowanceRateAndAR(); },
@@ -1360,6 +1634,7 @@ async function switchTab(name, btn){
     expense:   ()=> renderImportedVouchers('支出'),
     voucher:   ()=> renderImportedVouchers('轉帳'),
     bank:      ()=> renderBankDeposit(),
+    recon:     ()=> Recon.recompute(),
     history:   ()=> renderChangeHistory(),
   };
   if(TAB_RENDERS[name]) TAB_RENDERS[name]();
@@ -7859,6 +8134,208 @@ function updateInvTotal(){
   document.getElementById('rc-inv-total').textContent = fmt(tot);
   const e = document.getElementById('inv-total-bal'); if(e) e.textContent = fmt(tot);
 }
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════
+     收支對帳試算（Recon）— 整合自單檔工具「基金收支對帳試算」
+     全部邏輯封裝於 IIFE，僅對外暴露 window.Recon，避免污染主程式命名空間
+     ══════════════════════════════════════════════════════════════ -->
+<script>
+"use strict";
+(function(){
+  var FIELDS = ["A","B","C","INT","MISC","G","H","E","F","Iadj","Dr","Emp","J"];
+  var TOL = 1; // 容許四捨五入誤差 ±1 元
+
+  function $(id){ return document.getElementById("rcn-"+id); }
+  function parseNum(s){
+    if(s===null||s===undefined) return 0;
+    var t = String(s).replace(/[^0-9.\-]/g,"");
+    if(t===""||t==="-"||t===".") return 0;
+    var v = parseFloat(t);
+    return isNaN(v)?0:v;
+  }
+  function fmtN(v){
+    if(v===""||v===null||v===undefined||isNaN(v)) return "0";
+    return Math.round(v).toLocaleString("en-US");
+  }
+  function get(id){ return parseNum($(id).value); }
+
+  function recompute(){
+    var A=get("A"), B=get("B"), C=get("C"), INT=get("INT"), MISC=get("MISC");
+    var G=get("G"), H=get("H"), E=get("E"), F=get("F"),
+        Iadj=get("Iadj"), Dr=get("Dr"), Emp=get("Emp"), J=get("J");
+
+    var revLedgerNet = A - B;                 // 餘絀表醫療收入淨
+    var revBonusNet  = G - B + H;             // 獎勵金表醫療收入淨
+    var R  = revLedgerNet - revBonusNet;      // 收入認列差異 (= A − G − H)
+    var M  = Iadj + Dr + Emp;                 // 當月入成本獎勵金
+    var costExpected = E + M;                 // 成本應數
+    var CD = C - costExpected;                // 成本認列差異
+    var P  = revBonusNet - E;                 // 奬前收支淨餘數(計算)
+    var Fcalc = Math.round(P * 0.05);         // 5%(計算)
+    var IorigCalc = Iadj + J;                 // 繳局原始(反推)
+    var distributable = P - F;                // 可分配數
+    var distCheck = distributable - (IorigCalc + Dr + Emp);
+
+    var surplusLedger  = revLedgerNet - C;    // 業務賸餘(餘絀表算式)
+    var surplusExpected = F + J;              // 應有業務賸餘
+    var diff = surplusLedger - surplusExpected; // = R − CD
+
+    var nonOp = INT + MISC;                    // 業務外收入(本月，假設無業務外費用)
+    var periodSurplus = surplusLedger + nonOp; // 本期賸餘
+
+    var okR  = Math.abs(R)  <= TOL;
+    var okCD = Math.abs(CD) <= TOL;
+    var ok5  = Math.abs(F - Fcalc) <= TOL;
+    var okD  = Math.abs(distCheck) <= TOL;
+    var allOk = okR && okCD && ok5 && okD;
+
+    var hasInput = FIELDS.some(function(id){ return $(id).value.trim()!==""; });
+
+    // ---- 恆等式天平 ----
+    var eq = $("eq");
+    var diffZero = Math.abs(diff) <= TOL;
+    eq.innerHTML =
+      term("result", fmtN(surplusLedger), "業務賸餘(餘絀表)") +
+      op("=") +
+      term("", fmtN(F), "醫療作業基金5%") +
+      op("+") +
+      term("", fmtN(J), "加班費抵繳統籌款") +
+      op(diff>=0 ? "+" : "−") +
+      term("diff " + (diffZero?"zero":"nz"), fmtN(Math.abs(diff)), "差異(R−CD)");
+
+    // ---- 狀態列 ----
+    var chip = $("chip");
+    var msg  = $("verdictMsg");
+    if(!hasInput){
+      chip.className="chip"; chip.textContent="—";
+      msg.textContent="請輸入數字或載入範例。";
+    } else if(allOk){
+      chip.className="chip ok"; chip.textContent="對帳相符";
+      msg.textContent="兩表一致：業務賸餘等於 5% 提撥加計加班費抵繳，無收入或成本認列差異。";
+    } else {
+      chip.className="chip warn"; chip.textContent="發現差異";
+      var parts=[];
+      if(!okR)  parts.push("收入認列差 "+fmtN(R));
+      if(!okCD) parts.push("成本認列差 "+fmtN(CD));
+      if(!ok5)  parts.push("5% 提撥不符");
+      if(!okD)  parts.push("獎勵金分配不符");
+      msg.textContent = parts.join("；") + "。詳見下方檢核。";
+    }
+
+    // ---- 逐項檢核 ----
+    var checks = $("checks");
+    checks.innerHTML =
+      chkRow(okR,  "收入認列一致",
+        "門診醫療收入 = 掛帳 + 健保不給付/部分負擔/其他",
+        okR ? "R = 0" : "R = "+fmtN(R)) +
+      chkRow(okCD, "成本認列一致",
+        "門診醫療成本 = 支出部份 + 當月獎勵金 "+fmtN(M),
+        okCD ? "CD = 0" : "CD = "+fmtN(CD)) +
+      chkRow(ok5,  "醫療作業基金 5% 相符",
+        "奬前 "+fmtN(P)+" × 5% ≈ "+fmtN(Fcalc),
+        ok5 ? "相符" : "表列 "+fmtN(F)+" / 計算 "+fmtN(Fcalc)) +
+      chkRow(okD,  "獎勵金分配相符",
+        "可分配 "+fmtN(distributable)+" = 繳局原始 "+fmtN(IorigCalc)+" + 醫師 + 員工",
+        okD ? "相符" : "差 "+fmtN(distCheck));
+
+    // ---- 拆解表 ----
+    var brk = $("brk");
+    brk.innerHTML =
+      brkRow("醫療作業基金 5%（F）", fmtN(F), false) +
+      brkRow("加班費抵繳統籌款（J）", fmtN(J), false) +
+      brkRow("收入認列差異（R）", (R>=0?"+":"")+fmtN(R), Math.abs(R)>TOL) +
+      brkRow("成本認列差異（−CD）", (CD>0? "−"+fmtN(CD) : (CD<0? "+"+fmtN(-CD) : "0")), Math.abs(CD)>TOL) +
+      "<tr class='tot'><td>業務賸餘（餘絀表）</td><td class='r'>"+fmtN(surplusLedger)+"</td></tr>" +
+      "<tr><td style='color:var(--muted)'>＋業務外賸餘（利息+雜項）</td><td class='r' style='color:var(--muted)'>"+fmtN(nonOp)+"</td></tr>" +
+      "<tr class='tot'><td>本期賸餘</td><td class='r'>"+fmtN(periodSurplus)+"</td></tr>";
+
+    // ---- 更正試算（僅在 R≠0 顯示） ----
+    var restate = $("restate");
+    if(hasInput && !okR){
+      restate.classList.remove("hidden");
+      var A2 = A - R;
+      var surplus2 = surplusLedger - R;      // = F + J − CD
+      var nonOp2 = nonOp + R;
+      var period2 = surplus2 + nonOp2;       // 應與 periodSurplus 相同
+      $("restateNote").textContent =
+        "若差異 "+fmtN(R)+" 元確為非醫療收入（如公庫利息）誤列門診醫療收入，改列業務外收入後試算如下。本期賸餘不變。";
+      $("rstTable").innerHTML =
+        "<tr><th>科目</th><th>原數</th><th>更正後</th></tr>" +
+        rstRow("門診醫療收入", A, A2, true) +
+        rstRow("業務收入（醫療收入淨）", revLedgerNet, A2 - B, false) +
+        rstRow("業務賸餘（短絀）", surplusLedger, surplus2, true) +
+        rstRow("利息 + 雜項（業務外收入）", nonOp, nonOp2, true) +
+        rstRow("本期賸餘", periodSurplus, period2, false);
+      $("je").innerHTML =
+        "建議更正分錄（科目依實際誤列項目調整）：<br>" +
+        "借　<b>41060102 門診收入</b>　"+fmtN(R)+"<br>" +
+        "　　貸　<b>420101 利息收入</b>　"+fmtN(R);
+    } else {
+      restate.classList.add("hidden");
+    }
+  }
+
+  // ---- render helpers ----
+  function term(cls, val, cap){
+    return "<div class='term "+cls+"'><div class='v mono'>"+val+"</div><div class='c'>"+cap+"</div></div>";
+  }
+  function op(s){ return "<div class='op'>"+s+"</div>"; }
+  function chkRow(ok, name, detail, amt){
+    var ico = ok ? "<span class='ico ok'>✓</span>" : "<span class='ico warn'>!</span>";
+    var amtCls = ok ? "amt mono" : "amt mono warn";
+    return "<div class='chk'>"+ico+"<div class='txt'>"+name+"<small>"+detail+"</small></div><div class='"+amtCls+"'>"+amt+"</div></div>";
+  }
+  function brkRow(label, val, warn){
+    return "<tr><td>"+label+"</td><td class='r"+(warn?" pos":"")+"'>"+val+"</td></tr>";
+  }
+  function rstRow(label, a, b, changed){
+    var cls = changed ? " class='num chg'" : " class='num'";
+    return "<tr><td>"+label+"</td><td class='num'>"+fmtN(a)+"</td><td"+cls+">"+fmtN(b)+"</td></tr>";
+  }
+
+  // ---- 範例 / 清除 ----
+  var DEMO = {A:384238,B:21191,C:353624,INT:2019,MISC:1581,
+              G:370476,H:11922,E:314299,F:2345,Iadj:-782,Dr:28075,Emp:12032,J:5238};
+  function loadDemo(){
+    var mon = $("mon"); if(mon) mon.value="115年6月";
+    FIELDS.forEach(function(id){ $(id).value = fmtN(DEMO[id]); });
+    recompute();
+  }
+  function askClear(){ $("ov").classList.add("show"); }
+  function closeOv(){ $("ov").classList.remove("show"); }
+  function doClear(){
+    FIELDS.forEach(function(id){ $(id).value=""; });
+    closeOv(); recompute();
+  }
+
+  // ---- 讀值格式化（失焦補千分位；聚焦顯示原值）＋事件綁定 ----
+  function wire(){
+    FIELDS.forEach(function(id){
+      var el = $(id); if(!el) return;
+      el.addEventListener("input", recompute);
+      el.addEventListener("blur", function(){
+        if(el.value.trim()==="") { recompute(); return; }
+        el.value = fmtN(parseNum(el.value));
+        recompute();
+      });
+      el.addEventListener("focus", function(){
+        var v = parseNum(el.value);
+        el.value = (v===0 && el.value.trim()==="") ? "" : String(Math.round(v));
+      });
+    });
+    var ov = $("ov");
+    if(ov) ov.addEventListener("click", function(e){ if(e.target===this) closeOv(); });
+    recompute();
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded", wire);
+  } else { wire(); }
+
+  // 對外只暴露 inline handler 需要的方法；分頁切換時由 TAB_RENDERS 呼叫 recompute
+  window.Recon = { recompute:recompute, loadDemo:loadDemo, askClear:askClear, closeOv:closeOv, doClear:doClear };
+})();
 </script>
 </body>
 </html>
