@@ -395,6 +395,9 @@ body.sb-resizing * { pointer-events: none !important; }
 .it td.td-r input { text-align: right; width:100%; }
 .it tfoot td { font-weight: bold; background: #f5f5f5; font-size: 12px; vertical-align: middle; }
 .it tfoot td { height: 7mm; }
+/* v4.8.2 公務預算用途別拆分：互補拉桿 */
+.pub-split-slider { accent-color: #1976d2; height: 16px; cursor: pointer; flex-shrink: 0; }
+@media print { .pub-split-slider, .pub-split-del { display: none !important; } }
 
 
 /* Add / Remove row buttons */
@@ -1137,7 +1140,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.8.1</div>
+      <div id="sb-version">v4.8.2</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1259,7 +1262,7 @@ body.sb-resizing * { pointer-events: none !important; }
           <div class="bp-row" id="row-pub-split" style="display:none; flex-direction:column; align-items:stretch; gap:2px;">
             <div style="display:flex; align-items:center; gap:6px;">
               <label style="font-weight:600;">用途別拆分：</label>
-              <button type="button" onclick="addPubSplitRow()" style="font-size:11px; padding:1px 8px; cursor:pointer; border:1px solid #1976d2; border-radius:4px; background:#e3f2fd; color:#1565c0;">＋ 新增用途</button>
+              <button type="button" onclick="onAddPubSplitClick()" style="font-size:11px; padding:1px 8px; cursor:pointer; border:1px solid #1976d2; border-radius:4px; background:#e3f2fd; color:#1565c0;">＋ 新增用途</button>
               <span id="pub-split-sum" style="margin-left:auto; font-size:11px; font-weight:600; color:#546e7a;">小計 $0</span>
             </div>
             <div id="pub-split-rows"></div>
@@ -2735,32 +2738,77 @@ function syncPubBudgetMode() {
   }
 }
 function pubSplitBox() { return document.getElementById('pub-split-rows'); }
-/* 新增一列用途別拆分（可帶預設值供載入還原） */
+function _pubItems() { return [...document.querySelectorAll('#pub-split-rows .pub-split-item')]; }
+function _pubAmtOf(it) { return Math.round(parseFloat((it.querySelector('.pub-split-amt').value || '').replace(/,/g, '')) || 0); }
+function _setPubAmt(it, v) {
+  const inp = it.querySelector('.pub-split-amt'); if (inp) inp.value = v ? fmtN(v) : '';
+  const sl = it.querySelector('.pub-split-slider'); if (sl) sl.value = v;
+}
+/* 新增一列用途別拆分（可帶預設值供載入還原；不做互補借扣） */
 function addPubSplitRow(purpose, amt) {
   const box = pubSplitBox(); if (!box) return;
   const div = document.createElement('div');
   div.className = 'pub-split-item';
   div.style.cssText = 'display:flex; align-items:center; gap:4px; margin-top:3px;';
   div.innerHTML =
-    `<select class="fsel pub-split-purpose" style="flex:1; font-size:11px;">${pubPurposeOptions(purpose)}</select>` +
+    `<select class="fsel pub-split-purpose" style="flex:1; min-width:88px; font-size:11px;">${pubPurposeOptions(purpose)}</select>` +
+    `<input type="range" class="pub-split-slider" min="0" max="0" value="${amt != null ? amt : 0}" step="1" oninput="onPubSlider(this)" title="拖曳：總額不變、其他用途按比例互補" style="width:70px;">` +
     `<input type="text" inputmode="decimal" class="pub-split-amt" placeholder="金額" value="${amt != null ? fmtN(amt) : ''}"` +
-    ` style="width:92px; text-align:right; font-size:11px;" oninput="calcPubSplit()" onblur="_fmtPriceBlur(this)" onfocus="_fmtPriceFocus(this)">` +
+    ` style="width:80px; text-align:right; font-size:11px;" oninput="calcPubSplit()" onblur="_fmtPriceBlur(this)" onfocus="_fmtPriceFocus(this)">` +
     `<button type="button" class="pub-split-del" title="刪除此列" style="border:none; background:#ffebee; color:#c62828; border-radius:4px; padding:1px 8px; cursor:pointer;">✕</button>`;
   box.appendChild(div);
   div.querySelector('.pub-split-del').onclick = () => { div.remove(); if (!box.children.length) addPubSplitRow(); calcPubSplit(); };
   calcPubSplit();
 }
+/* ＋新增用途：預設 1、從最大項借（總額不變）；全空時新增空列 */
+function onAddPubSplitClick() {
+  const items = _pubItems();
+  const amts = items.map(_pubAmtOf);
+  const total = amts.reduce((a, b) => a + b, 0);
+  let def = 0;
+  if (total > 0) {
+    let maxI = 0; amts.forEach((a, i) => { if (a > amts[maxI]) maxI = i; });
+    if (amts[maxI] >= 1) { _setPubAmt(items[maxI], amts[maxI] - 1); def = 1; }
+  }
+  addPubSplitRow('', def);
+}
+/* 拖曳拉桿：總額固定，被拖那列設為 v，其餘 (總額−v) 依原比例分配（互補） */
+function onPubSlider(el) {
+  const items = _pubItems();
+  const amts = items.map(_pubAmtOf);
+  const total = amts.reduce((a, b) => a + b, 0);
+  const idx = items.findIndex(it => it.querySelector('.pub-split-slider') === el);
+  if (idx < 0) return;
+  const v = Math.max(0, Math.min(Math.round(+el.value), total));
+  const others = items.map((_, i) => i).filter(i => i !== idx);
+  const otherSumOld = others.reduce((s, i) => s + amts[i], 0);
+  const remain = total - v;
+  let acc = 0;
+  others.forEach((i, k) => {
+    let share;
+    if (k === others.length - 1) share = remain - acc;               /* 末列吸收餘數，確保總額精準 */
+    else if (otherSumOld > 0) share = Math.round(remain * amts[i] / otherSumOld);
+    else share = Math.round(remain / others.length);
+    amts[i] = Math.max(0, share); acc += amts[i];
+  });
+  amts[idx] = v;
+  items.forEach((it, i) => _setPubAmt(it, amts[i]));
+  calcPubSplit();
+}
 /* 讀取拆分列（過濾全空列） */
 function readPubSplits() {
-  return [...document.querySelectorAll('#pub-split-rows .pub-split-item')].map(el => ({
+  return _pubItems().map(el => ({
     name: el.querySelector('.pub-split-purpose').value,
-    amt: Math.round(parseFloat((el.querySelector('.pub-split-amt').value || '').replace(/,/g, '')) || 0),
+    amt: _pubAmtOf(el),
   })).filter(s => s.name || s.amt);
 }
-/* 拆分小計 → 更新本單金額（21020301 時，總額以拆分為準） */
+/* 拆分小計 → 更新本單金額 + 同步各拉桿範圍(=總額)與值（21020301 時總額以拆分為準） */
 function calcPubSplit() {
-  const sum = readPubSplits().reduce((a, s) => a + s.amt, 0);
+  const items = _pubItems();
+  const amts = items.map(_pubAmtOf);
+  const sum = amts.reduce((a, b) => a + b, 0);
   const el = document.getElementById('pub-split-sum'); if (el) el.textContent = '小計 $' + fmtN(sum);
+  items.forEach((it, i) => { const sl = it.querySelector('.pub-split-slider'); if (sl) { sl.max = sum || 0; sl.value = amts[i]; } });
   if (isPubBudgetExpense()) {
     const t = Math.max(0, sum);
     const ad = document.getElementById('amount-disp'); if (ad) ad.textContent = '$' + fmtN(t);
