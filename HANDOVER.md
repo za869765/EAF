@@ -1,3 +1,15 @@
+# 專案接力記錄 — 2026/07/07（ACC v4.8.0）
+
+> 換台電腦繼續：先 `git -C .../EAF pull`。暗號「**佳里ACC，接力**」。
+
+## 本次完成（v4.8.0）— 用途說明重複把關（非阻擋動畫提醒）
+- **需求**：動支/請購單填「用途說明」時，若與歷史上**其他編號**的單子一模一樣，跳 CSS 動畫、明顯顏色文字彈窗提醒，但**不強制阻擋**存檔。
+- **做法（index.html）**：用途說明欄 `#purpose-desc` 加 `onblur="checkDupPurposeDesc()"`。`findDupPurposeDesc()` 掃 `cachedRecords`，比對 `purposeDesc`（trim 後完全相同）且屬其他編號（排除自己 id/voucherNo、排除作廢、排除空說明）；有中則 `showDupWarn()` 顯示橘色警示彈窗 `#dup-warn-popup`（`dupWarnIn` 彈入 + `dupWarnPulse` 脈動 CSS 動畫），列出重複憑證編號/類型/日期，點一下或 6.5 秒自動關。純提醒。
+- **子版號進位**：v4.7.9→v4.8.0（規則：子版到9進位）。
+- **驗證**：jsdom 抽真函式 10/10（多筆重複、排除作廢、編輯自己不誤報、獨特說明、空白、前後空白 trim）。
+
+---
+
 # 專案接力記錄 — 2026/07/07（ACC v4.7.9）
 
 > 換台電腦繼續：先 `git -C .../EAF pull`。暗號「**佳里ACC，接力**」。
