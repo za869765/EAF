@@ -395,11 +395,6 @@ body.sb-resizing * { pointer-events: none !important; }
 .it td.td-r input { text-align: right; width:100%; }
 .it tfoot td { font-weight: bold; background: #f5f5f5; font-size: 12px; vertical-align: middle; }
 .it tfoot td { height: 7mm; }
-/* v4.7.9 公務預算(21020301)多用途拆分：用途別欄預設隱藏，僅 pub-mode 顯示（含列印） */
-.pub-cell { display: none; }
-body.pub-mode .pub-cell { display: table-cell; }
-.it td.td-pub { text-align: center; vertical-align: middle; padding: 0.5mm; }
-.it td.td-pub select { width: 100%; font-size: 11px; border: none; background: transparent; }
 
 
 /* Add / Remove row buttons */
@@ -1142,7 +1137,7 @@ body.pub-mode .pub-cell { display: table-cell; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.8.0</div>
+      <div id="sb-version">v4.8.1</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1259,6 +1254,15 @@ body.pub-mode .pub-cell { display: table-cell; }
           <div class="bp-row" id="row-purpose" style="display:none;">
             <label>用途別　：</label>
             <select class="fsel" id="sel-purpose" onchange="onPurposeChange()" style="flex:1;"></select>
+          </div>
+          <!-- v4.8.1 公務預算(21020301) 用途別多筆拆分（工作計畫下方；金額合計＝本單金額） -->
+          <div class="bp-row" id="row-pub-split" style="display:none; flex-direction:column; align-items:stretch; gap:2px;">
+            <div style="display:flex; align-items:center; gap:6px;">
+              <label style="font-weight:600;">用途別拆分：</label>
+              <button type="button" onclick="addPubSplitRow()" style="font-size:11px; padding:1px 8px; cursor:pointer; border:1px solid #1976d2; border-radius:4px; background:#e3f2fd; color:#1565c0;">＋ 新增用途</button>
+              <span id="pub-split-sum" style="margin-left:auto; font-size:11px; font-weight:600; color:#546e7a;">小計 $0</span>
+            </div>
+            <div id="pub-split-rows"></div>
           </div>
           <div class="bp-row" id="row-personnel" style="display:none;">
             <label>人員類別：</label>
@@ -1868,8 +1872,7 @@ function applyType(type, { regen = true } = {}) {
          <th style="width:17%;">總額</th>
        </tr>`
     : `<tr>
-         <th class="pub-cell" style="width:24%;">用途別</th>
-         <th colspan="2" style="width:50%;">動支說明</th>
+         <th colspan="2" style="width:74%;">動支說明</th>
          <th colspan="2">金額</th>
        </tr>`;
 
@@ -1882,7 +1885,6 @@ function applyType(type, { regen = true } = {}) {
          <td class="td-r" id="grand-total" style="padding-right:3mm;">$0</td>
        </tr>`
     : `<tr>
-         <td class="pub-cell"></td>
          <td style="text-align:center; width:20%;">合計</td>
          <td colspan="2" style="text-align:center; font-size:11.5px; letter-spacing:1px; width:70%;"
              id="grand-total-zh">零元整</td>
@@ -1913,7 +1915,7 @@ function applyType(type, { regen = true } = {}) {
   }
   updateCashierNote();   /* 確保切換單據類型時出納斜線狀態正確重設 */
 
-  syncPubBudgetMode();   /* v4.7.9 切換單據類型時同步公務預算 pub-mode（21020301 僅動支單） */
+  syncPubBudgetMode();   /* v4.8.1 切換單據類型時同步公務預算用途別拆分區（21020301 僅動支單） */
   calcTotal();
 }
 
@@ -2718,18 +2720,59 @@ function pubPurposeOptions(sel) {
   return '<option value="">──用途別──</option>' +
     _pub21Purposes().map(p => `<option value="${p.code}"${sel === p.code ? ' selected' : ''}>${p.name}</option>`).join('');
 }
-/* 切換是否公務預算：整張明細表加/去 pub-mode（顯示/隱藏各列用途別欄）＋隱藏上方單一用途別列 */
+/* 切換是否公務預算：21020301 顯示「用途別拆分」區、隱藏單一用途別下拉；反之亦然 */
 function syncPubBudgetMode() {
   const pub = isPubBudgetExpense();
-  document.body.classList.toggle('pub-mode', pub);
-  if (pub) { const pr = document.getElementById('row-purpose'); if (pr) pr.style.display = 'none'; }
+  const rp = document.getElementById('row-purpose');
+  const rs = document.getElementById('row-pub-split');
+  if (rs) rs.style.display = pub ? 'flex' : 'none';
+  if (pub) {
+    if (rp) rp.style.display = 'none';
+    if (pubSplitBox() && pubSplitBox().children.length === 0) addPubSplitRow();
+    calcPubSplit();
+  } else if (rs) {
+    const b = pubSplitBox(); if (b) b.innerHTML = '';   /* 離開時清空拆分列 */
+  }
+}
+function pubSplitBox() { return document.getElementById('pub-split-rows'); }
+/* 新增一列用途別拆分（可帶預設值供載入還原） */
+function addPubSplitRow(purpose, amt) {
+  const box = pubSplitBox(); if (!box) return;
+  const div = document.createElement('div');
+  div.className = 'pub-split-item';
+  div.style.cssText = 'display:flex; align-items:center; gap:4px; margin-top:3px;';
+  div.innerHTML =
+    `<select class="fsel pub-split-purpose" style="flex:1; font-size:11px;">${pubPurposeOptions(purpose)}</select>` +
+    `<input type="text" inputmode="decimal" class="pub-split-amt" placeholder="金額" value="${amt != null ? fmtN(amt) : ''}"` +
+    ` style="width:92px; text-align:right; font-size:11px;" oninput="calcPubSplit()" onblur="_fmtPriceBlur(this)" onfocus="_fmtPriceFocus(this)">` +
+    `<button type="button" class="pub-split-del" title="刪除此列" style="border:none; background:#ffebee; color:#c62828; border-radius:4px; padding:1px 8px; cursor:pointer;">✕</button>`;
+  box.appendChild(div);
+  div.querySelector('.pub-split-del').onclick = () => { div.remove(); if (!box.children.length) addPubSplitRow(); calcPubSplit(); };
+  calcPubSplit();
+}
+/* 讀取拆分列（過濾全空列） */
+function readPubSplits() {
+  return [...document.querySelectorAll('#pub-split-rows .pub-split-item')].map(el => ({
+    name: el.querySelector('.pub-split-purpose').value,
+    amt: Math.round(parseFloat((el.querySelector('.pub-split-amt').value || '').replace(/,/g, '')) || 0),
+  })).filter(s => s.name || s.amt);
+}
+/* 拆分小計 → 更新本單金額（21020301 時，總額以拆分為準） */
+function calcPubSplit() {
+  const sum = readPubSplits().reduce((a, s) => a + s.amt, 0);
+  const el = document.getElementById('pub-split-sum'); if (el) el.textContent = '小計 $' + fmtN(sum);
+  if (isPubBudgetExpense()) {
+    const t = Math.max(0, sum);
+    const ad = document.getElementById('amount-disp'); if (ad) ad.textContent = '$' + fmtN(t);
+    const gt = document.getElementById('grand-total');  if (gt) gt.textContent = '$' + fmtN(t);
+    const gz = document.getElementById('grand-total-zh'); if (gz) gz.textContent = toChineseAmount(t);
+  }
 }
 
 function appendRow(i) {
   const tr = document.createElement('tr');
   if (formType === 'expense') {
     tr.innerHTML = `
-      <td class="pub-cell td-pub"><select data-r="${i}" data-c="purpose" class="pub-purpose-sel" style="width:100%; font-size:11px;">${pubPurposeOptions()}</select></td>
       <td class="td-name" colspan="2"><textarea data-r="${i}" data-c="name" rows="1" lang="zh-TW" oninput="autoResize(this)"></textarea></td>
       <td colspan="2" class="td-r" style="padding-right:2mm;">
         <input type="text" inputmode="decimal" data-r="${i}" data-c="price"
@@ -2888,6 +2931,12 @@ function revertFoldNote() {
 }
 
 function calcTotal() {
+  if (isPubBudgetExpense()) {   /* v4.8.1 公務預算：總額＝用途別拆分小計 */
+    calcPubSplit();
+    const ps = document.getElementById('purchase-sig'); if (ps) ps.style.display = 'none';
+    const ew = document.getElementById('exempt-wrap');  if (ew) ew.style.display = 'none';
+    return;
+  }
   let total = 0;
   const isPurchase = formType === 'purchase';
   if (isPurchase) {
@@ -2985,7 +3034,7 @@ function getFormData() {
     if (isExp) {
       const name = qv(i,'name');
       if (!name && !price) continue;
-      items.push(pub ? { name, price, purpose: qv(i,'purpose') } : { name, price });
+      items.push({ name, price });
       total += Math.round(parseFloat(price)||0);
     } else {
       const name = qv(i,'name'), spec = qv(i,'spec'), qty = qv(i,'qty'), unit = qv(i,'unit');
@@ -3004,12 +3053,11 @@ function getFormData() {
   let _pName = (()=>{ const s=document.getElementById('sel-purpose'); const v=s.value; return v ? (s.options[s.selectedIndex]?.text||'') : ''; })();
   let _pDesc = document.getElementById('purpose-desc').value;
   if (pub) {
-    const map = {};
-    items.forEach(it => { const k=(it.purpose||'').trim() || '（未指定）'; map[k]=(map[k]||0)+Math.round(parseFloat(it.price)||0); });
-    purposeSplits = Object.keys(map).map(k => ({ name:k, amt:map[k] }));
+    purposeSplits = readPubSplits();                          /* 工作計畫下方的用途別拆分 */
+    total = purposeSplits.reduce((a, s) => a + s.amt, 0);     /* 公務預算總額以拆分為準 */
     _pName = purposeSplits.length > 1 ? '多用途' : (purposeSplits[0]?.name || '');
     _pCode = _pName;
-    if (!_pDesc.trim()) _pDesc = purposeSplits.map(s => `${s.name} ${Number(s.amt).toLocaleString('zh-TW')}`).join('；');
+    if (!_pDesc.trim()) _pDesc = purposeSplits.map(s => `${s.name} ${fmtN(s.amt)}`).join('；');
   }
   return {
     voucherNo   : document.getElementById('voucher-no').value,
@@ -3102,7 +3150,6 @@ function fillForm(rec) {
     const item = (rec.items||[])[i] || {};
     const nameEl = qi(i,'name');  if (nameEl)  { nameEl.value  = item.name  || ''; autoResize(nameEl); }
     const priceEl= qi(i,'price'); if (priceEl) priceEl.value = item.price || '';
-    const purEl  = qi(i,'purpose'); if (purEl) purEl.value = item.purpose || '';   /* v4.7.9 公務預算用途別 */
     if (!isExp) {
       const specEl = qi(i,'spec'); if (specEl) { specEl.value = item.spec || ''; autoResize(specEl); }
       const qtyEl  = qi(i,'qty');  if (qtyEl)  qtyEl.value  = item.qty  || '';
@@ -3113,6 +3160,16 @@ function fillForm(rec) {
   calcTotal();
   /* v4.5.2 載入舊紀錄後：所有單價/金額 input 自動套千分位顯示 */
   document.querySelectorAll('[data-c="price"]').forEach(_fmtPriceBlur);
+  /* v4.8.1 公務預算：還原「用途別拆分」列（onBpChange 已顯示拆分區） */
+  if (isPubBudgetExpense()) {
+    const b = pubSplitBox();
+    if (b) {
+      b.innerHTML = '';
+      const sp = Array.isArray(rec.purposeSplits) ? rec.purposeSplits : [];
+      if (sp.length) sp.forEach(s => addPubSplitRow(s.name, s.amt)); else addPubSplitRow();
+      calcPubSplit();
+    }
+  }
   /* 載入既有紀錄：還原 notes（calcTotal 不再即時修改 notes） */
   document.getElementById('notes').value = rec.notes || '';
   _foldNoteApplied = false;
