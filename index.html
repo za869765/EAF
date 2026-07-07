@@ -1140,7 +1140,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.8.2</div>
+      <div id="sb-version">v4.8.3</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1274,6 +1274,7 @@ body.sb-resizing * { pointer-events: none !important; }
           <div class="bp-row" id="row-lecturer" style="display:none;">
             <label>款項用途：</label>
             <button class="lect-btn" id="lect-yes"   onclick="setLecturer('lecturer')" style="display:none;">講師/應診/通譯費</button>
+            <button class="lect-btn" id="lect-clinic" onclick="setLecturer('clinic')" style="display:none;">應診費</button>
             <button class="lect-btn active" id="lect-no" onclick="setLecturer('')"      style="display:none;">非講師/應診費</button>
             <button class="lect-btn" id="lect-bonus" onclick="setLecturer('bonus')"    style="display:none;">獎勵金</button>
             <button class="lect-btn" id="lect-promo" onclick="setLecturer('promo')"    style="display:none;">宣導品</button>
@@ -2314,6 +2315,10 @@ function updateLecturerRow() {
   document.getElementById('lect-no').style.display    = isLect21 ? '' : 'none';
   document.getElementById('lect-bonus').style.display = isLect21 ? '' : 'none';
   document.getElementById('lect-promo').style.display = isXuandao ? '' : 'none';
+  /* v4.8.3 21020311 國健科：主按鈕改「講師/通譯費」＋拆出「應診費」鈕；其他 BP 維持「講師/應診/通譯費」 */
+  const isClinicBp = CLINIC_FEE_BP_CODES.includes(bpCode);
+  document.getElementById('lect-yes').textContent      = isClinicBp ? '講師/通譯費' : '講師/應診/通譯費';
+  document.getElementById('lect-clinic').style.display = (isLect21 && isClinicBp) ? '' : 'none';
   /* 4501 憑證類型列 */
   document.getElementById('row-tax-doc').style.display = purposeCode === '4501' ? '' : 'none';
   /* v4.4.98 21020321 + 09 各項補助費 → 款項類型按鈕（不休假加班費 / 國內休假補助費） */
@@ -2342,6 +2347,9 @@ const ACCT_TYPE_CONFIG = {
 const ACCT_SLASH_TYPES = new Set(['公立醫院','衛生局','開具發票廠商']);
 const ACCT_NOTE_MAP    = { '財/社團法人':'列計92所得', '診所/檢驗所':'列計9A所得', '醫療門診診所/檢驗所':'列計9A所得', 'HPV':'列計9A所得', '個人':'列計50所得' };
 let acctType = '';
+/* v4.8.3 應診費（款項用途）帳戶類別 — 僅 21020311 國健科：個人50 / 診所帳戶9A / 法人帳戶92 / 公立機構帳戶斜線 */
+const CLINIC_FEE_BP_CODES = ['21020311'];
+const CLINIC_ACCT_TYPES   = ['個人','診所帳戶','法人帳戶','公立機構帳戶'];
 
 /* 50所得人員類別子選單（1501 / 2713 / 7103） */
 const INCOME_50_PURPOSES = ['1501','2713','7103'];
@@ -2393,12 +2401,31 @@ function _checkSubjectDirty() {
 function setLecturer(val) {
   isLecturer = val;
   document.getElementById('lect-yes').classList.toggle('active',   val === 'lecturer');
+  document.getElementById('lect-clinic').classList.toggle('active', val === 'clinic');
   document.getElementById('lect-no').classList.toggle('active',    val === '' && document.getElementById('lect-no').style.display !== 'none');
   document.getElementById('lect-bonus').classList.toggle('active', val === 'bonus');
   document.getElementById('lect-promo').classList.toggle('active', val === 'promo');
+  updateClinicAcctRow();   /* v4.8.3 應診費 → 顯示/收起帳戶類別列 */
   updateIncome50Row();
   updateCashierNote();
   _checkSubjectDirty();
+}
+/* v4.8.3 應診費（21020311）帳戶類別列：個人/診所帳戶/法人帳戶/公立機構帳戶，預設個人 */
+function updateClinicAcctRow() {
+  const rowAcct     = document.getElementById('row-acct-type');
+  const purposeCode = document.getElementById('sel-purpose').value;
+  const bpCode      = document.getElementById('sel-bp').value;
+  const isClinic    = isLecturer === 'clinic' && CLINIC_FEE_BP_CODES.includes(bpCode);
+  if (isClinic) {
+    if (!CLINIC_ACCT_TYPES.includes(acctType)) acctType = '個人';
+    document.getElementById('acct-type-btns').innerHTML =
+      CLINIC_ACCT_TYPES.map(o => `<button class="lect-btn${o===acctType?' active':''}" onclick="setAcctType('${o}')">${o}</button>`).join('');
+    rowAcct.style.display = '';
+  } else if (!ACCT_TYPE_CONFIG[purposeCode]) {
+    /* 非應診費、且非 2802/2807 帳戶類別用途 → 收起並清掉 clinic 類型 acctType */
+    if (CLINIC_ACCT_TYPES.includes(acctType)) acctType = '';
+    rowAcct.style.display = 'none';
+  }
 }
 
 function setTaxDoc(val) {
@@ -2523,6 +2550,11 @@ function updateCashierNote() {
     note = _t50;
   } else if (ACCT_TYPE_CONFIG[purposeCode] && acctType) {
     note = ACCT_SLASH_TYPES.has(acctType) ? '' : (_acctNM[acctType] || '');
+  } else if (isLecturer === 'clinic' && acctType) {
+    /* v4.8.3 應診費帳戶類別：個人50 / 診所帳戶9A / 法人帳戶92 / 公立機構帳戶→無附記(出納格斜線) */
+    note = acctType === '公立機構帳戶' ? '' :
+           acctType === '診所帳戶'     ? _t9a :
+           acctType === '法人帳戶'     ? _t92 : _t50;
   } else if (purposeCode === '1501') {
     note = income50Type === '費用' ? '' : _t50nhi;
   } else if (purposeCode === '2305') {
@@ -3160,10 +3192,10 @@ function fillForm(rec) {
   document.getElementById('sel-purpose').value = rec.purposeCode || '';
   onPurposeChange();
   /* 還原款項用途狀態 */
-  isLecturer = (rec.lecturerType === 'lecturer' || rec.lecturerType === 'bonus' || rec.lecturerType === 'promo')
-               ? rec.lecturerType : '';
+  isLecturer = ['lecturer','bonus','promo','clinic'].includes(rec.lecturerType) ? rec.lecturerType : '';
   taxDocType4501 = rec.taxDocType4501 || '';
   document.getElementById('lect-yes').classList.toggle('active',   isLecturer === 'lecturer');
+  document.getElementById('lect-clinic').classList.toggle('active', isLecturer === 'clinic');
   document.getElementById('lect-no').classList.toggle('active',    isLecturer === '');
   document.getElementById('lect-bonus').classList.toggle('active', isLecturer === 'bonus');
   document.getElementById('lect-promo').classList.toggle('active', isLecturer === 'promo');
@@ -3176,6 +3208,10 @@ function fillForm(rec) {
   /* 還原帳戶類別狀態 */
   if (rec.acctType && ACCT_TYPE_CONFIG[rec.purposeCode]) {
     setAcctType(rec.acctType);   /* setAcctType 已呼叫 updateIncome50Row */
+  } else if (isLecturer === 'clinic') {
+    /* v4.8.3 還原應診費帳戶類別 */
+    updateClinicAcctRow();
+    if (rec.acctType && CLINIC_ACCT_TYPES.includes(rec.acctType)) setAcctType(rec.acctType);
   }
   /* 確保講師費/個人 路徑的員工兼職列也正確顯示 */
   updateIncome50Row();
