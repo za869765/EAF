@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.7.8</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.7.9</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -531,7 +531,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.7.8</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.7.9</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -3737,7 +3737,6 @@ async function loadPubRecords(y){
     const all = await resp.json();
     return all.filter(r =>
       r.bpCode === '21020301' &&
-      (r.purposeName||'').startsWith('99') &&
       !r.archived &&
       !r.voided
     ).map(r => ({
@@ -3749,6 +3748,12 @@ async function loadPubRecords(y){
       purposeDesc: r.purposeDesc || r.notes || '',
       amount:      r.total || 0,
       locked:      !!r.locked,
+      /* v4.7.9 多用途拆分：優先用 purposeSplits，缺則由 items 的每列 purpose 彙總 */
+      purposeSplits: (Array.isArray(r.purposeSplits) && r.purposeSplits.length)
+        ? r.purposeSplits
+        : (Array.isArray(r.items) && r.items.some(it=>it && it.purpose)
+            ? Object.entries(r.items.reduce((m,it)=>{ const k=(it&&it.purpose||'').trim(); if(k){ m[k]=(m[k]||0)+Math.round(parseFloat(it.price)||0);} return m; },{})).map(([name,amt])=>({name,amt}))
+            : null),
     }));
   } catch(_){
     // 連線失敗或本機測試時顯示提示
@@ -3779,6 +3784,16 @@ async function renderPublicTab(){
   // 依年月分組
   const byYm = {};
   records.forEach(r=>{ (byYm[r.ym]=byYm[r.ym]||[]).push(r); });
+  /* v4.7.9 用途別年度彙總（拆分優先，缺則用 purposeName）— 供 ACC 依業務費用途別分清楚 */
+  const purposeAgg = {};
+  records.forEach(r=>{
+    if(r.purposeSplits && r.purposeSplits.length){
+      r.purposeSplits.forEach(s=>{ const k=(s.name||'（未指定）'); purposeAgg[k]=(purposeAgg[k]||0)+(s.amt||0); });
+    } else {
+      const k=(r.purposeName||'99 其他'); purposeAgg[k]=(purposeAgg[k]||0)+(r.amount||0);
+    }
+  });
+  const purposeAggRows = Object.entries(purposeAgg).sort((a,b)=>b[1]-a[1]);
 
   wrap.innerHTML = `
     <!-- 摘要 Banner -->
@@ -3804,6 +3819,20 @@ async function renderPublicTab(){
         <span id="pub-pct-txt" style="font-size:11px; color:#546e7a; white-space:nowrap;">${pct}% 已使用（共 ${records.length} 筆）</span>
       </div>
     </div>
+
+    <!-- v4.7.9 用途別年度彙總 -->
+    ${purposeAggRows.length ? `<div class="pub-section">
+      <div class="pub-hd" style="background:#455a64; font-size:12px;">
+        🧮 依用途別彙總（${y} 年度）
+        <span style="margin-left:auto; font-size:10px; color:#90a4ae;">業務費用途別分類，供 ACC 對應</span>
+      </div>
+      <div style="display:flex; flex-wrap:wrap; gap:6px; padding:10px 12px; background:#fafafa;">
+        ${purposeAggRows.map(([name,amt])=>`<div style="display:flex; align-items:center; gap:8px; background:#fff; border:1px solid #e0e0e0; border-radius:6px; padding:4px 10px;">
+          <span style="font-size:12px; color:#37474f;">${String(name).replace(/</g,'&lt;')}</span>
+          <b style="font-size:13px; color:#b71c1c; font-variant-numeric:tabular-nums;">${fmt(amt)}</b>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
 
     <!-- 動支清單（依月分組） -->
     <div class="pub-section">
@@ -3838,8 +3867,12 @@ async function renderPublicTab(){
                 <td style="color:#90a4ae;">${r.ym}</td>
                 <td>${r.date||''}</td>
                 <td style="font-size:11px;color:#546e7a;">${r.voucherNo||''}</td>
-                <td style="font-size:11px;color:#1565c0;">${r.purposeName||'99 其他'}</td>
-                <td style="font-size:11px;">${r.purposeDesc||''}</td>
+                <td style="font-size:11px;color:#1565c0;">${
+                  (r.purposeSplits && r.purposeSplits.length)
+                    ? r.purposeSplits.map(s=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:1px 0;"><span>${String(s.name||'').replace(/</g,'&lt;')}</span><span style="color:#b71c1c;font-weight:600;font-variant-numeric:tabular-nums;">${fmt(s.amt||0)}</span></div>`).join('')
+                    : (r.purposeName||'99 其他')
+                }</td>
+                <td style="font-size:11px;">${(r.purposeDesc||'').replace(/</g,'&lt;')}</td>
                 <td style="text-align:right;font-weight:700;color:#1565c0;">${fmt(r.amount||0)}</td>
                 <td style="text-align:center;">
                   <label style="display:flex;align-items:center;gap:4px;justify-content:center;cursor:pointer;">
@@ -3853,7 +3886,7 @@ async function renderPublicTab(){
                 </td>
               </tr>`;
             }).join('')}`;
-        }).join('') || '<tr><td colspan="7" class="empty-msg">本年度無 21020301／99 動支記錄</td></tr>'}
+        }).join('') || '<tr><td colspan="7" class="empty-msg">本年度無 21020301 公務預算動支記錄</td></tr>'}
         </tbody>
         <tfoot>
           <tr style="background:#e3f2fd; font-weight:700;">
