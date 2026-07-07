@@ -223,6 +223,32 @@ body.sb-resizing * { pointer-events: none !important; }
 #copy-success-popup .cp-label { font-size: 15px; color: #555; margin-bottom: 10px; letter-spacing: 1px; }
 #copy-success-popup .cp-no    { font-size: 32px; font-weight: bold; color: #1565c0; letter-spacing: 3px; }
 
+/* v4.8.0 用途說明重複警示（非阻擋、明顯動畫） */
+@keyframes dupWarnIn {
+  0%   { opacity:0; transform:translate(-50%,-50%) scale(.5) rotate(-4deg); }
+  55%  { transform:translate(-50%,-50%) scale(1.07) rotate(2deg); }
+  100% { opacity:1; transform:translate(-50%,-50%) scale(1) rotate(0); }
+}
+@keyframes dupWarnOut { 0%{opacity:1;transform:translate(-50%,-50%) scale(1);} 100%{opacity:0;transform:translate(-50%,-50%) scale(.85);} }
+@keyframes dupWarnPulse {
+  0%,100% { box-shadow: 0 16px 54px rgba(191,54,12,.42), 0 0 0 0 rgba(255,112,67,.55); }
+  50%     { box-shadow: 0 16px 54px rgba(191,54,12,.52), 0 0 0 15px rgba(255,112,67,0); }
+}
+#dup-warn-popup {
+  position: fixed; top: 42%; left: 50%; transform: translate(-50%,-50%);
+  background: linear-gradient(135deg,#fff3e0,#ffe0b2);
+  border: 3px solid #e65100; border-radius: 20px;
+  padding: 24px 34px; text-align: center;
+  z-index: 10001; max-width: 88vw; min-width: 300px; display: none; cursor: pointer;
+}
+#dup-warn-popup.in  { display:block; animation: dupWarnIn .4s cubic-bezier(.175,.885,.32,1.275) forwards, dupWarnPulse 1.1s ease-in-out .4s infinite; }
+#dup-warn-popup.out { display:block; animation: dupWarnOut .28s ease forwards; }
+#dup-warn-popup .dw-icon  { font-size: 50px; line-height:1; margin-bottom:6px; }
+#dup-warn-popup .dw-title { font-size: 19px; font-weight:800; color:#bf360c; letter-spacing:1px; margin-bottom:8px; }
+#dup-warn-popup .dw-body  { font-size: 13.5px; color:#4e342e; line-height:1.75; }
+#dup-warn-popup .dw-body b { color:#d84315; }
+#dup-warn-popup .dw-hint  { margin-top:12px; font-size:11px; color:#8d6e63; }
+
 /* ══════════════════════════════════
    FORM PAGE  (A4)
    ══════════════════════════════════ */
@@ -1100,6 +1126,13 @@ body.pub-mode .pub-cell { display: table-cell; }
   <div class="cp-label" id="cp-label-el">憑證編號已複製</div>
   <div class="cp-no"    id="cp-no-text"></div>
 </div>
+<!-- v4.8.0 用途說明與歷史其他編號重複提醒（非阻擋） -->
+<div id="dup-warn-popup" onclick="hideDupWarn()">
+  <div class="dw-icon">⚠️</div>
+  <div class="dw-title">用途說明重複</div>
+  <div class="dw-body" id="dw-body-el"></div>
+  <div class="dw-hint">此為提醒，不影響存檔 · 點一下關閉</div>
+</div>
 <div id="app">
 
 <!-- ══════════════════════ SIDEBAR ══════════════════════ -->
@@ -1109,7 +1142,7 @@ body.pub-mode .pub-cell { display: table-cell; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.7.9</div>
+      <div id="sb-version">v4.8.0</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1285,6 +1318,7 @@ body.pub-mode .pub-cell { display: table-cell; }
                                background:#f5f5f5; color:#333;">📋 複製</button>
               </div>
               <textarea class="fta" id="purpose-desc" rows="5"
+                        onblur="checkDupPurposeDesc()"
                         style="font-size:12.5px; min-height:20mm; width:100%;"></textarea>
               <!-- v4.4.38 列印專用 div：textarea 在列印時瀏覽器會吃字，改用 div 顯示 -->
               <div id="purpose-desc-print" aria-hidden="true"></div>
@@ -4444,6 +4478,48 @@ function showCopyPopup(no, opts = {}) {
     pop.classList.replace('in','out');
     _cpTimer = setTimeout(() => { pop.className = ''; pop.style.display = 'none'; }, 280);
   }, duration);
+}
+
+/* ══ v4.8.0 用途說明重複把關（與歷史其他編號單子一模一樣時提醒，不阻擋存檔）══ */
+let _dupTimer = null;
+function hideDupWarn() {
+  const pop = document.getElementById('dup-warn-popup');
+  if (!pop || !pop.classList.contains('in')) return;
+  if (_dupTimer) clearTimeout(_dupTimer);
+  pop.classList.replace('in','out');
+  setTimeout(() => { pop.className = ''; pop.style.display = 'none'; }, 300);
+}
+/* 找出與目前用途說明「一模一樣」且屬其他編號的歷史單子 */
+function findDupPurposeDesc() {
+  const desc = (document.getElementById('purpose-desc')?.value || '').trim();
+  if (!desc) return [];
+  const curVoucher = (document.getElementById('voucher-no')?.value || '').trim();
+  return (cachedRecords || []).filter(r =>
+    r && !r.voided &&
+    r.id !== currentId &&                                  /* 排除自己 */
+    (r.voucherNo || '').trim() !== curVoucher &&           /* 只比其他編號 */
+    (r.purposeDesc || '').trim() === desc
+  );
+}
+function checkDupPurposeDesc() {
+  const matches = findDupPurposeDesc();
+  if (matches.length) showDupWarn(matches); else hideDupWarn();
+}
+function showDupWarn(matches) {
+  const pop = document.getElementById('dup-warn-popup');
+  const body = document.getElementById('dw-body-el');
+  if (!pop || !body) return;
+  const list = matches.slice(0, 5).map(r => {
+    const t = r.formType === 'expense' ? '動支單' : '請購單';
+    return `<b>${(r.voucherNo || '（未編號）')}</b>（${t}${r.applyDateRoc ? '·' + r.applyDateRoc : ''}）`;
+  }).join('、');
+  const more = matches.length > 5 ? ` 等共 ${matches.length} 筆` : '';
+  body.innerHTML = `此單「用途說明」與下列<b>其他編號</b>的單子一模一樣：<br>${list}${more}<br>` +
+                   `<span style="font-size:12px;color:#6d4c41;">請確認是否為重複填報。</span>`;
+  if (_dupTimer) clearTimeout(_dupTimer);
+  pop.className = ''; pop.style.display = ''; void pop.offsetWidth;   /* reflow 重跑動畫 */
+  pop.classList.add('in');
+  _dupTimer = setTimeout(() => hideDupWarn(), 6500);
 }
 
 /* ══════════════════════════════════════════════════
