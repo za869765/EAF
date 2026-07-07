@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.7.5</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.7.6</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -531,7 +531,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.7.5</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.7.6</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -551,6 +551,7 @@ window.addEventListener('storage', (ev) => {
   <button class="tab-btn" onclick="switchTab('public',this)">💼 公務預算</button>
   <button class="tab-btn" onclick="switchTab('payable',this)">💰 應付費用</button>
   <button class="tab-btn" onclick="switchTab('custodial',this)">🏦 代收款</button>
+  <button class="tab-btn" onclick="switchTab('payacct',this)">📑 應付帳款</button>
   <button class="tab-btn" onclick="switchTab('surplus',this)">💰 累積賸餘</button>
   <button class="tab-btn" onclick="switchTab('recon',this)">📐 收支對帳</button>
   <button class="tab-btn" onclick="switchTab('history',this)">📜 歷史變更資料</button>
@@ -1088,6 +1089,36 @@ window.addEventListener('storage', (ev) => {
   </div>
   <div id="payable-sections"></div>
 </div><!-- /tab-payable -->
+
+<!-- ══════════════════════════════════════════
+     應付帳款 210202（v4.7.6）— 進貨／雜支賒購掛帳
+══════════════════════════════════════════ -->
+<div class="tab-pane" id="tab-payacct">
+  <div class="toolbar" style="gap:8px;">
+    <span style="font-size:13px;font-weight:600;color:#1e2a38;">210202 應付帳款明細</span>
+    <button class="btn btn-green" style="font-size:11px;" onclick="exportPayAcctCsv()">📥 匯出 CSV</button>
+  </div>
+  <div class="balance-banner">
+    <div class="bb-item">
+      <div class="bb-num" id="payacct-total">—</div>
+      <div class="bb-label">210202 應付帳款（剩餘未沖）</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" id="payacct-accrue">—</div>
+      <div class="bb-label">立帳（累計應付）</div>
+    </div>
+    <div class="bb-divider"></div>
+    <div class="bb-item">
+      <div class="bb-num" id="payacct-settle">—</div>
+      <div class="bb-label">已沖抵（已支付）</div>
+    </div>
+  </div>
+  <div style="font-size:11px;color:#78909c;padding:0 2px 10px;">
+    💡 進貨／雜支等賒購掛帳，本年度應付但尚未支付之款項｜<span id="payacct-cutoff-hint">截至 115年3月31日</span>
+  </div>
+  <div id="payacct-sections"></div>
+</div><!-- /tab-payacct -->
 
 <!-- ══════════════════════════════════════════
      TAB 8：應付代收款（210203）
@@ -1635,6 +1666,7 @@ async function switchTab(name, btn){
     allowance: ()=>{ renderAllowLedger(); renderAllowanceRateAndAR(); },
     payable:   ()=> renderPayable(),
     custodial: ()=> renderCustodial(),
+    payacct:   ()=> renderPayAcct(),
     surplus:   ()=> renderSurplusTab(),
     public:    ()=> renderPublicTab(),
     inventory: ()=>{ renderInvLedger('drug'); renderInvLedger('supply'); renderInvVoucherRecon(); },
@@ -1672,6 +1704,7 @@ function onYmChange(){
   renderAllowLedger();
   renderPayable();
   renderCustodial();
+  renderPayAcct();
   renderSurplusTab();
   renderImportedVouchers('收入');
   renderImportedVouchers('支出');
@@ -2988,6 +3021,7 @@ async function saveVouchers(){
   renderInvLedger('supply');
   renderPayable();
   renderCustodial();
+  renderPayAcct();
   renderSurplusTab();
   renderAllowLedger();
   updateHomeDashboard();
@@ -3365,7 +3399,7 @@ async function cleanupBlankEntries(){
     if(!resp.ok) throw new Error(j.error || ('HTTP '+resp.status));
     alert(`🧹 已刪除 ${j.deleted} 筆假空白分錄`);
     await AccV2.refresh();
-    renderPayable(); renderCustodial(); renderSurplusTab();
+    renderPayable(); renderCustodial(); renderPayAcct(); renderSurplusTab();
     renderImportedVouchers('收入'); renderImportedVouchers('支出'); renderImportedVouchers('轉帳');
     renderAllowLedger();
     renderAllowanceRateAndAR();
@@ -3460,6 +3494,16 @@ function exportPayableCsv(){
   });
   rows.push(['','','','','合計', data.total||0]);
   downloadCsv('應付費用_210205.csv', rows);
+}
+function exportPayAcctCsv(){
+  const data = loadPayAcct();
+  const rows = [['類別','年月','傳票序號','摘要','金額']];
+  (data.accrues||[]).forEach(e=>{ rows.push(['立帳', e.ym, e.ref||'', e.desc||'', e.amt]); });
+  (data.settles||[]).forEach(e=>{ rows.push(['已沖抵', e.ym, e.ref||'', e.desc||'', e.amt]); });
+  rows.push(['','','','立帳合計', data.accrueSum||0]);
+  rows.push(['','','','已沖合計', data.settleSum||0]);
+  rows.push(['','','','剩餘（未沖）', data.subtotal||0]);
+  downloadCsv('應付帳款_210202.csv', rows);
 }
 function exportCustodialCsv(){
   const data = loadCustodial();
@@ -5675,6 +5719,114 @@ function renderPayable(){
   }).join('');
 }
 
+/* ════════════════════════════════════════════
+   應付帳款 210202（v4.7.6）— 進貨／雜支賒購掛帳
+   純呈現，資料源：AccV2（210202 貸方＝立帳、借方＝沖帳）
+   比照 v4.7.5：立帳（累計應付，未沖）vs 已沖抵（已支付）兩區，年度隔離
+════════════════════════════════════════════ */
+function loadPayAcct(){
+  const {ym: filterYm} = (typeof getYm === 'function') ? getYm() : {ym:''};
+  let rows = AccV2.entries({ subjectPrefix:'210202' });
+  let _emptyYmCount = 0;
+  if(filterYm){
+    const filterY = String(filterYm).slice(0,3);   /* v4.7.2 年度隔離基準 */
+    rows = rows.filter(e => {
+      if (!e.ym) { _emptyYmCount++; return false; }
+      if (String(e.ym).slice(0,3) !== filterY) return false;  /* 僅本年度，避免他年度傳票跨年污染 */
+      return String(e.ym) <= filterYm;
+    });
+  }
+  /* 本年度是否有任何立帳（貸>借）— 供跨年沖帳略過判斷 */
+  const hasAccrue = rows.some(e => ((e.credit||0)-(e.debit||0)) > 0);
+  const accrues = [], settles = [];
+  let accrueSum = 0, settleSum = 0, _orphanCount = 0, _orphanSum = 0;
+  rows.forEach(e => {
+    const bal = (e.credit||0) - (e.debit||0);   /* 貸正=立帳（增加應付），借正=沖帳（付款） */
+    if(!bal) return;
+    /* 支出傳票沖帳 + 本年度無任何立帳 → 略過（多為去年立帳今年沖銷） */
+    if(bal < 0 && e.voucher_type === '支出' && !hasAccrue){
+      _orphanCount += 1; _orphanSum += -bal; return;
+    }
+    const dayMatch = String(e.make_date||'').match(/\/(\d{1,2})$/);
+    const rec = {
+      ym: e.ym,
+      day: dayMatch ? Number(dayMatch[1]) : '',
+      ref: `${e.voucher_no||''}#${e.seq||''}`,
+      desc: e.description || '',
+      voucher_type: e.voucher_type || '',
+      amt: bal,
+      make_date: e.make_date||'',
+    };
+    if(bal > 0){ accrues.push(rec); accrueSum += bal; }
+    else { settles.push(rec); settleSum += -bal; }
+  });
+  const subtotal = accrueSum - settleSum;
+  return { account:'210202', name:'應付帳款', accrues, settles, accrueSum, settleSum, subtotal, _orphanCount, _orphanSum, _emptyYmCount };
+}
+function renderPayAcct(){
+  const data = loadPayAcct();
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent = fmt(v); };
+  set('payacct-total', data.subtotal||0);
+  set('payacct-accrue', data.accrueSum||0);
+  set('payacct-settle', data.settleSum||0);
+  const hintEl = document.getElementById('payacct-cutoff-hint');
+  if(hintEl){
+    const {y,m} = (typeof getYm === 'function') ? getYm() : {y:'115',m:'3'};
+    const lastDay = new Date(Number(y)+1911, Number(m), 0).getDate();
+    hintEl.textContent = `截至 ${y} 年 ${m} 月 ${lastDay} 日`;
+  }
+  const sec = document.getElementById('payacct-sections');
+  if(!sec) return;
+  const _emptyYmHint = (data._emptyYmCount > 0)
+    ? `<div style="font-size:11px;padding:6px 12px;color:#8a6626;background:#fbf0d3;border:1px solid #e5d5ad;border-radius:6px;margin-bottom:8px;">⚠️ 已排除 ${data._emptyYmCount} 筆「無 ym」分錄（製票日格式無法解析）。</div>`
+    : '';
+  if(!data.accrues.length && !data.settles.length && !data._orphanCount){
+    sec.innerHTML = _emptyYmHint + `<div class="card"><div class="card-bd" style="text-align:center;padding:32px;color:#78909c;">
+      📭 此年度尚無 210202 應付帳款分錄 —— 請按頂列「📥 傳票匯入」上傳 FNWFRX0090 Excel。
+    </div></div>`;
+    return;
+  }
+  const _row = (e,i,isAcc) => {
+    const vtChip = e.voucher_type ? `<span class="acc-chip vt">${e.voucher_type}</span>` : '';
+    return `<tr style="${i%2?'background:var(--ivory,#faf9f5);':''}">
+        <td style="padding:5px 10px;color:var(--olive-gray,#5e5d59);white-space:nowrap;">${e.make_date||fmtPayDate(e.ym,e.day)}</td>
+        <td style="padding:5px 10px;color:var(--terracotta,#c96442);font-size:11px;white-space:nowrap;">${(e.ref||'').replace(/</g,'&lt;')}</td>
+        <td style="padding:5px 10px;color:var(--near-black,#333);font-size:11px;">${vtChip}${(e.desc||'').replace(/</g,'&lt;')}</td>
+        <td style="padding:5px 10px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;color:${isAcc?'#466934':'#8a2f2a'};font-weight:600;">${fmt(Math.abs(e.amt))}</td>
+    </tr>`;
+  };
+  const _section = (title, list, isAcc, sum) => `
+    <div style="background:${isAcc?'#eef4e8':'#f6ece9'};padding:6px 12px;font-size:12px;font-weight:700;color:${isAcc?'#3f5f30':'#8a2f2a'};border-top:1px solid var(--border-warm,#e8e6dc);">
+      ${title}<span style="float:right;font-variant-numeric:tabular-nums;">${fmt(sum)}（${list.length} 筆）</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;">
+      <colgroup><col style="width:82px;"><col style="width:120px;"><col><col style="width:120px;"></colgroup>
+      <tbody>${list.length ? [...list].sort((a,b)=>(b.make_date||'').localeCompare(a.make_date||'')).map((e,i)=>_row(e,i,isAcc)).join('') : `<tr><td colspan="4" style="padding:8px 10px;color:var(--ink-3,#c8ccd0);text-align:center;">（無）</td></tr>`}</tbody>
+    </table>`;
+  const negBalWarn = data.subtotal < 0
+    ? `<div style="font-size:11px;padding:6px 12px;color:#8a2f2a;background:#f4d9d5;border-bottom:1px solid #e3b7b0;">⚠️ 剩餘為負 = 沖帳已付出 > 立帳應付金額，可能是跨年結轉或立帳分錄尚未匯入。</div>`
+    : '';
+  const orphanNote = data._orphanCount > 0
+    ? `<div style="font-size:11px;padding:6px 12px;color:var(--stone-gray,#87867f);background:#fbf7ed;border-bottom:1px solid var(--border-warm,#e8e6dc);">🫥 已略過 ${data._orphanCount} 筆無立帳對應的支出傳票沖帳（共 ${fmt(data._orphanSum)} 元，多為去年立帳今年沖銷）。</div>`
+    : '';
+  sec.innerHTML = _emptyYmHint + `
+    <div class="card">
+      <div class="card-hd hd-teal">
+        📑 210202　應付帳款
+        <span style="margin-left:auto;font-size:12px;font-weight:500;">
+          剩餘（未沖）<b style="font-size:16px;">${fmt(data.subtotal)}</b>　＝　立帳 ${fmt(data.accrueSum)} − 已沖 ${fmt(data.settleSum)}
+        </span>
+      </div>
+      <div style="font-size:11px;padding:6px 12px;color:var(--olive-gray,#5e5d59);background:var(--border-cream,#f0eee6);border-bottom:1px solid var(--border-warm,#e8e6dc);">💡 進貨／雜支等賒購掛帳（借 110404 醫療用品 或 510601 成本／貸 210202）</div>
+      ${orphanNote}
+      ${negBalWarn}
+      <div class="card-bd" style="padding:0;">
+        ${_section('＋ 立帳明細（累計應付，未沖）', data.accrues, true, data.accrueSum)}
+        ${_section('− 已沖抵明細（已支付）', data.settles, false, data.settleSum)}
+      </div>
+    </div>`;
+}
+
 /* ════ 傳票明細匯入（v2 API：upsert by voucher_no+seq，重複不重計） ════ */
 async function onAccEntriesUpload(inp){
   const f = inp.files[0]; if(!f) return;
@@ -5805,7 +5957,7 @@ async function onAccEntriesUpload(inp){
     </div>`;
     alert(`✅ 匯入完成（${out.length} 筆）\n\n${lines.join('\n')}\n\n合計：新增 ${totalAdd}，更新 ${totalUpd}，略過 ${totalSkip}`);
     await AccV2.refresh();
-    renderPayable(); renderCustodial(); renderSurplusTab();
+    renderPayable(); renderCustodial(); renderPayAcct(); renderSurplusTab();
     renderImportedVouchers('收入'); renderImportedVouchers('支出'); renderImportedVouchers('轉帳');
     renderAllowLedger();
     renderAllowanceRateAndAR();
@@ -6050,7 +6202,7 @@ function applyExpenseWriteoff(){
     accSave('acc_yeardata_'+y, STATE.yearData);
   }
 
-  renderPayable(); renderCustodial(); renderSurplusTab(); updateHomeDashboard();
+  renderPayable(); renderCustodial(); renderPayAcct(); renderSurplusTab(); updateHomeDashboard();
 
   const box = document.getElementById('expense-preview');
   if(box) box.innerHTML = `<div style="background:#e8f5e9;border-radius:8px;padding:12px;color:#1b5e20;font-weight:700;">✅ 沖銷完成！已沖 ${active.length} 筆（略過 ${result.items.length-active.length} 筆）</div>`;
@@ -8192,6 +8344,8 @@ function logout(){
   updateHomeDashboard();
   // 應付代收款分頁
   renderCustodial();
+  // 應付帳款分頁（210202）
+  renderPayAcct();
   // 累積賸餘分頁
   renderSurplusTab();
   // 銀行存款分頁
