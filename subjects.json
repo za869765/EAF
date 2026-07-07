@@ -151,7 +151,7 @@
             { "code": "通訊費-數據通訊費", "name": "通訊費-數據通訊費", "useExpense": true, "usePurchase": false },
             { "code": "通訊費-一般通訊費", "name": "通訊費-一般通訊費", "useExpense": true, "usePurchase": false },
             { "code": "房屋建築修繕經費",  "name": "房屋建築修繕經費",  "useExpense": true, "usePurchase": false },
-            { "code": "兵勤車租金",       "name": "兵勤車租金",       "useExpense": true, "usePurchase": false },
+            { "code": "電動車電池租金",   "name": "電動車電池租金",   "useExpense": true, "usePurchase": false },
             { "code": "辦公器具養護費",   "name": "辦公器具養護費",   "useExpense": true, "usePurchase": false },
             { "code": "一般事務費",       "name": "一般事務費",       "useExpense": true, "usePurchase": false },
             { "code": "其他業務租金",     "name": "其他業務租金",     "useExpense": true, "usePurchase": false },
