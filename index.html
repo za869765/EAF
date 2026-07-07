@@ -1140,7 +1140,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.8.3</div>
+      <div id="sb-version">v4.8.4</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -2804,11 +2804,12 @@ function onAddPubSplitClick() {
   }
   addPubSplitRow('', def);
 }
-/* 拖曳拉桿：總額固定，被拖那列設為 v，其餘 (總額−v) 依原比例分配（互補） */
+/* 拖曳拉桿：在「動支說明總金額」內分配，被拖那列設為 v，其餘 (總額−v) 依原比例互補 */
 function onPubSlider(el) {
   const items = _pubItems();
   const amts = items.map(_pubAmtOf);
-  const total = amts.reduce((a, b) => a + b, 0);
+  const total = _pubDocTotal();
+  if (total <= 0) { el.value = 0; return; }   /* 尚未輸入動支說明金額 → 無可分配 */
   const idx = items.findIndex(it => it.querySelector('.pub-split-slider') === el);
   if (idx < 0) return;
   const v = Math.max(0, Math.min(Math.round(+el.value), total));
@@ -2834,19 +2835,29 @@ function readPubSplits() {
     amt: _pubAmtOf(el),
   })).filter(s => s.name || s.amt);
 }
-/* 拆分小計 → 更新本單金額 + 同步各拉桿範圍(=總額)與值（21020301 時總額以拆分為準） */
+/* 動支說明表格加總＝本單總金額（拆分要分配的目標） */
+function _pubDocTotal() {
+  let t = 0; for (let i = 0; i < rowCount; i++) t += Math.round(parseFloat(qv(i, 'price')) || 0);
+  return Math.max(0, t);
+}
+/* 拆分小計 + 差額把關 + 同步拉桿範圍(=總金額)。不覆寫本單金額（由動支說明加總決定） */
 function calcPubSplit() {
   const items = _pubItems();
   const amts = items.map(_pubAmtOf);
   const sum = amts.reduce((a, b) => a + b, 0);
-  const el = document.getElementById('pub-split-sum'); if (el) el.textContent = '小計 $' + fmtN(sum);
-  items.forEach((it, i) => { const sl = it.querySelector('.pub-split-slider'); if (sl) { sl.max = sum || 0; sl.value = amts[i]; } });
-  if (isPubBudgetExpense()) {
-    const t = Math.max(0, sum);
-    const ad = document.getElementById('amount-disp'); if (ad) ad.textContent = '$' + fmtN(t);
-    const gt = document.getElementById('grand-total');  if (gt) gt.textContent = '$' + fmtN(t);
-    const gz = document.getElementById('grand-total-zh'); if (gz) gz.textContent = toChineseAmount(t);
+  const docTotal = _pubDocTotal();
+  const el = document.getElementById('pub-split-sum');
+  if (el) {
+    if (docTotal === 0 && sum === 0) { el.textContent = '小計 $0'; }
+    else {
+      const diff = docTotal - sum;
+      el.innerHTML = `小計 $${fmtN(sum)}` +
+        (diff === 0 ? ` <span style="color:#2e7d32;">✓ 已分配完</span>`
+         : diff > 0 ? ` <span style="color:#c62828;">差額 $${fmtN(diff)} 待分配</span>`
+         : ` <span style="color:#c62828;">⚠ 超出 $${fmtN(-diff)}</span>`);
+    }
   }
+  items.forEach((it, i) => { const sl = it.querySelector('.pub-split-slider'); if (sl) { sl.max = docTotal || 0; sl.value = amts[i]; } });
 }
 
 function appendRow(i) {
@@ -3011,12 +3022,6 @@ function revertFoldNote() {
 }
 
 function calcTotal() {
-  if (isPubBudgetExpense()) {   /* v4.8.1 公務預算：總額＝用途別拆分小計 */
-    calcPubSplit();
-    const ps = document.getElementById('purchase-sig'); if (ps) ps.style.display = 'none';
-    const ew = document.getElementById('exempt-wrap');  if (ew) ew.style.display = 'none';
-    return;
-  }
   let total = 0;
   const isPurchase = formType === 'purchase';
   if (isPurchase) {
@@ -3046,6 +3051,8 @@ function calcTotal() {
   updateItemTypeRow();
   /* 宣導品單價判斷（promo 模式）需每次更新，不依賴 updateItemTypeRow 的早返 */
   updateCashierNote();
+  /* v4.8.4 公務預算：動支說明加總＝總金額；更新用途別拆分小計/差額/拉桿範圍 */
+  if (isPubBudgetExpense()) calcPubSplit();
 }
 
 /* ══════════════════════
@@ -3133,8 +3140,7 @@ function getFormData() {
   let _pName = (()=>{ const s=document.getElementById('sel-purpose'); const v=s.value; return v ? (s.options[s.selectedIndex]?.text||'') : ''; })();
   let _pDesc = document.getElementById('purpose-desc').value;
   if (pub) {
-    purposeSplits = readPubSplits();                          /* 工作計畫下方的用途別拆分 */
-    total = purposeSplits.reduce((a, s) => a + s.amt, 0);     /* 公務預算總額以拆分為準 */
+    purposeSplits = readPubSplits();                          /* 用途別分配（總額＝動支說明加總，不覆寫 total） */
     _pName = purposeSplits.length > 1 ? '多用途' : (purposeSplits[0]?.name || '');
     _pCode = _pName;
     if (!_pDesc.trim()) _pDesc = purposeSplits.map(s => `${s.name} ${fmtN(s.amt)}`).join('；');
