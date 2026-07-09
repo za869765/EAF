@@ -1147,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.9.2</div>
+      <div id="sb-version">v4.9.3</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1270,7 +1270,6 @@ body.sb-resizing * { pointer-events: none !important; }
             <div style="display:flex; align-items:center; gap:6px;">
               <label id="pub-split-label" style="font-weight:600;">用途別拆分：</label>
               <button type="button" onclick="onAddPubSplitClick()" style="font-size:11px; padding:1px 8px; cursor:pointer; border:1px solid #1976d2; border-radius:4px; background:#e3f2fd; color:#1565c0;">＋ 新增用途</button>
-              <button type="button" id="pub-auto-btn" onclick="autoAllocatePubSplit(true)" title="依下方動支說明各明細品名，自動歸類到用途別並帶入金額（之後可再手動調整）" style="font-size:11px; padding:1px 8px; cursor:pointer; border:1px solid #6a1b9a; border-radius:4px; background:#f3e5f5; color:#6a1b9a;">🎯 智能分配</button>
               <span id="pub-split-sum" style="margin-left:auto; font-size:11px; font-weight:600; color:#546e7a;">小計 $0</span>
             </div>
             <div id="pub-split-rows"></div>
