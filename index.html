@@ -1147,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.9.1</div>
+      <div id="sb-version">v4.9.2</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1268,7 +1268,7 @@ body.sb-resizing * { pointer-events: none !important; }
           <!-- v4.8.1 公務預算(21020301) 用途別多筆拆分（工作計畫下方；金額合計＝本單金額） -->
           <div class="bp-row" id="row-pub-split" style="display:none; flex-direction:column; align-items:stretch; gap:2px;">
             <div style="display:flex; align-items:center; gap:6px;">
-              <label style="font-weight:600;">用途別拆分：</label>
+              <label id="pub-split-label" style="font-weight:600;">用途別拆分：</label>
               <button type="button" onclick="onAddPubSplitClick()" style="font-size:11px; padding:1px 8px; cursor:pointer; border:1px solid #1976d2; border-radius:4px; background:#e3f2fd; color:#1565c0;">＋ 新增用途</button>
               <button type="button" id="pub-auto-btn" onclick="autoAllocatePubSplit(true)" title="依下方動支說明各明細品名，自動歸類到用途別並帶入金額（之後可再手動調整）" style="font-size:11px; padding:1px 8px; cursor:pointer; border:1px solid #6a1b9a; border-radius:4px; background:#f3e5f5; color:#6a1b9a;">🎯 智能分配</button>
               <span id="pub-split-sum" style="margin-left:auto; font-size:11px; font-weight:600; color:#546e7a;">小計 $0</span>
@@ -1276,7 +1276,7 @@ body.sb-resizing * { pointer-events: none !important; }
             <div id="pub-split-rows"></div>
           </div>
           <!-- v4.8.6 B1/B2 公務預算用途別拆分列印替身：螢幕隱藏、列印時顯示純文字一行（免印下拉/金額框/＋鈕/差額字，並免多列撐爆上半聯） -->
-          <div class="bp-row" id="row-pub-split-print" aria-hidden="true"><label style="font-weight:600;">用途別：</label><span id="pub-split-print-text" style="font-size:11.5px;"></span></div>
+          <div class="bp-row" id="row-pub-split-print" aria-hidden="true"><label id="pub-split-print-label" style="font-weight:600;">用途別：</label><span id="pub-split-print-text" style="font-size:11.5px;"></span></div>
           <div class="bp-row" id="row-personnel" style="display:none;">
             <label>人員類別：</label>
             <span id="personnel-lbl" style="font-size:11.5px; color:#555;">兼任人員</span>
@@ -2886,6 +2886,9 @@ function _pubDocTotal() {
 /* 拆分小計 + 差額把關 + 同步拉桿範圍(=總金額)。不覆寫本單金額（由動支說明加總決定） */
 function calcPubSplit() {
   const items = _pubItems();
+  /* v4.9.2 標籤：單一用途別＝「用途別」、兩個以上＝「用途別拆分」 */
+  const _lbl = document.getElementById('pub-split-label');
+  if (_lbl) _lbl.textContent = items.length > 1 ? '用途別拆分：' : '用途別：';
   const amts = items.map(_pubAmtOf);
   const sum = amts.reduce((a, b) => a + b, 0);
   const docTotal = _pubDocTotal();
@@ -6673,6 +6676,8 @@ window.addEventListener('beforeprint', () => {
   if (pspTxt) {
     const _sp = (typeof isPubBudgetExpense === 'function' && isPubBudgetExpense() && typeof readPubSplits === 'function') ? readPubSplits() : [];
     pspTxt.innerHTML = _sp.map(s => `<span style="white-space:nowrap; margin-right:4mm;">${esc(s.name)} ${fmtN(s.amt)} 元</span>`).join('');
+    const _pl = document.getElementById('pub-split-print-label');   /* v4.9.2 單一＝用途別、多筆＝用途別拆分 */
+    if (_pl) _pl.textContent = _sp.length > 1 ? '用途別拆分：' : '用途別：';
   }
   /* v4.4.38 採購品名 / 規格：依文字長度縮字以塞進 5 行 */
   document.querySelectorAll('#items-body textarea[data-c="name"], #items-body textarea[data-c="spec"]').forEach(ta => {
