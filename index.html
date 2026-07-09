@@ -1147,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.9.0</div>
+      <div id="sb-version">v4.9.1</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -3422,6 +3422,27 @@ function validatePayeeBeforeSave(data) {
   return true;
 }
 
+/* v4.9.1 公務預算(21020301)用途別拆分把關：拆分合計必須＝本單金額（動支說明加總），
+   未分配（少分）或超出（多分）一律擋存檔；作廢／非公務預算單放行。 */
+function validatePubSplitBeforeSave(data) {
+  if (data.voided) return true;                          /* 作廢單例外 */
+  if (!isPubBudgetExpense()) return true;                /* 僅公務預算(21020301)動支單 */
+  const docTotal = _pubDocTotal();                       /* 動支說明加總＝本單金額 */
+  if (docTotal <= 0) return true;                        /* 尚無金額可分配，交給其他把關 */
+  const splits = Array.isArray(data.purposeSplits) ? data.purposeSplits : [];
+  const sum = splits.reduce((a, s) => a + (Number(s.amt) || 0), 0);
+  const diff = docTotal - sum;
+  if (diff === 0) return true;                           /* 剛好分配完 → 放行 */
+  showAlert(
+    (diff > 0
+      ? `用途別拆分還有 <b>$${fmtN(diff)}</b> 未分配。`
+      : `用途別拆分超出本單金額 <b>$${fmtN(-diff)}</b>。`) +
+    `<br>拆分合計需等於本單金額 <b>$${fmtN(docTotal)}</b>（目前小計 $${fmtN(sum)}），請調整後再存檔。`,
+    '⚠️'
+  );
+  return false;
+}
+
 /* v4.2.23 / v4.4.93 人數不一致善意提醒（非強制）：僅動支單 + 員工 / 員工代墊
    計算動支說明中「完全符合 EMPLOYEE_LIST」的人名數，與受款人卡片數比對。*/
 async function _confirmItemPayeeCountMismatch(data) {
@@ -3447,6 +3468,11 @@ async function _confirmItemPayeeCountMismatch(data) {
 async function saveRecord() {
   const _preData = getFormData();
   if (!validatePayeeBeforeSave(_preData)) {
+    setSyncStatus('● 已連線', 'ok');
+    return;
+  }
+  /* v4.9.1 公務預算用途別拆分未分配/超出 → 擋存檔（拆分合計須＝本單金額） */
+  if (!validatePubSplitBeforeSave(_preData)) {
     setSyncStatus('● 已連線', 'ok');
     return;
   }
