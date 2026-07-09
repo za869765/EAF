@@ -1147,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.8.7</div>
+      <div id="sb-version">v4.8.8</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -6590,7 +6590,7 @@ window.addEventListener('beforeprint', () => {
   const pspTxt = document.getElementById('pub-split-print-text');
   if (pspTxt) {
     const _sp = (typeof isPubBudgetExpense === 'function' && isPubBudgetExpense() && typeof readPubSplits === 'function') ? readPubSplits() : [];
-    pspTxt.innerHTML = _sp.map(s => `<span style="white-space:nowrap; margin-right:4mm;">${esc(s.name)} ${fmtN(s.amt)}</span>`).join('');
+    pspTxt.innerHTML = _sp.map(s => `<span style="white-space:nowrap; margin-right:4mm;">${esc(s.name)} ${fmtN(s.amt)} 元</span>`).join('');
   }
   /* v4.4.38 採購品名 / 規格：依文字長度縮字以塞進 5 行 */
   document.querySelectorAll('#items-body textarea[data-c="name"], #items-body textarea[data-c="spec"]').forEach(ta => {
