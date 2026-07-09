@@ -133,6 +133,12 @@
       await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
       await new Promise(r => setTimeout(r, 120));
 
+      /* v4.8.6 B9：批次列印不會觸發 iframe 的原生列印，需手動 dispatch beforeprint 才會填入
+         列印替身 div（用途說明 #purpose-desc-print / 交貨地點 #delivery-place-print /
+         公務預算拆分 #pub-split-print-text），否則克隆出來是空白 */
+      try { iframe.contentWindow.dispatchEvent(new iframe.contentWindow.Event('beforeprint')); } catch (_e) {}
+      await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
       /* importNode form-page 到主文件 */
       const fp = iframe.contentDocument.getElementById('form-page');
       if (!fp) throw new Error('form-page 元素不存在');

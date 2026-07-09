@@ -397,7 +397,13 @@ body.sb-resizing * { pointer-events: none !important; }
 .it tfoot td { height: 7mm; }
 /* v4.8.2 公務預算用途別拆分：互補拉桿 */
 .pub-split-slider { accent-color: #1976d2; height: 16px; cursor: pointer; flex-shrink: 0; }
-@media print { .pub-split-slider, .pub-split-del { display: none !important; } }
+#row-pub-split-print { display: none; }   /* 螢幕隱藏，僅列印顯示 */
+@media print {
+  .pub-split-slider, .pub-split-del { display: none !important; }
+  /* v4.8.6 B1/B2：列印用純文字替身取代互動拆分列（免印下拉/金額框/＋鈕/差額字＋免撐爆上半聯） */
+  #row-pub-split { display: none !important; }
+  #row-pub-split-print { display: flex !important; align-items: baseline; }
+}
 
 
 /* Add / Remove row buttons */
@@ -931,6 +937,7 @@ body.sb-resizing * { pointer-events: none !important; }
   #row-lecturer, #row-acct-type, #row-income50-type, #row-item-type,
   #row-custody-09, #row-tax-doc,
   #row-budget-info, #exempt-wrap, #copy-no-btn, #copy-purpose-btn,
+  #copy-notes-btn, #dup-warn-popup, #copy-success-popup,
   .date-picker-btn { display: none !important; }
   /* 隱藏未選擇的佔位文字 */
   #main-acct-lbl[data-ph="1"] { visibility: hidden; }
@@ -1140,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.8.5</div>
+      <div id="sb-version">v4.8.6</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1267,6 +1274,8 @@ body.sb-resizing * { pointer-events: none !important; }
             </div>
             <div id="pub-split-rows"></div>
           </div>
+          <!-- v4.8.6 B1/B2 公務預算用途別拆分列印替身：螢幕隱藏、列印時顯示純文字一行（免印下拉/金額框/＋鈕/差額字，並免多列撐爆上半聯） -->
+          <div class="bp-row" id="row-pub-split-print" aria-hidden="true"><label style="font-weight:600;">用途別：</label><span id="pub-split-print-text" style="font-size:11.5px;"></span></div>
           <div class="bp-row" id="row-personnel" style="display:none;">
             <label>人員類別：</label>
             <span id="personnel-lbl" style="font-size:11.5px; color:#555;">兼任人員</span>
@@ -6559,17 +6568,23 @@ window.addEventListener('beforeprint', () => {
   if (pd && pdp) {
     pdp.textContent = pd.value || '';
     const len = (pd.value || '').length;
-    /* v4.4.43 階梯細化 + 新增 7px / 6.5px 級距，配合 max-height 32mm 處理超長文字 */
+    /* v4.8.6 B10：階梯重校準到實際 max-height 24mm（原按 32mm 校準，長文會被 overflow:hidden 裁掉）；長端再壓小 */
     let fz = 13.5, lh = 1.5;
-    if (len > 320)      { fz = 6.5;  lh = 1.10; }
-    else if (len > 250) { fz = 7;    lh = 1.15; }
-    else if (len > 200) { fz = 8;    lh = 1.20; }
-    else if (len > 140) { fz = 9;    lh = 1.25; }
-    else if (len > 90)  { fz = 10;   lh = 1.30; }
+    if (len > 300)      { fz = 6;    lh = 1.05; }
+    else if (len > 240) { fz = 6.5;  lh = 1.10; }
+    else if (len > 190) { fz = 7.5;  lh = 1.15; }
+    else if (len > 140) { fz = 8.5;  lh = 1.22; }
+    else if (len > 90)  { fz = 9.5;  lh = 1.28; }
     else if (len > 55)  { fz = 11;   lh = 1.35; }
     else if (len > 30)  { fz = 12;   lh = 1.40; }
     pdp.style.fontSize = fz + 'px';
     pdp.style.lineHeight = lh;
+  }
+  /* v4.8.6 B1/B2 公務預算用途別拆分 → 列印替身（純文字，避免印出下拉/金額框/＋鈕/差額字＋免撐爆版面） */
+  const pspTxt = document.getElementById('pub-split-print-text');
+  if (pspTxt) {
+    const _sp = (typeof isPubBudgetExpense === 'function' && isPubBudgetExpense() && typeof readPubSplits === 'function') ? readPubSplits() : [];
+    pspTxt.innerHTML = _sp.map(s => `<span style="white-space:nowrap; margin-right:4mm;">${esc(s.name)} ${fmtN(s.amt)}</span>`).join('');
   }
   /* v4.4.38 採購品名 / 規格：依文字長度縮字以塞進 5 行 */
   document.querySelectorAll('#items-body textarea[data-c="name"], #items-body textarea[data-c="spec"]').forEach(ta => {

@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.8.5</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.8.6</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -312,10 +312,21 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
 .pub-add-btn:hover { background:#bbdefb; }
 .pub-save-btn { padding:3px 12px; border:1px solid #2e7d32; border-radius:4px; background:#e8f5e9; color:#1b5e20; font-size:11px; cursor:pointer; font-family:inherit; }
 .pub-del-btn { background:#ffebee; border:1px solid #ef9a9a; border-radius:3px; cursor:pointer; font-size:10px; padding:1px 5px; color:#c62828; }
+.pub-print-title { display:none; }
 @media print {
-  #top-bar, #ym-bar, #ym-global-bar, #tab-nav, .toolbar, #tab-voucher, #tab-inventory, #tab-property, #tab-allowance { display:none !important; }
-  #tab-public { display:block !important; }
+  #top-bar, #ym-bar, #ym-global-bar, #tab-nav, .toolbar { display:none !important; }
+  /* v4.8.6 B4：只印目前作用中的分頁，不再從任何分頁（含收支對帳列印鈕）附印整份公務預算清單 */
+  .tab-pane { display:none !important; }
+  .tab-pane.active { display:block !important; }
   .pub-add-row, .pub-add-btn, .pub-save-btn, .pub-del-btn, .pub-foot button { display:none !important; }
+  /* v4.8.6 B5：深色表頭改成印得出來的深字淺底＋強制上色，避免預設不印背景時白紙白字 */
+  .pub-hd { background:#eceff1 !important; color:#000 !important; border-bottom:2px solid #000 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .pub-hd .pub-budget-info, .pub-hd .pub-budget-info span, .pub-hd .pub-budget-info span b { color:#000 !important; }
+  .pub-table th { background:#e8e8e8 !important; color:#000 !important; border-bottom:1px solid #000 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  /* v4.8.6 B7：收支對帳分頁列印隱藏操作按鈕（載入範例/清除/列印/存PDF） */
+  #tab-recon button { display:none !important; }
+  /* v4.8.6 B6：公務預算列印標題（螢幕隱藏、renderPublicTab 產生於可列印的 #pub-sections 內） */
+  .pub-print-title { display:block !important; }
 }
 /* ── 公務預算結束 ── */
 
@@ -531,7 +542,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.8.5</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.8.6</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -3796,6 +3807,8 @@ async function renderPublicTab(){
   const purposeAggRows = Object.entries(purposeAgg).sort((a,b)=>b[1]-a[1]);
 
   wrap.innerHTML = `
+    <!-- v4.8.6 B6：列印用標題（螢幕隱藏、列印顯示），確保紙本有年度抬頭 -->
+    <div class="pub-print-title" style="text-align:center; font-size:16px; font-weight:800; margin:0 0 8px; color:#000;">臺南市佳里區衛生所　${y} 年度 公務預算動支清單（21020301 應付代收款）</div>
     <!-- 摘要 Banner -->
     <div class="pub-section">
       <div class="pub-hd">
