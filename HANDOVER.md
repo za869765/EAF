@@ -1,3 +1,16 @@
+# 專案接力記錄 — 2026/07/07（ACC v4.8.7）
+
+> 換台電腦繼續：先 `git -C .../EAF pull`。暗號「**佳里ACC，接力**」。
+
+## v4.8.5–4.8.7 全面獵蟲修復（四輪對抗驗證 150+ agents）
+四輪：獵蟲8面向→列印6面向→general-purpose中立重鑑定30項→旅程6條。確認 32 真 bug、淘汰 4 死案（R1 loadPayAcct孤兒=結轉傳票設計／R3 select列印=.fsel已處理／R4 用途說明彙總=validateForm已擋／C6 財產picker=純死碼）。分三批修、每批 jsdom 驗證＋push：
+- **v4.8.5 帳務/稅務**：A1 開新單/換主科目清拆分殘留；A2/A5/NEW-1/NEW-2 dirty 追蹤重構（`_subjectSnapshot` 共用快照納入 acctType/income50Type/拆分簽章，公務預算單以拆分簽章取代 sel-purpose）；A3 應診費改用途別保留帳戶類別；A4 admin getIncomeType 認診所帳戶9A/法人帳戶92；A6 拆分下拉存名稱非'99'；A7 存檔前拆分差額把關；A8 lect-clinic 雙高亮；A9 showDupWarn esc()；A10 拉桿不溢出。
+- **v4.8.6 列印/紙本**：B1/B2 公務預算拆分列印替身 `#row-pub-split-print`（beforeprint 填純文字，@media print 隱藏互動列→解吃字＋285mm裁切）；B3/B8 彈窗/複製鈕列印隱藏；B4 acc 只印作用中分頁；B5 深色表頭深字淺底 print-color-adjust；B6 公務預算列印標題；B7 recon 隱藏按鈕；B9 batch-print dispatch beforeprint 填替身；B10 用途說明縮字階梯校準 24mm。
+- **v4.8.7 潛伏/既有**：C1 loadPubRecords 年度過濾；C2 exportPublicCsv purposeName+拆分欄；C3 admin subjects 來源標記+儲存攔截（防舊備份覆蓋 D1）；NEW-4 表尾全部合計；NEW-5 扣繳重存二次套用守門（偵測「代扣繳」列）；NEW-6 折讓 fold note 去重；NEW-7/C5 財產匯入提示；R2 銀行 116 fallback 僅 115。
+- ⚠️ 列印外觀（替身版面/白字/批次）仍待線上目視；帳務修復多屬鎖定單重存路徑，建議實測「載入既有單→改→存」。
+
+---
+
 # 專案接力記錄 — 2026/07/07（ACC v4.8.4）
 
 > 換台電腦繼續：先 `git -C .../EAF pull`。暗號「**佳里ACC，接力**」。
