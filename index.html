@@ -1147,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.8.8</div>
+      <div id="sb-version">v4.8.9</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1270,6 +1270,7 @@ body.sb-resizing * { pointer-events: none !important; }
             <div style="display:flex; align-items:center; gap:6px;">
               <label style="font-weight:600;">用途別拆分：</label>
               <button type="button" onclick="onAddPubSplitClick()" style="font-size:11px; padding:1px 8px; cursor:pointer; border:1px solid #1976d2; border-radius:4px; background:#e3f2fd; color:#1565c0;">＋ 新增用途</button>
+              <button type="button" id="pub-auto-btn" onclick="autoAllocatePubSplit(true)" title="依下方動支說明各明細品名，自動歸類到用途別並帶入金額（之後可再手動調整）" style="font-size:11px; padding:1px 8px; cursor:pointer; border:1px solid #6a1b9a; border-radius:4px; background:#f3e5f5; color:#6a1b9a;">🎯 智能分配</button>
               <span id="pub-split-sum" style="margin-left:auto; font-size:11px; font-weight:600; color:#546e7a;">小計 $0</span>
             </div>
             <div id="pub-split-rows"></div>
@@ -2799,7 +2800,11 @@ function syncPubBudgetMode() {
   if (rs) rs.style.display = pub ? 'flex' : 'none';
   if (pub) {
     if (rp) rp.style.display = 'none';
-    if (pubSplitBox() && pubSplitBox().children.length === 0) addPubSplitRow();
+    const box = pubSplitBox();
+    if (box && box.children.length === 0) {
+      if (_pubDocTotal() > 0) autoAllocatePubSplit(false);   /* v4.8.9 進入時已有動支說明→智能預設分配 */
+      if (box.children.length === 0) addPubSplitRow();        /* 仍空（無明細）→給一空列 */
+    }
     calcPubSplit();
   } else if (rs) {
     const b = pubSplitBox(); if (b) b.innerHTML = '';   /* 離開時清空拆分列 */
@@ -2897,6 +2902,57 @@ function calcPubSplit() {
   }
   items.forEach((it, i) => { const sl = it.querySelector('.pub-split-slider'); if (sl) { sl.max = docTotal || 0; sl.value = amts[i]; } });
   if (typeof _checkSubjectDirty === 'function') _checkSubjectDirty();   /* v4.8.5 A2/A5：鎖定單改拆分要能被偵測 */
+}
+/* v4.8.9 智能分配：依動支說明各明細品名關鍵字自動歸類到 21020301 用途別、同類加總帶入拆分列，之後可再手動/拉桿調整。
+   規則由上而下比對，先命中者勝；故較特定的關鍵字（電池、開通）需排在較廣的（機車、系統）之前。 */
+const PUB_AUTO_RULES = [
+  { kw: ['電池'],                                     purpose: '電動車電池租金' },
+  { kw: ['數據', '網路', '寬頻', '光世代'],            purpose: '通訊費-數據通訊費' },
+  { kw: ['電話', '電信', '通訊', '手機', '行動'],       purpose: '通訊費-一般通訊費' },
+  { kw: ['開通', '規費', '牌照', '稅', '驗車', '檢驗', '工本', '過戶', '登記費'], purpose: '稅捐及規費' },
+  { kw: ['電費'],                                     purpose: '電費' },
+  { kw: ['水費'],                                     purpose: '水費' },
+  { kw: ['油料', '汽油', '柴油', '加油', '機油'],       purpose: '油料' },
+  { kw: ['車輛', '機車', '汽車', '保養', '輪胎'],       purpose: '車輛養護費' },
+  { kw: ['房屋', '建築', '修繕', '泥作'],              purpose: '房屋建築修繕經費' },
+  { kw: ['廳舍', '公共意外', '火險'],                  purpose: '辦公廳舍保險' },
+  { kw: ['保險', '投保'],                             purpose: '保險費' },
+  { kw: ['差旅', '旅費', '出差', '交通費'],            purpose: '國內差旅費' },
+  { kw: ['訓練', '研習', '講習', '課程'],              purpose: '教育訓練費' },
+  { kw: ['會費', '公會', '協會', '學會'],              purpose: '國內組織會費' },
+  { kw: ['土地租'],                                   purpose: '土地租金' },
+  { kw: ['租金', '租賃', '租用'],                      purpose: '其他業務租金' },
+  { kw: ['軟體', '資訊', '系統', '電腦', '程式', '雲端', '主機', '網站'], purpose: '資訊操作維護費' },
+  { kw: ['設施', '機械', '設備', '冷氣', '空調', '發電機'], purpose: '設施及機械設備養護費' },
+  { kw: ['辦公器具', '器具', '傢俱', '家具'],           purpose: '辦公器具養護費' },
+  { kw: ['文具', '事務用品', '辦公用品', '紙張', '碳粉', '墨水'], purpose: '一般事務費' },
+];
+function _pubMatchPurpose(name, validNames) {
+  for (const r of PUB_AUTO_RULES) {
+    if (r.kw.some(k => name.includes(k)) && validNames.includes(r.purpose)) return r.purpose;
+  }
+  return validNames.includes('其他') ? '其他' : (validNames[0] || '');   /* 無命中 → 其他 */
+}
+function autoAllocatePubSplit(fromBtn) {
+  if (!isPubBudgetExpense()) return;
+  const validNames = _pub21Purposes().map(p => p.name);
+  if (!validNames.length) return;
+  const order = [], map = {};   /* order 保留出現順序、map 為用途別→加總金額 */
+  for (let i = 0; i < rowCount; i++) {
+    const nm = (qv(i, 'name') || '').trim();
+    const price = Math.round(parseFloat(qv(i, 'price')) || 0);
+    if (!nm || !price) continue;
+    const p = _pubMatchPurpose(nm, validNames);
+    if (!(p in map)) { map[p] = 0; order.push(p); }
+    map[p] += price;
+  }
+  if (!order.length) { if (fromBtn) alert('尚未填寫「動支說明」明細（品名＋金額），無法自動分配。'); return; }
+  if (fromBtn && readPubSplits().some(s => s.amt > 0)
+      && !confirm('將依動支說明各明細重新自動分配用途別，覆蓋目前的拆分內容？')) return;
+  const box = pubSplitBox(); if (!box) return;
+  box.innerHTML = '';
+  order.forEach(p => addPubSplitRow(p, map[p]));
+  calcPubSplit();
 }
 
 function appendRow(i) {
