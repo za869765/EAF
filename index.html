@@ -1147,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.9.3</div>
+      <div id="sb-version">v4.9.4</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -2832,43 +2832,36 @@ function addPubSplitRow(purpose, amt) {
   div.querySelector('.pub-split-del').onclick = () => { div.remove(); if (!box.children.length) addPubSplitRow(); calcPubSplit(); };
   calcPubSplit();
 }
-/* ＋新增用途：預設 1、從最大項借（總額不變）；全空時新增空列 */
-function onAddPubSplitClick() {
-  const items = _pubItems();
-  const amts = items.map(_pubAmtOf);
-  const total = amts.reduce((a, b) => a + b, 0);
-  let def = 0;
-  if (total > 0) {
-    let maxI = 0; amts.forEach((a, i) => { if (a > amts[maxI]) maxI = i; });
-    if (amts[maxI] >= 1) { _setPubAmt(items[maxI], amts[maxI] - 1); def = 1; }
+/* v4.9.4 鎖定/解鎖某拆分列（第一列＝自動結餘：唯讀、灰底、拉桿停用；其餘列可編輯） */
+function _pubLockRow(it, locked) {
+  const inp = it.querySelector('.pub-split-amt');
+  const sl  = it.querySelector('.pub-split-slider');
+  if (inp) {
+    inp.readOnly = locked;
+    inp.style.background = locked ? '#eceff1' : '';
+    inp.style.color = locked ? '#607d8b' : '';
+    inp.title = locked ? '第一個用途＝金額－其他用途，自動結餘、不用手動填' : '';
   }
-  addPubSplitRow('', def);
+  if (sl) { sl.disabled = locked; sl.style.opacity = locked ? '0.35' : ''; }
 }
-/* 拖曳拉桿：在「動支說明總金額」內分配，被拖那列設為 v，其餘 (總額−v) 依原比例互補 */
+/* v4.9.4 ＋新增用途：新列預設 $1、供使用者調整；第一列（自動結餘）即時補差 → 加總恆等金額 */
+function onAddPubSplitClick() {
+  const total = _pubDocTotal();
+  addPubSplitRow('', total > 0 ? Math.min(1, total) : 0);
+}
+/* v4.9.4 拖曳拉桿：只調整被拖的「非第一列」，夾在剩餘額度內；第一列（自動結餘）由 calcPubSplit 補差。
+   第一列拉桿已停用，拖它不動作。 */
 function onPubSlider(el) {
   const items = _pubItems();
-  const amts = items.map(_pubAmtOf);
   const total = _pubDocTotal();
   if (total <= 0) { el.value = 0; return; }   /* 尚未輸入動支說明金額 → 無可分配 */
   const idx = items.findIndex(it => it.querySelector('.pub-split-slider') === el);
-  if (idx < 0) return;
-  const v = Math.max(0, Math.min(Math.round(+el.value), total));
-  const others = items.map((_, i) => i).filter(i => i !== idx);
-  const otherSumOld = others.reduce((s, i) => s + amts[i], 0);
-  const remain = total - v;
-  /* v4.8.5 A10：每列分配夾在剩餘預算 left 內、末列吃剩，確保各列非負且合計精準=remain（杜絕小計>總額） */
-  let left = remain;
-  others.forEach((i, k) => {
-    let share;
-    if (k === others.length - 1) share = left;                        /* 末列吃剩 */
-    else if (otherSumOld > 0) share = Math.round(remain * amts[i] / otherSumOld);
-    else share = Math.round(remain / others.length);
-    share = Math.max(0, Math.min(share, left));
-    amts[i] = share; left -= share;
-  });
-  amts[idx] = v;
-  items.forEach((it, i) => _setPubAmt(it, amts[i]));
-  calcPubSplit();
+  if (idx <= 0) { calcPubSplit(); return; }   /* 第一列＝自動結餘，拖曳不動作 */
+  let otherNonFirst = 0;
+  items.forEach((it, i) => { if (i !== 0 && i !== idx) otherNonFirst += _pubAmtOf(it); });
+  const v = Math.max(0, Math.min(Math.round(+el.value), Math.max(0, total - otherNonFirst)));
+  _setPubAmt(items[idx], v);
+  calcPubSplit();   /* 第一列吸收剩餘 → 加總恆等金額 */
 }
 /* 讀取拆分列（過濾全空列） */
 function readPubSplits() {
@@ -2888,9 +2881,16 @@ function calcPubSplit() {
   /* v4.9.2 標籤：單一用途別＝「用途別」、兩個以上＝「用途別拆分」 */
   const _lbl = document.getElementById('pub-split-label');
   if (_lbl) _lbl.textContent = items.length > 1 ? '用途別拆分：' : '用途別：';
+  const docTotal = _pubDocTotal();
+  /* v4.9.4 第一列＝自動結餘：第一個用途 = 金額 − 其他用途加總（唯讀）；單一用途即 100%、加總恆等金額 */
+  if (items.length && docTotal > 0) {
+    let sumOthers = 0;
+    for (let i = 1; i < items.length; i++) sumOthers += _pubAmtOf(items[i]);
+    _setPubAmt(items[0], Math.max(0, docTotal - sumOthers));
+  }
+  items.forEach((it, i) => _pubLockRow(it, i === 0 && docTotal > 0));
   const amts = items.map(_pubAmtOf);
   const sum = amts.reduce((a, b) => a + b, 0);
-  const docTotal = _pubDocTotal();
   const el = document.getElementById('pub-split-sum');
   if (el) {
     if (docTotal === 0 && sum === 0) { el.textContent = '小計 $0'; }
