@@ -1147,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.9.5</div>
+      <div id="sb-version">v4.9.6</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -2225,18 +2225,20 @@ function onBpChange() {
   pSel.innerHTML = '';
   if (bp && bp.purposes.length > 0) {
     /* v4.4.93 依 purpose.useExpense / usePurchase 過濾；掩蔽（兩者皆 false）不出現 */
-    const validPurps = bp.purposes.filter(p => _purposeAllows(p, formType));
+    /* v4.9.6 排除「99 其他」不可選；用途別代碼＝名稱時只顯示一次（免出現「車輛養護費　車輛養護費」） */
+    const validPurps = bp.purposes.filter(p => _purposeAllows(p, formType) && !_isOtherPurpose(p));
+    const _purpText = p => p.code === p.name ? p.name : (p.code + '　' + p.name);
     if (validPurps.length === 0) {
       pRow.style.display = 'none';
     } else if (validPurps.length === 1) {
       /* 僅一個用途別 → 自動選取，不顯示佔位 */
-      validPurps.forEach(p => pSel.appendChild(new Option(p.code+'　'+p.name, p.code)));
+      validPurps.forEach(p => pSel.appendChild(new Option(_purpText(p), p.code)));
       pSel.value = validPurps[0].code;
       pRow.style.display = '';
       if (!_suppressAutoFill) setTimeout(() => onPurposeChange(), 0);
     } else {
       pSel.appendChild(new Option('── 選擇用途別 ──', ''));
-      validPurps.forEach(p => pSel.appendChild(new Option(p.code+'　'+p.name, p.code)));
+      validPurps.forEach(p => pSel.appendChild(new Option(_purpText(p), p.code)));
       pRow.style.display = '';
     }
   } else { pRow.style.display = 'none'; }
@@ -2778,10 +2780,12 @@ function priceTabToNextName() { /* deprecated v4.4.86 */ }
 function isPubBudgetExpense() {
   return formType === 'expense' && document.getElementById('sel-bp')?.value === '21020301';
 }
+/* v4.9.6 「99 其他」不再讓人於用途別下拉選取（既有資料照常顯示，不受影響） */
+function _isOtherPurpose(p) { return !!p && (String(p.code) === '99' || p.name === '其他'); }
 function _pub21Purposes() {
   for (const a of (CFG.mainAccounts || [])) {
     for (const b of (a.businessPlans || [])) {
-      if (b.code === '21020301') return (b.purposes || []).filter(p => _purposeAllows(p, 'expense'));
+      if (b.code === '21020301') return (b.purposes || []).filter(p => _purposeAllows(p, 'expense') && !_isOtherPurpose(p));
     }
   }
   return [];
