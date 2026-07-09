@@ -1147,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.8.6</div>
+      <div id="sb-version">v4.8.7</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -3047,10 +3047,12 @@ function applyFoldNoteOnSave() {
     }
   }
   if (!parts.length) return;
-  _prevNotesBeforeFold = notesEl.value;
-  _foldNoteApplied = true;
   const foldNote = parts.join('；');
   const cur = notesEl.value.trim();
+  /* v4.8.7 NEW-6：載入既有「已折讓」單重存時，notes 可能已含相同折讓行→不重複附加（避免其他說明事項灌重複淨額行） */
+  if (cur.includes(foldNote)) { _prevNotesBeforeFold = notesEl.value; _foldNoteApplied = true; return; }
+  _prevNotesBeforeFold = notesEl.value;
+  _foldNoteApplied = true;
   notesEl.value = cur ? cur + '\n' + foldNote : foldNote;
 }
 
@@ -4119,8 +4121,12 @@ async function confirmSave() {
   }
 
   /* 扣繳拆分攔截 */
+  /* v4.8.7 NEW-5：載入既有「已代扣繳」單子重存時，明細已含代扣繳列（淨額+代扣繳列），
+     不可再拆一次，否則第1列被當毛額二次扣、又插入重複代扣繳列→總額灌水、稅額翻倍。 */
+  let _alreadyDeducted = false;
+  for (let _i = 0; _i < rowCount; _i++) { if ((qv(_i, 'name') || '').startsWith('代扣繳')) { _alreadyDeducted = true; break; } }
   const total  = getCurrentTotal();
-  const result = calcDeductions(total);
+  const result = _alreadyDeducted ? null : calcDeductions(total);
   if (result) {
     /* 儲存還原狀態 */
     _prevNotes     = document.getElementById('notes').value;

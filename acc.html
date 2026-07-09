@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>醫療基金 會計帳務 — 佳里區衛生所 v4.8.6</title>
+<title>醫療基金 會計帳務 — 佳里區衛生所 v4.8.7</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="design.css">
@@ -542,7 +542,7 @@ window.addEventListener('storage', (ev) => {
 <div id="top-bar">
   <h1>📒 醫療基金 會計帳務 — 臺南市佳里區衛生所</h1>
   <span class="badge-fund">醫療基金專戶</span>
-  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.8.6</span>
+  <span id="ver-badge" style="font-size:10px; color:#78909c;">v4.8.7</span>
   <a class="tbtn tbtn-gray" href="/" target="_blank" style="background:#1b3a1e;color:#a5d6a7;">📝 回填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
   <button class="tbtn tbtn-blue" onclick="document.getElementById('acc-entries-upload').click()" style="background:#4a148c;border:none;cursor:pointer;">📥 傳票匯入</button>
@@ -3499,9 +3499,12 @@ function downloadCsv(filename, rows){
 function exportPublicCsv(){
   const {y} = getYm();
   const settled = getPubSettled(y);
-  const rows = [['年月','申請日期','動支單號','用途別','用途說明','金額','核銷']];
+  /* v4.8.7 C2：改用 purposeName（原讀不存在的 purposeCode→用途別欄永遠空白）＋新增用途別拆分欄 */
+  const rows = [['年月','申請日期','動支單號','用途別','用途別拆分','用途說明','金額','核銷']];
   (_pubRecords||[]).forEach(r=>{
-    rows.push([r.ym, r.date||'', r.voucherNo||'', r.purposeCode||'', r.purposeDesc||r.purposeName||'', r.amount||0, settled.has(String(r.id))?'已核銷':'待核銷']);
+    const splitStr = (r.purposeSplits && r.purposeSplits.length)
+      ? r.purposeSplits.map(s=>`${s.name} ${s.amt}`).join('；') : '';
+    rows.push([r.ym, r.date||'', r.voucherNo||'', r.purposeName||'', splitStr, r.purposeDesc||'', r.amount||0, settled.has(String(r.id))?'已核銷':'待核銷']);
   });
   downloadCsv(`公務預算_${y}年.csv`, rows);
 }
@@ -3722,7 +3725,8 @@ function updatePubTotals(){
   if(rv){ rv.style.color=over?'#ff5252':'#69f0ae'; rv.textContent=(over?'▲超額 ':'')+fmt(Math.abs(remain)); }
   if(pv) pv.textContent=`${pct}% 已使用（共 ${_pubRecords.length} 筆）`;
   if(bar){ bar.style.width=`${pct}%`; bar.style.background=over?'#e53935':'#1976d2'; }
-  if(tot) tot.textContent=fmt(spent);
+  /* v4.8.7 NEW-4：表尾合計＝全部動支（與各月小計一致），不隨核銷勾選變動 */
+  if(tot) tot.textContent=fmt(_pubRecords.reduce((s,r)=>s+(r.amount||0),0));
   if(foot){ foot.style.color=over?'#e53935':'#546e7a'; foot.textContent=`已核銷 ${fmt(spent)} ／ 年度預算 ${fmt(budget)} ／ 剩餘 ${over?'▲超額 ':''}${fmt(Math.abs(remain))}`; }
 }
 
@@ -3746,10 +3750,13 @@ async function loadPubRecords(y){
     const resp = await fetch('/api/records', { headers:{ 'Content-Type':'application/json' } });
     if(!resp.ok) throw new Error('API error');
     const all = await resp.json();
+    /* v4.8.7 C1：依年度過濾（原本 y 未使用→跨年度全部混算）。取申請年碼，缺則用動支單號年碼 */
+    const _yr = r => { const m = String(recYm(r) || ''); if (/^\d{3}/.test(m)) return m.slice(0, 3); const v = (r.voucherNo || '').match(/^(\d{3})-/); return v ? v[1] : ''; };
     return all.filter(r =>
       r.bpCode === '21020301' &&
       !r.archived &&
-      !r.voided
+      !r.voided &&
+      _yr(r) === String(y)
     ).map(r => ({
       id:          r.id,
       ym:          recYm(r) || '?',
@@ -3788,6 +3795,7 @@ async function renderPublicTab(){
   const settled = getPubSettled(y);   // 本頁自己維護，與 locked/傳票無關
   const budget  = getPubBudget(y);
   const spent   = records.filter(r=>settled.has(String(r.id))).reduce((s,r)=>s+(r.amount||0),0);
+  const fullTotal = records.reduce((s,r)=>s+(r.amount||0),0);   // v4.8.7 NEW-4：全部動支合計（＝各月小計加總）
   const remain  = budget - spent;
   const pct     = budget>0 ? Math.min(100,Math.round(spent/budget*100)) : 0;
   const over    = remain < 0;
@@ -3903,8 +3911,8 @@ async function renderPublicTab(){
         </tbody>
         <tfoot>
           <tr style="background:#e3f2fd; font-weight:700;">
-            <td colspan="5" style="text-align:right; padding:7px 10px;">年度合計</td>
-            <td id="pub-tfoot-total" style="text-align:right; color:#1565c0; padding:7px 10px;">${fmt(spent)}</td>
+            <td colspan="5" style="text-align:right; padding:7px 10px;">全部動支合計<span style="font-weight:400;font-size:11px;color:#78909c;">（已核銷 ${fmt(spent)}）</span></td>
+            <td id="pub-tfoot-total" style="text-align:right; color:#1565c0; padding:7px 10px;">${fmt(fullTotal)}</td>
             <td></td>
           </tr>
         </tfoot>
@@ -6663,7 +6671,9 @@ function getBankOpeningBalance(y, acct){
   if(openRows.length){
     return openRows.reduce((s,e) => s + (e.debit||0) - (e.credit||0), 0);
   }
-  return +(localStorage.getItem(acct.initKey) || 0);
+  /* v4.8.7 R2：localStorage 期初值是 115 年初基準；僅 115 年可後備，其他年度無結轉傳票時回 0，
+     避免選到 116（D1 尚無 116300001）誤用 115 期初值 */
+  return String(y) === '115' ? +(localStorage.getItem(acct.initKey) || 0) : 0;
 }
 function renderBankDeposit(){
   const {y, m, ym, label} = getYm();
@@ -7956,6 +7966,11 @@ async function onPropReportUpload(inp){
   parsed.forEach(p=>{
     html += `${p.ym}：本期結存 <b>${fmt(p.bal)}</b>（上期結轉 ${fmt(p.carry)}、本期折舊 ${fmt(p.depr)}${p.add?`、增加 ${fmt(p.add)}`:''}${p.sub?`、減少 ${fmt(p.sub)}`:''}）<br>`;
   });
+  /* v4.8.7 NEW-7：官方報表有本期增加/減少（資產購置或報廢）時，存摺「原始成本」欄為固定值→含增減月份的累折欄僅供參考 */
+  if(parsed.some(p => (p.add||0) !== 0 || (p.sub||0) !== 0))
+    html += `<span style="color:#e65100;">⚠️ 偵測到「本期增加/減少」（資產購置或報廢）：帳面淨值已採官方結存（正確），但折舊存摺「原始成本」欄為固定值，含增減月份的「累計折舊」欄僅供參考、非精算。</span><br>`;
+  /* v4.8.7 C5：官方本期折舊成為權威，提示會影響月底結算折舊/傳票金額（by-design） */
+  html += `<span style="color:#78909c;font-size:11px;">※ 官方「本期折舊」已成為權威值，該月「月底結算」折舊欄與產製折舊傳票將以此為準。</span><br>`;
   if(warnings.length) html += `<span style="color:#c0392b;">⚠️ ${warnings.join('；')}</span><br>`;
   html += `</div></div>`;
   if(box) box.innerHTML = html;

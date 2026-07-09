@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v4.8.6</title>
+<title>管理者入口 — 動支單系統 v4.8.7</title>
 <link rel="stylesheet" href="design.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -401,7 +401,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.8.6</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.8.7</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -418,7 +418,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.8.6</span>
+    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.8.7</span>
     <button id="maint-btn" onclick="toggleMaintenance()" style="padding:4px 14px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;"></button>
     <a class="link-btn" href="/acc.html" style="background:#1b5e20;">📒 會計帳務</a>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
@@ -1303,27 +1303,33 @@ function importPayeesJson(ev) {
 /* ════════════════════
    SUBJECTS
    ════════════════════ */
+let _subjectsSource = '';   /* v4.8.7 C3：'d1' | 'static' | 'empty'，供 saveSubjects 判斷是否會用舊備份覆蓋 D1 */
 async function loadSubjects() {
   setMsg('subj-msg', '⟳ 載入中…', false);
   try {
-    /* 嘗試從 Gist API 取得最新版；若無則回退靜態檔 */
-    let data = null;
+    /* 嘗試從 D1 取得最新版；若無則回退靜態檔（並記錄來源） */
+    let data = null, src = 'empty';
     const r1 = await fetch('/api/subjects');
     if (r1.ok) {
       data = await r1.json();
-      if (!data || !data.mainAccounts) data = null;
+      if (!data || !data.mainAccounts) data = null; else src = 'd1';
     }
     if (!data) {
       const r2 = await fetch('/subjects.json');
-      if (r2.ok) data = await r2.json();
+      if (r2.ok) { data = await r2.json(); src = 'static'; }
     }
+    _subjectsSource = src;
     subjects = data || { settings:{ orgName:'臺南市佳里區衛生所', exemptThreshold:10000 }, mainAccounts:[] };
     _normalizeSubjects(subjects); /* v4.4.97 補齊缺旗標的 useExpense/usePurchase */
     renderTree();
     fillSettings();
-    setMsg('subj-msg', '✓ 載入完成', false);
+    /* v4.8.7 C3：明確標示來源，fallback 時強烈警告勿儲存（避免用舊備份覆蓋 D1 較新設定） */
+    if (src === 'd1')          setMsg('subj-msg', '✓ 載入完成（線上 D1）', false);
+    else if (src === 'static') setMsg('subj-msg', '⚠ D1 讀取失敗，顯示的是靜態備份；此時請「勿」儲存，否則會用舊備份覆蓋線上設定。請重新整理再試', true);
+    else                       setMsg('subj-msg', '❌ 載入失敗（無資料）', true);
     checkMissingSubjects(); /* v4.4.29 */
   } catch (e) {
+    _subjectsSource = '';
     setMsg('subj-msg', '❌ 載入失敗', true);
   }
 }
@@ -1431,6 +1437,13 @@ function updateSubjLockUI() {
 
 async function saveSubjects() {
   if (!subjects) return;
+  /* v4.8.7 C3：若目前不是從 D1 載入（靜態備份/載入失敗），儲存會用舊內容覆蓋線上設定→先攔截確認 */
+  if (_subjectsSource !== 'd1') {
+    if (!confirm('⚠ 目前科目設定不是從線上 D1 讀取（可能是靜態備份或先前載入失敗）。\n現在儲存會用「畫面上的內容」整包覆蓋線上 D1，可能吃掉線上較新的科目/預算設定（例如公務預算業務費用途別）。\n\n建議先重新整理、確認從 D1 載入後再改。仍要強制儲存？')) {
+      setMsg('subj-msg', '已取消儲存（請重新整理確認從 D1 載入後再改）', true);
+      return;
+    }
+  }
   setMsg('subj-msg', '⟳ 儲存中…', false);
   try {
     const r = await fetch('/api/subjects', {
@@ -1439,7 +1452,7 @@ async function saveSubjects() {
       body: JSON.stringify(subjects),
     });
     const res = await r.json();
-    if (res.ok) setMsg('subj-msg', '✓ 已儲存', false);
+    if (res.ok) { _subjectsSource = 'd1'; setMsg('subj-msg', '✓ 已儲存', false); }
     else        setMsg('subj-msg', '❌ 儲存失敗', true);
   } catch (_) {
     setMsg('subj-msg', '❌ 連線失敗', true);
