@@ -402,7 +402,7 @@ body.sb-resizing * { pointer-events: none !important; }
   .pub-split-slider, .pub-split-del { display: none !important; }
   /* v4.8.6 B1/B2：列印用純文字替身取代互動拆分列（免印下拉/金額框/＋鈕/差額字＋免撐爆上半聯） */
   #row-pub-split { display: none !important; }
-  #row-pub-split-print { display: flex !important; align-items: baseline; }
+  #row-pub-split-print.pub-on { display: flex !important; align-items: baseline; }
 }
 
 
@@ -1147,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.9.6</div>
+      <div id="sb-version">v4.9.7</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -6677,7 +6677,11 @@ window.addEventListener('beforeprint', () => {
   /* v4.8.6 B1/B2 公務預算用途別拆分 → 列印替身（純文字，避免印出下拉/金額框/＋鈕/差額字＋免撐爆版面） */
   const pspTxt = document.getElementById('pub-split-print-text');
   if (pspTxt) {
-    const _sp = (typeof isPubBudgetExpense === 'function' && isPubBudgetExpense() && typeof readPubSplits === 'function') ? readPubSplits() : [];
+    const _isPub = (typeof isPubBudgetExpense === 'function' && isPubBudgetExpense());
+    const _sp = (_isPub && typeof readPubSplits === 'function') ? readPubSplits() : [];
+    /* v4.9.7 列印替身僅公務預算(21020301)才印；非公務預算移除 pub-on → 不再出現第二個空白「用途別：」 */
+    const _pspRow = document.getElementById('row-pub-split-print');
+    if (_pspRow) _pspRow.classList.toggle('pub-on', _isPub);
     pspTxt.innerHTML = _sp.map(s => `<span style="white-space:nowrap; margin-right:4mm;">${esc(s.name)} ${fmtN(s.amt)} 元</span>`).join('');
     const _pl = document.getElementById('pub-split-print-label');   /* v4.9.2 單一＝用途別、多筆＝用途別拆分 */
     if (_pl) _pl.textContent = _sp.length > 1 ? '用途別拆分：' : '用途別：';
