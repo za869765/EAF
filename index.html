@@ -1147,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.9.7</div>
+      <div id="sb-version">v4.9.8</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -3436,6 +3436,13 @@ function validatePubSplitBeforeSave(data) {
   const docTotal = _pubDocTotal();                       /* 動支說明加總＝本單金額 */
   if (docTotal <= 0) return true;                        /* 尚無金額可分配，交給其他把關 */
   const splits = Array.isArray(data.purposeSplits) ? data.purposeSplits : [];
+  /* v4.9.8 有金額卻沒選「用途別」的拆分列要擋下（放加總檢查前，才擋得到 sum 剛好相等的情況），
+     否則存檔後列印會印出「用途別： 金額」缺名稱 */
+  const _nameless = splits.filter(s => (Number(s.amt) || 0) > 0 && !String(s.name || '').trim());
+  if (_nameless.length) {
+    showAlert(`有 <b>${_nameless.length}</b> 列用途別拆分只有金額、沒有選「用途別」，<br>請先為每一列選擇用途別後再存檔。`, '⚠️');
+    return false;
+  }
   const sum = splits.reduce((a, s) => a + (Number(s.amt) || 0), 0);
   const diff = docTotal - sum;
   if (diff === 0) return true;                           /* 剛好分配完 → 放行 */
