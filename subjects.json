@@ -23,6 +23,7 @@
             { "code": "2301", "name": "國內旅費",                  "useExpense": true,  "usePurchase": false },
             { "code": "2305", "name": "貨物運費",                  "useExpense": true,  "usePurchase": true  },
             { "code": "2401", "name": "印刷及裝訂費",              "useExpense": false, "usePurchase": true  },
+            { "code": "2502", "name": "一般房屋修護費",            "useExpense": false, "usePurchase": true  },
             { "code": "2505", "name": "機械及設備修護費",          "useExpense": true,  "usePurchase": true  },
             { "code": "2507", "name": "什項設備修護費",            "useExpense": true,  "usePurchase": true  },
             { "code": "2607", "name": "責任保險費",                "useExpense": true,  "usePurchase": true  },
