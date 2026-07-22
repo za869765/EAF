@@ -1147,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v5.0.1</div>
+      <div id="sb-version">v5.0.2</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -7051,10 +7051,13 @@ window.addEventListener('afterprint', () => {
   </div>
 </div>
 <script>
-/* ══════ v4.9.10 新版本偵測：線上已推新版 → 動畫彈窗 + 倒數強制重整（三檔共用同段） ══════
-   每 2 分鐘（前景時）fetch index 的 sb-version 與本頁版本比對；不同即彈窗。
-   「稍後」延 5 分鐘：index 填單中 / acc dirty 時直接 reload 會丟資料，需給存檔出路。 */
+/* ══════ v4.9.10 新版本偵測 + v5.0.2 管理者解鎖強制重整（index 專用擴充版；acc/admin 僅版本偵測段） ══════
+   版本：每 2 分鐘（前景時）fetch index 的 sb-version 與本頁版本比對；不同即彈窗倒數強制重整。
+   解鎖訊號：每 60 秒 fetch /api/reload-signal，訊號時間 > 頁面載入時間 → 同款彈窗
+   （admin 解鎖/還原單據後發訊號，避免有人停在過期的編輯畫面操作）。
+   「稍後」延 5 分鐘：填單中直接 reload 會丟未存檔資料，需給存檔出路。 */
 (function(){
+  const _loadTs = Date.now();
   let _shown = false;
   function _selfVer(){
     const el = document.getElementById('sb-version') || document.getElementById('ver-badge');
@@ -7067,10 +7070,19 @@ window.addEventListener('afterprint', () => {
       if (!r.ok) return;
       const m = (await r.text()).match(/sb-version">\s*(v[\d.]+)/);
       const cur = _selfVer();
-      if (m && cur && m[1] !== cur) _show(m[1], cur);
+      if (m && cur && m[1] !== cur) _show({ icon:'🚀', title:'系統已更新', desc:'偵測到新版本 <b>' + m[1] + '</b>（目前為 ' + cur + '）' });
     } catch(_){}
   }
-  function _show(nv, cur){
+  async function _checkSignal(){
+    if (_shown || document.hidden) return;
+    try {
+      const r = await fetch('/api/reload-signal?_=' + Date.now(), { cache:'no-store' });
+      if (!r.ok) return;
+      const j = await r.json();
+      if (j && j.ts && j.ts > _loadTs) _show({ icon:'🔓', title:'資料已更新', desc:'管理者已解鎖／更新單據<br>此頁面的資料已過期' });
+    } catch(_){}
+  }
+  function _show(o){
     if (document.getElementById('vchk-overlay')) return;
     _shown = true;
     const st = document.createElement('style');
@@ -7095,10 +7107,10 @@ window.addEventListener('afterprint', () => {
     const d = document.createElement('div');
     d.id = 'vchk-overlay';
     d.innerHTML = '<div id="vchk-card">' +
-      '<div class="vchk-icon">🚀</div>' +
-      '<h2>系統已更新</h2>' +
-      '<div class="vchk-vers">偵測到新版本 <b>' + nv + '</b>（目前為 ' + cur + '）</div>' +
-      '<div class="vchk-sub"><span id="vchk-count">60</span> 秒後自動重新整理載入新版</div>' +
+      '<div class="vchk-icon">' + o.icon + '</div>' +
+      '<h2>' + o.title + '</h2>' +
+      '<div class="vchk-vers">' + o.desc + '</div>' +
+      '<div class="vchk-sub"><span id="vchk-count">60</span> 秒後自動重新整理</div>' +
       '<button id="vchk-reload">⟳ 立即重新整理</button>' +
       '<button id="vchk-later">稍後 5 分鐘提醒（我要先儲存資料）</button>' +
       '</div>';
@@ -7113,12 +7125,14 @@ window.addEventListener('afterprint', () => {
     document.getElementById('vchk-reload').onclick = function(){ clearInterval(t); location.reload(); };
     document.getElementById('vchk-later').onclick = function(){
       clearInterval(t); d.remove(); st.remove();
-      setTimeout(function(){ _shown = false; _check(); }, 300000);
+      setTimeout(function(){ _shown = false; _check(); _checkSignal(); }, 300000);
     };
   }
   setInterval(_check, 120000);
-  document.addEventListener('visibilitychange', function(){ if (!document.hidden) setTimeout(_check, 800); });
+  setInterval(_checkSignal, 60000);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden){ setTimeout(_check, 800); setTimeout(_checkSignal, 400); } });
   setTimeout(_check, 20000);
+  setTimeout(_checkSignal, 8000);
 })();
 </script>
 </body>

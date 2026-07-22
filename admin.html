@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v5.0.1</title>
+<title>管理者入口 — 動支單系統 v5.0.2</title>
 <link rel="stylesheet" href="design.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -401,7 +401,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v5.0.1</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v5.0.2</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -418,7 +418,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span id="ver-badge" style="font-size:11px; color:#78909c; letter-spacing:.5px;">v5.0.1</span>
+    <span id="ver-badge" style="font-size:11px; color:#78909c; letter-spacing:.5px;">v5.0.2</span>
     <button id="maint-btn" onclick="toggleMaintenance()" style="padding:4px 14px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;"></button>
     <a class="link-btn" href="/acc.html" style="background:#1b5e20;">📒 會計帳務</a>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
@@ -1905,6 +1905,13 @@ function downloadCSV(records, filename) {
 /* ════════════════════
    LOCK / UNLOCK / RESTORE
    ════════════════════ */
+/* v5.0.2 解鎖/還原後發「強制重整」訊號：index 填單頁輪詢到即彈窗重整（避免停在過期編輯畫面）。失敗靜默不擋流程。 */
+function _sendReloadSignal() {
+  try {
+    fetch('/api/reload-signal', { method: 'POST', headers: { 'X-Admin-Pass': PASS } })
+      .catch(() => {});
+  } catch (_) {}
+}
 async function toggleLock(id, lock, vNo) {
   const label = lock ? '鎖定' : '解鎖';
   const ok = await showAdminConfirm(`確定要<strong>${label}</strong> ${vNo ? '<strong>'+esc(vNo)+'</strong>' : '此筆紀錄'}？${!lock ? '<br>解鎖後使用者可在填單頁面修改。' : ''}`);
@@ -1917,7 +1924,7 @@ async function toggleLock(id, lock, vNo) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
     });
-    if ((await r.json()).ok) { setMsg('rec-msg', `✓ 已${label}`, false); loadRecords(); }
+    if ((await r.json()).ok) { setMsg('rec-msg', `✓ 已${label}`, false); if (!lock) _sendReloadSignal(); loadRecords(); }
     else setMsg('rec-msg', `❌ ${label}失敗`, true);
   } catch (_) { setMsg('rec-msg', '❌ 連線失敗', true); }
 }
@@ -1939,6 +1946,7 @@ async function bulkLock(lock) {
       })
     ));
     setMsg('rec-msg', `✓ 已${label} ${checked.length} 筆`, false);
+    if (!lock) _sendReloadSignal();
     loadRecords();
   } catch (_) { setMsg('rec-msg', '❌ 操作失敗', true); }
 }
@@ -1953,7 +1961,7 @@ async function restoreVoid(id, vNo) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ voided: false, locked: false, printed: false }),
     });
-    if ((await r.json()).ok) { setMsg('rec-msg', '✓ 已還原', false); loadRecords(); }
+    if ((await r.json()).ok) { setMsg('rec-msg', '✓ 已還原', false); _sendReloadSignal(); loadRecords(); }
     else setMsg('rec-msg', '❌ 還原失敗', true);
   } catch (_) { setMsg('rec-msg', '❌ 連線失敗', true); }
 }
@@ -1976,6 +1984,7 @@ async function bulkRestore() {
       body: JSON.stringify({ voided: false, locked: false, printed: false }),
     })));
     setMsg('rec-msg', `✓ 已還原 ${checked.length} 筆`, false);
+    _sendReloadSignal();
     loadRecords();
   } catch (_) { setMsg('rec-msg', '❌ 操作失敗', true); }
 }
