@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v4.9.9</title>
+<title>管理者入口 — 動支單系統 v4.9.10</title>
 <link rel="stylesheet" href="design.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -401,7 +401,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.9.9</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v4.9.10</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -418,7 +418,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.9.9</span>
+    <span id="ver-badge" style="font-size:11px; color:#78909c; letter-spacing:.5px;">v4.9.10</span>
     <button id="maint-btn" onclick="toggleMaintenance()" style="padding:4px 14px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;"></button>
     <a class="link-btn" href="/acc.html" style="background:#1b5e20;">📒 會計帳務</a>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
@@ -3825,6 +3825,77 @@ function resolveAdminPrompt(ok) {
       sessionStorage.removeItem('adminPass'); // 密碼已失效
     }
   } catch(_){}
+})();
+</script>
+<script>
+/* ══════ v4.9.10 新版本偵測：線上已推新版 → 動畫彈窗 + 倒數強制重整（三檔共用同段） ══════
+   每 2 分鐘（前景時）fetch index 的 sb-version 與本頁版本比對；不同即彈窗。
+   「稍後」延 5 分鐘：index 填單中 / acc dirty 時直接 reload 會丟資料，需給存檔出路。 */
+(function(){
+  let _shown = false;
+  function _selfVer(){
+    const el = document.getElementById('sb-version') || document.getElementById('ver-badge');
+    return el ? ((el.textContent || '').match(/v[\d.]+/) || [''])[0] : '';
+  }
+  async function _check(){
+    if (_shown || document.hidden) return;
+    try {
+      const r = await fetch('/?vchk=' + Date.now(), { cache:'no-store' });
+      if (!r.ok) return;
+      const m = (await r.text()).match(/sb-version">\s*(v[\d.]+)/);
+      const cur = _selfVer();
+      if (m && cur && m[1] !== cur) _show(m[1], cur);
+    } catch(_){}
+  }
+  function _show(nv, cur){
+    if (document.getElementById('vchk-overlay')) return;
+    _shown = true;
+    const st = document.createElement('style');
+    st.textContent = [
+      '@keyframes vchkFade { from{opacity:0} to{opacity:1} }',
+      '@keyframes vchkPop  { 0%{transform:scale(.6); opacity:0} 60%{transform:scale(1.06)} 100%{transform:scale(1); opacity:1} }',
+      '@keyframes vchkFloat{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }',
+      '@keyframes vchkTick { 0%{transform:scale(1.5); color:#ffab40} 100%{transform:scale(1); color:#e65100} }',
+      '#vchk-overlay{ position:fixed; inset:0; background:rgba(15,25,40,.72); backdrop-filter:blur(3px); z-index:99999; display:flex; align-items:center; justify-content:center; animation:vchkFade .25s ease-out; }',
+      '#vchk-card{ background:#fff; border-radius:14px; padding:34px 40px 28px; width:400px; max-width:90vw; text-align:center; box-shadow:0 18px 60px rgba(0,0,0,.45); animation:vchkPop .45s cubic-bezier(.34,1.56,.64,1); font-family:inherit; }',
+      '#vchk-card .vchk-icon{ font-size:52px; line-height:1; animation:vchkFloat 2.2s ease-in-out infinite; }',
+      '#vchk-card h2{ margin:14px 0 6px; font-size:21px; color:#1e2a38; }',
+      '#vchk-card .vchk-vers{ font-size:14px; color:#546e7a; margin-bottom:14px; }',
+      '#vchk-card .vchk-vers b{ color:#1565c0; }',
+      '#vchk-count{ display:inline-block; min-width:34px; font-size:26px; font-weight:bold; color:#e65100; animation:vchkTick 1s ease-out; }',
+      '#vchk-card .vchk-sub{ font-size:13px; color:#78909c; margin-bottom:18px; }',
+      '#vchk-reload{ width:100%; padding:13px; font-size:16px; font-weight:bold; letter-spacing:1px; color:#fff; background:#1565c0; border:none; border-radius:8px; cursor:pointer; font-family:inherit; }',
+      '#vchk-reload:hover{ background:#0d47a1; }',
+      '#vchk-later{ margin-top:10px; background:none; border:none; color:#90a4ae; font-size:12px; cursor:pointer; text-decoration:underline; font-family:inherit; }'
+    ].join('\n');
+    document.head.appendChild(st);
+    const d = document.createElement('div');
+    d.id = 'vchk-overlay';
+    d.innerHTML = '<div id="vchk-card">' +
+      '<div class="vchk-icon">🚀</div>' +
+      '<h2>系統已更新</h2>' +
+      '<div class="vchk-vers">偵測到新版本 <b>' + nv + '</b>（目前為 ' + cur + '）</div>' +
+      '<div class="vchk-sub"><span id="vchk-count">60</span> 秒後自動重新整理載入新版</div>' +
+      '<button id="vchk-reload">⟳ 立即重新整理</button>' +
+      '<button id="vchk-later">稍後 5 分鐘提醒（我要先儲存資料）</button>' +
+      '</div>';
+    document.body.appendChild(d);
+    let n = 60;
+    const cd = document.getElementById('vchk-count');
+    const t = setInterval(function(){
+      n--;
+      if (cd) { cd.textContent = n; cd.style.animation = 'none'; void cd.offsetWidth; cd.style.animation = ''; }
+      if (n <= 0) { clearInterval(t); location.reload(); }
+    }, 1000);
+    document.getElementById('vchk-reload').onclick = function(){ clearInterval(t); location.reload(); };
+    document.getElementById('vchk-later').onclick = function(){
+      clearInterval(t); d.remove(); st.remove();
+      setTimeout(function(){ _shown = false; _check(); }, 300000);
+    };
+  }
+  setInterval(_check, 120000);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) setTimeout(_check, 800); });
+  setTimeout(_check, 20000);
 })();
 </script>
 </body>
