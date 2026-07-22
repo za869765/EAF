@@ -1147,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v4.9.8</div>
+      <div id="sb-version">v4.9.9</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1512,7 +1512,7 @@ body.sb-resizing * { pointer-events: none !important; }
           <option value="vendor">非農會廠商</option>
           <option value="nonghui">農會廠商</option>
           <option value="employee">員工</option>
-          <option value="employee-advance">員工代墊</option>
+          <option value="employee-advance">代墊</option>
           <option value="bill">憑繳費單 / 匯費</option>
         </select>
         <span id="payee-bill-label" style="display:none; margin-left:12px; color:#c62828; font-weight:bold;">憑繳費單 / 匯費</span>
@@ -3391,7 +3391,7 @@ function validatePayeeBeforeSave(data) {
   if (data.voided) return true;
   const pType = document.getElementById('payee-type')?.value || '';
   if (!pType) {
-    showAlert('請先選擇受款人資料<br><br>（類別：非農會廠商 / 農會廠商 / 員工 / 員工代墊 / 憑繳費單 / 匯費）', '⚠️');
+    showAlert('請先選擇受款人資料<br><br>（類別：非農會廠商 / 農會廠商 / 員工 / 代墊 / 憑繳費單 / 匯費）', '⚠️');
     document.getElementById('payee-type')?.focus();
     return false;
   }
@@ -3412,7 +3412,7 @@ function validatePayeeBeforeSave(data) {
   if (EMPLOYEE_PAYEE_TYPES.includes(pType)) {
     const noAcct = filled.filter(p => !(p.bank || '').trim() && !(p.acctNo || '').trim());
     if (noAcct.length) {
-      showAlert('員工 / 員工代墊必須補齊銀行或帳號，請移除或補齊不完整的卡片', '⚠️');
+      showAlert('員工 / 代墊必須補齊銀行或帳號，請移除或補齊不完整的卡片', '⚠️');
       return false;
     }
   }
@@ -3420,7 +3420,7 @@ function validatePayeeBeforeSave(data) {
   if (pType === 'employee-advance') {
     const reason = (data.payeeReason || '').trim();
     if (!reason) {
-      showAlert('員工代墊必須填寫「代墊原因」', '⚠️');
+      showAlert('代墊必須填寫「代墊原因」', '⚠️');
       document.getElementById('payee-reason')?.focus();
       return false;
     }
@@ -3456,22 +3456,24 @@ function validatePubSplitBeforeSave(data) {
   return false;
 }
 
-/* v4.2.23 / v4.4.93 人數不一致善意提醒（非強制）：僅動支單 + 員工 / 員工代墊
-   計算動支說明中「完全符合 EMPLOYEE_LIST」的人名數，與受款人卡片數比對。*/
+/* v4.2.23 / v4.4.93 人數不一致善意提醒（非強制）：僅動支單 + 員工 / 代墊
+   計算動支說明中「完全符合候選名單」的人名數，與受款人卡片數比對。
+   v4.9.9：代墊類別的名單擴大為 _advAllNames()（主檔 3~4 字姓名＋員工名單＋郵局備用）*/
 async function _confirmItemPayeeCountMismatch(data) {
   if (data.voided) return true;
   if (data.formType !== 'expense') return true;
   const pType = document.getElementById('payee-type')?.value || '';
   if (!EMPLOYEE_PAYEE_TYPES.includes(pType)) return true;
+  const roster = (pType === 'employee') ? EMPLOYEE_LIST : _advAllNames();
   const names = [];
   (data.items || []).forEach(it => {
     const v = (it.name || '').trim();
-    if (v && EMPLOYEE_LIST.includes(v) && !names.includes(v)) names.push(v);
+    if (v && roster.includes(v) && !names.includes(v)) names.push(v);
   });
   const payeeCount = (data.payees || []).filter(p => p && p.name).length;
   if (!names.length || names.length === payeeCount) return true;
   return await showConfirm(
-    `動支說明中有 <b>${names.length}</b> 位員工（${names.map(esc).join('、')}），<br>` +
+    `動支說明中有 <b>${names.length}</b> 位${pType === 'employee' ? '員工' : '人員'}（${names.map(esc).join('、')}），<br>` +
     `但目前受款人卡片為 <b>${payeeCount}</b> 筆，<br>數量不一致。<br><br>` +
     `是否仍要繼續存檔？`,
     { title:'⚠️ 人數不一致', icon:'⚠️', okText:'✓ 繼續存檔', cancelText:'✕ 取消修改' }
@@ -4950,6 +4952,57 @@ let EMPLOYEE_LIST = [
   '顏詩瑋','陳翊瑄','蔡沛汝','黃俊琛','黎欣妮','方雪雲','侯晏筑'
 ];
 
+/* ══════════════════════════════════
+   v4.9.9 「代墊」（原員工代墊）改版：
+   1) 候選＝全部 active PAYEES 中戶名為 3~4 字純中文「姓名」者（行業尾詞排除機構行號）
+   2) POSTAL_BACKUP：舊員工郵局帳戶備用清單（EMPLOYEE_1150721.xls，去重＋排除與主檔完全相同者）
+      僅「代墊」類別顯示、排在最後不優先；戶名+帳號與主檔完全相同者 runtime 再過濾一次
+   3) 同名多帳戶：以主檔（新建立）為主；選郵局舊帳戶時 confirm 提醒
+   ══════════════════════════════════ */
+const ADV_ORG_KW_RE = /(公司|診所|書局|書店|旗幟|商行|商號|企業|工程|農會|工會|公會|協會|藥局|醫院|中心|銀行|郵局|車行|超商|超市|文具|印刷|餐廳|飯店|花店)$/;
+function _isPersonName34(n) {
+  const t = String(n || '').trim();
+  const L = [...t].length;
+  return L >= 3 && L <= 4 && /^[一-鿿]+$/.test(t) && !ADV_ORG_KW_RE.test(t);
+}
+const POSTAL_BANK = '7000021-中華郵政股份有限公司郵政存簿儲金';
+const POSTAL_BACKUP = [
+  ["吳政達","00713700039211","1140101"],["尹菀華","01913180087777","1011001"],["林俐雯","01913350069350","1100101"],["黃素香","01913180081210","1100101"],["蕭俐雯","00711840125562","1100101"],["陳阿輕","04010710283263","1010302"],
+  ["胡秀蓮","01913970045767","1001201"],["賴麗卿","01912890867769","1000401"],["陳俐卉","01912890488052","1000401"],["黃略達","01910010923361"],["鄭淑文","01912890552303","1001001"],["張珀琅","01414070665044","1000711"],
+  ["陳欽娥","01912920115063"],["林佳慧","01912890940094"],["李欣怡","01912890709198"],["楊欣蓓","01912890738615"],["盤莉馨","00411100449325"],["林佳穎","01910760330489"],
+  ["詹欣凌","00311270397619"],["陳延佳","01911360319269"],["姜澤雄","01910010740471"],["黃莉婷","01010960788101"],["李虹君","00310051274118"],["黃怡禎","00311000676521"],
+  ["洪郁茹","01910280314673"],["王嚮蕾","01910280234924"],["林佳蓉","01012780101390"],["林榮昆","01910280038662"],["王錦足","01910010149002"],["陳彥廷","01910010880031"],
+  ["李欣妤","01910140177872"],["陳奕樑","01016450204712"],["許利嬖","00312830564956"],["趙珮如","00311580424694"],["蔡佳叡","00314210257019"],["王淑真","00314210071950"],
+  ["梁維娟","00210120205431"],["林秀霙","01910280136624"],["李村安","01910280339582"],["錢昭誼","00711840254581"],["邱麗靜","01910010737026"],["李育青","00311000455134"],
+  ["洪儷娟","01212220265227"],["姜怡如","03010080687160"],["陳裕祥","00310980369365"],["吳淑媛","00010063128287"],["葉耀嶸","00312350162592"],["劉憲璋","00311580370194"],
+  ["廖美惠","01910280254594"],["黃勝利","00310051642287"],["邱永榮","00314510168993"],["馬慈蓮","01910280264815"],["劉冠廷","01910010841460"],["郭宇竤","00310190497019"],
+  ["黃芷玲","02912900703441"],["陳孟宏","00310051392438"],["蔡昀珊","01914430176158"],["黃聖芬","01911220353838"],["黃獻德","01911360483960"],["邱雅芳","01910010810741"],
+  ["張芸庭","01911360504490"],["林志聰","02810940096639"],["王信智","01913520545854"],["洪宜均","00712440031954"],["孫葉宏","01910760364020"],["潘明葳","00910030445337"],
+  ["葉宴宏","01910280182750"],["謝心嵐","01910280237051"],["陳羿瑄","01914740320801"],["陳暐杰","01914740366386"],["張玲惠","00812540107037"],["黃俊琛","01012780007546","1140101"],
+  ["李品瑤","03013630201565","1140101"],["王順美","01912890641511"],["蔡玉梅","01911220288901"],["吳淑貞","01913180067879","1140716"],["郭麗貞","01913180130436"],["鍾宜珍","00715030286091"],
+  ["李侞蓁","01910010274276"],["林美伶","01912890525908"],["楊建芳","00311000315452","1140101"],["呂佳卉","00810410211241"],["魏玉茵","00310840498426"],["林培閔","00310220424785"],
+  ["古樺菁","00711050197844"],["盧俞靜","00315910258660"],["吳美怡","00314960089660","1130201"],["蔡錦慧","01912890758453"],["黃柏瑋","00313570187652","1140401"],["曾與晴","01913040372485"],
+  ["黃靜宜","01912890835881"],["趙彥涵","01414110790762"],["蕭佩芳","00311310664360"],["蔡雨芯","01910450166623"],["林岳振","01910280357689"],["李欣霖","01910010675131"],
+  ["吳璨安","01913660737546"],["周湘蓮","01912000397423"],["黃靖雯","01912890989526"],["黃莉涵","01912890905111"],["李金玫","01913520377602"],["李美怡","01913350069238"],
+  ["徐蓉偵","01911190388621"],["黃純潔","00312040552641"],["黃蓁妤","01912890660571"],["劉映妊","01015370240656","1140716"],["吳美蓉","00311750321457"],["邱淑玲","01913350098400"],
+  ["游任慈","24410070743676"],["王素珠","00313260129690"],["李昀翰","01912890733301"],["趙羚秝","00312830360198"],["楊子湘","01912890968818"],["黃淑菁","01912890709551"],
+  ["戴君瑜","00412800710315"],["鄭博文","00312660320560"],["嚴永賜","01912440286486"],["鄭宗祐","00212560823008"],["劉國華","00316200146497"],["林士弘","01910280217257"],
+  ["張琳麗","00310220419863"],["張瑀宸","01912890839011"],["鄭兆鑫","02912070505650","1140101"],["黃瑞培","00213780203796"],["王聖捷","01912890794014"],["蔡沛汝","03013940118042"],
+  ["陳翊瑄","24411940229146"],["陳伶雯","00912470026099"],["方雪雲","00314030134641"],["侯晏筑","01913520421195"],["施懷景","00314820086615"],["王聖捷","01912759103039"]
+];
+/* 郵局備用清單（排除「戶名+帳號」已正式建檔於 PAYEES 主檔者 — 完全相同者忽略不重複呈現） */
+function _advPostal() {
+  const key = new Set(PAYEES.map(p => `${(p.name || '').trim()}|${String(p.acctNo || '').trim()}`));
+  return POSTAL_BACKUP
+    .filter(b => !key.has(b[0] + '|' + b[1]))
+    .map(b => ({ name: b[0], acctNo: b[1], quit: b[2] || '' }));
+}
+/* 代墊候選姓名全集：active 3~4 字姓名 ∪ 員工名單 ∪ 郵局備用 */
+function _advAllNames() {
+  const a = PAYEES.filter(p => !p.frozen && _isPersonName34(p.name)).map(p => p.name);
+  return [...new Set([...a, ...EMPLOYEE_LIST, ..._advPostal().map(b => b.name)])];
+}
+
 async function loadPayees() {
   try {
     const r = await fetch('/api/payees');
@@ -4986,8 +5039,18 @@ function _payeeFilteredByType(type) {
     const f = frozen.filter(p => (p.bank||'').includes(NONGHUI_KW)).map(p => ({...p, _frozen:true}));
     return [...a, ...f];
   }
-  /* v4.4.93 employee / employee-advance 共用員工清單候選 */
-  if (EMPLOYEE_PAYEE_TYPES.includes(type)) {
+  /* v4.9.9 代墊：候選＝全部 3~4 字姓名戶名（主檔在前）＋員工名單佔位＋郵局備用（殿後不優先） */
+  if (type === 'employee-advance') {
+    const a = active.filter(p => _isPersonName34(p.name));
+    const placeholders = EMPLOYEE_LIST
+      .filter(n => !a.some(p => p.name === n))
+      .map(name => ({ name, acctNo:'', bank:'', _placeholder:true }));
+    const postal = _advPostal().map(b => ({ name:b.name, acctNo:b.acctNo, bank:POSTAL_BANK, _postal:true, _quit:b.quit }));
+    const f = frozen.filter(p => _isPersonName34(p.name)).map(p => ({...p, _frozen:true}));
+    return [...a, ...placeholders, ...postal, ...f];
+  }
+  /* v4.4.93 employee 維持員工清單候選 */
+  if (type === 'employee') {
     /* 員工清單 + 已存在 active PAYEES 中對應名字的帳號資料 */
     const result = [];
     EMPLOYEE_LIST.forEach(name => {
@@ -5383,10 +5446,12 @@ function renderPayeeCardList(i) {
     }
     const meta = p._placeholder
       ? '<span class="pi-new">（員工清單 — 尚無帳號資料，請新建）</span>'
-      : (p.isNew
+      : p._postal
+        ? `<span style="color:#8d6e63;">📮 郵局備用（舊資料）${p._quit ? '・已離職 ' + esc(p._quit) : ''}</span>`
+        : (p.isNew
           ? `<span class="pi-new">🆕 新廠商</span> 建立於 ${p.createdAt||'—'}`
           : (p.lastTransferDate ? `最後匯款：${p.lastTransferDate}` : ''));
-    const voidBtn = p._placeholder ? '' :
+    const voidBtn = (p._placeholder || p._postal) ? '' :
       `<button type="button" class="pi-void-btn" onclick="event.stopPropagation(); freezePayeeFromSearch(${i}, ${k})"
         title="操作此受款人"
         style="float:right; padding:2px 8px; background:#f5f5f5; color:#555; border:1px solid #ccc; border-radius:3px; font-size:11px; cursor:pointer; margin-top:-2px;">操作</button>`;
@@ -5399,12 +5464,28 @@ function renderPayeeCardList(i) {
   box._filtered = list;
 }
 
-function _pickPayeeFromBox(i, k) {
+async function _pickPayeeFromBox(i, k) {
   const c = document.getElementById('payees-container');
   const box = c?.querySelector(`.payee-card[data-idx="${i}"] .pc-list`);
   const p = box?._filtered?.[k];
   if (!p) return;
   if (p._placeholder) { openNewPayeeModalForCard(i, p.name); return; }
+  /* v4.9.9 同名多帳戶：以主檔新帳戶為主 — 選郵局舊備用時 confirm；選主檔時提示另有備用 */
+  if (p._postal) {
+    const newer = PAYEES.filter(x => !x.frozen && x.name === p.name);
+    if (newer.length) {
+      const ok = await showConfirm(
+        `「${esc(p.name)}」已有較新的帳戶：<br>` +
+        newer.map(x => `・${esc(x.bank||'—')}　${esc(x.acctNo||'—')}`).join('<br>') +
+        `<br><br>確定改用<b>舊郵局備用帳戶</b>（${esc(p.acctNo)}）？`,
+        { title:'📮 郵局備用帳戶', icon:'📮', okText:'✓ 用舊郵局帳戶', cancelText:'✕ 取消' }
+      );
+      if (!ok) return;
+    }
+  } else if (document.getElementById('payee-type')?.value === 'employee-advance'
+             && _advPostal().some(b => b.name === p.name)) {
+    showToast(`📮 「${p.name}」另有舊郵局備用帳戶（清單末端可選）`);
+  }
   /* v4.4.86：保留原本附記事項與發票資訊（避免使用者在「變更」時靜默丟資料） */
   const prev = _payeeCards[i] || {};
   const hadInvoice = prev.receiptType === '2' && (prev.invoiceNo || prev.invoiceDate || prev.invoiceAmount);
@@ -5466,8 +5547,12 @@ function autoFillEmployeePayees() {
   /* 依 type 取候選名字清單與可用 PAYEES 範圍 */
   let candidateNames = [];
   let scopedActive = active;
-  if (EMPLOYEE_PAYEE_TYPES.includes(type)) {
+  if (type === 'employee') {
     candidateNames = EMPLOYEE_LIST.slice();
+  } else if (type === 'employee-advance') {
+    /* v4.9.9 代墊：候選姓名＝全部 3~4 字姓名（主檔＋員工名單＋郵局備用） */
+    scopedActive = active.filter(p => _isPersonName34(p.name));
+    candidateNames = _advAllNames();
   } else if (type === 'vendor') {
     scopedActive = active.filter(p => !(p.bank||'').includes(NONGHUI_KW));
     candidateNames = [...new Set(scopedActive.map(p => p.name).filter(Boolean))];
@@ -5483,13 +5568,14 @@ function autoFillEmployeePayees() {
     if (candidateNames.includes(v) && !names.includes(v)) names.push(v);
   });
   if (!names.length) {
-    const hint = EMPLOYEE_PAYEE_TYPES.includes(type) ? '員工清單' : (type === 'nonghui' ? '農會廠商清單' : '非農會廠商清單');
+    const hint = type === 'employee' ? '員工清單' : type === 'employee-advance' ? '代墊候選清單' : (type === 'nonghui' ? '農會廠商清單' : '非農會廠商清單');
     showToast(`ℹ️ 動支說明未發現${hint}中的名字（需完全相符）`);
     return;
   }
   const cards = [];
   const ambiguous = [];
   const missing = [];
+  const postalUsed = [];
   names.forEach(nm => {
     const matches = scopedActive.filter(x => x.name === nm);
     if (matches.length === 1) {
@@ -5499,18 +5585,30 @@ function autoFillEmployeePayees() {
       ambiguous.push(nm);
       cards.push({ name:nm, bank:'', acctNo:'', isNew:false, expanded:true, kw:nm });
     } else {
-      missing.push(nm);
-      cards.push({ name:nm, bank:'', acctNo:'', isNew:false, expanded:true, kw:nm });
+      /* v4.9.9 代墊：主檔無此人 → 查郵局備用（唯一才帶，多筆視為 ambiguous） */
+      let ph = [];
+      if (type === 'employee-advance') ph = _advPostal().filter(b => b.name === nm);
+      if (ph.length === 1) {
+        postalUsed.push(nm);
+        cards.push({ name:nm, bank:POSTAL_BANK, acctNo:ph[0].acctNo, isNew:false, expanded:false, kw:'' });
+      } else if (ph.length > 1) {
+        ambiguous.push(nm);
+        cards.push({ name:nm, bank:'', acctNo:'', isNew:false, expanded:true, kw:nm });
+      } else {
+        missing.push(nm);
+        cards.push({ name:nm, bank:'', acctNo:'', isNew:false, expanded:true, kw:nm });
+      }
     }
   });
   _payeeCards = cards;
   renderPayeeCards();
   updatePayeePrintLine();
   let msg = `✓ 已自動帶入 ${names.length} 筆受款人`;
+  if (postalUsed.length) msg += `\n📮 使用郵局備用帳戶（主檔無新帳戶）：${postalUsed.join('、')}`;
   if (ambiguous.length) msg += `\n⚠️ 同名多帳戶未帶入：${ambiguous.join('、')}（請手動選）`;
   if (missing.length)   msg += `\nℹ️ 尚無帳號資料：${missing.join('、')}（請新建）`;
   showToast(msg.split('\n')[0]);
-  if (ambiguous.length || missing.length) {
+  if (ambiguous.length || missing.length || postalUsed.length) {
     setTimeout(() => showAlert(msg.replace(/\n/g,'<br>'), '⚠️'), 300);
   }
 }
@@ -5654,12 +5752,15 @@ async function submitNewPayee() {
     showToast('✗ 代號格式：8 碼數字（統編）或 身分證字號（A123456789）');
     return;
   }
-  /* v4.2.23 / v4.4.93 員工 / 員工代墊類別阻止重複戶名（避免自動帶入時歧義） */
+  /* v4.2.23 / v4.4.93 員工 / 代墊類別阻止重複戶名（避免自動帶入時歧義）
+     v4.9.9 代墊擴大：任何 3~4 字姓名同名已有主檔帳戶即攔截（不限員工名單） */
   const curType = document.getElementById('payee-type').value;
-  if (EMPLOYEE_PAYEE_TYPES.includes(curType) && EMPLOYEE_LIST.includes(name)) {
+  const _dupGuard = (curType === 'employee' && EMPLOYEE_LIST.includes(name))
+                 || (curType === 'employee-advance' && _isPersonName34(name));
+  if (_dupGuard) {
     const exists = PAYEES.filter(p => p.name === name && !p.frozen);
     if (exists.length) {
-      showAlert(`員工「${esc(name)}」已有帳戶資料，不可重複建立。<br>若需修改請到後台「受款人管理」分頁。`, '⚠️');
+      showAlert(`「${esc(name)}」已有帳戶資料，不可重複建立。<br>若需修改請到後台「受款人管理」分頁。`, '⚠️');
       return;
     }
   }
