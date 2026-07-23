@@ -1147,7 +1147,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v5.0.2</div>
+      <div id="sb-version">v5.0.3</div>
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -1294,10 +1294,12 @@ body.sb-resizing * { pointer-events: none !important; }
             <button class="lect-btn" id="cust09-overtime" onclick="setCustody09Type('overtime')">不休假加班費</button>
             <button class="lect-btn" id="cust09-vacation" onclick="setCustody09Type('vacation')">國內休假補助費</button>
           </div>
+          <!-- v5.0.3 4501 憑證類型改「房屋/車位(列計51所得) / 其它」，預設其它(出納斜線)。
+               id 沿用 taxdoc-invoice(''=其它) / taxdoc-receipt('receipt'=房屋/車位) 不改，D1 舊資料值相容 -->
           <div class="bp-row" id="row-tax-doc" style="display:none;">
             <label>憑證類型：</label>
-            <button class="lect-btn active" id="taxdoc-invoice" onclick="setTaxDoc('')">發票</button>
-            <button class="lect-btn"        id="taxdoc-receipt" onclick="setTaxDoc('receipt')">收據</button>
+            <button class="lect-btn"        id="taxdoc-receipt" onclick="setTaxDoc('receipt')">房屋/車位(列計51所得)</button>
+            <button class="lect-btn active" id="taxdoc-invoice" onclick="setTaxDoc('')">其它</button>
           </div>
           <div class="bp-row" id="row-acct-type" style="display:none;">
             <label>帳戶類別：</label>
@@ -2312,7 +2314,7 @@ function _normalizeSubjects(cfg) {
 const LECTURER_BP_CODES  = ['21020311','21020312','21020313','21020321','21020322'];
 const XUANDAO_BP_CODES   = ['21020311','21020312','21020313','21020319','21020321','21020322'];
 let isLecturer      = '';   /* '' = 非講師費, 'lecturer' = 講師費, 'bonus' = 獎勵金 */
-let taxDocType4501  = '';   /* '' = 發票(預設) / 'receipt' = 收據 */
+let taxDocType4501  = '';   /* v5.0.3: '' = 其它(預設，出納斜線) / 'receipt' = 房屋/車位(列計51所得)。值沿用舊發票/收據語義，D1 舊資料相容 */
 let custody09Type   = '';   /* v4.4.98 21020321/09: '' = 未選 / 'overtime' = 不休假加班費 / 'vacation' = 國內休假補助費 */
 
 /* 款項用途列顯示邏輯：21020321 需 purposeCode=99 才顯示 */
