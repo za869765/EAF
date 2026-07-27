@@ -459,17 +459,106 @@ function decidePayway(payee, farmCodes) {
   return '2';
 }
 
+/* 付款類別（＝分組維度）：1 農會存帳／6 電匯(e企)／2 繳費單代繳 */
+const PAY_CAT_LABEL = { '1': '農會存帳', '6': '電匯(e企)', '2': '繳費單/代繳' };
+const PAY_CAT_ORDER = ['1', '6', '2'];
+
+/**
+ * 解析一筆記錄的受款人（含金額比對與付款類別），供分組與預覽共用
+ * @returns {payees:[], issues:[]}
+ */
+function resolvePayees(rec, ctx) {
+  const issues = [];
+  const recAmt = +rec.total || 0;
+  let ps = Array.isArray(rec.payees) && rec.payees.length ? rec.payees
+    : (rec.payee && rec.payee.type ? [rec.payee] : []);
+  if (!ps.length) {
+    issues.push({ recId: rec.id, level: 'error', msg: `${rec.voucherNo}：無受款人資料，請於預覽手動補齊` });
+    ps = [{ type: 'manual' }];
+  }
+  /* 多受款人：items[].name ↔ payees[].name 對映金額（price 為字串） */
+  let amtByName = null;
+  if (ps.length > 1) {
+    amtByName = {};
+    for (const it of rec.items || []) {
+      const nm = String(it.name || '').trim();
+      amtByName[nm] = (amtByName[nm] || 0) + (+String(it.price || '').replace(/,/g, '') || 0);
+    }
+  }
+  const payees = ps.map((p) => {
+    const bk = splitBank(p.bank);
+    let amt;
+    if (ps.length === 1) amt = recAmt;
+    else {
+      amt = amtByName[String(p.name || '').trim()];
+      if (amt == null) {
+        issues.push({ recId: rec.id, level: 'error',
+          msg: `${rec.voucherNo}：受款人「${p.name || '(未命名)'}」金額無法自動比對，請於預覽填入` });
+        amt = 0;
+      }
+    }
+    const rev = p.receiptType != null && p.receiptType !== '' ? String(p.receiptType) : '0';
+    const payee = {
+      seq: 0, name: String(p.name || '').trim(),
+      account: p.acctNo || '', userbank: bk.code,
+      bankna: bk.code ? (ctx.bankNameByCode(bk.code) || bk.name) : bk.name,
+      payway: decidePayway(p, ctx.farmCodes), amt,
+      usedoc: String(rec.purposeDesc || '').trim(), rev,
+      srcType: p.type || '', srcRec: rec.voucherNo,
+      needsInput: p.type === 'bill' || p.type === 'manual' || !p.name,
+    };
+    if (rev === '2' && (p.invoiceNo || p.invoiceAmount)) {
+      payee.invoices = [{ invno: p.invoiceNo || '', invdate: toRoc7(p.invoiceDate || ''),
+        invamt: +String(p.invoiceAmount || '').replace(/,/g, '') || amt }];
+    }
+    if (payee.needsInput)
+      issues.push({ recId: rec.id, level: 'error',
+        msg: `${rec.voucherNo}：${p.type === 'bill' ? '持繳費單（代繳）' : '受款人'}需人工填入名稱等欄位` });
+    return payee;
+  });
+  const psum = Math.round(payees.reduce((s, p) => s + (+p.amt || 0), 0) * 100) / 100;
+  if (psum !== Math.round(recAmt * 100) / 100)
+    issues.push({ recId: rec.id, level: 'warn',
+      msg: `${rec.voucherNo}：受款人金額合計 ${psum} ≠ 單金額 ${recAmt}，請於預覽調整` });
+  return { payees, issues };
+}
+
+/**
+ * 分組預覽（不配序號、不建傳票）：專戶 × 付款類別
+ * @returns [{acct, cat, catLabel, recIds:Set, n, sum}]
+ */
+function planGrouping(records, ctx) {
+  const map = new Map();
+  for (const rec of records) {
+    const acct = rec.acctCode || '';
+    if (!acct) continue;
+    const { payees } = resolvePayees(rec, ctx);
+    for (const p of payees) {
+      const key = acct + '|' + p.payway;
+      if (!map.has(key)) map.set(key, { acct, cat: p.payway, catLabel: PAY_CAT_LABEL[p.payway] || p.payway, recIds: new Set(), sum: 0 });
+      const g = map.get(key);
+      g.recIds.add(rec.id); g.sum += +p.amt || 0;
+    }
+  }
+  return [...map.values()]
+    .map((g) => ({ ...g, n: g.recIds.size, sum: Math.round(g.sum * 100) / 100 }))
+    .sort((a, b) => a.acct.localeCompare(b.acct) || PAY_CAT_ORDER.indexOf(a.cat) - PAY_CAT_ORDER.indexOf(b.cat));
+}
+
 /**
  * 動支單/請購單 → 支出傳票（kind=2）
+ * 分組維度＝**專戶 × 付款類別**（農會存帳／電匯／繳費單代繳），最多 專戶數×3 張。
+ * 單據類型（動支/請購）不作為分組依據。一張單若含多種付款類別的受款人，
+ * 會依受款人金額拆到各自的傳票（借方金額同步拆分），確保每張傳票付款方式單純。
  * @param {Array} records 已勾選的 EAF 記錄（原始 JSON）
  * @param {Object} ctx {
  *   year:'115', payDate7:'1150727', postDate7:'1150727'|'9991231', mvchno,
- *   combine:true(每專戶一張)|false(每單一張),
+ *   combine:true(同專戶同類別合併)|false(每單每類別各一張),
  *   bcodeFor(code)→string, farmCodes:Set<7碼>, defaultPkind:'',
  *   bankNameByCode(code)→官方名|'', nextRecno()→'115290001',
  *   acctNames:{'11010202':'保管款專戶',...}
  * }
- * @returns {vouchers:[], issues:[{recId,voucherNo,level,msg}]}
+ * @returns {vouchers:[], issues:[{recId,level,msg}]}
  */
 function mapRecordsToVouchers(records, ctx) {
   const issues = [];
@@ -477,24 +566,43 @@ function mapRecordsToVouchers(records, ctx) {
   const useOf = (rec) => (/^\d{4}$/.test(rec.purposeCode || '') && !/^2102/.test(rec.bpCode) ? rec.purposeCode : '');
   const relateOf = (rec) => (isCustodyBp(rec.bpCode) && /^\d{2}$/.test(rec.purposeCode || '') ? rec.purposeCode : '');
 
-  /* 依專戶動態分組（P10） */
+  /* ① 解析每筆單的受款人 → ② 依 專戶 × 付款類別 分組 */
   const groups = new Map();
   for (const rec of records) {
     const acct = rec.acctCode || '';
     if (!acct) { issues.push({ recId: rec.id, level: 'error', msg: `${rec.voucherNo}：無專戶(acctCode)，略過` }); continue; }
-    const key = ctx.combine ? acct : acct + '|' + rec.id;
-    if (!groups.has(key)) groups.set(key, { acct, recs: [] });
-    groups.get(key).recs.push(rec);
+    const { payees, issues: pIssues } = resolvePayees(rec, ctx);
+    issues.push(...pIssues);
+    const byCat = new Map();
+    for (const p of payees) {
+      if (!byCat.has(p.payway)) byCat.set(p.payway, []);
+      byCat.get(p.payway).push(p);
+    }
+    if (byCat.size > 1)
+      issues.push({ recId: rec.id, level: 'warn',
+        msg: `${rec.voucherNo}：受款人含 ${[...byCat.keys()].map((c) => PAY_CAT_LABEL[c] || c).join('、')} 多種付款方式，已依金額拆入不同傳票` });
+    for (const [cat, catPayees] of byCat) {
+      const key = ctx.combine ? `${acct}|${cat}` : `${acct}|${cat}|${rec.id}`;
+      if (!groups.has(key)) groups.set(key, { acct, cat, items: [] });
+      groups.get(key).items.push({ rec, payees: catPayees });
+    }
   }
 
+  const ordered = [...groups.entries()]
+    .sort((a, b) => a[1].acct.localeCompare(b[1].acct)
+      || PAY_CAT_ORDER.indexOf(a[1].cat) - PAY_CAT_ORDER.indexOf(b[1].cat)
+      || a[0].localeCompare(b[0]));
+
   const vouchers = [];
-  for (const { acct, recs } of groups.values()) {
+  for (const [, g] of ordered) {
+    const { acct, cat, items } = g;
     const v = {
       year: ctx.year, kind: '2', importrecno: ctx.nextRecno(),
       mvchno: ctx.mvchno || '', payDate: ctx.payDate7, postDate: ctx.postDate7 || ctx.payDate7,
       memo: '', rnum: 0, urgent: '', scode1: '1',
-      lines: [], payees: [], sourceIds: recs.map((r) => r.id),
+      lines: [], payees: [], sourceIds: items.map((it) => it.rec.id),
       acctCode: acct, acctName: (ctx.acctNames && ctx.acctNames[acct]) || acct,
+      payCat: cat, payCatLabel: PAY_CAT_LABEL[cat] || cat,
     };
     let seq = 1, total = 0;
     /* 銀行專戶列（先佔位，金額最後補） */
@@ -503,20 +611,22 @@ function mapRecordsToVouchers(records, ctx) {
     v.lines.push(bankLine);
 
     const memoParts = [];
-    for (const rec of recs) {
-      const recAmt = +rec.total || 0;
-      total += recAmt;
+    for (const { rec, payees } of items) {
+      /* 本張傳票承擔的金額＝本類別受款人金額合計（一單跨類別時自動拆分） */
+      const catAmt = Math.round(payees.reduce((s, p) => s + (+p.amt || 0), 0) * 100) / 100;
+      const recAmt = Math.round((+rec.total || 0) * 100) / 100;
+      total += catAmt;
       memoParts.push(String(rec.purposeDesc || rec.bpLabel || '').trim());
       const base = {
         dc: 'D', code: rec.bpCode, use: useOf(rec), relate: relateOf(rec),
         scode1: '55000', bcode: ctx.bcodeFor(rec.bpCode), ttype: '2',
       };
       if (base.use && /^1\d{3}$/.test(base.use)) base.pkind = ctx.defaultPkind || '';
-      /* purposeSplits 多用途 → 每拆分一列（P3）；否則一列 */
+      /* purposeSplits 多用途 → 每拆分一列（僅本張承擔整單金額時才展開） */
       const splits = Array.isArray(rec.purposeSplits)
         ? rec.purposeSplits.filter((s) => s && +s.amt > 0) : [];
-      if (splits.length > 1) {
-        const ssum = splits.reduce((s, x) => s + (+x.amt || 0), 0);
+      if (splits.length > 1 && catAmt === recAmt) {
+        const ssum = Math.round(splits.reduce((s, x) => s + (+x.amt || 0), 0) * 100) / 100;
         if (ssum !== recAmt)
           issues.push({ recId: rec.id, level: 'warn', msg: `${rec.voucherNo}：用途拆分合計 ${ssum} ≠ 單金額 ${recAmt}，請於預覽調整` });
         for (const sp of splits) {
@@ -524,63 +634,19 @@ function mapRecordsToVouchers(records, ctx) {
             memo: `${sp.name}｜${String(rec.purposeDesc || '').trim()}` });
         }
       } else {
+        if (splits.length > 1)
+          issues.push({ recId: rec.id, level: 'warn',
+            msg: `${rec.voucherNo}：多用途拆分因跨付款方式而併為單列，用途明細請於預覽摘要確認` });
         const memoTxt = (rec.bpCode === '21020301' && rec.purposeName)
           ? `${rec.purposeName}｜${String(rec.purposeDesc || '').trim()}`
           : String(rec.purposeDesc || '').trim();
-        v.lines.push({ ...base, seq: seq++, amt: recAmt, memo: memoTxt });
+        v.lines.push({ ...base, seq: seq++, amt: catAmt, memo: memoTxt });
       }
-
-      /* ── 受款人（P1/P5/P6/P7/P11） ── */
-      let ps = Array.isArray(rec.payees) && rec.payees.length ? rec.payees
-        : (rec.payee && rec.payee.type ? [rec.payee] : []);
-      if (!ps.length) {
-        issues.push({ recId: rec.id, level: 'error', msg: `${rec.voucherNo}：無受款人資料，請於預覽手動補齊` });
-        ps = [{ type: 'manual' }];
-      }
-      /* 多受款人：items[].name ↔ payees[].name 對映金額（price 為字串） */
-      let amtByName = null;
-      if (ps.length > 1) {
-        amtByName = {};
-        for (const it of rec.items || []) {
-          const nm = String(it.name || '').trim();
-          amtByName[nm] = (amtByName[nm] || 0) + (+String(it.price || '').replace(/,/g, '') || 0);
-        }
-      }
-      for (const p of ps) {
-        const bk = splitBank(p.bank);
-        let amt;
-        if (ps.length === 1) amt = recAmt;
-        else {
-          amt = amtByName[String(p.name || '').trim()];
-          if (amt == null) {
-            issues.push({ recId: rec.id, level: 'error',
-              msg: `${rec.voucherNo}：受款人「${p.name || '(未命名)'}」金額無法自動比對，請於預覽填入` });
-            amt = 0;
-          }
-        }
-        const rev = p.receiptType != null && p.receiptType !== '' ? String(p.receiptType) : '0';
-        const payee = {
-          seq: 0 /* 稍後統一編號 */, name: String(p.name || '').trim(),
-          account: p.acctNo || '', userbank: bk.code,
-          bankna: bk.code ? (ctx.bankNameByCode(bk.code) || bk.name) : bk.name,
-          payway: decidePayway(p, ctx.farmCodes), amt,
-          usedoc: String(rec.purposeDesc || '').trim(), rev,
-          srcType: p.type || '', srcRec: rec.voucherNo,
-          needsInput: p.type === 'bill' || p.type === 'manual' || !p.name,
-        };
-        if (rev === '2' && (p.invoiceNo || p.invoiceAmount)) {
-          payee.invoices = [{ invno: p.invoiceNo || '', invdate: toRoc7(p.invoiceDate || ''),
-            invamt: +String(p.invoiceAmount || '').replace(/,/g, '') || amt }];
-        }
-        if (payee.needsInput)
-          issues.push({ recId: rec.id, level: 'error',
-            msg: `${rec.voucherNo}：${p.type === 'bill' ? '持繳費單（代繳）' : '受款人'}需人工填入名稱等欄位` });
-        v.payees.push(payee);
-      }
+      v.payees.push(...payees);
     }
     bankLine.amt = Math.round(total * 100) / 100;
-    bankLine.memo = truncBig5(memoParts.filter(Boolean).join('；'), 1000);
-    v.memo = truncBig5(memoParts.filter(Boolean).join('；'), 100);
+    bankLine.memo = truncBig5(`${v.payCatLabel}｜` + memoParts.filter(Boolean).join('；'), 1000);
+    v.memo = truncBig5(`${v.payCatLabel}｜` + memoParts.filter(Boolean).join('；'), 100);
     v.payees.forEach((p, i) => { p.seq = i + 1; });
     vouchers.push(v);
   }
@@ -594,6 +660,7 @@ if (typeof module !== 'undefined' && module.exports) {
     F03_FIELDS, F04_FIELDS, F05_FIELDS, F06_FIELDS, F07_FIELDS,
     validateVoucher, validateBatch, guessBcode, FIXED_ASSET_CODES,
     splitBank, decidePayway, mapRecordsToVouchers,
+    resolvePayees, planGrouping, PAY_CAT_LABEL, PAY_CAT_ORDER,
     voucherToF03Row, voucherToF04Rows, voucherToF05Rows, voucherToF06Rows, voucherToF07Rows,
     buildExportFiles, crc32, buildZip,
   };

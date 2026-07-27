@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SBA 傳票工坊 — 佳里區衛生所 v1.0.0</title>
+<title>SBA 傳票工坊 — 佳里區衛生所 v1.1.0</title>
 <link rel="stylesheet" href="design.css">
 <style>
 /* ── 沿用 acc.html 視覺語言（parchment / warm charcoal） ── */
@@ -105,7 +105,7 @@ window.addEventListener('storage', (ev) => {
 
 <div id="top-bar">
   <h1>📤 SBA 傳票工坊 — 臺南市佳里區衛生所</h1>
-  <span class="small" id="ver-badge" style="color:#78909c;">v1.0.0</span>
+  <span class="small" id="ver-badge" style="color:#78909c;">v1.1.0</span>
   <a class="tbtn tbtn-gray" href="/acc.html">📒 會計帳務</a>
   <a class="tbtn tbtn-gray" href="/" target="_blank">📝 填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
@@ -154,9 +154,10 @@ window.addEventListener('storage', (ev) => {
         <button data-v="unposted" onclick="setPostMode('unposted')">未入帳(9991231)</button>
       </span>
       <span class="pill-toggle" id="pk-combine-toggle">
-        <button class="on" data-v="1" onclick="setCombine(true)">每專戶合併一張</button>
+        <button class="on" data-v="1" onclick="setCombine(true)">同專戶同付款方式合併</button>
         <button data-v="0" onclick="setCombine(false)">每單獨立一張</button>
       </span>
+      <span class="small">分組＝專戶 × 付款方式（農會存帳／電匯／繳費單代繳）</span>
       <button class="btn btn-main" onclick="generateVouchers()">⚡ 產生支出傳票 → 預覽</button>
     </div>
     <div id="pk-issues"></div>
@@ -421,17 +422,29 @@ function selectedRecords() {
   const ids = new Set([...document.querySelectorAll('.pk-cb:checked')].map(cb => cb.value));
   return STATE.records.filter(r => ids.has(r.id));
 }
+function mapCtx(pay7) {
+  const farmCodes = new Set(String(STATE.settings.farm || '').split(/[,，\s]+/).filter(Boolean));
+  const acctNameMap = {};
+  for (const a of new Set(STATE.records.map(r => r.acctCode).filter(Boolean))) acctNameMap[a] = subjectName(a);
+  return {
+    year: rocYearNow(), payDate7: pay7 || toRoc7(todayIso()),
+    postDate7: STATE.postMode === 'posted' ? (pay7 || toRoc7(todayIso())) : '9991231',
+    mvchno: STATE.settings.mvchno || '', combine: STATE.combine,
+    bcodeFor, farmCodes, defaultPkind: STATE.settings.pkind || '',
+    bankNameByCode: (c) => STATE.bankByCode.get(c) || '',
+    nextRecno: () => nextRecnoFor('2'), acctNames: acctNameMap,
+  };
+}
 function updatePickSummary() {
   const sel = selectedRecords();
   if (!sel.length) { $('pk-summary').textContent = '尚未勾選'; return; }
-  const byAcct = {};
-  for (const r of sel) {
-    byAcct[r.acctCode] = byAcct[r.acctCode] || { n: 0, sum: 0 };
-    byAcct[r.acctCode].n++; byAcct[r.acctCode].sum += +r.total || 0;
-  }
-  $('pk-summary').innerHTML = Object.entries(byAcct).map(([a, s]) =>
-    `<span><span class="chip ${a === '11010202' ? 'cust' : 'fund'}">${esc(a)} ${esc(subjectName(a))}</span> ${s.n} 筆 <b>$${fmtN(s.sum)}</b> → 1 張支出傳票</span>`
-  ).join('') + `<span>｜合計 ${sel.length} 筆 <b>$${fmtN(sel.reduce((s, r) => s + (+r.total || 0), 0))}</b></span>`;
+  /* 分組預覽：專戶 × 付款類別（農會存帳／電匯／繳費單代繳） */
+  const plan = planGrouping(sel, mapCtx());
+  const nV = STATE.combine ? plan.length : plan.reduce((s, g) => s + g.n, 0);
+  $('pk-summary').innerHTML = plan.map(g =>
+    `<span><span class="chip ${g.acct === '11010202' ? 'cust' : 'fund'}">${esc(g.acct)} ${esc(subjectName(g.acct))}</span>` +
+    `<span class="chip exp">${esc(g.catLabel)}</span> ${g.n} 筆 <b>$${fmtN(g.sum)}</b></span>`
+  ).join('') + `<span>｜合計 ${sel.length} 筆 <b>$${fmtN(sel.reduce((s, r) => s + (+r.total || 0), 0))}</b> → <b>${nV}</b> 張支出傳票</span>`;
 }
 function setPostMode(m) {
   STATE.postMode = m;
@@ -440,6 +453,7 @@ function setPostMode(m) {
 function setCombine(c) {
   STATE.combine = c;
   document.querySelectorAll('#pk-combine-toggle button').forEach(b => b.classList.toggle('on', b.dataset.v === (c ? '1' : '0')));
+  updatePickSummary();
 }
 function nextRecnoFor(kind) {
   const year = rocYearNow();
@@ -457,18 +471,7 @@ function generateVouchers() {
   if (!sel.length) { alert('請先勾選單據'); return; }
   const payIso = $('pk-paydate').value;
   if (!payIso) { alert('請選製票日期'); return; }
-  const pay7 = toRoc7(payIso);
-  const farmCodes = new Set(String(STATE.settings.farm || '').split(/[,，\s]+/).filter(Boolean));
-  const acctNameMap = {};
-  for (const a of new Set(sel.map(r => r.acctCode))) acctNameMap[a] = subjectName(a);
-  const { vouchers, issues } = mapRecordsToVouchers(sel, {
-    year: rocYearNow(), payDate7: pay7,
-    postDate7: STATE.postMode === 'posted' ? pay7 : '9991231',
-    mvchno: STATE.settings.mvchno || '', combine: STATE.combine,
-    bcodeFor, farmCodes, defaultPkind: STATE.settings.pkind || '',
-    bankNameByCode: (c) => STATE.bankByCode.get(c) || '',
-    nextRecno: () => nextRecnoFor('2'), acctNames: acctNameMap,
-  });
+  const { vouchers, issues } = mapRecordsToVouchers(sel, mapCtx(toRoc7(payIso)));
   STATE.drafts.push(...vouchers);
   $('pk-issues').innerHTML = issues.map(i =>
     `<div class="vmsg ${i.level === 'error' ? 'err' : 'wrn'}">${esc(i.msg)}</div>`).join('');
@@ -526,6 +529,7 @@ function renderPreview() {
       <div class="toolbar">
         <b>${KIND_NAMES[v.kind] || v.kind}</b>
         <span class="chip ${v.acctCode === '11010202' ? 'cust' : 'fund'}">${esc(v.acctName || '')}</span>
+        ${v.payCatLabel ? `<span class="chip exp">${esc(v.payCatLabel)}</span>` : ''}
         <label>匯入序號 <input class="w-code" style="width:100px;" value="${esc(v.importrecno)}" onchange="updV(${vi},'importrecno',this.value)"></label>
         <label>製票日 <input class="w-date" value="${esc(v.payDate)}" onchange="updV(${vi},'payDate',this.value)"></label>
         <label>入帳日 <input class="w-date" value="${esc(v.postDate)}" onchange="updV(${vi},'postDate',this.value)" title="未入帳填 9991231"></label>
