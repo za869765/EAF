@@ -1,3 +1,24 @@
+# 專案接力記錄 — 2026/07/27（v5.0.4／SBA 傳票工坊 v1.0.0）
+
+> 換台電腦繼續：先 `git -C .../EAF pull`。暗號「**佳里ACC，接力**」。
+> 本輪由 Claude（Fable 5）建置，**下一棒（Opus 5.0）請先讀本段＋`docs/SBA匯出傳票_設計.md`**。
+
+## 本次完成 — 新增「📤 SBA 傳票工坊」（sba.html，勾動支單→支出傳票→SBA匯入ZIP）
+- **需求**：勾選近期有效動支單/請購單（匯款付款）→ 批次產支出傳票 → 轉 SBA 作業型『匯入傳票資料檔』ZIP（F03主檔/F04明細/F05受款人/F06立沖/F07發票 XML）直接匯入 SBA。保管款(11010202)/基金款(11010201)依單上 acctCode **自動分張**；另附轉帳傳票快速編輯器（同批混匯，官方允許）。
+- **新檔**：`sba.html`（5分頁：選單製票/傳票預覽/轉帳傳票/匯出/設定；登入守門同 acc.html）＋`sba-core.js`（**純邏輯無DOM**：民國日期/Big5截長/XML欄序/檢核/動支單→傳票對應/CRC32+store ZIP，Node 可 require 測試）＋`docs/SBA匯出傳票_設計.md`（含兩輪對抗審查結論）＋`docs/SBA匯出_操作說明.md`。acc.html 只加 top-bar 連結；**後端零改動**（/api/records、/api/acc/v2/entries、/api/acc/v2/config PUT sba_settings/sba_exported）。
+- **規格關鍵**（來源 D:\SBA\SBA作業型-匯入傳票作業說明.doc，Big5）：檔名 FnnYYYMMDDAA.XML（民國7碼+批號2碼[1-9A-Z]）、root=檔名主體、UTF-8、金額2位/數量6位小數；kind=2 銀行專戶列=貸方唯一序1；Σ受款人=Σ(借方ttype=2)；F99 由 SBA 端產生。
+- **兩輪審查後的硬決策**：①匯入序號高段 90001 起配（年3+類1+流水5），絕不撞 SBA 正式號；②fvchti_bcode（預算科目4碼）官方範例每列必有→設定頁對照表（種子推導=第1,2,4碼+末碼、98→Y，**須人工對 SBA 常用會計科目核對**）；③銀行列 scode1=55000；④付款方式：佳里農會(6180069/6180416)→1存帳、其他有帳號→6電匯(e企)、繳費單→2自領(代繳，SBA無專碼)；⑤多受款人金額=items[].name↔payees[].name 對映（38筆多受款單驗證可行）；⑥purposeSplits 拆多列借方；⑦21020301 公務預算 relate 一律空（purpose 是中文名）；⑧用途別1XXX→pkind 必填擋匯出；⑨固定資產12科目缺23~29欄擋匯出；⑩沖帳 F06 選配：候選=D1 歷史分錄同科目(+子目前2碼)貸方列。
+- **驗證**：smoke-sba-core(38)+smoke-sba-map(22)+smoke-sba-page(20，vm+mockDOM 抽真 inline JS 實跑)＝80 項全過；ZIP 經 Python zipfile CRC 驗證、XML 全 well-formed；官方範例傳票逐欄重現。
+
+## ⏳ 待辦（下一棒 Opus 5.0 優先順序）
+1. **首批實匯 SBA 驗證**（最重要）：先 1 張小額單走完 SBA 轉入→檢核→轉製。已知風險點：bcode 對照未經 SBA 核對、pkind 代碼、F07 元素名（欄位表 finvoice_invdate/invamt vs 官方範例 finvoice_date/amt，現採欄位表）、F06 沖帳。SBA 檢核錯誤訊息會指名欄位，照改即可。
+2. **F99 回寫**：SBA 轉製成功會回一個 txt（匯入序號↔正式傳票號對照）。可做上傳解析→把正式號寫回 `acc_config.sba_exported`，甚至直接組 acc_voucher_entries 分錄免再等 FNWFRX0090。
+3. 收入傳票(kind=1)+繳款人 F08 尚未做（設計文件 §6 有欄位規格）。
+4. UI 線上目視未做（本輪全 vm 驗證）——實際開 /sba.html 檢查版面與操作動線。
+5. 使用者未確認項：繳費單「代繳」對應自領(2) 是暫定，問使用者 SBA 實務用哪個碼。
+
+---
+
 # 專案接力記錄 — 2026/07/07（ACC v4.8.7）
 
 > 換台電腦繼續：先 `git -C .../EAF pull`。暗號「**佳里ACC，接力**」。

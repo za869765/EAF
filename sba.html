@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SBA 傳票工坊 — 佳里區衛生所 v1.0.0</title>
+<link rel="stylesheet" href="design.css">
+<style>
+/* ── 沿用 acc.html 視覺語言（parchment / warm charcoal） ── */
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--parchment, #f5f4ed); color: var(--near-black, #141413);
+  font-family: var(--font-sans, 'Microsoft JhengHei', sans-serif); font-size: 13px; }
+#top-bar { display: flex; align-items: center; gap: 8px; padding: 8px 14px;
+  background: var(--dark-surface, #30302e); }
+#top-bar h1 { font-family: var(--font-serif, Georgia, serif); font-size: 15px; font-weight: 500;
+  flex: 1; color: var(--ivory, #faf9f5); margin: 0; }
+.tbtn { padding: 4px 12px; border: none; border-radius: var(--r-md, 6px); font-size: 11px;
+  cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+  box-shadow: 0 0 0 1px rgba(250,249,245,.08); font-family: inherit; }
+.tbtn-gray { background: #3d3d3a; color: var(--warm-silver, #b0aea5); }
+.tbtn-gray:hover { background: #4d4c48; }
+.tbtn-blue { background: var(--terracotta, #c96442); color: var(--ivory, #faf9f5); }
+.tbtn-blue:hover { background: var(--terracotta-deep, #a84e2f); }
+#tab-nav { display: flex; gap: 2px; background: var(--dark-surface, #30302e);
+  padding: 0 10px; border-bottom: 2px solid var(--deep-dark, #141413); flex-wrap: wrap; }
+.tab-btn { padding: 9px 16px; background: transparent; color: var(--warm-silver, #b0aea5);
+  border: none; font-size: 12px; cursor: pointer; border-bottom: 3px solid transparent;
+  margin-bottom: -2px; font-family: inherit; }
+.tab-btn:hover { color: var(--ivory, #faf9f5); }
+.tab-btn.active { color: var(--ivory, #faf9f5); border-bottom-color: var(--terracotta, #c96442); }
+.tab-pane { display: none; padding: 14px; max-width: 1280px; margin: 0 auto; }
+.tab-pane.active { display: block; }
+.card { background: var(--ivory, #faf9f5); border-radius: var(--r-lg, 12px);
+  box-shadow: var(--sh-card, 0 0 0 1px #f0eee6); padding: 12px 14px; margin-bottom: 12px; }
+.card h3 { margin: 0 0 8px; font-size: 13px; }
+table.grid { border-collapse: collapse; width: 100%; font-size: 12px; }
+table.grid th { background: var(--warm-sand, #e8e6dc); color: var(--charcoal-warm, #4d4c48);
+  padding: 5px 7px; text-align: left; font-weight: 600; white-space: nowrap; position: sticky; top: 0; }
+table.grid td { padding: 4px 7px; border-bottom: 1px solid var(--border-cream, #f0eee6); vertical-align: top; }
+table.grid tr:hover td { background: #f2f0e8; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.chip { display: inline-block; padding: 0 6px; border-radius: 8px; font-size: 10px;
+  background: var(--warm-sand, #e8e6dc); color: var(--charcoal-warm, #4d4c48); white-space: nowrap; }
+.chip.fund { background: #dde8d9; color: #3c5a34; }
+.chip.cust { background: #e3e0f0; color: #4a4470; }
+.chip.exp  { background: #f0e0d8; color: #7a4a30; }
+.chip.done { background: #d7e3d2; color: #33552c; }
+.chip.warn { background: #f3e2c0; color: #7a5b18; }
+input, select, textarea { font-family: inherit; font-size: 12px; padding: 3px 6px;
+  border: 1px solid var(--ring-warm, #d1cfc5); border-radius: var(--r-sm, 6px);
+  background: var(--pure-white, #fff); color: inherit; }
+input:focus, select:focus { outline: 2px solid var(--focus-blue, #3898ec); outline-offset: -1px; }
+input.w-amt { width: 92px; text-align: right; }
+input.w-code { width: 82px; } input.w-4 { width: 56px; } input.w-2 { width: 44px; }
+input.w-date { width: 84px; } input.w-memo { width: 100%; min-width: 180px; }
+.btn { padding: 5px 14px; border: none; border-radius: var(--r-md, 8px); cursor: pointer;
+  font-size: 12px; font-family: inherit; background: var(--warm-sand, #e8e6dc);
+  color: var(--charcoal-warm, #4d4c48); box-shadow: var(--sh-ring-1, 0 0 0 1px #d1cfc5); }
+.btn:hover { background: #dedcd0; }
+.btn-main { background: var(--terracotta, #c96442); color: var(--ivory, #faf9f5); box-shadow: none; }
+.btn-main:hover { background: var(--terracotta-deep, #a84e2f); }
+.btn-sm { padding: 2px 8px; font-size: 11px; }
+.btn-danger { background: #b53333; color: #fff; box-shadow: none; }
+.vmsg { font-size: 12px; padding: 3px 8px; border-radius: 6px; margin: 2px 0; }
+.vmsg.err { background: #f6e0e0; color: #8c2323; }
+.vmsg.wrn { background: #f3ecd2; color: #7a5b18; }
+.vmsg.okk { background: #dfe9da; color: #33552c; }
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.toolbar label { font-size: 12px; color: var(--olive-gray, #5e5d59); }
+.sumbar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 8px 12px;
+  background: var(--warm-sand, #e8e6dc); border-radius: var(--r-md, 8px); margin: 10px 0; font-size: 12px; }
+.sumbar b { font-variant-numeric: tabular-nums; }
+#modal-mask { display: none; position: fixed; inset: 0; background: rgba(20,20,19,.45); z-index: 50; }
+#modal-box { position: fixed; top: 8vh; left: 50%; transform: translateX(-50%); width: min(860px, 94vw);
+  max-height: 80vh; overflow: auto; background: var(--ivory, #faf9f5); border-radius: var(--r-xl, 16px);
+  padding: 16px; z-index: 51; box-shadow: 0 12px 40px rgba(20,20,19,.25); }
+.pill-toggle { display: inline-flex; border-radius: 8px; overflow: hidden; box-shadow: var(--sh-ring-1); }
+.pill-toggle button { border: none; padding: 4px 10px; font-size: 11px; cursor: pointer;
+  background: var(--pure-white, #fff); color: var(--olive-gray, #5e5d59); font-family: inherit; }
+.pill-toggle button.on { background: var(--terracotta, #c96442); color: #fff; }
+.voucher-card { border-left: 4px solid var(--terracotta, #c96442); }
+.voucher-card.k3 { border-left-color: #5c8653; }
+.small { font-size: 11px; color: var(--stone-gray, #87867f); }
+.scroll-x { overflow-x: auto; }
+@media print { #top-bar, #tab-nav, .btn, .toolbar { display: none !important; } }
+</style>
+</head>
+<script>
+/* 登入守門：與 admin.html / acc.html 同一機制 */
+(function(){
+  const ss = sessionStorage.getItem('adminPass');
+  const ls = localStorage.getItem('acc_admin_pass');
+  if (ss) { localStorage.setItem('acc_admin_pass', ss); }
+  else if (ls) { sessionStorage.setItem('adminPass', ls); }
+  else { window.location.replace('/admin.html'); }
+})();
+window.addEventListener('storage', (ev) => {
+  if (ev.key === 'acc_admin_pass' && ev.newValue === null) {
+    try { sessionStorage.removeItem('adminPass'); } catch(_) {}
+    window.location.replace('/admin.html');
+  }
+});
+</script>
+<body>
+
+<div id="top-bar">
+  <h1>📤 SBA 傳票工坊 — 臺南市佳里區衛生所</h1>
+  <span class="small" id="ver-badge" style="color:#78909c;">v1.0.0</span>
+  <a class="tbtn tbtn-gray" href="/acc.html">📒 會計帳務</a>
+  <a class="tbtn tbtn-gray" href="/" target="_blank">📝 填單</a>
+  <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
+  <button class="tbtn tbtn-gray" onclick="logout()">登出</button>
+</div>
+
+<div id="tab-nav">
+  <button class="tab-btn active" data-tab="pick" onclick="switchTab('pick',this)">📋 選單製票</button>
+  <button class="tab-btn" data-tab="preview" onclick="switchTab('preview',this)">🧾 傳票預覽 <span id="draft-count" class="chip">0</span></button>
+  <button class="tab-btn" data-tab="transfer" onclick="switchTab('transfer',this)">🔁 轉帳傳票</button>
+  <button class="tab-btn" data-tab="export" onclick="switchTab('export',this)">⬇️ 匯出</button>
+  <button class="tab-btn" data-tab="settings" onclick="switchTab('settings',this)">⚙️ 設定</button>
+</div>
+
+<!-- ═══ 📋 選單製票 ═══ -->
+<div class="tab-pane active" id="tab-pick">
+  <div class="card">
+    <div class="toolbar">
+      <label>期間 <input type="date" id="pk-from"> ～ <input type="date" id="pk-to"></label>
+      <label><input type="checkbox" id="pk-printed" checked> 僅已列印</label>
+      <label><input type="checkbox" id="pk-unexported" checked> 僅未匯出</label>
+      <label>類型
+        <select id="pk-type"><option value="">全部</option><option value="expense">動支單</option><option value="purchase">請購單</option></select>
+      </label>
+      <label>專戶
+        <select id="pk-acct"><option value="">全部</option></select>
+      </label>
+      <input type="search" id="pk-q" placeholder="搜尋 摘要/單號/受款人…" style="width:180px;">
+      <button class="btn btn-sm" onclick="renderPickList()">🔍 重新整理</button>
+    </div>
+    <div class="scroll-x" style="max-height:52vh;overflow-y:auto;">
+      <table class="grid" id="pk-table">
+        <thead><tr>
+          <th><input type="checkbox" id="pk-all" onclick="toggleAllPick(this.checked)"></th>
+          <th>單號</th><th>日期</th><th>類型</th><th>專戶</th><th>科目</th><th>用途/摘要</th>
+          <th class="num">金額</th><th>受款人</th><th>狀態</th>
+        </tr></thead>
+        <tbody id="pk-body"></tbody>
+      </table>
+    </div>
+    <div class="sumbar" id="pk-summary">尚未勾選</div>
+    <div class="toolbar">
+      <label>製票日期 <input type="date" id="pk-paydate"></label>
+      <span class="pill-toggle" id="pk-posted-toggle">
+        <button class="on" data-v="posted" onclick="setPostMode('posted')">已入帳(同製票日)</button>
+        <button data-v="unposted" onclick="setPostMode('unposted')">未入帳(9991231)</button>
+      </span>
+      <span class="pill-toggle" id="pk-combine-toggle">
+        <button class="on" data-v="1" onclick="setCombine(true)">每專戶合併一張</button>
+        <button data-v="0" onclick="setCombine(false)">每單獨立一張</button>
+      </span>
+      <button class="btn btn-main" onclick="generateVouchers()">⚡ 產生支出傳票 → 預覽</button>
+    </div>
+    <div id="pk-issues"></div>
+  </div>
+</div>
+
+<!-- ═══ 🧾 傳票預覽 ═══ -->
+<div class="tab-pane" id="tab-preview">
+  <div id="pv-empty" class="card small">尚無傳票草稿——請至「📋 選單製票」勾選產生，或於「🔁 轉帳傳票」手動編製。</div>
+  <div id="pv-list"></div>
+</div>
+
+<!-- ═══ 🔁 轉帳傳票 ═══ -->
+<div class="tab-pane" id="tab-transfer">
+  <div class="card">
+    <h3>🔁 快速編製轉帳傳票（調整分錄）</h3>
+    <div class="toolbar">
+      <label>製票日期(=入帳日) <input type="date" id="tr-date"></label>
+      <label>傳票摘要 <input type="text" id="tr-memo" style="width:320px;" placeholder="例：11507 月底應付費用立帳"></label>
+    </div>
+    <div class="scroll-x">
+      <table class="grid" id="tr-table">
+        <thead><tr><th>#</th><th>借/貸</th><th>科目</th><th>bcode</th><th>用途別</th><th>子目</th><th>歸屬</th><th class="num">金額</th><th>摘要</th><th></th></tr></thead>
+        <tbody id="tr-body"></tbody>
+      </table>
+    </div>
+    <div class="toolbar">
+      <button class="btn btn-sm" onclick="addTrLine()">＋ 加列</button>
+      <span id="tr-balance" class="small"></span>
+      <button class="btn btn-main" onclick="addTransferVoucher()">⚡ 加入預覽</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ⬇️ 匯出 ═══ -->
+<div class="tab-pane" id="tab-export">
+  <div class="card">
+    <h3>⬇️ 產生 SBA 匯入檔（ZIP）</h3>
+    <div class="toolbar">
+      <label>處理日期 <input type="date" id="ex-date"></label>
+      <label>批號(2碼) <input type="text" id="ex-batch" value="AA" maxlength="2" style="width:48px;text-transform:uppercase;"></label>
+      <button class="btn" onclick="runBatchValidation()">🧪 全批檢核</button>
+      <button class="btn btn-main" id="ex-dl" onclick="downloadZip()">📦 下載 ZIP</button>
+      <button class="btn" id="ex-mark" onclick="markExported()" disabled>✅ 標記已匯出（寫入 D1）</button>
+    </div>
+    <div id="ex-validation"></div>
+    <div id="ex-files" class="small"></div>
+  </div>
+  <div class="card">
+    <h3>📜 匯出紀錄</h3>
+    <div class="scroll-x" style="max-height:40vh;overflow-y:auto;">
+      <table class="grid"><thead><tr><th>時間</th><th>批號</th><th>匯入序號</th><th>來源單</th></tr></thead>
+      <tbody id="ex-log"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ⚙️ 設定 ═══ -->
+<div class="tab-pane" id="tab-settings">
+  <div class="card">
+    <h3>⚙️ SBA 匯出設定</h3>
+    <div class="toolbar"><label>SBA 製票人帳號(mvchno) <input type="text" id="st-mvchno" style="width:140px;" placeholder="須為 SBA 系統使用者帳號"></label></div>
+    <div class="toolbar"><label>用人費用預設人員類別(pkind) <input type="text" id="st-pkind" style="width:80px;" placeholder="如 01"></label>
+      <span class="small">用途別 1XXX 時必填；代碼須存在 SBA 共用項目代碼檔(fnxwanormi)</span></div>
+    <div class="toolbar"><label>存帳銀行代碼白名單 <input type="text" id="st-farm" style="width:220px;" value="6180069,6180416"></label>
+      <span class="small">佳里區農會 6180069／佳興分部 6180416；其餘有帳號→e電匯、繳費單→自領(代繳)</span></div>
+    <h3 style="margin-top:14px;">科目 → 預算科目(bcode) 對照</h3>
+    <div class="small" style="margin-bottom:6px;">⚠️ 官方範例 F04 每列均有 bcode。以下種子值為規律推導（第1,2,4碼＋末碼、98→Y），<b>請對照 SBA「常用會計科目設定」逐一核對後儲存</b>。</div>
+    <div class="scroll-x" style="max-height:38vh;overflow-y:auto;">
+      <table class="grid"><thead><tr><th>EAS 科目</th><th>名稱</th><th>bcode</th></tr></thead>
+      <tbody id="st-bcode-body"></tbody></table>
+    </div>
+    <div class="toolbar" style="margin-top:10px;">
+      <button class="btn btn-main" onclick="saveSettings()">💾 儲存設定（D1）</button>
+      <span id="st-msg" class="small"></span>
+    </div>
+  </div>
+</div>
+
+<!-- 沖帳選擇 modal -->
+<div id="modal-mask" onclick="closeModal()"></div>
+<div id="modal-box" style="display:none;">
+  <h3 id="modal-title">選擇沖帳立帳傳票</h3>
+  <div class="small" id="modal-hint"></div>
+  <div class="scroll-x" style="max-height:52vh;overflow-y:auto;margin-top:8px;">
+    <table class="grid"><thead><tr><th>傳票號</th><th>序</th><th>日期</th><th>子目</th><th>摘要</th><th class="num">貸方金額</th><th></th></tr></thead>
+    <tbody id="modal-body"></tbody></table>
+  </div>
+  <div class="toolbar" style="margin-top:10px;">
+    <button class="btn" onclick="clearOffset()">🚫 解除沖帳連結</button>
+    <button class="btn" onclick="closeModal()">關閉</button>
+  </div>
+</div>
+
+<script src="sba-core.js"></script>
+<script>
+/* ═══════════════ 狀態 ═══════════════ */
+const STATE = {
+  records: [], entries: [], subjects: null, banks: [], bankByCode: new Map(),
+  config: {}, settings: { mvchno: '', pkind: '', farm: '6180069,6180416', bcodeMap: {} },
+  exported: {},              /* recId → {recno,batch,at,src} */
+  drafts: [],                /* normalized vouchers (sba-core 模型) */
+  combine: true, postMode: 'posted',
+  serials: {},               /* '1152' → 已配最大流水 */
+  modalCtx: null,
+};
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const fmtN = (n) => (+n || 0).toLocaleString('zh-TW');
+const todayIso = () => new Date().toISOString().slice(0, 10);
+const rocYearNow = () => String(new Date().getFullYear() - 1911);
+
+function logout() {
+  sessionStorage.removeItem('adminPass');
+  localStorage.removeItem('acc_admin_pass');
+  window.location.replace('/admin.html');
+}
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  $('tab-' + name).classList.add('active');
+  (btn || document.querySelector(`.tab-btn[data-tab="${name}"]`)).classList.add('active');
+  if (name === 'preview') renderPreview();
+  if (name === 'export') { renderExportLog(); runBatchValidation(); }
+  if (name === 'settings') renderSettings();
+}
+
+/* ═══════════════ 開機載入 ═══════════════ */
+async function boot() {
+  const [records, entries, subjects, banks, config] = await Promise.all([
+    fetch('/api/records').then(r => r.json()).catch(() => []),
+    fetch('/api/acc/v2/entries').then(r => r.json()).catch(() => []),
+    fetch('/api/subjects').then(r => r.ok ? r.json() : null).catch(() => null)
+      .then(s => s || fetch('/subjects.json').then(r => r.json()).catch(() => null)),
+    fetch('/banks.json').then(r => r.json()).catch(() => []),
+    fetch('/api/acc/v2/config').then(r => r.json()).catch(() => ({})),
+  ]);
+  STATE.records = Array.isArray(records) ? records : [];
+  STATE.entries = Array.isArray(entries) ? entries : [];
+  STATE.subjects = subjects;
+  STATE.banks = banks;
+  for (const b of banks) if (!STATE.bankByCode.has(b.code)) STATE.bankByCode.set(b.code, b.name);
+  STATE.config = config || {};
+  if (config && config.sba_settings) Object.assign(STATE.settings, config.sba_settings);
+  if (config && config.sba_exported) STATE.exported = config.sba_exported;
+  /* 序號高水位：從匯出紀錄還原（預設高段 90000 起，杜絕與 SBA 正式號相撞） */
+  for (const rec of Object.values(STATE.exported)) {
+    const s = String(rec.recno || '');
+    if (/^\d{9}$/.test(s)) {
+      const pfx = s.slice(0, 4), n = +s.slice(4);
+      if (!(pfx in STATE.serials) || n > STATE.serials[pfx]) STATE.serials[pfx] = n;
+    }
+  }
+  /* 預設期間：近 60 天 */
+  const d = new Date(); d.setDate(d.getDate() - 60);
+  $('pk-from').value = d.toISOString().slice(0, 10);
+  $('pk-to').value = todayIso();
+  $('pk-paydate').value = todayIso();
+  $('tr-date').value = todayIso();
+  $('ex-date').value = todayIso();
+  buildAcctFilter();
+  renderPickList();
+  addTrLine(); addTrLine();
+}
+
+function subjectName(code) {
+  if (!STATE.subjects) return '';
+  for (const ma of STATE.subjects.mainAccounts || []) {
+    if (ma.code === code) return ma.name;
+    for (const bp of ma.businessPlans || []) if (bp.code === code) return bp.name;
+  }
+  const e = STATE.entries.find(x => (x.subject || '').startsWith(code + ' '));
+  return e ? e.subject.slice(code.length + 1) : '';
+}
+function allKnownSubjectCodes() {
+  const set = new Map(); /* code → name */
+  if (STATE.subjects) for (const ma of STATE.subjects.mainAccounts || []) {
+    set.set(ma.code, ma.name);
+    for (const bp of ma.businessPlans || []) set.set(bp.code, bp.name);
+  }
+  for (const e of STATE.entries) {
+    const m = String(e.subject || '').match(/^(\S+)\s+(.*)$/);
+    if (m && !set.has(m[1])) set.set(m[1], m[2]);
+  }
+  return set;
+}
+function bcodeFor(code) {
+  const map = STATE.settings.bcodeMap || {};
+  if (map[code] != null && map[code] !== '') return map[code];
+  return guessBcode(code);
+}
+function recDateIso(r) {
+  if (r.applyDateRaw && /^\d{4}-\d{2}-\d{2}/.test(r.applyDateRaw)) return r.applyDateRaw.slice(0, 10);
+  const m = String(r.savedAt || '').match(/^(\d{3})\/(\d{2})\/(\d{2})/);
+  if (m) return `${+m[1] + 1911}-${m[2]}-${m[3]}`;
+  return '';
+}
+
+/* ═══════════════ 📋 選單製票 ═══════════════ */
+function buildAcctFilter() {
+  const sel = $('pk-acct');
+  const accts = [...new Set(STATE.records.map(r => r.acctCode).filter(Boolean))].sort();
+  for (const a of accts) {
+    const o = document.createElement('option');
+    o.value = a; o.textContent = `${a} ${subjectName(a)}`;
+    sel.appendChild(o);
+  }
+}
+function pickFiltered() {
+  const from = $('pk-from').value, to = $('pk-to').value;
+  const onlyPrinted = $('pk-printed').checked, onlyUnexp = $('pk-unexported').checked;
+  const ft = $('pk-type').value, acct = $('pk-acct').value;
+  const q = $('pk-q').value.trim();
+  return STATE.records.filter(r => {
+    if (r.voided) return false;
+    if (!['expense', 'purchase'].includes(r.formType)) return false;
+    if (onlyPrinted && !r.printed) return false;
+    if (onlyUnexp && STATE.exported[r.id]) return false;
+    if (ft && r.formType !== ft) return false;
+    if (acct && r.acctCode !== acct) return false;
+    const d = recDateIso(r);
+    if (from && d && d < from) return false;
+    if (to && d && d > to) return false;
+    if (q) {
+      const hay = [r.voucherNo, r.purposeDesc, r.bpLabel,
+        ...(r.payees || []).map(p => p.name)].join(' ');
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  }).sort((a, b) => (recDateIso(b) || '').localeCompare(recDateIso(a) || ''));
+}
+function renderPickList() {
+  const rows = pickFiltered();
+  const tb = $('pk-body');
+  tb.innerHTML = rows.map(r => {
+    const acctChip = r.acctCode === '11010202' ? 'cust' : 'fund';
+    const payeeTxt = (r.payees || []).map(p => p.type === 'bill' ? '💳繳費單' : (p.name || '')).filter(Boolean).join('、')
+      || (r.payee && r.payee.name) || (r.payee && r.payee.type === 'bill' ? '💳繳費單' : '') || '—';
+    const st = [
+      r.printed ? '<span class="chip done">已列印</span>' : '<span class="chip warn">未列印</span>',
+      STATE.exported[r.id] ? `<span class="chip done">已匯出 ${esc(STATE.exported[r.id].recno)}</span>` : '',
+    ].join(' ');
+    return `<tr>
+      <td><input type="checkbox" class="pk-cb" value="${esc(r.id)}" onchange="updatePickSummary()"></td>
+      <td>${esc(r.voucherNo)}</td><td>${esc(recDateIso(r))}</td>
+      <td><span class="chip">${r.formType === 'expense' ? '動支' : '請購'}</span></td>
+      <td><span class="chip ${acctChip}">${esc(r.acctCode)}</span></td>
+      <td>${esc(r.bpCode)} ${esc(r.bpLabel || '')}</td>
+      <td style="max-width:280px;">${esc(String(r.purposeDesc || '').slice(0, 60))}</td>
+      <td class="num">${fmtN(r.total)}</td>
+      <td style="max-width:160px;">${esc(payeeTxt)}</td>
+      <td>${st}</td></tr>`;
+  }).join('') || '<tr><td colspan="10" class="small">無符合條件的單據</td></tr>';
+  $('pk-all').checked = false;
+  updatePickSummary();
+}
+function toggleAllPick(on) {
+  document.querySelectorAll('.pk-cb').forEach(cb => { cb.checked = on; });
+  updatePickSummary();
+}
+function selectedRecords() {
+  const ids = new Set([...document.querySelectorAll('.pk-cb:checked')].map(cb => cb.value));
+  return STATE.records.filter(r => ids.has(r.id));
+}
+function updatePickSummary() {
+  const sel = selectedRecords();
+  if (!sel.length) { $('pk-summary').textContent = '尚未勾選'; return; }
+  const byAcct = {};
+  for (const r of sel) {
+    byAcct[r.acctCode] = byAcct[r.acctCode] || { n: 0, sum: 0 };
+    byAcct[r.acctCode].n++; byAcct[r.acctCode].sum += +r.total || 0;
+  }
+  $('pk-summary').innerHTML = Object.entries(byAcct).map(([a, s]) =>
+    `<span><span class="chip ${a === '11010202' ? 'cust' : 'fund'}">${esc(a)} ${esc(subjectName(a))}</span> ${s.n} 筆 <b>$${fmtN(s.sum)}</b> → 1 張支出傳票</span>`
+  ).join('') + `<span>｜合計 ${sel.length} 筆 <b>$${fmtN(sel.reduce((s, r) => s + (+r.total || 0), 0))}</b></span>`;
+}
+function setPostMode(m) {
+  STATE.postMode = m;
+  document.querySelectorAll('#pk-posted-toggle button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
+}
+function setCombine(c) {
+  STATE.combine = c;
+  document.querySelectorAll('#pk-combine-toggle button').forEach(b => b.classList.toggle('on', b.dataset.v === (c ? '1' : '0')));
+}
+function nextRecnoFor(kind) {
+  const year = rocYearNow();
+  const pfx = year + String(kind);
+  let base = STATE.serials[pfx] || 90000;
+  for (const v of STATE.drafts) {
+    const s = String(v.importrecno || '');
+    if (s.startsWith(pfx)) base = Math.max(base, +s.slice(4) || 0);
+  }
+  STATE.serials[pfx] = base + 1;
+  return pfx + String(base + 1).padStart(5, '0');
+}
+function generateVouchers() {
+  const sel = selectedRecords();
+  if (!sel.length) { alert('請先勾選單據'); return; }
+  const payIso = $('pk-paydate').value;
+  if (!payIso) { alert('請選製票日期'); return; }
+  const pay7 = toRoc7(payIso);
+  const farmCodes = new Set(String(STATE.settings.farm || '').split(/[,，\s]+/).filter(Boolean));
+  const acctNameMap = {};
+  for (const a of new Set(sel.map(r => r.acctCode))) acctNameMap[a] = subjectName(a);
+  const { vouchers, issues } = mapRecordsToVouchers(sel, {
+    year: rocYearNow(), payDate7: pay7,
+    postDate7: STATE.postMode === 'posted' ? pay7 : '9991231',
+    mvchno: STATE.settings.mvchno || '', combine: STATE.combine,
+    bcodeFor, farmCodes, defaultPkind: STATE.settings.pkind || '',
+    bankNameByCode: (c) => STATE.bankByCode.get(c) || '',
+    nextRecno: () => nextRecnoFor('2'), acctNames: acctNameMap,
+  });
+  STATE.drafts.push(...vouchers);
+  $('pk-issues').innerHTML = issues.map(i =>
+    `<div class="vmsg ${i.level === 'error' ? 'err' : 'wrn'}">${esc(i.msg)}</div>`).join('');
+  $('draft-count').textContent = STATE.drafts.length;
+  switchTab('preview');
+}
+
+/* ═══════════════ 🧾 傳票預覽/編輯 ═══════════════ */
+const KIND_NAMES = { '1': '收入傳票', '2': '支出傳票', '3': '轉帳傳票' };
+const OFFSETABLE = (code) => /^(2102|210205|210202|110305|180705)/.test(code);
+function renderPreview() {
+  $('pv-empty').style.display = STATE.drafts.length ? 'none' : 'block';
+  $('draft-count').textContent = STATE.drafts.length;
+  if (LAST_EXPORT && draftsSig() !== LAST_EXPORT.sig) $('ex-mark').disabled = true;
+  $('pv-list').innerHTML = STATE.drafts.map((v, vi) => {
+    const r = validateVoucher(v);
+    const linesHtml = v.lines.map((L, li) => `
+      <tr>
+        <td>${L.seq}</td>
+        <td><select onchange="updLine(${vi},${li},'dc',this.value)"><option value="D"${L.dc === 'D' ? ' selected' : ''}>借</option><option value="C"${L.dc === 'C' ? ' selected' : ''}>貸</option></select></td>
+        <td><input class="w-code" value="${esc(L.code)}" onchange="updLine(${vi},${li},'code',this.value)" title="${esc(subjectName(L.code))}"> <span class="small">${esc(subjectName(L.code)).slice(0, 8)}</span></td>
+        <td><input class="w-4" value="${esc(L.bcode || '')}" onchange="updLine(${vi},${li},'bcode',this.value)"></td>
+        <td><input class="w-4" value="${esc(L.use || '')}" onchange="updLine(${vi},${li},'use',this.value)"></td>
+        <td>${/^1\d{3}$/.test(L.use || '') ? `<input class="w-2" value="${esc(L.pkind || '')}" placeholder="pkind" onchange="updLine(${vi},${li},'pkind',this.value)">` : ''}</td>
+        <td><input class="w-2" value="${esc(L.relate || '')}" onchange="updLine(${vi},${li},'relate',this.value)"></td>
+        <td><input class="w-4" value="${esc(L.scode1 || '')}" onchange="updLine(${vi},${li},'scode1',this.value)"></td>
+        <td><input class="w-amt" value="${L.amt}" onchange="updLine(${vi},${li},'amt',this.value)"></td>
+        <td><input class="w-memo" value="${esc(L.memo || '')}" onchange="updLine(${vi},${li},'memo',this.value)"></td>
+        <td style="white-space:nowrap;">
+          ${L.dc === 'D' && OFFSETABLE(L.code) ? `<button class="btn btn-sm" onclick="openOffsetModal(${vi},${li})">${L.offset ? '🔗' + esc(L.offset.vchrno) + '#' + esc(String(L.offset.seq)) : '沖帳'}</button>` : ''}
+          <button class="btn btn-sm" onclick="delLine(${vi},${li})">✕</button>
+        </td>
+      </tr>`).join('');
+    const payeesHtml = (v.payees || []).map((P, pi) => `
+      <tr${P.needsInput ? ' style="background:#fdf3e7;"' : ''}>
+        <td>${P.seq}</td>
+        <td><input style="width:110px;" value="${esc(P.name)}" placeholder="${P.srcType === 'bill' ? '繳費單受款單位' : '受款人'}" onchange="updPayee(${vi},${pi},'name',this.value)"></td>
+        <td><input style="width:120px;" value="${esc(P.account || '')}" onchange="updPayee(${vi},${pi},'account',this.value)"></td>
+        <td><input class="w-code" value="${esc(P.userbank || '')}" onchange="updPayee(${vi},${pi},'userbank',this.value)" title="${esc(P.bankna || '')}"></td>
+        <td><select onchange="updPayee(${vi},${pi},'payway',this.value)">
+          ${['1:存帳', '2:自領(代繳)', '3:郵寄', '6:電匯(e企)'].map(o => { const [k, n] = o.split(':'); return `<option value="${k}"${P.payway === k ? ' selected' : ''}>${n}</option>`; }).join('')}
+        </select></td>
+        <td><input class="w-amt" value="${P.amt}" onchange="updPayee(${vi},${pi},'amt',this.value)"></td>
+        <td><select onchange="updPayee(${vi},${pi},'rev',this.value)">
+          ${['0:其他書據', '1:普通收據', '2:統一發票'].map(o => { const [k, n] = o.split(':'); return `<option value="${k}"${P.rev === k ? ' selected' : ''}>${n}</option>`; }).join('')}
+        </select></td>
+        <td>${P.rev === '2' ? `
+          <input class="w-code" placeholder="發票號" value="${esc((P.invoices && P.invoices[0] && P.invoices[0].invno) || '')}" onchange="updInvoice(${vi},${pi},'invno',this.value)">
+          <input class="w-date" placeholder="民國7碼" value="${esc((P.invoices && P.invoices[0] && P.invoices[0].invdate) || '')}" onchange="updInvoice(${vi},${pi},'invdate',this.value)">
+          <input class="w-amt" placeholder="金額" value="${(P.invoices && P.invoices[0] && P.invoices[0].invamt) || ''}" onchange="updInvoice(${vi},${pi},'invamt',this.value)">` : ''}</td>
+        <td><input class="w-memo" value="${esc(P.usedoc || '')}" onchange="updPayee(${vi},${pi},'usedoc',this.value)"></td>
+        <td><button class="btn btn-sm" onclick="delPayee(${vi},${pi})">✕</button></td>
+      </tr>`).join('');
+    return `<div class="card voucher-card${v.kind === '3' ? ' k3' : ''}">
+      <div class="toolbar">
+        <b>${KIND_NAMES[v.kind] || v.kind}</b>
+        <span class="chip ${v.acctCode === '11010202' ? 'cust' : 'fund'}">${esc(v.acctName || '')}</span>
+        <label>匯入序號 <input class="w-code" style="width:100px;" value="${esc(v.importrecno)}" onchange="updV(${vi},'importrecno',this.value)"></label>
+        <label>製票日 <input class="w-date" value="${esc(v.payDate)}" onchange="updV(${vi},'payDate',this.value)"></label>
+        <label>入帳日 <input class="w-date" value="${esc(v.postDate)}" onchange="updV(${vi},'postDate',this.value)" title="未入帳填 9991231"></label>
+        <label>單據張數 <input class="w-2" value="${v.rnum || 0}" onchange="updV(${vi},'rnum',this.value)"></label>
+        <span style="flex:1;"></span>
+        <button class="btn btn-sm btn-danger" onclick="delVoucher(${vi})">🗑️ 刪除此張</button>
+      </div>
+      <div class="toolbar"><label style="flex:1;">摘要 <input class="w-memo" value="${esc(v.memo || '')}" onchange="updV(${vi},'memo',this.value)"></label></div>
+      <div class="scroll-x"><table class="grid">
+        <thead><tr><th>序</th><th>借貸</th><th>科目</th><th>bcode</th><th>用途別</th><th>pkind</th><th>子目</th><th>歸屬</th><th class="num">金額</th><th>摘要</th><th></th></tr></thead>
+        <tbody>${linesHtml}</tbody></table></div>
+      <div class="toolbar"><button class="btn btn-sm" onclick="addLine(${vi})">＋ 加明細列</button></div>
+      ${v.kind === '2' ? `
+      <h3 style="margin-top:8px;">受款人（F05）</h3>
+      <div class="scroll-x"><table class="grid">
+        <thead><tr><th>序</th><th>名稱</th><th>帳號</th><th>銀行代碼</th><th>付款方式</th><th class="num">金額</th><th>單據</th><th>發票(統一發票時)</th><th>支出用途</th><th></th></tr></thead>
+        <tbody>${payeesHtml}</tbody></table></div>
+      <div class="toolbar"><button class="btn btn-sm" onclick="addPayee(${vi})">＋ 加受款人</button></div>` : ''}
+      <div>${r.errors.map(e => `<div class="vmsg err">❌ ${esc(e)}</div>`).join('')}
+      ${r.warnings.map(w => `<div class="vmsg wrn">⚠️ ${esc(w)}</div>`).join('')}
+      ${!r.errors.length ? '<div class="vmsg okk">✅ 檢核通過</div>' : ''}</div>
+    </div>`;
+  }).join('');
+}
+function updV(vi, k, val) {
+  const v = STATE.drafts[vi];
+  if (k === 'rnum') v[k] = +val || 0;
+  else v[k] = val.trim();
+  renderPreview();
+}
+function updLine(vi, li, k, val) {
+  const L = STATE.drafts[vi].lines[li];
+  L[k] = k === 'amt' ? (+String(val).replace(/,/g, '') || 0) : val.trim();
+  if (k === 'code') { L.bcode = bcodeFor(L.code); }
+  renderPreview();
+}
+function updPayee(vi, pi, k, val) {
+  const P = STATE.drafts[vi].payees[pi];
+  P[k] = k === 'amt' ? (+String(val).replace(/,/g, '') || 0) : val.trim();
+  if (k === 'name' && P.name) P.needsInput = false;
+  if (k === 'userbank') P.bankna = STATE.bankByCode.get(P.userbank) || P.bankna || '';
+  if (k === 'rev' && P.rev !== '2') delete P.invoices; /* 單據改回 0/1 時清發票，避免殘留誤產 F07 */
+  renderPreview();
+}
+function updInvoice(vi, pi, k, val) {
+  const P = STATE.drafts[vi].payees[pi];
+  if (!P.invoices || !P.invoices.length) P.invoices = [{ invno: '', invdate: '', invamt: 0 }];
+  P.invoices[0][k] = k === 'invamt' ? (+String(val).replace(/,/g, '') || 0) : val.trim();
+  renderPreview();
+}
+function addLine(vi) {
+  const v = STATE.drafts[vi];
+  v.lines.push({ seq: v.lines.length + 1, dc: 'D', code: '', bcode: '', use: '', relate: '',
+    scode1: '55000', amt: 0, ttype: v.kind === '3' ? '' : '2', memo: '' });
+  renderPreview();
+}
+function delLine(vi, li) {
+  const v = STATE.drafts[vi];
+  v.lines.splice(li, 1);
+  v.lines.forEach((L, i) => { L.seq = i + 1; });
+  renderPreview();
+}
+function addPayee(vi) {
+  const v = STATE.drafts[vi];
+  v.payees.push({ seq: v.payees.length + 1, name: '', account: '', userbank: '', bankna: '',
+    payway: '1', amt: 0, usedoc: '', rev: '0' });
+  renderPreview();
+}
+function delPayee(vi, pi) {
+  const v = STATE.drafts[vi];
+  v.payees.splice(pi, 1);
+  v.payees.forEach((P, i) => { P.seq = i + 1; });
+  renderPreview();
+}
+function delVoucher(vi) {
+  if (!confirm('刪除這張傳票草稿？')) return;
+  STATE.drafts.splice(vi, 1);
+  renderPreview();
+}
+
+/* ── 沖帳 modal：從歷史 SBA 分錄找同科目貸方立帳列 ── */
+function openOffsetModal(vi, li) {
+  const L = STATE.drafts[vi].lines[li];
+  STATE.modalCtx = { vi, li };
+  const code = String(L.code).slice(0, 8);
+  const base6 = code.slice(0, 6);
+  const year = STATE.drafts[vi].year;
+  const cands = STATE.entries.filter(e => {
+    const sc = String(e.subject || '').split(' ')[0];
+    if (!(sc === code || sc.startsWith(base6))) return false;
+    if (!(+e.credit > 0)) return false;
+    if (!String(e.voucher_no || '').startsWith(year)) return false;
+    if (L.relate && String(e.sub_account || '').slice(0, 2) !== L.relate) return false;
+    return true;
+  }).sort((a, b) => String(b.voucher_no).localeCompare(String(a.voucher_no))).slice(0, 120);
+  $('modal-title').textContent = `選擇沖帳立帳傳票 — ${code} ${subjectName(code)}`;
+  $('modal-hint').textContent = `候選＝D1 歷史 SBA 分錄中，本年度同科目${L.relate ? `（子目 ${L.relate}）` : ''}之貸方（立帳）列。資料截至最後匯入月份，較新的立帳請至 SBA 端手動沖。`;
+  $('modal-body').innerHTML = cands.map(e => `
+    <tr><td>${esc(e.voucher_no)}</td><td>${esc(String(e.seq))}</td><td>${esc(e.post_date || e.make_date || '')}</td>
+    <td>${esc(e.sub_account || '')}</td><td style="max-width:280px;">${esc(String(e.description || '').slice(0, 40))}</td>
+    <td class="num">${fmtN(e.credit)}</td>
+    <td><button class="btn btn-sm" onclick="pickOffset('${esc(e.voucher_no)}',${+e.seq || 0},${+e.credit || 0})">選此列</button></td></tr>`
+  ).join('') || '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
+  $('modal-mask').style.display = 'block';
+  $('modal-box').style.display = 'block';
+}
+function pickOffset(vchrno, seq, credit) {
+  const { vi, li } = STATE.modalCtx;
+  const L = STATE.drafts[vi].lines[li];
+  L.offset = { year: String(vchrno).slice(0, 3), kind: String(vchrno).slice(3, 4),
+    vchrno: String(vchrno), seq,
+    amt: Math.min(L.amt, +credit || L.amt), max: +credit || null };
+  closeModal(); renderPreview();
+}
+function clearOffset() {
+  const { vi, li } = STATE.modalCtx;
+  delete STATE.drafts[vi].lines[li].offset;
+  closeModal(); renderPreview();
+}
+function closeModal() {
+  $('modal-mask').style.display = 'none';
+  $('modal-box').style.display = 'none';
+}
+
+/* ═══════════════ 🔁 轉帳傳票 ═══════════════ */
+function addTrLine() {
+  const tb = $('tr-body');
+  const i = tb.children.length;
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${i + 1}</td>
+    <td><select class="tr-dc"><option value="D">借</option><option value="C">貸</option></select></td>
+    <td><input class="w-code tr-code" list="subject-list" onchange="trCodeHint(this)"> <span class="small tr-name"></span></td>
+    <td><input class="w-4 tr-bcode"></td>
+    <td><input class="w-4 tr-use"></td>
+    <td><input class="w-2 tr-relate"></td>
+    <td><input class="w-4 tr-scode1" value="55000"></td>
+    <td><input class="w-amt tr-amt" onchange="trBalance()"></td>
+    <td><input class="w-memo tr-memo"></td>
+    <td><button class="btn btn-sm" onclick="this.closest('tr').remove();trBalance()">✕</button></td>`;
+  tb.appendChild(tr);
+  ensureSubjectDatalist();
+}
+function ensureSubjectDatalist() {
+  if ($('subject-list')) return;
+  const dl = document.createElement('datalist');
+  dl.id = 'subject-list';
+  for (const [code, name] of allKnownSubjectCodes()) {
+    const o = document.createElement('option');
+    o.value = code; o.label = name;
+    dl.appendChild(o);
+  }
+  document.body.appendChild(dl);
+}
+function trCodeHint(inp) {
+  const tr = inp.closest('tr');
+  tr.querySelector('.tr-name').textContent = subjectName(inp.value).slice(0, 10);
+  tr.querySelector('.tr-bcode').value = bcodeFor(inp.value);
+}
+function trLines() {
+  return [...$('tr-body').children].map((tr, i) => ({
+    seq: i + 1,
+    dc: tr.querySelector('.tr-dc').value,
+    code: tr.querySelector('.tr-code').value.trim(),
+    bcode: tr.querySelector('.tr-bcode').value.trim(),
+    use: tr.querySelector('.tr-use').value.trim(),
+    relate: tr.querySelector('.tr-relate').value.trim(),
+    scode1: tr.querySelector('.tr-scode1').value.trim(),
+    amt: +String(tr.querySelector('.tr-amt').value).replace(/,/g, '') || 0,
+    memo: tr.querySelector('.tr-memo').value.trim(),
+    ttype: '',
+  })).filter(L => L.code || L.amt);
+}
+function trBalance() {
+  const ls = trLines();
+  const d = ls.filter(L => L.dc === 'D').reduce((s, L) => s + L.amt, 0);
+  const c = ls.filter(L => L.dc === 'C').reduce((s, L) => s + L.amt, 0);
+  $('tr-balance').innerHTML = `借 <b>${fmtN(d)}</b> ／ 貸 <b>${fmtN(c)}</b> ${d === c && d > 0 ? '✅ 平衡' : '❌ 未平衡'}`;
+}
+function addTransferVoucher() {
+  const ls = trLines();
+  if (!ls.length) { alert('請先輸入分錄'); return; }
+  const pay7 = toRoc7($('tr-date').value);
+  const v = {
+    year: rocYearNow(), kind: '3', importrecno: nextRecnoFor('3'),
+    mvchno: STATE.settings.mvchno || '', payDate: pay7, postDate: pay7,
+    memo: $('tr-memo').value.trim(), rnum: 0, urgent: '', scode1: '1',
+    lines: ls, payees: [], sourceIds: [], acctCode: '', acctName: '轉帳',
+  };
+  STATE.drafts.push(v);
+  $('tr-body').innerHTML = ''; addTrLine(); addTrLine(); $('tr-memo').value = '';
+  trBalance();
+  switchTab('preview');
+}
+
+/* ═══════════════ ⬇️ 匯出 ═══════════════ */
+function existingRecnos() {
+  return Object.values(STATE.exported).map(e => String(e.recno));
+}
+function runBatchValidation() {
+  const box = $('ex-validation');
+  if (!STATE.drafts.length) { box.innerHTML = '<div class="vmsg wrn">預覽區沒有傳票草稿</div>'; $('ex-mark').disabled = true; return false; }
+  const { errors, warnings } = validateBatch(STATE.drafts, { existingRecnos: existingRecnos() });
+  box.innerHTML = errors.map(e => `<div class="vmsg err">❌ ${esc(e)}</div>`).join('')
+    + warnings.map(w => `<div class="vmsg wrn">⚠️ ${esc(w)}</div>`).join('')
+    + (!errors.length ? `<div class="vmsg okk">✅ 全批 ${STATE.drafts.length} 張檢核通過</div>` : '');
+  return !errors.length;
+}
+let LAST_EXPORT = null;
+function draftsSig() { return JSON.stringify(STATE.drafts); }
+function downloadZip() {
+  if (!runBatchValidation()) { alert('檢核未通過，請先修正紅色項目'); return; }
+  const proc7 = toRoc7($('ex-date').value);
+  const batch = $('ex-batch').value.trim().toUpperCase();
+  if (!/^[1-9A-Z]{2}$/.test(batch)) { alert('批號須為 2 碼（1-9、A-Z）'); return; }
+  let files;
+  try { ({ files } = buildExportFiles(STATE.drafts, proc7, batch)); }
+  catch (e) { alert(e.message); return; }
+  const zip = buildZip(files);
+  const blob = new Blob([zip], { type: 'application/zip' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `SBA匯入傳票_${proc7}${batch}.zip`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  $('ex-files').innerHTML = '已產生：' + Object.entries(files).map(([n, c]) =>
+    `<span class="chip">${esc(n)}（${(c.match(/_row>/g) || []).length / 2} 列）</span>`).join(' ');
+  /* 快照「實際打包」的內容——之後草稿有變動就必須重新下載才能標記 */
+  LAST_EXPORT = {
+    proc7, batch, at: new Date().toISOString(), sig: draftsSig(),
+    snapshot: STATE.drafts.map((v) => ({
+      importrecno: v.importrecno, acctCode: v.acctCode, sourceIds: [...(v.sourceIds || [])],
+    })),
+  };
+  $('ex-mark').disabled = false;
+}
+async function markExported() {
+  if (!LAST_EXPORT) return;
+  if (draftsSig() !== LAST_EXPORT.sig) {
+    alert('傳票內容在下載 ZIP 後有變動——請重新下載 ZIP 再標記，以免紀錄與檔案不符');
+    $('ex-mark').disabled = true;
+    return;
+  }
+  const { batch, at, snapshot } = LAST_EXPORT;
+  for (const v of snapshot) {
+    for (const id of v.sourceIds) {
+      STATE.exported[id] = { recno: v.importrecno, batch: LAST_EXPORT.proc7 + batch, at, src: v.acctCode };
+    }
+    /* 轉帳傳票（無 sourceIds）也記序號，避免重複配號 */
+    if (!v.sourceIds.length) {
+      STATE.exported['recno:' + v.importrecno] = { recno: v.importrecno, batch: LAST_EXPORT.proc7 + batch, at, src: 'manual' };
+    }
+  }
+  const okA = await putConfig('sba_exported', STATE.exported);
+  if (okA) {
+    alert(`已標記 ${snapshot.length} 張傳票為已匯出`);
+    STATE.drafts = [];
+    LAST_EXPORT = null;
+    $('draft-count').textContent = '0';
+    $('ex-mark').disabled = true;
+    renderExportLog(); renderPickList(); runBatchValidation();
+  } else {
+    alert('寫入 D1 失敗（密碼或連線問題），請重試');
+  }
+}
+function renderExportLog() {
+  const rows = Object.entries(STATE.exported)
+    .map(([id, e]) => ({ id, ...e }))
+    .sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+  const byRecno = new Map();
+  for (const r of rows) {
+    if (!byRecno.has(r.recno)) byRecno.set(r.recno, { ...r, srcs: [] });
+    if (!r.id.startsWith('recno:')) {
+      const rec = STATE.records.find(x => x.id === r.id);
+      byRecno.get(r.recno).srcs.push(rec ? rec.voucherNo : r.id);
+    }
+  }
+  $('ex-log').innerHTML = [...byRecno.values()].map(r =>
+    `<tr><td>${esc(String(r.at || '').slice(0, 16).replace('T', ' '))}</td><td>${esc(r.batch || '')}</td>
+     <td>${esc(r.recno)}</td><td>${esc(r.srcs.join('、') || '手動編製')}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="small">尚無匯出紀錄</td></tr>';
+}
+
+/* ═══════════════ ⚙️ 設定 ═══════════════ */
+function renderSettings() {
+  $('st-mvchno').value = STATE.settings.mvchno || '';
+  $('st-pkind').value = STATE.settings.pkind || '';
+  $('st-farm').value = STATE.settings.farm || '6180069,6180416';
+  const codes = allKnownSubjectCodes();
+  $('st-bcode-body').innerHTML = [...codes.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([code, name]) => `
+    <tr><td>${esc(code)}</td><td>${esc(name)}</td>
+    <td><input class="w-4 st-bcode" data-code="${esc(code)}" value="${esc(bcodeFor(code))}"></td></tr>`).join('');
+}
+async function saveSettings() {
+  STATE.settings.mvchno = $('st-mvchno').value.trim();
+  STATE.settings.pkind = $('st-pkind').value.trim();
+  STATE.settings.farm = $('st-farm').value.trim();
+  const map = {};
+  document.querySelectorAll('.st-bcode').forEach(inp => {
+    const c = inp.dataset.code, v = inp.value.trim();
+    if (v && v !== guessBcode(c)) map[c] = v;
+    else if (v) map[c] = v; /* 全存，一律顯性 */
+  });
+  STATE.settings.bcodeMap = map;
+  const ok = await putConfig('sba_settings', STATE.settings);
+  $('st-msg').textContent = ok ? '✅ 已儲存至 D1' : '❌ 儲存失敗（密碼或連線問題）';
+}
+async function putConfig(key, value) {
+  try {
+    const res = await fetch('/api/acc/v2/config/' + key, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Pass': sessionStorage.getItem('adminPass') || '' },
+      body: JSON.stringify(value),
+    });
+    return res.ok;
+  } catch (_) { return false; }
+}
+
+boot().catch((e) => {
+  console.error(e);
+  alert('資料載入失敗：' + e.message + '\n請重新整理；若持續失敗請檢查網路或 D1 狀態。');
+});
+</script>
+</body>
+</html>
