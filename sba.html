@@ -865,7 +865,7 @@ function updInvoice(vi, pi, k, val) {
 function addLine(vi) {
   const v = STATE.drafts[vi];
   v.lines.push({ seq: v.lines.length + 1, dc: 'D', code: '', bcode: '', use: '', relate: '',
-    scode1: '55000', amt: 0, ttype: v.kind === '3' ? '' : '2', memo: '' });
+    scode1: '00001', amt: 0, ttype: v.kind === '3' ? '' : '2', memo: '' });
   renderPreview();
 }
 function delLine(vi, li) {
@@ -948,7 +948,7 @@ function addTrLine() {
     <td><input class="w-4 tr-bcode"></td>
     <td><input class="w-4 tr-use"></td>
     <td><input class="w-2 tr-relate"></td>
-    <td><input class="w-4 tr-scode1" value="55000"></td>
+    <td><input class="w-4 tr-scode1" value="00001"></td>
     <td><input class="w-amt tr-amt" onchange="trBalance()"></td>
     <td><input class="w-memo tr-memo"></td>
     <td><button class="btn btn-sm" onclick="this.closest('tr').remove();trBalance()">✕</button></td>`;

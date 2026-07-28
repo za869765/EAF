@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.3.1';
+const SBA_CORE_VERSION = '5.3.2';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -745,7 +745,7 @@ function mapRecordsToVouchers(records, ctx) {
     let seq = 1, total = 0;
     /* 銀行專戶列（先佔位，金額最後補） */
     const bankLine = { seq: seq++, dc: 'C', code: acct, use: '', relate: '',
-      scode1: '55000', bcode: ctx.bcodeFor(acct), amt: 0, ttype: '2', memo: '' };
+      scode1: '00001' /* 歸屬性質：本基金代碼檔=00001.一般（官方範例的 55000 與本基金不符，實測 v5.3.1） */, bcode: ctx.bcodeFor(acct), amt: 0, ttype: '2', memo: '' };
     v.lines.push(bankLine);
 
     const memoParts = [];
@@ -757,7 +757,7 @@ function mapRecordsToVouchers(records, ctx) {
       memoParts.push(String(rec.purposeDesc || rec.bpLabel || '').trim());
       const base = {
         dc: 'D', code: rec.bpCode, use: useOf(rec), relate: relateOf(rec),
-        scode1: '55000', bcode: ctx.bcodeFor(rec.bpCode), ttype: '2',
+        scode1: '00001' /* 歸屬性質：本基金代碼檔=00001.一般（官方範例的 55000 與本基金不符，實測 v5.3.1） */, bcode: ctx.bcodeFor(rec.bpCode), ttype: '2',
       };
       if (base.use && /^1\d{3}$/.test(base.use)) base.pkind = ctx.defaultPkind || '';
       /* purposeSplits 多用途 → 每拆分一列（僅本張承擔整單金額時才展開） */
