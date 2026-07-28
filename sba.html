@@ -394,6 +394,17 @@ async function boot() {
   if (config && Array.isArray(config.sba_payee_skip)) STATE.paySkip = new Set(config.sba_payee_skip);
   if (config && config.sba_offset_open) STATE.offsetOpen = config.sba_offset_open;
   STATE.entriesKeySet = new Set(STATE.entries.map(e => String(e.voucher_no) + '#' + e.seq));
+  /* v5.5.2 受款人主檔統編查找表（帳號優先、姓名後備）：F05 受款人統編 + F07 發票統編/營業人名稱 */
+  STATE.payeeGuiMap = new Map();
+  for (const p of STATE.payees) {
+    const code = String(p.code || '').trim();
+    if (!code) continue;
+    const bk = String(p.bank || '').split('-')[0].trim();
+    const ac = String(p.acctNo || '').replace(/\D/g, '');
+    if (bk && ac && !STATE.payeeGuiMap.has(bk + '|' + ac)) STATE.payeeGuiMap.set(bk + '|' + ac, code);
+    const nm = String(p.name || '').replace(/\s/g, '').toUpperCase();
+    if (nm && !STATE.payeeGuiMap.has('n:' + nm)) STATE.payeeGuiMap.set('n:' + nm, code);
+  }
   /* 勾選集合開機清理：單已不存在/作廢/已匯出者移除 */
   for (const id of [...STATE.pickSel]) {
     const r = STATE.records.find(x => String(x.id) === id);
@@ -699,8 +710,19 @@ function mapCtx(pay7) {
     catOverride: STATE.catOv,
     bcodeFor, farmCodes, defaultPkind: STATE.settings.pkind || '',
     bankNameByCode: (c) => STATE.bankByCode.get(c) || '',
+    payeeGuiFor: (p) => payeeGuiOf(String(p.bank || '').split('-')[0].trim(), p.acctNo, p.name),
     nextRecno: () => nextRecnoFor('2'), acctNames: acctNameMap,
   };
+}
+/* 受款人統編查找（v5.5.2）：帳號優先、姓名後備；僅回合格公司統編（isValidGui） */
+function payeeGuiOf(bankCode, acctNo, name) {
+  const m = STATE.payeeGuiMap;
+  if (!m) return '';
+  const ac = String(acctNo || '').replace(/\D/g, '');
+  const bk = String(bankCode || '').trim();
+  const code = (bk && ac && m.get(bk + '|' + ac))
+    || m.get('n:' + String(name || '').replace(/\s/g, '').toUpperCase()) || '';
+  return isValidGui(code) ? code : '';
 }
 function updatePickSummary() {
   /* 各卡片頭「✔已勾 n 筆」即時更新＋有勾選的卡片綠框綠頭（縮小狀態也明顯） */
@@ -822,6 +844,15 @@ function renderPreview() {
     if (sub === null) return;
     L.offset.sub = sub;
     L.relate = sub;
+  }));
+  /* 舊草稿回填受款人統編/發票營業人資訊（v5.5.2） */
+  STATE.drafts.forEach(v => (v.payees || []).forEach(P => {
+    if (P.compno == null) P.compno = payeeGuiOf(P.userbank, P.account, P.name);
+    const iv = P.rev === '2' && P.invoices && P.invoices[0];
+    if (iv) {
+      if (iv.compno == null) iv.compno = P.compno || '';
+      if (iv.name == null) iv.name = P.name || '';
+    }
   }));
   $('pv-empty').style.display = STATE.drafts.length ? 'none' : 'block';
   $('draft-count').textContent = STATE.drafts.length;

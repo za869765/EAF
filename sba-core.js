@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.5.1';
+const SBA_CORE_VERSION = '5.5.2';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -30,6 +30,16 @@ function toRoc7(s) {
   m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (m) return String(+m[1] - 1911).padStart(3, '0') + m[2] + m[3];
   return '';
+}
+
+/** 民國7碼日期差（b−a 天數）；任一無效回 null */
+function roc7DiffDays(a, b) {
+  const p = (s) => {
+    const m = String(s || '').match(/^(\d{3})(\d{2})(\d{2})$/);
+    return m ? Date.UTC(+m[1] + 1911, +m[2] - 1, +m[3]) : null;
+  };
+  const da = p(a), db = p(b);
+  return da == null || db == null ? null : Math.round((db - da) / 86400000);
 }
 
 /* ── Big5 位元組長度（SBA 為 Big5 系統，varchar 長度以 byte 計）──
@@ -221,6 +231,11 @@ function validateVoucher(v, opt) {
           const isum = invs.reduce((s, iv) => s + (+iv.invamt || 0), 0);
           if (Math.round(isum * 100) !== Math.round((+P.amt || 0) * 100))
             E(`${pt}：發票金額合計 ${isum} ≠ 應領金額 ${P.amt}`);
+          invs.forEach((iv) => {
+            const gap = roc7DiffDays(iv.invdate, v.payDate);
+            if (gap != null && gap > 15 && !iv.reason)
+              W(`${pt}：發票日期 ${iv.invdate} 距製票日逾15日（${gap}天），F07 將自動填制式原因（採購法73-1）`);
+          });
         }
       }
     });
@@ -337,14 +352,16 @@ function voucherToF07Rows(v) {
   (v.payees || []).forEach((P) => {
     if (P.rev !== '2') return; /* 僅統一發票受款人產 F07（rev 改回 0/1 時發票殘留不得輸出） */
     (P.invoices || []).forEach((iv, i) => {
+      /* v5.5.2 發票日期距製票日逾15日：SBA 要求填原因（採購法73-1），F07 原因欄空白疑致 SBA 剔除日期/金額待補登 */
+      const gap = roc7DiffDays(iv.invdate, v.payDate);
       rows.push({
         finvoice_year: v.year, finvoice_kind: v.kind, finvoice_importrecno: v.importrecno,
         finvoice_dtlseq: String(P.seq), finvoice_dtl2seq: String(i + 1),
         finvoice_invno: iv.invno || '', finvoice_invdate: iv.invdate || '',
         finvoice_invamt: fmt2(iv.invamt || 0), finvoice_compno: iv.compno || '',
-        finvoice_name: truncBig5(iv.name || '', 200),
+        finvoice_name: truncBig5(iv.name || (P.rev === '2' ? P.name : '') || '', 200),
         finvoice_distribution: iv.distribution || '0',
-        finvoice_reason: truncBig5(iv.reason || '', 1000),
+        finvoice_reason: truncBig5(iv.reason || (gap != null && gap > 15 ? '核銷請款作業時程，發票日期與製票日相距逾15日' : ''), 1000),
       });
     });
   });
@@ -647,11 +664,13 @@ function resolvePayees(rec, ctx) {
     const rev = p.receiptType != null && p.receiptType !== '' ? String(p.receiptType) : '0';
     /* ctx.catOverride[recId]＝sba.html 六大格手動移組覆寫（整單強制同一付款類別） */
     const payway = (ctx.catOverride && ctx.catOverride[rec.id]) || decidePayway(p, ctx.farmCodes);
+    /* v5.5.2 統一編號：由受款人主檔查（帳號優先、姓名後備；僅合格公司統編）→ F05 受款人統編 + F07 發票統編 */
+    const gui = ctx.payeeGuiFor ? String(ctx.payeeGuiFor(p) || '') : '';
     const payee = {
       seq: 0, name: String(p.name || '').trim(),
       account: p.acctNo || '', userbank: bk.code,
       bankna: bk.code ? (ctx.bankNameByCode(bk.code) || bk.name) : bk.name,
-      payway, amt,
+      payway, amt, compno: gui,
       /* 支票劃線/禁背預設（使用者規則）：自領(2)→劃線0否/禁背1是；存帳/電匯→劃線1是/禁背1是 */
       remark1: payway === '2' ? '0' : '1', remark2: '1',
       usedoc: String(rec.purposeDesc || '').trim(), rev,
@@ -661,7 +680,8 @@ function resolvePayees(rec, ctx) {
     };
     if (rev === '2' && (p.invoiceNo || p.invoiceAmount)) {
       payee.invoices = [{ invno: p.invoiceNo || '', invdate: toRoc7(p.invoiceDate || ''),
-        invamt: +String(p.invoiceAmount || '').replace(/,/g, '') || amt }];
+        invamt: +String(p.invoiceAmount || '').replace(/,/g, '') || amt,
+        compno: gui, name: payee.name }];
     }
     if (payee.needsInput)
       issues.push({ recId: rec.id, level: 'error',
@@ -823,7 +843,7 @@ if (typeof module !== 'undefined' && module.exports) {
     validateVoucher, validateBatch, guessBcode, FIXED_ASSET_CODES,
     splitBank, decidePayway, mapRecordsToVouchers,
     FNWACX_SHEET, FNWACX_FUND, FNWACX_HEADERS, payeeToFnwacxRow, buildSbaPayeeIndex, payeeExistsInSba, normPayeeName,
-    unzipAll, buildFnwacxFromTemplate, isValidGui,
+    unzipAll, buildFnwacxFromTemplate, isValidGui, roc7DiffDays,
     resolvePayees, planGrouping, PAY_CAT_LABEL, PAY_CAT_ORDER,
     voucherToF03Row, voucherToF04Rows, voucherToF05Rows, voucherToF06Rows, voucherToF07Rows,
     buildExportFiles, crc32, buildZip,
