@@ -53,6 +53,8 @@ tr.row-exported { opacity: .45; filter: grayscale(.7); }
 .gcard { background: var(--pure-white, #fff); border-radius: var(--r-lg, 12px);
   box-shadow: var(--sh-ring-1, 0 0 0 1px #d1cfc5); overflow: hidden; }
 .gcard.empty { opacity: .55; }
+.gcard.has-sel { box-shadow: 0 0 0 2px #5c8653; }
+.gcard.has-sel .gcard-hd { background: #dfe9da; }
 .gcard-hd { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
   padding: 9px 12px; background: var(--warm-sand, #e8e6dc); cursor: pointer; user-select: none; }
 .gcard-hd label { font-size: 11px; cursor: pointer; }
@@ -168,8 +170,7 @@ window.addEventListener('storage', (ev) => {
       <span class="small" id="pk-hitinfo" style="font-weight:700; color:#a84e2f;"></span>
     </div>
     <div class="toolbar" style="margin-bottom:2px;">
-      <button class="btn btn-sm" onclick="toggleAllPick(true)">☑ 全選(跳過已匯出)</button>
-      <button class="btn btn-sm" onclick="toggleAllPick(false)">✖ 清除勾選</button>
+      <button class="btn btn-sm" onclick="clearPickSel()">✖ 清除勾選</button>
       <span class="small" id="pk-summary">尚未勾選</span>
     </div>
     <div class="grp-grid" id="pk-groups"></div>
@@ -313,9 +314,11 @@ document.write('<script src="sba-core.js?v=' + (window.APP_VERSION || '0') + '">
 /* ═══════════════ 狀態 ═══════════════ */
 const STATE = {
   records: [], entries: [], subjects: null, banks: [], bankByCode: new Map(), payees: [],
+  /* 勾選與草稿皆存 localStorage：重整/搜尋不清，僅使用者主動清除（v5.3.7） */
+  pickSel: (() => { try { return new Set(JSON.parse(localStorage.getItem('sba_pick_sel') || '[]').map(String)); } catch (_) { return new Set(); } })(),
   config: {}, settings: { mvchno: '', pkind: '', farm: '6180069,6180416,6180427,6180438,6180449', bcodeMap: {} },
   exported: {},              /* recId → {recno,batch,at,src} */
-  drafts: [],                /* normalized vouchers (sba-core 模型) */
+  drafts: (() => { try { return JSON.parse(localStorage.getItem('sba_drafts') || '[]'); } catch (_) { return []; } })(),
   combine: true,
   openGrp: null,             /* 目前放大的卡片 'acct|cat'；null=全部縮小 */
   pickSort: { key: 'date', dir: -1 }, /* 卡片內排序：no/date/amt/payee，dir 1升冪 -1降冪 */
@@ -368,6 +371,13 @@ async function boot() {
   if (config && config.sba_exported) STATE.exported = config.sba_exported;
   if (config && config.sba_catov) STATE.catOv = config.sba_catov;
   if (config && Array.isArray(config.sba_payee_skip)) STATE.paySkip = new Set(config.sba_payee_skip);
+  /* 勾選集合開機清理：單已不存在/作廢/已匯出者移除 */
+  for (const id of [...STATE.pickSel]) {
+    const r = STATE.records.find(x => String(x.id) === id);
+    if (!r || r.voided || STATE.exported[id] || STATE.exported[r.id]) STATE.pickSel.delete(id);
+  }
+  savePickSel();
+  $('draft-count').textContent = STATE.drafts.length; /* 還原的草稿數 */
   /* 序號高水位：從匯出紀錄還原（預設高段 90000 起，杜絕與 SBA 正式號相撞） */
   for (const rec of Object.values(STATE.exported)) {
     const s = String(rec.recno || '');
@@ -469,7 +479,7 @@ function pickRowHtml(r, effCat, key) {
     + PAY_CAT_ORDER.map(c => `<option value="${c}"${c === effCat ? ' selected' : ''}>${PAY_CAT_LABEL[c]}</option>`).join('')
     + `</select>${STATE.catOv[r.id] ? ' <span class="chip warn">手動</span>' : ''}`;
   return `<tr${exported ? ' class="row-exported"' : ''} data-rid="${esc(String(r.id))}">
-    <td><input type="checkbox" class="pk-cb" value="${esc(r.id)}" data-grp="${key}"${exported ? ' data-exported="1"' : ''} onchange="updatePickSummary()"></td>
+    <td><input type="checkbox" class="pk-cb" value="${esc(r.id)}" data-grp="${key}"${exported ? ' data-exported="1"' : ''}${STATE.pickSel.has(String(r.id)) ? ' checked' : ''} onchange="togglePickRec(this.value,this.checked)"></td>
     <td><a href="/?rec=${encodeURIComponent(r.id)}" target="_blank" title="於填單頁開啟此申請單">${esc(r.voucherNo)}</a></td><td>${esc(recDateIso(r))}</td>
     <td><span class="chip">${r.formType === 'expense' ? '動支' : '請購'}</span></td>
     <td>${esc(r.bpCode)} ${esc(r.bpLabel || '')}</td>
@@ -483,7 +493,6 @@ function renderPickList() {
   const rows = pickFiltered();
   const ctx = mapCtx();
   const q = $('pk-q').value.trim();
-  const checkedBefore = new Set([...document.querySelectorAll('.pk-cb:checked')].map(c => c.value));
   const accts = [...new Set(STATE.records.map(r => r.acctCode).filter(Boolean))].sort();
   const byKey = new Map();                       /* 'acct|cat' → {recs:[{r,effCat}], sum} */
   const catPayees = { '1': new Set(), '6': new Set() }; /* 未出帳不重複受款人（兩專戶合計） */
@@ -543,7 +552,6 @@ function renderPickList() {
       <div class="gcard-body">${body}</div>
     </div>`;
   }).join('')).join('');
-  document.querySelectorAll('.pk-cb').forEach(cb => { if (checkedBefore.has(cb.value)) cb.checked = true; });
   bindRecPopHost('pk-groups');
   updatePickSummary();
 }
@@ -569,6 +577,8 @@ function pickCmp(a, b) {
   }
   return dir * (recDateIso(a) || '').localeCompare(recDateIso(b) || '');
 }
+/* 傳票草稿存 localStorage：重整不消失，僅刪除此張/標記已匯出移除（v5.3.7） */
+function saveDrafts() { try { localStorage.setItem('sba_drafts', JSON.stringify(STATE.drafts)); } catch (_) {} }
 /* ── 單據浮標預覽（hover 顯示申請單全文；點單號另開填單頁）──
    事件代理繫結一次於 #pk-groups（避免 inline handler 內插 id） */
 const _popHosts = new Set();
@@ -626,20 +636,29 @@ function moveRecGroup(id, cat) {
   renderPickList();
   putConfig('sba_catov', STATE.catOv);
 }
-/* 全選一律跳過已匯出（反灰）列，要重匯出請逐筆手動勾 */
+/* 勾選狀態存 localStorage（重整/搜尋不清；僅「清除勾選」或標記已匯出後移除） */
+function savePickSel() { try { localStorage.setItem('sba_pick_sel', JSON.stringify([...STATE.pickSel])); } catch (_) {} }
+function togglePickRec(id, on) {
+  if (on) STATE.pickSel.add(String(id)); else STATE.pickSel.delete(String(id));
+  savePickSel(); updatePickSummary();
+}
+/* 全選此組一律跳過已匯出（反灰）列 */
 function toggleGroupPick(cb) {
   document.querySelectorAll(`.pk-cb[data-grp="${cb.dataset.grp}"]:not([data-exported])`)
-    .forEach(x => { x.checked = cb.checked; });
-  updatePickSummary();
+    .forEach(x => {
+      x.checked = cb.checked;
+      if (cb.checked) STATE.pickSel.add(String(x.value)); else STATE.pickSel.delete(String(x.value));
+    });
+  savePickSel(); updatePickSummary();
 }
-function toggleAllPick(on) {
-  document.querySelectorAll('.pk-cb:not([data-exported])').forEach(cb => { cb.checked = on; });
-  document.querySelectorAll('.grp-cb:not([disabled])').forEach(cb => { cb.checked = on; });
+function clearPickSel() {
+  STATE.pickSel.clear(); savePickSel();
+  document.querySelectorAll('.pk-cb, .grp-cb').forEach(cb => { cb.checked = false; });
   updatePickSummary();
 }
 function selectedRecords() {
-  const ids = new Set([...document.querySelectorAll('.pk-cb:checked')].map(cb => cb.value));
-  return STATE.records.filter(r => ids.has(r.id));
+  /* 以 localStorage 勾選集合為準（搜尋濾掉的列仍算已勾） */
+  return STATE.records.filter(r => STATE.pickSel.has(String(r.id)));
 }
 function mapCtx(pay7) {
   const farmCodes = new Set(String(STATE.settings.farm || '').split(/[,，\s]+/).filter(Boolean));
@@ -656,11 +675,13 @@ function mapCtx(pay7) {
   };
 }
 function updatePickSummary() {
-  /* 各卡片頭「✔已勾 n 筆」即時更新（縮小狀態也看得到勾了什麼） */
+  /* 各卡片頭「✔已勾 n 筆」即時更新＋有勾選的卡片綠框綠頭（縮小狀態也明顯） */
   document.querySelectorAll('.pk-selcount').forEach(elm => {
     const n = [...document.querySelectorAll(`.pk-cb[data-grp="${elm.dataset.grp}"]`)].filter(c => c.checked).length;
     elm.style.display = n ? '' : 'none';
     elm.textContent = `✔ 已勾 ${n} 筆`;
+    const card = elm.closest('.gcard');
+    if (card) card.classList.toggle('has-sel', n > 0);
   });
   const sel = selectedRecords();
   if (!sel.length) { $('pk-summary').textContent = '尚未勾選'; return; }
@@ -764,6 +785,7 @@ function renderPreview() {
   /* 匯出區併入預覽（v5.2.8）：有草稿即顯示並自動檢核，通過就能直接下載 */
   $('pv-export').style.display = STATE.drafts.length ? 'block' : 'none';
   if (STATE.drafts.length) { renderExportLog(); runBatchValidation(); }
+  saveDrafts(); /* 每次重繪即持久化（所有草稿變動都會經過 renderPreview） */
   $('pv-list').innerHTML = STATE.drafts.map((v, vi) => {
     const r = validateVoucher(v);
     const linesHtml = v.lines.map((L, li) => {
@@ -1094,7 +1116,11 @@ async function markExported() {
   const okA = await putConfig('sba_exported', STATE.exported);
   if (okA) {
     alert(`已標記 ${snapshot.length} 張傳票為已匯出`);
+    /* 已匯出的來源單自勾選集合移除 */
+    for (const v of snapshot) for (const id of (v.sourceIds || [])) STATE.pickSel.delete(String(id));
+    savePickSel();
     STATE.drafts = [];
+    saveDrafts();
     LAST_EXPORT = null;
     $('draft-count').textContent = '0';
     $('ex-mark').disabled = true;
