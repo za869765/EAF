@@ -994,14 +994,12 @@ function openOffsetModal(vi, li) {
   STATE.modalCtx = { vi, li };
   const code = String(L.code).slice(0, 8);
   const base6 = code.slice(0, 6);
-  const year = STATE.drafts[vi].year;
   const rel = String(L.relate || '');
-  /* 候選＝本年度同科目家族全部貸方列（不再依子目硬過濾、不截舊單——v5.4.4：一月周轉金曾被「最新120筆」擠掉） */
+  /* 候選＝同科目家族「歷年」全部貸方列（v5.4.5 連年度限制也移除——跨年度沖銷實際存在，原則：寧可多列不可選不到） */
   const cands = STATE.entries.filter(e => {
     const sc = String(e.subject || '').split(' ')[0];
     if (!(sc === code || sc.startsWith(base6))) return false;
     if (!(+e.credit > 0)) return false;
-    if (!String(e.voucher_no || '').startsWith(year)) return false;
     return true;
   });
   const subOf = (e) => String(e.sub_account || '').slice(0, 2);
@@ -1014,7 +1012,7 @@ function openOffsetModal(vi, li) {
   });
   STATE.modalCands = { cands, rel };
   $('modal-title').textContent = `選擇沖帳立帳傳票 — ${code} ${subjectName(code)}`;
-  $('modal-hint').textContent = `候選＝D1 歷史 SBA 分錄中，本年度同科目家族全部貸方（立帳）列，依子目分組${rel ? `、與本列子目 ${rel} 相同者置頂推薦` : ''}。資料截至最後匯入月份，較新的立帳請至 SBA 端手動沖。`;
+  $('modal-hint').textContent = `候選＝D1 歷史 SBA 分錄中，同科目家族「歷年」全部貸方（立帳）列，依子目分組${rel ? `、與本列子目 ${rel} 相同者置頂推薦` : ''}、組內新到舊。資料截至最後匯入月份，更新的立帳請先匯入最新 FNWFRX0090 或至 SBA 端手動沖。`;
   $('modal-q').value = '';
   renderOffsetList('');
   $('modal-mask').style.display = 'block';
