@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SBA 傳票工坊 — 佳里區衛生所 v5.0.6</title>
+<title>SBA 傳票工坊 — 佳里區衛生所 v5.0.7</title>
 <link rel="stylesheet" href="design.css">
 <style>
 /* ── 沿用 acc.html 視覺語言（parchment / warm charcoal） ── */
@@ -46,6 +46,9 @@ table.grid tr:hover td { background: #f2f0e8; }
 .chip.exp  { background: #f0e0d8; color: #7a4a30; }
 .chip.done { background: #d7e3d2; color: #33552c; }
 .chip.warn { background: #f3e2c0; color: #7a5b18; }
+tr.grp-hd td, tr.grp-hd:hover td { background: #dcd9cc; border-top: 2px solid #b8b5a6; font-weight: 600; }
+tr.grp-hd label { font-size: 11px; margin-right: 8px; cursor: pointer; }
+tr.row-exported { opacity: .45; filter: grayscale(.7); }
 input, select, textarea { font-family: inherit; font-size: 12px; padding: 3px 6px;
   border: 1px solid var(--ring-warm, #d1cfc5); border-radius: var(--r-sm, 6px);
   background: var(--pure-white, #fff); color: inherit; }
@@ -105,7 +108,7 @@ window.addEventListener('storage', (ev) => {
 
 <div id="top-bar">
   <h1>📤 SBA 傳票工坊 — 臺南市佳里區衛生所</h1>
-  <span class="small" id="ver-badge" style="color:#78909c;">v5.0.6</span>
+  <span class="small" id="ver-badge" style="color:#78909c;">v5.0.7</span>
   <a class="tbtn tbtn-gray" href="/acc.html">📒 會計帳務</a>
   <a class="tbtn tbtn-gray" href="/" target="_blank">📝 填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
@@ -126,14 +129,14 @@ window.addEventListener('storage', (ev) => {
     <div class="toolbar">
       <label>期間 <input type="date" id="pk-from"> ～ <input type="date" id="pk-to"></label>
       <label><input type="checkbox" id="pk-printed" checked> 僅已列印</label>
-      <label><input type="checkbox" id="pk-unexported" checked> 僅未匯出</label>
+      <label><input type="checkbox" id="pk-unexported"> 僅未匯出</label>
       <label>類型
         <select id="pk-type"><option value="">全部</option><option value="expense">動支單</option><option value="purchase">請購單</option></select>
       </label>
       <label>專戶
         <select id="pk-acct"><option value="">全部</option></select>
       </label>
-      <input type="search" id="pk-q" placeholder="搜尋 摘要/單號/受款人…" style="width:180px;">
+      <input type="search" id="pk-q" placeholder="搜尋 摘要/受款人；單號末3碼可多筆(空格分隔)" style="width:230px;">
       <button class="btn btn-sm" onclick="renderPickList()">🔍 重新整理</button>
     </div>
     <div class="scroll-x" style="max-height:52vh;overflow-y:auto;">
@@ -252,12 +255,12 @@ window.addEventListener('storage', (ev) => {
   </div>
 </div>
 
-<script src="sba-core.js?v=5.0.6"></script>
+<script src="sba-core.js?v=5.0.7"></script>
 <script>
 /* 版本握手：sba-core.js 與本頁必須同版，不一致＝瀏覽器快取到舊檔 */
 (function(){
   const got = typeof SBA_CORE_VERSION === 'undefined' ? '(舊版)' : 'v' + SBA_CORE_VERSION;
-  if (got !== 'v5.0.6') alert('程式版本不一致（頁面 v5.0.6／核心 ' + got + '），請按 Ctrl+F5 強制重新整理後再使用');
+  if (got !== 'v5.0.7') alert('程式版本不一致（頁面 v5.0.7／核心 ' + got + '），請按 Ctrl+F5 強制重新整理後再使用');
 })();
 /* ═══════════════ 狀態 ═══════════════ */
 const STATE = {
@@ -389,38 +392,78 @@ function pickFiltered() {
     if (q) {
       const hay = [r.voucherNo, r.purposeDesc, r.bpLabel,
         ...(r.payees || []).map(p => p.name)].join(' ');
-      if (!hay.includes(q)) return false;
+      /* 多關鍵字(空格/逗號分隔)任一命中即顯示；純數字＝單號末碼（434 → 115-0434） */
+      const toks = q.split(/[\s,，、]+/).filter(Boolean);
+      if (!toks.some(t => /^\d{1,4}$/.test(t) ? String(r.voucherNo || '').endsWith(t) : hay.includes(t))) return false;
     }
     return true;
   }).sort((a, b) => (recDateIso(b) || '').localeCompare(recDateIso(a) || ''));
 }
+function pickRowHtml(r, grp, multi) {
+  const acctChip = r.acctCode === '11010202' ? 'cust' : 'fund';
+  const exported = STATE.exported[r.id];
+  const payeeTxt = (r.payees || []).map(p => p.type === 'bill' ? '💳繳費單' : (p.name || '')).filter(Boolean).join('、')
+    || (r.payee && r.payee.name) || (r.payee && r.payee.type === 'bill' ? '💳繳費單' : '') || '—';
+  const st = [
+    r.printed ? '<span class="chip done">已列印</span>' : '<span class="chip warn">未列印</span>',
+    exported ? `<span class="chip done">已匯出 ${esc(exported.recno)}</span>` : '',
+    multi ? '<span class="chip warn">跨付款</span>' : '',
+  ].join(' ');
+  return `<tr${exported ? ' class="row-exported"' : ''}>
+    <td><input type="checkbox" class="pk-cb" value="${esc(r.id)}" data-grp="${grp}"${exported ? ' data-exported="1"' : ''} onchange="updatePickSummary()"></td>
+    <td>${esc(r.voucherNo)}</td><td>${esc(recDateIso(r))}</td>
+    <td><span class="chip">${r.formType === 'expense' ? '動支' : '請購'}</span></td>
+    <td><span class="chip ${acctChip}">${esc(r.acctCode)}</span></td>
+    <td>${esc(r.bpCode)} ${esc(r.bpLabel || '')}</td>
+    <td style="max-width:280px;">${esc(String(r.purposeDesc || '').slice(0, 60))}</td>
+    <td class="num">${fmtN(r.total)}</td>
+    <td style="max-width:160px;">${esc(payeeTxt)}</td>
+    <td>${st}</td></tr>`;
+}
 function renderPickList() {
   const rows = pickFiltered();
   const tb = $('pk-body');
-  tb.innerHTML = rows.map(r => {
-    const acctChip = r.acctCode === '11010202' ? 'cust' : 'fund';
-    const payeeTxt = (r.payees || []).map(p => p.type === 'bill' ? '💳繳費單' : (p.name || '')).filter(Boolean).join('、')
-      || (r.payee && r.payee.name) || (r.payee && r.payee.type === 'bill' ? '💳繳費單' : '') || '—';
-    const st = [
-      r.printed ? '<span class="chip done">已列印</span>' : '<span class="chip warn">未列印</span>',
-      STATE.exported[r.id] ? `<span class="chip done">已匯出 ${esc(STATE.exported[r.id].recno)}</span>` : '',
-    ].join(' ');
-    return `<tr>
-      <td><input type="checkbox" class="pk-cb" value="${esc(r.id)}" onchange="updatePickSummary()"></td>
-      <td>${esc(r.voucherNo)}</td><td>${esc(recDateIso(r))}</td>
-      <td><span class="chip">${r.formType === 'expense' ? '動支' : '請購'}</span></td>
-      <td><span class="chip ${acctChip}">${esc(r.acctCode)}</span></td>
-      <td>${esc(r.bpCode)} ${esc(r.bpLabel || '')}</td>
-      <td style="max-width:280px;">${esc(String(r.purposeDesc || '').slice(0, 60))}</td>
-      <td class="num">${fmtN(r.total)}</td>
-      <td style="max-width:160px;">${esc(payeeTxt)}</td>
-      <td>${st}</td></tr>`;
-  }).join('') || '<tr><td colspan="10" class="small">無符合條件的單據</td></tr>';
+  if (!rows.length) {
+    tb.innerHTML = '<tr><td colspan="10" class="small">無符合條件的單據</td></tr>';
+    $('pk-all').checked = false; updatePickSummary(); return;
+  }
+  /* 清單依 專戶 × 付款類別 分區（同產傳票分組）；跨類別單歸首類並標「跨付款」 */
+  const ctx = mapCtx();
+  const groups = new Map();
+  for (const r of rows) {
+    const cats = [...new Set(resolvePayees(r, ctx).payees.map(p => p.payway))]
+      .sort((a, b) => PAY_CAT_ORDER.indexOf(a) - PAY_CAT_ORDER.indexOf(b));
+    const key = (r.acctCode || '') + '|' + (cats[0] || '2');
+    if (!groups.has(key)) groups.set(key, { acct: r.acctCode || '', cat: cats[0] || '2', recs: [], sum: 0 });
+    const g = groups.get(key);
+    g.recs.push({ r, multi: cats.length > 1 });
+    g.sum += +r.total || 0;
+  }
+  const ordered = [...groups.values()].sort((a, b) => a.acct.localeCompare(b.acct)
+    || PAY_CAT_ORDER.indexOf(a.cat) - PAY_CAT_ORDER.indexOf(b.cat));
+  tb.innerHTML = ordered.map((g, gi) => {
+    const acctChip = g.acct === '11010202' ? 'cust' : 'fund';
+    /* 群內未匯出在前、已匯出(反灰)墊底 */
+    g.recs.sort((a, b) => (STATE.exported[a.r.id] ? 1 : 0) - (STATE.exported[b.r.id] ? 1 : 0));
+    return `<tr class="grp-hd"><td colspan="10">
+      <label><input type="checkbox" class="grp-cb" data-grp="g${gi}" onchange="toggleGroupPick(this)"> 全選此組</label>
+      <span class="chip ${acctChip}">${esc(g.acct)} ${esc(subjectName(g.acct))}</span>
+      <span class="chip exp">${esc(PAY_CAT_LABEL[g.cat] || g.cat)}</span>
+      ${g.recs.length} 筆 <b>$${fmtN(g.sum)}</b></td></tr>`
+      + g.recs.map(({ r, multi }) => pickRowHtml(r, 'g' + gi, multi)).join('');
+  }).join('');
   $('pk-all').checked = false;
   updatePickSummary();
 }
+/* 全選一律跳過已匯出（反灰）列，要重匯出請逐筆手動勾 */
+function toggleGroupPick(cb) {
+  document.querySelectorAll(`.pk-cb[data-grp="${cb.dataset.grp}"]:not([data-exported])`)
+    .forEach(x => { x.checked = cb.checked; });
+  updatePickSummary();
+}
 function toggleAllPick(on) {
-  document.querySelectorAll('.pk-cb').forEach(cb => { cb.checked = on; });
+  document.querySelectorAll('.pk-cb:not([data-exported])').forEach(cb => { cb.checked = on; });
+  document.querySelectorAll('.grp-cb').forEach(cb => { cb.checked = on; });
   updatePickSummary();
 }
 function selectedRecords() {
