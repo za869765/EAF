@@ -712,7 +712,8 @@ function updatePickSummary() {
     return `<div class="sel-line"><span class="chip ${g.acct === '11010202' ? 'cust' : 'fund'}">${esc(subjectName(g.acct) || g.acct)}</span>
       <span class="chip exp">${esc(g.catLabel)}</span> ${g.n} 筆 <b>$${fmtN(g.sum)}</b>｜<span class="small">${esc(shown)}</span></div>`;
   }).join('');
-  $('pk-summary').innerHTML = `<div class="sel-banner"><b>✔ 已勾選 ${sel.length} 筆 → 將產生 ${plan.length} 張支出傳票</b>${lines}</div>`;
+  const total = sel.reduce((s, r) => s + (+r.total || 0), 0);
+  $('pk-summary').innerHTML = `<div class="sel-banner"><b>✔ 已勾選 ${sel.length} 筆・合計 $${fmtN(total)} → 將產生 ${plan.length} 張支出傳票</b>${lines}</div>`;
 }
 function nextRecnoFor(kind) {
   const year = rocYearNow();
