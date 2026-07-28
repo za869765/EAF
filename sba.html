@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SBA 傳票工坊 — 佳里區衛生所 v5.1.0</title>
+<title>SBA 傳票工坊 — 佳里區衛生所 v5.1.1</title>
 <link rel="stylesheet" href="design.css">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 /* ── 沿用 acc.html 視覺語言（parchment / warm charcoal） ── */
 * { box-sizing: border-box; }
@@ -130,7 +131,7 @@ window.addEventListener('storage', (ev) => {
 
 <div id="top-bar">
   <h1>📤 SBA 傳票工坊 — 臺南市佳里區衛生所</h1>
-  <span class="small" id="ver-badge" style="color:#78909c;">v5.1.0</span>
+  <span class="small" id="ver-badge" style="color:#78909c;">v5.1.1</span>
   <a class="tbtn tbtn-gray" href="/acc.html">📒 會計帳務</a>
   <a class="tbtn tbtn-gray" href="/admin.html#payees" target="_blank">💳 受款人資料庫</a>
   <a class="tbtn tbtn-gray" href="/" target="_blank">📝 填單</a>
@@ -143,6 +144,7 @@ window.addEventListener('storage', (ev) => {
   <button class="tab-btn" data-tab="preview" onclick="switchTab('preview',this)">🧾 傳票預覽 <span id="draft-count" class="chip">0</span></button>
   <button class="tab-btn" data-tab="transfer" onclick="switchTab('transfer',this)">🔁 轉帳傳票</button>
   <button class="tab-btn" data-tab="export" onclick="switchTab('export',this)">⬇️ 匯出</button>
+  <button class="tab-btn" data-tab="paydb" onclick="switchTab('paydb',this)">👥 受款人匯入</button>
   <button class="tab-btn" data-tab="settings" onclick="switchTab('settings',this)">⚙️ 設定</button>
 </div>
 
@@ -231,6 +233,30 @@ window.addEventListener('storage', (ev) => {
   </div>
 </div>
 
+<!-- ═══ 👥 受款人匯入 ═══ -->
+<div class="tab-pane" id="tab-paydb">
+  <div class="card">
+    <h3>👥 新受款人比對 → SBA 匯入檔（FNWACX0170）</h3>
+    <div class="toolbar">
+      <label class="btn btn-sm">📂 上傳 SBA 受款人資料庫現況檔(xlsx)
+        <input type="file" id="pi-file" accept=".xlsx" style="display:none;" onchange="loadSbaPayeeDb(this.files[0])"></label>
+      <span class="small" id="pi-db-msg">請先於會計系統匯出受款人資料（FNWACX0170 xlsx）後上傳，再與本系統受款人資料庫比對</span>
+    </div>
+    <div class="toolbar">
+      <span class="small" id="pi-diff-msg"></span>
+      <button class="btn btn-main" id="pi-dl" onclick="downloadFnwacx()" disabled>⬇️ 產生 SBA 匯入檔(xlsx)</button>
+    </div>
+    <div class="scroll-x" style="max-height:56vh;overflow-y:auto;">
+      <table class="grid"><thead><tr>
+        <th><input type="checkbox" id="pi-all" onclick="piSelAll(this.checked)"></th>
+        <th>受款人代碼</th><th>名稱</th><th>領取方式</th><th>銀行帳號</th><th>分行代號</th>
+        <th>統一編號</th><th>收據別</th><th>指定兌付</th><th>提示</th>
+      </tr></thead><tbody id="pi-body"><tr><td colspan="10" class="small">請先上傳現況檔</td></tr></tbody></table>
+    </div>
+    <div class="small" style="margin-top:6px;">比對鍵：受款人代碼/統編 → 銀行帳號（去前導零）→ 無代碼無帳號時比姓名。凍結中的受款人不列入。</div>
+  </div>
+</div>
+
 <!-- ═══ ⚙️ 設定 ═══ -->
 <div class="tab-pane" id="tab-settings">
   <div class="card">
@@ -270,16 +296,16 @@ window.addEventListener('storage', (ev) => {
 
 <div id="rec-pop"></div>
 
-<script src="sba-core.js?v=5.1.0"></script>
+<script src="sba-core.js?v=5.1.1"></script>
 <script>
 /* 版本握手：sba-core.js 與本頁必須同版，不一致＝瀏覽器快取到舊檔 */
 (function(){
   const got = typeof SBA_CORE_VERSION === 'undefined' ? '(舊版)' : 'v' + SBA_CORE_VERSION;
-  if (got !== 'v5.1.0') alert('程式版本不一致（頁面 v5.1.0／核心 ' + got + '），請按 Ctrl+F5 強制重新整理後再使用');
+  if (got !== 'v5.1.1') alert('程式版本不一致（頁面 v5.1.1／核心 ' + got + '），請按 Ctrl+F5 強制重新整理後再使用');
 })();
 /* ═══════════════ 狀態 ═══════════════ */
 const STATE = {
-  records: [], entries: [], subjects: null, banks: [], bankByCode: new Map(),
+  records: [], entries: [], subjects: null, banks: [], bankByCode: new Map(), payees: [],
   config: {}, settings: { mvchno: '', pkind: '', farm: '6180069,6180416', bcodeMap: {} },
   exported: {},              /* recId → {recno,batch,at,src} */
   drafts: [],                /* normalized vouchers (sba-core 模型) */
@@ -307,21 +333,24 @@ function switchTab(name, btn) {
   (btn || document.querySelector(`.tab-btn[data-tab="${name}"]`)).classList.add('active');
   if (name === 'preview') renderPreview();
   if (name === 'export') { renderExportLog(); runBatchValidation(); }
+  if (name === 'paydb') renderPayeeDiff();
   if (name === 'settings') renderSettings();
 }
 
 /* ═══════════════ 開機載入 ═══════════════ */
 async function boot() {
-  const [records, entries, subjects, banks, config] = await Promise.all([
+  const [records, entries, subjects, banks, config, payees] = await Promise.all([
     fetch('/api/records').then(r => r.json()).catch(() => []),
     fetch('/api/acc/v2/entries').then(r => r.json()).catch(() => []),
     fetch('/api/subjects').then(r => r.ok ? r.json() : null).catch(() => null)
       .then(s => s || fetch('/subjects.json').then(r => r.json()).catch(() => null)),
     fetch('/banks.json').then(r => r.json()).catch(() => []),
     fetch('/api/acc/v2/config').then(r => r.json()).catch(() => ({})),
+    fetch('/api/payees').then(r => r.json()).catch(() => []),
   ]);
   STATE.records = Array.isArray(records) ? records : [];
   STATE.entries = Array.isArray(entries) ? entries : [];
+  STATE.payees = Array.isArray(payees) ? payees : [];
   STATE.subjects = subjects;
   STATE.banks = banks;
   for (const b of banks) if (!STATE.bankByCode.has(b.code)) STATE.bankByCode.set(b.code, b.name);
@@ -429,7 +458,7 @@ function pickRowHtml(r, effCat, key) {
   const mv = `<select onchange="moveRecGroup('${esc(r.id)}',this.value)">`
     + PAY_CAT_ORDER.map(c => `<option value="${c}"${c === effCat ? ' selected' : ''}>${PAY_CAT_LABEL[c]}</option>`).join('')
     + `</select>${STATE.catOv[r.id] ? ' <span class="chip warn">手動</span>' : ''}`;
-  return `<tr${exported ? ' class="row-exported"' : ''} onmouseenter="showRecPop(event,'${esc(r.id)}')" onmousemove="moveRecPop(event)" onmouseleave="hideRecPop()">
+  return `<tr${exported ? ' class="row-exported"' : ''} data-rid="${esc(String(r.id))}">
     <td><input type="checkbox" class="pk-cb" value="${esc(r.id)}" data-grp="${key}"${exported ? ' data-exported="1"' : ''} onchange="updatePickSummary()"></td>
     <td><a href="/?rec=${encodeURIComponent(r.id)}" target="_blank" title="於填單頁開啟此申請單">${esc(r.voucherNo)}</a></td><td>${esc(recDateIso(r))}</td>
     <td><span class="chip">${r.formType === 'expense' ? '動支' : '請購'}</span></td>
@@ -490,13 +519,29 @@ function renderPickList() {
     </div>`;
   }).join('')).join('');
   document.querySelectorAll('.pk-cb').forEach(cb => { if (checkedBefore.has(cb.value)) cb.checked = true; });
+  bindRecPopOnce();
   updatePickSummary();
 }
 function toggleGroupCard(key) {
   STATE.openGrp = STATE.openGrp === key ? null : key;
   renderPickList();
 }
-/* ── 單據浮標預覽（hover 顯示申請單全文；點單號另開填單頁） ── */
+/* ── 單據浮標預覽（hover 顯示申請單全文；點單號另開填單頁）──
+   事件代理繫結一次於 #pk-groups（避免 inline handler 內插 id） */
+let _recPopBound = false;
+function bindRecPopOnce() {
+  if (_recPopBound) return; _recPopBound = true;
+  const host = $('pk-groups');
+  host.addEventListener('mouseover', (ev) => {
+    const tr = ev.target.closest('tr[data-rid]');
+    if (tr && !tr.contains(ev.relatedTarget instanceof Node ? ev.relatedTarget : null)) showRecPop(ev, tr.dataset.rid);
+    else if (tr) moveRecPop(ev);
+  });
+  host.addEventListener('mousemove', (ev) => {
+    if (ev.target.closest('tr[data-rid]')) moveRecPop(ev); else hideRecPop();
+  });
+  host.addEventListener('mouseleave', hideRecPop);
+}
 function showRecPop(ev, id) {
   const r = STATE.records.find(x => String(x.id) === String(id));
   if (!r) return;
@@ -957,6 +1002,110 @@ async function saveSettings() {
   const ok = await putConfig('sba_settings', STATE.settings);
   $('st-msg').textContent = ok ? '✅ 已儲存至 D1' : '❌ 儲存失敗（密碼或連線問題）';
 }
+/* ═══════════════ 👥 受款人匯入（FNWACX0170） ═══════════════ */
+const PI_WAY_LABEL = { '1': '1 存入帳戶', '2': '2 自領', '3': '3 郵寄', '4': '4 領回轉寄', '5': '5 機關指定', '6': '6 電匯' };
+const PI_REV_LABEL = { '': '（空）', '1': '1 發票', '2': '2 收據' };
+let SBA_DB_IDX = null;   /* 上傳現況檔建立的索引 */
+let PI_ROWS = [];        /* [{p, row(12欄), sel}] */
+async function loadSbaPayeeDb(file) {
+  if (!file) return;
+  try {
+    const wb = XLSX.read(await file.arrayBuffer());
+    /* 優先抓「受(繳)款人匯出/匯入」工作表，找不到才退回第一張 */
+    const shName = wb.SheetNames.find(nm => /受\(繳\)款人/.test(nm)) || wb.SheetNames[0];
+    const raw = XLSX.utils.sheet_to_json(wb.Sheets[shName], { header: 1, raw: true, defval: '' });
+    /* 帳號欄若為數字儲存格＝前導零已遺失/可能科學記號，比對不可靠 → 警示 */
+    const numAccts = raw.slice(2).filter(r => r && typeof r[5] === 'number').length;
+    const dataRows = raw.slice(2).map(r => (r || []).map(v => v == null ? '' : String(v)));
+    const n = dataRows.filter(r => r && r[1]).length;
+    if (!n) { alert(`工作表「${shName}」找不到受款人資料列，請確認為 FNWACX0170 匯出檔`); return; }
+    SBA_DB_IDX = buildSbaPayeeIndex(dataRows);
+    $('pi-db-msg').textContent = `✅ 已載入 SBA 現況 ${n} 筆（${file.name}／${shName}）`
+      + (numAccts ? `　⚠️ ${numAccts} 筆帳號為數字格式（前導零可能遺失，比對恐失準，建議匯出時設文字格式）` : '');
+    renderPayeeDiff();
+  } catch (e) { alert('讀取失敗：' + e.message); }
+}
+function renderPayeeDiff() {
+  const tb = $('pi-body');
+  if (!SBA_DB_IDX) { tb.innerHTML = '<tr><td colspan="10" class="small">請先上傳現況檔</td></tr>'; $('pi-dl').disabled = true; return; }
+  const farm = new Set(String(STATE.settings.farm || '').split(/[,，\s]+/).filter(Boolean));
+  const news = STATE.payees.filter(p => !p.frozen && !payeeExistsInSba(p, SBA_DB_IDX));
+  PI_ROWS = news.map(p => ({ p, row: payeeToFnwacxRow(p, farm), sel: !!String(p.code || '').trim() }));
+  $('pi-diff-msg').innerHTML = `本系統受款人 ${STATE.payees.filter(p => !p.frozen).length} 筆（不含凍結）→ SBA 未建 <b>${PI_ROWS.length}</b> 筆`;
+  $('pi-dl').disabled = !PI_ROWS.length;
+  tb.innerHTML = PI_ROWS.map((x, i) => {
+    const r = x.row;
+    const waySel = `<select onchange="piUpd(${i},4,this.value)">` + Object.keys(PI_WAY_LABEL).map(c =>
+      `<option value="${c}"${c === r[4] ? ' selected' : ''}>${PI_WAY_LABEL[c]}</option>`).join('') + '</select>';
+    const revSel = `<select onchange="piUpd(${i},10,this.value)">` + Object.keys(PI_REV_LABEL).map(c =>
+      `<option value="${c}"${c === r[10] ? ' selected' : ''}>${PI_REV_LABEL[c]}</option>`).join('') + '</select>';
+    return `<tr${r[0] ? '' : ' style="background:#fdf3e7;"'}>
+      <td><input type="checkbox" class="pi-cb"${x.sel ? ' checked' : ''} onchange="PI_ROWS[${i}].sel=this.checked"></td>
+      <td>${esc(r[0]) || '<span class="chip warn">缺代碼</span>'}</td>
+      <td>${esc(r[1])}</td><td>${waySel}</td>
+      <td style="font-family:monospace;">${esc(r[5])}</td><td>${esc(r[7])}</td>
+      <td>${esc(r[9])}</td><td>${revSel}</td>
+      <td><input class="w-4" value="${esc(r[11])}" onchange="piUpd(${i},11,this.value)"></td>
+      <td class="small">${r[0] ? '' : 'SBA 現況每筆皆有受款人代碼(統編/身分證)，缺漏請先於受款人資料庫補齊'}</td></tr>`;
+  }).join('') || '<tr><td colspan="10" class="small">🎉 沒有新受款人——SBA 資料庫已涵蓋本系統全部受款人</td></tr>';
+  $('pi-all').checked = false;
+}
+function piUpd(i, col, v) { PI_ROWS[i].row[col] = String(v || '').trim(); }
+function piSelAll(on) {
+  PI_ROWS.forEach(x => { x.sel = on; });
+  document.querySelectorAll('.pi-cb').forEach(cb => { cb.checked = on; });
+}
+/* 匯出前逐列檢核（Codex 格式審查：欄位長度/值域全驗，不合即中止） */
+function fnwacxRowErr(r, i) {
+  const t = `第 ${i + 1} 筆(${r[1] || '?'})`;
+  if (!r[1]) return `${t}：名稱空白`;
+  if (r[0] && r[0].length > 10) return `${t}：受款人代碼超過10碼`;
+  if (r[5] && !/^\d{1,14}$/.test(r[5])) return `${t}：銀行帳號須為1~14碼數字`;
+  if (r[7] && !/^\d{7}$/.test(r[7])) return `${t}：金融機構分行代號須為7碼`;
+  if (!['1', '2', '3', '4', '5', '6'].includes(r[4])) return `${t}：領取方式不合法`;
+  if (r[10] && !['1', '2'].includes(r[10])) return `${t}：收據別不合法`;
+  if (r[11] && !/^\d{7}$/.test(r[11])) return `${t}：指定兌付分行代號須為7碼`;
+  return '';
+}
+/* 產檔後回讀驗證：工作表名/基金列/12欄標題/每格值（含前導零）需與送出內容完全一致 */
+function fnwacxRoundTrip(buf, aoa) {
+  try {
+    const wb = XLSX.read(buf);
+    if (!wb.Sheets[FNWACX_SHEET]) return `工作表名稱不符（應為 ${FNWACX_SHEET}）`;
+    const back = XLSX.utils.sheet_to_json(wb.Sheets[FNWACX_SHEET], { header: 1, raw: true, defval: '' });
+    if (String(back[0][0]) !== '基金：' || String(back[0][1]) !== FNWACX_FUND) return '基金列不符';
+    for (let i = 0; i < 12; i++) if (String(back[1][i]) !== FNWACX_HEADERS[i]) return `標題第${i + 1}欄不符`;
+    for (let i = 2; i < aoa.length; i++) for (let j = 0; j < 12; j++) {
+      const want = String(aoa[i][j] || ''), got = back[i] ? String(back[i][j] == null ? '' : back[i][j]) : '';
+      if (want !== got) return `資料列${i - 1} 第${j + 1}欄回讀不符（${want} → ${got}）`;
+    }
+    return '';
+  } catch (e) { return '回讀失敗：' + e.message; }
+}
+function downloadFnwacx() {
+  const sel = PI_ROWS.filter(x => x.sel);
+  if (!sel.length) { alert('請先勾選要匯入的受款人'); return; }
+  const missing = sel.filter(x => !x.row[0]).length;
+  if (missing && !confirm(`${missing} 筆缺受款人代碼（SBA 現況每筆皆有代碼，可能拒收），仍要匯出？`)) return;
+  const aoa = [['基金：', FNWACX_FUND], FNWACX_HEADERS, ...sel.map(x => x.row)];
+  for (let i = 2; i < aoa.length; i++) {
+    const e = fnwacxRowErr(aoa[i], i - 2);
+    if (e) { alert('匯出前檢核未過，已中止：\n' + e); return; }
+  }
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, FNWACX_SHEET);
+  /* bookSST：官方檔字串全為 sharedStrings t="s"；SheetJS 預設 t="str" 恐遭舊匯入程式拒收 */
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array', bookSST: true });
+  const rt = fnwacxRoundTrip(buf, aoa);
+  if (rt) { alert('產出檔回讀驗證未過，已中止：\n' + rt); return; }
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${FNWACX_FUND}_FNWACX0170_新受款人_${toRoc7(todayIso())}.xlsx`;
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
 async function putConfig(key, value) {
   try {
     const res = await fetch('/api/acc/v2/config/' + key, {

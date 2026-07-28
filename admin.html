@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v5.1.0</title>
+<title>管理者入口 — 動支單系統 v5.1.1</title>
 <link rel="stylesheet" href="design.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -401,7 +401,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v5.1.0</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v5.1.1</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -418,7 +418,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span id="ver-badge" style="font-size:11px; color:#78909c; letter-spacing:.5px;">v5.1.0</span>
+    <span id="ver-badge" style="font-size:11px; color:#78909c; letter-spacing:.5px;">v5.1.1</span>
     <button id="maint-btn" onclick="toggleMaintenance()" style="padding:4px 14px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;"></button>
     <a class="link-btn" href="/acc.html" style="background:#1b5e20;">📒 會計帳務</a>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
@@ -716,6 +716,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
         <button class="btn btn-blue" onclick="document.getElementById('payee-import-file').click()">📥 匯入 JSON</button>
         <input id="payee-import-file" type="file" accept=".json" style="display:none;" onchange="importPayeesJson(event)">
         <button class="btn btn-gray" onclick="openEmployeeModal()" title="管理「員工 / 代墊」自動帶入名單">👥 員工名單</button>
+        <button class="btn btn-blue" onclick="exportPayeesSbaXlsx()" title="匯出 SBA 會計系統受款人匯入格式（FNWACX0170，未凍結全部）">⬇️ 匯出SBA格式</button>
         <input id="payees-kw" type="text" placeholder="🔍 關鍵字（戶名/銀行/帳號）" style="padding:5px 10px; border:1px solid #b0bec5; border-radius:4px; font-size:13px; min-width:240px;" oninput="renderPayeesAdmin()">
         <select id="payees-filter" style="padding:5px 10px; border:1px solid #b0bec5; border-radius:4px; font-size:13px;" onchange="renderPayeesAdmin()">
           <option value="active">☀️ 僅未凍結</option>
@@ -737,11 +738,12 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
               <th style="padding:8px 10px;">存款帳號</th>
               <th style="padding:8px 10px;">存款銀行</th>
               <th style="padding:8px 10px;">最後匯款 / 建立</th>
+              <th style="padding:8px 10px;">最近單據</th>
               <th style="padding:8px 10px;">來源</th>
               <th style="padding:8px 10px;">操作</th>
             </tr>
           </thead>
-          <tbody id="payees-tbody"><tr><td colspan="7" style="padding:20px; text-align:center; color:#888;">載入中…</td></tr></tbody>
+          <tbody id="payees-tbody"><tr><td colspan="8" style="padding:20px; text-align:center; color:#888;">載入中…</td></tr></tbody>
         </table>
       </div>
       <div id="payees-summary" style="margin-top:10px; font-size:12px; color:#546e7a;"></div>
@@ -950,7 +952,7 @@ async function login() {
       await loadSubjects();
       updateMaintBtn();
       await loadRecords();
-      if (location.hash === '#payees') showTab('payees'); /* v5.1.0 SBA 工坊深連結 */
+      if (location.hash === '#payees') showTab('payees'); /* v5.1.1 SBA 工坊深連結 */
     } else {
       document.getElementById('login-err').textContent = '❌ 密碼錯誤';
     }
@@ -1095,8 +1097,9 @@ function renderPayeesAdmin() {
   /* v4.4.86 依戶名降序排列（zh-Hant locale） */
   list.sort((a, b) => (b.name || '').localeCompare(a.name || '', 'zh-Hant'));
   const tbody = document.getElementById('payees-tbody');
+  const recIdx = _buildPayeeRecIdx(); /* v5.1.1 受款人 ↔ 動支/請購單使用索引 */
   if (!list.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="padding:20px; text-align:center; color:#888;">（無資料）</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#888;">（無資料）</td></tr>';
   } else {
     tbody.innerHTML = list.map(p => {
       const key = `${p.name||''}||${p.acctNo||''}||${p.bank||''}`;
@@ -1118,12 +1121,18 @@ function renderPayeesAdmin() {
       const codeCell = p.code
         ? `<span style="font-family:monospace;">${_payeeEsc(p.code)}</span>`
         : '<span style="color:#bbb;">—</span>';
+      /* v5.1.1 最近三筆動支/請購單（hover 浮標預覽、點擊開填單頁） */
+      const recs = _payeeRecentRecs(p, recIdx);
+      const recentCell = recs.length
+        ? recs.map(e => `<a href="/?rec=${encodeURIComponent(e.id)}" target="_blank" data-rid="${_payeeEsc(String(e.id))}" style="color:#1565c0; text-decoration:none; margin-right:6px;">${_payeeEsc(e.no)}</a>`).join('')
+        : '<span style="color:#bbb;">—</span>';
       return `<tr style="${rowStyle}">
         <td style="padding:6px 10px;">${_payeeEsc(p.name)}${frozenBadge}</td>
         <td style="padding:6px 10px;">${codeCell}</td>
         <td style="padding:6px 10px; font-family:monospace;">${_payeeEsc(p.acctNo)}</td>
         <td style="padding:6px 10px;">${_payeeEsc(p.bank)}</td>
         <td style="padding:6px 10px;">${dateCell}</td>
+        <td style="padding:6px 10px; white-space:nowrap;">${recentCell}</td>
         <td style="padding:6px 10px; color:#666;">${source}</td>
         <td style="padding:6px 10px; white-space:nowrap;">
           <button class="btn btn-gray btn-payee-edit" data-key="${_payeeEsc(key)}" style="padding:3px 10px; font-size:12px;">✏️</button>
@@ -1133,11 +1142,143 @@ function renderPayeesAdmin() {
     }).join('');
   }
   _bindPayeesTbodyOnce();
+  _bindRecPopOnce();
   const nonghuiCount = PAYEES_ADMIN.filter(p => (p.bank||'').includes(PAYEE_NONGHUI_KW)).length;
   const newCount = PAYEES_ADMIN.filter(p => p.isNew).length;
   const frozenCount = PAYEES_ADMIN.filter(p => p.frozen).length;
   document.getElementById('payees-summary').textContent =
     `共 ${PAYEES_ADMIN.length} 筆 (含佳里區農會 ${nonghuiCount}、新廠商 ${newCount}、凍結 ${frozenCount})，目前顯示 ${list.length} 筆`;
+}
+
+/* ── v5.1.1 受款人「最近單據」索引：非作廢動支/請購單。
+   鍵＝分行代號|完整帳號（同 sba-core 比對規則）；受款人有帳號時不退姓名比對 ── */
+function _bankCode7(bank) {
+  const s = String(bank || '');
+  return (s.indexOf('-') === 7 && /^\d{7}$/.test(s.slice(0, 7))) ? s.slice(0, 7) : '';
+}
+function _normPName(s) { return String(s || '').replace(/\s/g, '').toUpperCase(); }
+function _buildPayeeRecIdx() {
+  const byAcct = new Map(), byName = new Map();
+  for (const r of (_recCache || [])) {
+    if (r.voided || !['expense', 'purchase'].includes(r.formType)) continue;
+    const d = String(r.applyDateRaw || r.savedAt || '');
+    const ps = (r.payees && r.payees.length) ? r.payees : (r.payee && r.payee.type ? [r.payee] : []);
+    for (const q of ps) {
+      const ent = { id: r.id, no: r.voucherNo || '(無單號)', d };
+      const a = String(q.acctNo || '').replace(/\D/g, '');
+      if (a) {
+        const k = _bankCode7(q.bank) + '|' + a;
+        if (!byAcct.has(k)) byAcct.set(k, []);
+        byAcct.get(k).push(ent);
+      }
+      const nm = _normPName(q.name);
+      if (nm) { if (!byName.has(nm)) byName.set(nm, []); byName.get(nm).push(ent); }
+    }
+  }
+  for (const m of [byAcct, byName]) for (const v of m.values()) v.sort((x, y) => y.d.localeCompare(x.d));
+  return { byAcct, byName };
+}
+function _payeeRecentRecs(p, idx) {
+  const a = String(p.acctNo || '').replace(/\D/g, '');
+  const list = a ? (idx.byAcct.get(_bankCode7(p.bank) + '|' + a) || [])
+    : (idx.byName.get(_normPName(p.name)) || []);
+  const seen = new Set(), out = [];
+  for (const e of list) { if (seen.has(e.id)) continue; seen.add(e.id); out.push(e); if (out.length === 3) break; }
+  return out;
+}
+/* 最近單據浮標預覽（同 sba.html rec-pop 概念；事件代理繫結一次，不用 inline handler） */
+let _recPopBound = false;
+function _bindRecPopOnce() {
+  if (_recPopBound) return; _recPopBound = true;
+  const tb = document.getElementById('payees-tbody');
+  tb.addEventListener('mouseover', (ev) => {
+    const a = ev.target.closest('a[data-rid]');
+    if (a) showPayeeRecPop(ev, a.dataset.rid);
+  });
+  tb.addEventListener('mousemove', (ev) => {
+    if (ev.target.closest('a[data-rid]')) movePayeeRecPop(ev); else hidePayeeRecPop();
+  });
+  tb.addEventListener('mouseleave', hidePayeeRecPop);
+}
+function showPayeeRecPop(ev, id) {
+  const r = (_recCache || []).find(x => String(x.id) === String(id));
+  if (!r) return;
+  const pop = document.getElementById('payee-rec-pop');
+  const ps = (r.payees && r.payees.length) ? r.payees : (r.payee && r.payee.type ? [r.payee] : []);
+  const pl = ps.map(q => q.type === 'bill' ? '💳繳費單' : (q.name || '')).filter(Boolean).join('、');
+  pop.innerHTML = `<b>${_payeeEsc(r.voucherNo || '')}</b>　${r.formType === 'expense' ? '動支單' : '請購單'}${r.printed ? '・已列印' : '・未列印'}<br>
+    ${_payeeEsc(String(r.applyDateRaw || '').slice(0, 10))}｜${_payeeEsc(r.acctCode || '')}　${_payeeEsc(r.bpCode || '')} ${_payeeEsc(r.bpLabel || '')}<br>
+    ${_payeeEsc(String(r.purposeDesc || ''))}<br>
+    <b>$${(+r.total || 0).toLocaleString('zh-TW')}</b>｜受款人：${_payeeEsc(pl || '—')}`;
+  pop.style.display = 'block';
+  movePayeeRecPop(ev);
+}
+function movePayeeRecPop(ev) {
+  const pop = document.getElementById('payee-rec-pop');
+  if (pop.style.display !== 'block') return;
+  let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + pop.offsetWidth > innerWidth - 8) x = Math.max(8, ev.clientX - pop.offsetWidth - 14);
+  if (y + pop.offsetHeight > innerHeight - 8) y = Math.max(8, innerHeight - pop.offsetHeight - 8);
+  pop.style.left = x + 'px'; pop.style.top = y + 'px';
+}
+function hidePayeeRecPop() { document.getElementById('payee-rec-pop').style.display = 'none'; }
+
+/* ── v5.1.1 匯出 SBA FNWACX0170 受款人匯入格式（未凍結全部；規則與 sba-core.js payeeToFnwacxRow 同步維護） ── */
+async function exportPayeesSbaXlsx() {
+  /* 農會白名單與 SBA 工坊共用 D1 設定（sba_settings.farm），讀不到才用預設 */
+  let farmStr = '6180069,6180416';
+  try {
+    const cfg = await fetch('/api/acc/v2/config').then(r => r.json());
+    if (cfg && cfg.sba_settings && cfg.sba_settings.farm) farmStr = cfg.sba_settings.farm;
+  } catch (_) {}
+  const FARM = new Set(farmStr.split(/[,，\s]+/).filter(Boolean));
+  const rows = PAYEES_ADMIN.filter(p => !p.frozen).map(p => {
+    const bank = String(p.bank || '');
+    const bkCode = (bank.indexOf('-') === 7 && /^\d{7}$/.test(bank.slice(0, 7))) ? bank.slice(0, 7) : '';
+    const bkName = bank.indexOf('-') >= 0 ? bank.slice(bank.indexOf('-') + 1) : bank;
+    const acct = String(p.acctNo || '').replace(/\D/g, '').slice(0, 14);
+    const way = (FARM.has(bkCode) || /佳里區農會/.test(bkName)) ? '1' : (acct ? '6' : '2');
+    const code = String(p.code || '').trim().toUpperCase();
+    return [code.slice(0, 10), (p.name || '').trim(), '', '', way, acct, (p.name || '').trim(),
+      bkCode, '', code.slice(0, 12), '', way === '2' ? '' : '6180069'];
+  });
+  if (!rows.length) { alert('無可匯出的受款人'); return; }
+  const missing = rows.filter(r => !r[0]).length;
+  if (missing && !confirm(`${missing} 筆缺受款人代碼（SBA 現況每筆皆有代碼，可能拒收），仍要匯出？`)) return;
+  const HEAD = ['受款人代碼\n(長度10)', '受款人名稱\n(長度200)', '受款人電話\n(長度30)', '受款人地址\n(長度200)',
+    '領取方式\n(長度1，參閱備註說明)', '銀行帳號\n(長度14)', '戶名\n(長度200)', '金融機構分行代號\n(長度7)',
+    'email\n(長度50)', '統一編號\n(長度12)', '收據別\n(長度1，參閱備註說明)', '指定兌付銀行分行代號\n(長度7)'];
+  /* 匯出前逐列檢核（同 sba.html fnwacxRowErr 規則） */
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i];
+    const bad = !r[1] ? '名稱空白'
+      : (r[0] && r[0].length > 10) ? '受款人代碼超過10碼'
+      : (r[5] && !/^\d{1,14}$/.test(r[5])) ? '銀行帳號須為1~14碼數字'
+      : (r[7] && !/^\d{7}$/.test(r[7])) ? '金融機構分行代號須為7碼'
+      : !['1', '2', '3', '4', '5', '6'].includes(r[4]) ? '領取方式不合法' : '';
+    if (bad) { alert(`匯出前檢核未過，已中止：第 ${i + 1} 筆(${r[1] || '?'})：${bad}`); return; }
+  }
+  const aoa = [['基金：', '310400121'], HEAD, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '受(繳)款人匯入');
+  /* bookSST：官方檔字串全為 sharedStrings t="s"；SheetJS 預設 t="str" 恐遭舊匯入程式拒收 */
+  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array', bookSST: true });
+  /* 回讀驗證：每格值（含前導零）須與送出一致 */
+  try {
+    const back = XLSX.utils.sheet_to_json(XLSX.read(buf).Sheets['受(繳)款人匯入'], { header: 1, raw: true, defval: '' });
+    for (let i = 0; i < aoa.length; i++) for (let j = 0; j < 12; j++) {
+      const want = String(aoa[i][j] == null ? '' : aoa[i][j]);
+      const got = back[i] ? String(back[i][j] == null ? '' : back[i][j]) : '';
+      if (want !== got) { alert(`產出檔回讀驗證未過，已中止：列${i + 1} 欄${j + 1}（${want} → ${got}）`); return; }
+    }
+  } catch (e) { alert('產出檔回讀驗證失敗，已中止：' + e.message); return; }
+  const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `310400121_FNWACX0170_受款人_${ymd}.xlsx`;
+  a.click(); URL.revokeObjectURL(a.href);
 }
 
 let _payeeEditKey = null;
@@ -3811,10 +3952,14 @@ function resolveAdminPrompt(ok) {
   </div>
 </div>
 
+<div id="payee-rec-pop" style="display:none; position:fixed; z-index:99; width:380px; max-width:92vw;
+  background:#fff; border:1px solid #b0bec5; border-radius:8px; padding:10px 12px; font-size:12px;
+  box-shadow:0 8px 28px rgba(0,0,0,.25); pointer-events:none; line-height:1.6;"></div>
+
 <script>
 /* ── 自動還原登入（同 session 內從 acc.html 等頁面返回時免重打密碼） ── */
 (async function autoRestore(){
-  /* v5.1.0 新分頁 sessionStorage 為空時退回 localStorage（同 acc/sba 頁還原機制；logout 會清除） */
+  /* v5.1.1 新分頁 sessionStorage 為空時退回 localStorage（同 acc/sba 頁還原機制；logout 會清除） */
   const saved = sessionStorage.getItem('adminPass') || localStorage.getItem('acc_admin_pass');
   if(!saved) return;
   try {
@@ -3832,7 +3977,7 @@ function resolveAdminPrompt(ok) {
       await loadSubjects();
       updateMaintBtn();
       await loadRecords();
-      showTab(location.hash === '#payees' ? 'payees' : 'reports'); /* v5.1.0 SBA 工坊深連結 */
+      showTab(location.hash === '#payees' ? 'payees' : 'reports'); /* v5.1.1 SBA 工坊深連結 */
     } else {
       sessionStorage.removeItem('adminPass'); // 密碼已失效
     }

@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.1.0';
+const SBA_CORE_VERSION = '5.1.1';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -462,6 +462,55 @@ function decidePayway(payee, farmCodes) {
   return '2';
 }
 
+/* ── FNWACX0170 受款人匯入檔（xlsx 12 欄；模板=受(繳)款人匯入 工作表）── */
+const FNWACX_SHEET = '受(繳)款人匯入';
+const FNWACX_FUND = '310400121';
+const FNWACX_HEADERS = ['受款人代碼\n(長度10)', '受款人名稱\n(長度200)', '受款人電話\n(長度30)',
+  '受款人地址\n(長度200)', '領取方式\n(長度1，參閱備註說明)', '銀行帳號\n(長度14)', '戶名\n(長度200)',
+  '金融機構分行代號\n(長度7)', 'email\n(長度50)', '統一編號\n(長度12)', '收據別\n(長度1，參閱備註說明)',
+  '指定兌付銀行分行代號\n(長度7)'];
+/**
+ * EAF 受款人主檔 → FNWACX0170 12 欄列。
+ * 領取方式：佳里區農會帳戶→1 存入受款人帳戶；其他銀行有帳號→6 電匯；無帳號→2 自領。
+ * 指定兌付：現況檔慣例，1/6 預設 6180069（佳里區農會），2 留空；可於 UI 逐列改。
+ */
+function payeeToFnwacxRow(p, farmCodes) {
+  const bk = splitBank(p.bank);
+  const acct = String(p.acctNo || '').replace(/\D/g, '').slice(0, 14);
+  const isFarm = farmCodes.has(bk.code) || /佳里區農會/.test(bk.name);
+  const way = isFarm ? '1' : (acct ? '6' : '2');
+  const code = String(p.code || '').trim().toUpperCase();
+  return [code.slice(0, 10), String(p.name || '').trim(), '', '', way, acct,
+    String(p.name || '').trim(), bk.code, '', code.slice(0, 12), '', way === '2' ? '' : '6180069'];
+}
+/** 受款人姓名正規化（比對用）：去空白＋大寫 */
+function normPayeeName(s) { return String(s || '').replace(/\s/g, '').toUpperCase(); }
+/** 既有 SBA 受款人現況（12 欄 rows，不含前兩列表頭）→ 比對索引。
+ *  帳號鍵＝分行代號|完整帳號數字（不去前導零，避免異行同號誤判） */
+function buildSbaPayeeIndex(rows) {
+  const codes = new Set(), bankAccts = new Set(), names = new Set();
+  for (const r of rows) {
+    if (!r || !r[1]) continue;
+    if (r[0]) codes.add(String(r[0]).trim().toUpperCase());
+    if (r[9]) codes.add(String(r[9]).trim().toUpperCase());
+    const a = String(r[5] || '').replace(/\D/g, '');
+    if (a) bankAccts.add(String(r[7] || '').replace(/\D/g, '') + '|' + a);
+    names.add(normPayeeName(r[1]));
+    if (r[6]) names.add(normPayeeName(r[6]));
+  }
+  return { codes, bankAccts, names };
+}
+/** EAF 受款人是否已存在 SBA。
+ *  SBA 為「一帳戶一列」（同一人可多列），故有帳號時只認「分行|帳號」——
+ *  同一人新開帳戶須新增一列，不能因代碼已存在而略過。無帳號才退代碼/姓名。 */
+function payeeExistsInSba(p, idx) {
+  const a = String(p.acctNo || '').replace(/\D/g, '');
+  if (a) return idx.bankAccts.has(splitBank(p.bank).code.replace(/\D/g, '') + '|' + a);
+  const code = String(p.code || '').trim().toUpperCase();
+  if (code) return idx.codes.has(code);
+  return idx.names.has(normPayeeName(p.name));
+}
+
 /* 付款類別（＝分組維度）：1 農會存帳／6 電匯(e企)／2 繳費單代繳 */
 const PAY_CAT_LABEL = { '1': '農會存帳', '6': '電匯(e企)', '2': '繳費單/代繳' };
 const PAY_CAT_ORDER = ['1', '6', '2'];
@@ -665,6 +714,7 @@ if (typeof module !== 'undefined' && module.exports) {
     F03_FIELDS, F04_FIELDS, F05_FIELDS, F06_FIELDS, F07_FIELDS,
     validateVoucher, validateBatch, guessBcode, FIXED_ASSET_CODES,
     splitBank, decidePayway, mapRecordsToVouchers,
+    FNWACX_SHEET, FNWACX_FUND, FNWACX_HEADERS, payeeToFnwacxRow, buildSbaPayeeIndex, payeeExistsInSba, normPayeeName,
     resolvePayees, planGrouping, PAY_CAT_LABEL, PAY_CAT_ORDER,
     voucherToF03Row, voucherToF04Rows, voucherToF05Rows, voucherToF06Rows, voucherToF07Rows,
     buildExportFiles, crc32, buildZip,
