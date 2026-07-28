@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v5.1.1</title>
+<title>管理者入口 — 動支單系統 v5.1.2</title>
 <link rel="stylesheet" href="design.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -401,7 +401,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v5.1.1</p>
+    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v5.1.2</p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -418,7 +418,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span id="ver-badge" style="font-size:11px; color:#78909c; letter-spacing:.5px;">v5.1.1</span>
+    <span id="ver-badge" style="font-size:11px; color:#78909c; letter-spacing:.5px;">v5.1.2</span>
     <button id="maint-btn" onclick="toggleMaintenance()" style="padding:4px 14px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;"></button>
     <a class="link-btn" href="/acc.html" style="background:#1b5e20;">📒 會計帳務</a>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
@@ -952,7 +952,7 @@ async function login() {
       await loadSubjects();
       updateMaintBtn();
       await loadRecords();
-      if (location.hash === '#payees') showTab('payees'); /* v5.1.1 SBA 工坊深連結 */
+      if (location.hash === '#payees') showTab('payees'); /* v5.1.2 SBA 工坊深連結 */
     } else {
       document.getElementById('login-err').textContent = '❌ 密碼錯誤';
     }
@@ -1097,7 +1097,7 @@ function renderPayeesAdmin() {
   /* v4.4.86 依戶名降序排列（zh-Hant locale） */
   list.sort((a, b) => (b.name || '').localeCompare(a.name || '', 'zh-Hant'));
   const tbody = document.getElementById('payees-tbody');
-  const recIdx = _buildPayeeRecIdx(); /* v5.1.1 受款人 ↔ 動支/請購單使用索引 */
+  const recIdx = _buildPayeeRecIdx(); /* v5.1.2 受款人 ↔ 動支/請購單使用索引 */
   if (!list.length) {
     tbody.innerHTML = '<tr><td colspan="8" style="padding:20px; text-align:center; color:#888;">（無資料）</td></tr>';
   } else {
@@ -1121,7 +1121,7 @@ function renderPayeesAdmin() {
       const codeCell = p.code
         ? `<span style="font-family:monospace;">${_payeeEsc(p.code)}</span>`
         : '<span style="color:#bbb;">—</span>';
-      /* v5.1.1 最近三筆動支/請購單（hover 浮標預覽、點擊開填單頁） */
+      /* v5.1.2 最近三筆動支/請購單（hover 浮標預覽、點擊開填單頁） */
       const recs = _payeeRecentRecs(p, recIdx);
       const recentCell = recs.length
         ? recs.map(e => `<a href="/?rec=${encodeURIComponent(e.id)}" target="_blank" data-rid="${_payeeEsc(String(e.id))}" style="color:#1565c0; text-decoration:none; margin-right:6px;">${_payeeEsc(e.no)}</a>`).join('')
@@ -1150,7 +1150,7 @@ function renderPayeesAdmin() {
     `共 ${PAYEES_ADMIN.length} 筆 (含佳里區農會 ${nonghuiCount}、新廠商 ${newCount}、凍結 ${frozenCount})，目前顯示 ${list.length} 筆`;
 }
 
-/* ── v5.1.1 受款人「最近單據」索引：非作廢動支/請購單。
+/* ── v5.1.2 受款人「最近單據」索引：非作廢動支/請購單。
    鍵＝分行代號|完整帳號（同 sba-core 比對規則）；受款人有帳號時不退姓名比對 ── */
 function _bankCode7(bank) {
   const s = String(bank || '');
@@ -1223,7 +1223,7 @@ function movePayeeRecPop(ev) {
 }
 function hidePayeeRecPop() { document.getElementById('payee-rec-pop').style.display = 'none'; }
 
-/* ── v5.1.1 匯出 SBA FNWACX0170 受款人匯入格式（未凍結全部；規則與 sba-core.js payeeToFnwacxRow 同步維護） ── */
+/* ── v5.1.2 匯出 SBA FNWACX0170 受款人匯入格式（未凍結全部；規則與 sba-core.js payeeToFnwacxRow 同步維護） ── */
 async function exportPayeesSbaXlsx() {
   /* 農會白名單與 SBA 工坊共用 D1 設定（sba_settings.farm），讀不到才用預設 */
   let farmStr = '6180069,6180416';
@@ -3959,7 +3959,7 @@ function resolveAdminPrompt(ok) {
 <script>
 /* ── 自動還原登入（同 session 內從 acc.html 等頁面返回時免重打密碼） ── */
 (async function autoRestore(){
-  /* v5.1.1 新分頁 sessionStorage 為空時退回 localStorage（同 acc/sba 頁還原機制；logout 會清除） */
+  /* v5.1.2 新分頁 sessionStorage 為空時退回 localStorage（同 acc/sba 頁還原機制；logout 會清除） */
   const saved = sessionStorage.getItem('adminPass') || localStorage.getItem('acc_admin_pass');
   if(!saved) return;
   try {
@@ -3977,7 +3977,7 @@ function resolveAdminPrompt(ok) {
       await loadSubjects();
       updateMaintBtn();
       await loadRecords();
-      showTab(location.hash === '#payees' ? 'payees' : 'reports'); /* v5.1.1 SBA 工坊深連結 */
+      showTab(location.hash === '#payees' ? 'payees' : 'reports'); /* v5.1.2 SBA 工坊深連結 */
     } else {
       sessionStorage.removeItem('adminPass'); // 密碼已失效
     }

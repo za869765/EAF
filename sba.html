@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SBA 傳票工坊 — 佳里區衛生所 v5.1.1</title>
+<title>SBA 傳票工坊 — 佳里區衛生所 v5.1.2</title>
 <link rel="stylesheet" href="design.css">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -131,7 +131,7 @@ window.addEventListener('storage', (ev) => {
 
 <div id="top-bar">
   <h1>📤 SBA 傳票工坊 — 臺南市佳里區衛生所</h1>
-  <span class="small" id="ver-badge" style="color:#78909c;">v5.1.1</span>
+  <span class="small" id="ver-badge" style="color:#78909c;">v5.1.2</span>
   <a class="tbtn tbtn-gray" href="/acc.html">📒 會計帳務</a>
   <a class="tbtn tbtn-gray" href="/admin.html#payees" target="_blank">💳 受款人資料庫</a>
   <a class="tbtn tbtn-gray" href="/" target="_blank">📝 填單</a>
@@ -249,9 +249,9 @@ window.addEventListener('storage', (ev) => {
     <div class="scroll-x" style="max-height:56vh;overflow-y:auto;">
       <table class="grid"><thead><tr>
         <th><input type="checkbox" id="pi-all" onclick="piSelAll(this.checked)"></th>
-        <th>受款人代碼</th><th>名稱</th><th>領取方式</th><th>銀行帳號</th><th>分行代號</th>
-        <th>統一編號</th><th>收據別</th><th>指定兌付</th><th>提示</th>
-      </tr></thead><tbody id="pi-body"><tr><td colspan="10" class="small">請先上傳現況檔</td></tr></tbody></table>
+        <th>受款人代碼(=統一編號)</th><th>名稱</th><th>領取方式</th><th>銀行帳號</th><th>分行代號</th>
+        <th>收據別</th><th>指定兌付</th><th>提示</th>
+      </tr></thead><tbody id="pi-body"><tr><td colspan="9" class="small">請先上傳現況檔</td></tr></tbody></table>
     </div>
     <div class="small" style="margin-top:6px;">比對鍵：受款人代碼/統編 → 銀行帳號（去前導零）→ 無代碼無帳號時比姓名。凍結中的受款人不列入。</div>
   </div>
@@ -296,12 +296,12 @@ window.addEventListener('storage', (ev) => {
 
 <div id="rec-pop"></div>
 
-<script src="sba-core.js?v=5.1.1"></script>
+<script src="sba-core.js?v=5.1.2"></script>
 <script>
 /* 版本握手：sba-core.js 與本頁必須同版，不一致＝瀏覽器快取到舊檔 */
 (function(){
   const got = typeof SBA_CORE_VERSION === 'undefined' ? '(舊版)' : 'v' + SBA_CORE_VERSION;
-  if (got !== 'v5.1.1') alert('程式版本不一致（頁面 v5.1.1／核心 ' + got + '），請按 Ctrl+F5 強制重新整理後再使用');
+  if (got !== 'v5.1.2') alert('程式版本不一致（頁面 v5.1.2／核心 ' + got + '），請按 Ctrl+F5 強制重新整理後再使用');
 })();
 /* ═══════════════ 狀態 ═══════════════ */
 const STATE = {
@@ -1025,13 +1025,38 @@ async function loadSbaPayeeDb(file) {
     renderPayeeDiff();
   } catch (e) { alert('讀取失敗：' + e.message); }
 }
+/* 收據別預設：該受款人「最近一筆」動支/請購單的 receiptType（EAF 2統一發票→SBA 1發票、1收據→2收據、0/無→空） */
+function latestRevDefaults() {
+  const recs = STATE.records
+    .filter(r => !r.voided && ['expense', 'purchase'].includes(r.formType))
+    .sort((a, b) => (recDateIso(b) || '').localeCompare(recDateIso(a) || ''));
+  const byKey = new Map();
+  for (const r of recs) {
+    const ps = (r.payees && r.payees.length) ? r.payees : (r.payee && r.payee.type ? [r.payee] : []);
+    for (const q of ps) {
+      const rt = String(q.receiptType == null ? '' : q.receiptType);
+      if (!rt || rt === '0') continue;
+      const a = String(q.acctNo || '').replace(/\D/g, '');
+      const k = a ? splitBank(q.bank).code + '|' + a : 'n|' + normPayeeName(q.name);
+      if (!byKey.has(k)) byKey.set(k, rt);
+    }
+  }
+  return byKey;
+}
 function renderPayeeDiff() {
   const tb = $('pi-body');
-  if (!SBA_DB_IDX) { tb.innerHTML = '<tr><td colspan="10" class="small">請先上傳現況檔</td></tr>'; $('pi-dl').disabled = true; return; }
+  if (!SBA_DB_IDX) { tb.innerHTML = '<tr><td colspan="9" class="small">請先上傳現況檔</td></tr>'; $('pi-dl').disabled = true; return; }
   const farm = new Set(String(STATE.settings.farm || '').split(/[,，\s]+/).filter(Boolean));
   const news = STATE.payees.filter(p => !p.frozen && !payeeExistsInSba(p, SBA_DB_IDX));
-  PI_ROWS = news.map(p => ({ p, row: payeeToFnwacxRow(p, farm), sel: !!String(p.code || '').trim() }));
-  $('pi-diff-msg').innerHTML = `本系統受款人 ${STATE.payees.filter(p => !p.frozen).length} 筆（不含凍結）→ SBA 未建 <b>${PI_ROWS.length}</b> 筆`;
+  const revIdx = latestRevDefaults();
+  PI_ROWS = news.map(p => {
+    const row = payeeToFnwacxRow(p, farm);
+    const a = String(p.acctNo || '').replace(/\D/g, '');
+    const rt = revIdx.get(a ? splitBank(p.bank).code + '|' + a : 'n|' + normPayeeName(p.name));
+    row[10] = rt === '2' ? '1' : rt === '1' ? '2' : '';
+    return { p, row, sel: !!String(p.code || '').trim() };
+  });
+  $('pi-diff-msg').innerHTML = `本系統受款人 ${STATE.payees.filter(p => !p.frozen).length} 筆（不含凍結）→ SBA 未建 <b>${PI_ROWS.length}</b> 筆（僅列 SBA 沒有的）`;
   $('pi-dl').disabled = !PI_ROWS.length;
   tb.innerHTML = PI_ROWS.map((x, i) => {
     const r = x.row;
@@ -1040,17 +1065,24 @@ function renderPayeeDiff() {
     const revSel = `<select onchange="piUpd(${i},10,this.value)">` + Object.keys(PI_REV_LABEL).map(c =>
       `<option value="${c}"${c === r[10] ? ' selected' : ''}>${PI_REV_LABEL[c]}</option>`).join('') + '</select>';
     return `<tr${r[0] ? '' : ' style="background:#fdf3e7;"'}>
-      <td><input type="checkbox" class="pi-cb"${x.sel ? ' checked' : ''} onchange="PI_ROWS[${i}].sel=this.checked"></td>
-      <td>${esc(r[0]) || '<span class="chip warn">缺代碼</span>'}</td>
+      <td><input type="checkbox" class="pi-cb" id="pi-cb-${i}"${x.sel ? ' checked' : ''} onchange="PI_ROWS[${i}].sel=this.checked"></td>
+      <td><input class="w-code" value="${esc(r[0])}" placeholder="統編/身分證" onchange="piUpdCode(${i},this.value)">${r[0] ? '' : ' <span class="chip warn">缺</span>'}</td>
       <td>${esc(r[1])}</td><td>${waySel}</td>
       <td style="font-family:monospace;">${esc(r[5])}</td><td>${esc(r[7])}</td>
-      <td>${esc(r[9])}</td><td>${revSel}</td>
-      <td><input class="w-4" value="${esc(r[11])}" onchange="piUpd(${i},11,this.value)"></td>
-      <td class="small">${r[0] ? '' : 'SBA 現況每筆皆有受款人代碼(統編/身分證)，缺漏請先於受款人資料庫補齊'}</td></tr>`;
-  }).join('') || '<tr><td colspan="10" class="small">🎉 沒有新受款人——SBA 資料庫已涵蓋本系統全部受款人</td></tr>';
+      <td>${revSel}</td>
+      <td style="color:#9e9e9e;">${esc(r[11]) || '—'}</td>
+      <td class="small">${r[0] ? '' : '請補代碼後匯出（SBA 現況每筆皆有統編/身分證）'}</td></tr>`;
+  }).join('') || '<tr><td colspan="9" class="small">🎉 沒有新受款人——SBA 資料庫已涵蓋本系統全部受款人</td></tr>';
   $('pi-all').checked = false;
 }
 function piUpd(i, col, v) { PI_ROWS[i].row[col] = String(v || '').trim(); }
+/* 受款人代碼＝統一編號：填一格同步兩欄；補上代碼即自動勾選 */
+function piUpdCode(i, v) {
+  const code = String(v || '').trim().toUpperCase();
+  PI_ROWS[i].row[0] = code.slice(0, 10);
+  PI_ROWS[i].row[9] = code.slice(0, 12);
+  if (code && !PI_ROWS[i].sel) { PI_ROWS[i].sel = true; const cb = $('pi-cb-' + i); if (cb) cb.checked = true; }
+}
 function piSelAll(on) {
   PI_ROWS.forEach(x => { x.sel = on; });
   document.querySelectorAll('.pi-cb').forEach(cb => { cb.checked = on; });
