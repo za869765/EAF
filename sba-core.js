@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.0.7';
+const SBA_CORE_VERSION = '5.0.8';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -505,7 +505,8 @@ function resolvePayees(rec, ctx) {
       seq: 0, name: String(p.name || '').trim(),
       account: p.acctNo || '', userbank: bk.code,
       bankna: bk.code ? (ctx.bankNameByCode(bk.code) || bk.name) : bk.name,
-      payway: decidePayway(p, ctx.farmCodes), amt,
+      /* ctx.catOverride[recId]＝sba.html 六大格手動移組覆寫（整單強制同一付款類別） */
+      payway: (ctx.catOverride && ctx.catOverride[rec.id]) || decidePayway(p, ctx.farmCodes), amt,
       usedoc: String(rec.purposeDesc || '').trim(), rev,
       srcType: p.type || '', srcRec: rec.voucherNo,
       needsInput: p.type === 'bill' || p.type === 'manual' || !p.name,

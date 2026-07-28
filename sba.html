@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SBA 傳票工坊 — 佳里區衛生所 v5.0.7</title>
+<title>SBA 傳票工坊 — 佳里區衛生所 v5.0.8</title>
 <link rel="stylesheet" href="design.css">
 <style>
 /* ── 沿用 acc.html 視覺語言（parchment / warm charcoal） ── */
@@ -46,9 +46,21 @@ table.grid tr:hover td { background: #f2f0e8; }
 .chip.exp  { background: #f0e0d8; color: #7a4a30; }
 .chip.done { background: #d7e3d2; color: #33552c; }
 .chip.warn { background: #f3e2c0; color: #7a5b18; }
-tr.grp-hd td, tr.grp-hd:hover td { background: #dcd9cc; border-top: 2px solid #b8b5a6; font-weight: 600; }
-tr.grp-hd label { font-size: 11px; margin-right: 8px; cursor: pointer; }
 tr.row-exported { opacity: .45; filter: grayscale(.7); }
+/* ── 六大格（專戶 × 付款方式）卡片：平時縮小、點擊放大 ── */
+.grp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+.gcard { background: var(--pure-white, #fff); border-radius: var(--r-lg, 12px);
+  box-shadow: var(--sh-ring-1, 0 0 0 1px #d1cfc5); overflow: hidden; }
+.gcard.empty { opacity: .55; }
+.gcard-hd { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 9px 12px; background: var(--warm-sand, #e8e6dc); cursor: pointer; user-select: none; }
+.gcard-hd label { font-size: 11px; cursor: pointer; }
+.gcard.open { grid-column: 1 / -1; }
+.gcard.open .gcard-hd { background: #dcd9cc; }
+.gcard-n { margin-left: auto; font-size: 12px; white-space: nowrap; }
+.gcard-arrow { font-size: 11px; color: var(--stone-gray, #87867f); white-space: nowrap; }
+.gcard-body { display: none; max-height: 46vh; overflow: auto; }
+.gcard.open .gcard-body { display: block; }
 input, select, textarea { font-family: inherit; font-size: 12px; padding: 3px 6px;
   border: 1px solid var(--ring-warm, #d1cfc5); border-radius: var(--r-sm, 6px);
   background: var(--pure-white, #fff); color: inherit; }
@@ -108,7 +120,7 @@ window.addEventListener('storage', (ev) => {
 
 <div id="top-bar">
   <h1>📤 SBA 傳票工坊 — 臺南市佳里區衛生所</h1>
-  <span class="small" id="ver-badge" style="color:#78909c;">v5.0.7</span>
+  <span class="small" id="ver-badge" style="color:#78909c;">v5.0.8</span>
   <a class="tbtn tbtn-gray" href="/acc.html">📒 會計帳務</a>
   <a class="tbtn tbtn-gray" href="/" target="_blank">📝 填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
@@ -139,28 +151,18 @@ window.addEventListener('storage', (ev) => {
       <input type="search" id="pk-q" placeholder="搜尋 摘要/受款人；單號末3碼可多筆(空格分隔)" style="width:230px;">
       <button class="btn btn-sm" onclick="renderPickList()">🔍 重新整理</button>
     </div>
-    <div class="scroll-x" style="max-height:52vh;overflow-y:auto;">
-      <table class="grid" id="pk-table">
-        <thead><tr>
-          <th><input type="checkbox" id="pk-all" onclick="toggleAllPick(this.checked)"></th>
-          <th>單號</th><th>日期</th><th>類型</th><th>專戶</th><th>科目</th><th>用途/摘要</th>
-          <th class="num">金額</th><th>受款人</th><th>狀態</th>
-        </tr></thead>
-        <tbody id="pk-body"></tbody>
-      </table>
+    <div class="toolbar" style="margin-bottom:2px;">
+      <button class="btn btn-sm" onclick="toggleAllPick(true)">☑ 全選(跳過已匯出)</button>
+      <button class="btn btn-sm" onclick="toggleAllPick(false)">✖ 清除勾選</button>
+      <span class="small" id="pk-summary">尚未勾選</span>
     </div>
-    <div class="sumbar" id="pk-summary">尚未勾選</div>
+    <div class="grp-grid" id="pk-groups"></div>
     <div class="toolbar">
       <label>製票日期 <input type="date" id="pk-paydate"></label>
       <span class="pill-toggle" id="pk-posted-toggle">
         <button class="on" data-v="posted" onclick="setPostMode('posted')">已入帳(同製票日)</button>
         <button data-v="unposted" onclick="setPostMode('unposted')">未入帳(9991231)</button>
       </span>
-      <span class="pill-toggle" id="pk-combine-toggle">
-        <button class="on" data-v="1" onclick="setCombine(true)">同專戶同付款方式合併</button>
-        <button data-v="0" onclick="setCombine(false)">每單獨立一張</button>
-      </span>
-      <span class="small">分組＝專戶 × 付款方式（農會存帳／電匯／繳費單代繳）</span>
       <button class="btn btn-main" onclick="generateVouchers()">⚡ 產生支出傳票 → 預覽</button>
     </div>
     <div id="pk-issues"></div>
@@ -255,12 +257,12 @@ window.addEventListener('storage', (ev) => {
   </div>
 </div>
 
-<script src="sba-core.js?v=5.0.7"></script>
+<script src="sba-core.js?v=5.0.8"></script>
 <script>
 /* 版本握手：sba-core.js 與本頁必須同版，不一致＝瀏覽器快取到舊檔 */
 (function(){
   const got = typeof SBA_CORE_VERSION === 'undefined' ? '(舊版)' : 'v' + SBA_CORE_VERSION;
-  if (got !== 'v5.0.7') alert('程式版本不一致（頁面 v5.0.7／核心 ' + got + '），請按 Ctrl+F5 強制重新整理後再使用');
+  if (got !== 'v5.0.8') alert('程式版本不一致（頁面 v5.0.8／核心 ' + got + '），請按 Ctrl+F5 強制重新整理後再使用');
 })();
 /* ═══════════════ 狀態 ═══════════════ */
 const STATE = {
@@ -269,6 +271,8 @@ const STATE = {
   exported: {},              /* recId → {recno,batch,at,src} */
   drafts: [],                /* normalized vouchers (sba-core 模型) */
   combine: true, postMode: 'posted',
+  openGrp: null,             /* 目前放大的卡片 'acct|cat'；null=全部縮小 */
+  catOv: {},                 /* recId → '1'|'6'|'2' 手動移組覆寫（存 D1 sba_catov） */
   serials: {},               /* '1152' → 已配最大流水 */
   modalCtx: null,
 };
@@ -311,6 +315,7 @@ async function boot() {
   STATE.config = config || {};
   if (config && config.sba_settings) Object.assign(STATE.settings, config.sba_settings);
   if (config && config.sba_exported) STATE.exported = config.sba_exported;
+  if (config && config.sba_catov) STATE.catOv = config.sba_catov;
   /* 序號高水位：從匯出紀錄還原（預設高段 90000 起，杜絕與 SBA 正式號相撞） */
   for (const rec of Object.values(STATE.exported)) {
     const s = String(rec.recno || '');
@@ -399,61 +404,95 @@ function pickFiltered() {
     return true;
   }).sort((a, b) => (recDateIso(b) || '').localeCompare(recDateIso(a) || ''));
 }
-function pickRowHtml(r, grp, multi) {
-  const acctChip = r.acctCode === '11010202' ? 'cust' : 'fund';
+function pickRowHtml(r, effCat, key) {
   const exported = STATE.exported[r.id];
   const payeeTxt = (r.payees || []).map(p => p.type === 'bill' ? '💳繳費單' : (p.name || '')).filter(Boolean).join('、')
     || (r.payee && r.payee.name) || (r.payee && r.payee.type === 'bill' ? '💳繳費單' : '') || '—';
   const st = [
     r.printed ? '<span class="chip done">已列印</span>' : '<span class="chip warn">未列印</span>',
     exported ? `<span class="chip done">已匯出 ${esc(exported.recno)}</span>` : '',
-    multi ? '<span class="chip warn">跨付款</span>' : '',
   ].join(' ');
+  /* 移組：系統可能分錯，可手動改付款方式（同步影響開票分組與 F05 payway） */
+  const mv = `<select onchange="moveRecGroup('${esc(r.id)}',this.value)">`
+    + PAY_CAT_ORDER.map(c => `<option value="${c}"${c === effCat ? ' selected' : ''}>${PAY_CAT_LABEL[c]}</option>`).join('')
+    + `</select>${STATE.catOv[r.id] ? ' <span class="chip warn">手動</span>' : ''}`;
   return `<tr${exported ? ' class="row-exported"' : ''}>
-    <td><input type="checkbox" class="pk-cb" value="${esc(r.id)}" data-grp="${grp}"${exported ? ' data-exported="1"' : ''} onchange="updatePickSummary()"></td>
+    <td><input type="checkbox" class="pk-cb" value="${esc(r.id)}" data-grp="${key}"${exported ? ' data-exported="1"' : ''} onchange="updatePickSummary()"></td>
     <td>${esc(r.voucherNo)}</td><td>${esc(recDateIso(r))}</td>
     <td><span class="chip">${r.formType === 'expense' ? '動支' : '請購'}</span></td>
-    <td><span class="chip ${acctChip}">${esc(r.acctCode)}</span></td>
     <td>${esc(r.bpCode)} ${esc(r.bpLabel || '')}</td>
-    <td style="max-width:280px;">${esc(String(r.purposeDesc || '').slice(0, 60))}</td>
+    <td style="max-width:300px;">${esc(String(r.purposeDesc || '').slice(0, 60))}</td>
     <td class="num">${fmtN(r.total)}</td>
     <td style="max-width:160px;">${esc(payeeTxt)}</td>
-    <td>${st}</td></tr>`;
+    <td>${st}</td>
+    <td style="white-space:nowrap;">${mv}</td></tr>`;
 }
 function renderPickList() {
   const rows = pickFiltered();
-  const tb = $('pk-body');
-  if (!rows.length) {
-    tb.innerHTML = '<tr><td colspan="10" class="small">無符合條件的單據</td></tr>';
-    $('pk-all').checked = false; updatePickSummary(); return;
-  }
-  /* 清單依 專戶 × 付款類別 分區（同產傳票分組）；跨類別單歸首類並標「跨付款」 */
   const ctx = mapCtx();
-  const groups = new Map();
+  const q = $('pk-q').value.trim();
+  const checkedBefore = new Set([...document.querySelectorAll('.pk-cb:checked')].map(c => c.value));
+  const accts = [...new Set(STATE.records.map(r => r.acctCode).filter(Boolean))].sort();
+  const byKey = new Map();                       /* 'acct|cat' → {recs:[{r,effCat}], sum} */
+  const catPayees = { '1': new Set(), '6': new Set() }; /* 未出帳不重複受款人（兩專戶合計） */
+  const ownAcctRe = /(保管款|醫療基金|醫療作業基金)專戶/;  /* 本所兩專戶不算受款人 */
   for (const r of rows) {
-    const cats = [...new Set(resolvePayees(r, ctx).payees.map(p => p.payway))]
+    const ps = resolvePayees(r, ctx).payees;
+    const cats = [...new Set(ps.map(p => p.payway))]
       .sort((a, b) => PAY_CAT_ORDER.indexOf(a) - PAY_CAT_ORDER.indexOf(b));
-    const key = (r.acctCode || '') + '|' + (cats[0] || '2');
-    if (!groups.has(key)) groups.set(key, { acct: r.acctCode || '', cat: cats[0] || '2', recs: [], sum: 0 });
-    const g = groups.get(key);
-    g.recs.push({ r, multi: cats.length > 1 });
-    g.sum += +r.total || 0;
+    const effCat = cats[0] || '2';
+    const key = (r.acctCode || '') + '|' + effCat;
+    if (!byKey.has(key)) byKey.set(key, { recs: [], sum: 0 });
+    byKey.get(key).recs.push({ r, effCat });
+    byKey.get(key).sum += +r.total || 0;
+    if (!STATE.exported[r.id]) for (const p of ps) {
+      const nm = String(p.name || '').replace(/\s/g, '');
+      if (nm && catPayees[p.payway] && !ownAcctRe.test(nm)) catPayees[p.payway].add(nm);
+    }
   }
-  const ordered = [...groups.values()].sort((a, b) => a.acct.localeCompare(b.acct)
-    || PAY_CAT_ORDER.indexOf(a.cat) - PAY_CAT_ORDER.indexOf(b.cat));
-  tb.innerHTML = ordered.map((g, gi) => {
-    const acctChip = g.acct === '11010202' ? 'cust' : 'fund';
-    /* 群內未匯出在前、已匯出(反灰)墊底 */
-    g.recs.sort((a, b) => (STATE.exported[a.r.id] ? 1 : 0) - (STATE.exported[b.r.id] ? 1 : 0));
-    return `<tr class="grp-hd"><td colspan="10">
-      <label><input type="checkbox" class="grp-cb" data-grp="g${gi}" onchange="toggleGroupPick(this)"> 全選此組</label>
-      <span class="chip ${acctChip}">${esc(g.acct)} ${esc(subjectName(g.acct))}</span>
-      <span class="chip exp">${esc(PAY_CAT_LABEL[g.cat] || g.cat)}</span>
-      ${g.recs.length} 筆 <b>$${fmtN(g.sum)}</b></td></tr>`
-      + g.recs.map(({ r, multi }) => pickRowHtml(r, 'g' + gi, multi)).join('');
-  }).join('');
-  $('pk-all').checked = false;
+  const openAll = !!q; /* 搜尋中：有命中的卡片全部展開 */
+  $('pk-groups').innerHTML = PAY_CAT_ORDER.map(cat => accts.map(acct => {
+    const key = acct + '|' + cat;
+    const g = byKey.get(key) || { recs: [], sum: 0 };
+    g.recs.sort((a, b) => (STATE.exported[a.r.id] ? 1 : 0) - (STATE.exported[b.r.id] ? 1 : 0)); /* 已匯出(反灰)墊底 */
+    const open = openAll ? g.recs.length > 0 : STATE.openGrp === key;
+    const acctChip = acct === '11010202' ? 'cust' : 'fund';
+    const pcnt = (cat === '1' || cat === '6')
+      ? `<span class="chip" title="農會存帳/電匯 各自統計：兩專戶合計、不重複受款人、排除本所兩專戶、不含已匯出">未出帳受款人(兩專戶合計) <b>${catPayees[cat].size}</b> 人</span>` : '';
+    const body = g.recs.length
+      ? `<table class="grid"><thead><tr><th></th><th>單號</th><th>日期</th><th>類型</th><th>科目</th><th>用途/摘要</th>
+          <th class="num">金額</th><th>受款人</th><th>狀態</th><th>移組</th></tr></thead><tbody>`
+        + g.recs.map(({ r, effCat }) => pickRowHtml(r, effCat, key)).join('') + '</tbody></table>'
+      : '<div class="small" style="padding:10px 12px;">無單據</div>';
+    return `<div class="gcard${open ? ' open' : ''}${g.recs.length ? '' : ' empty'}">
+      <div class="gcard-hd" onclick="toggleGroupCard('${key}')">
+        <label onclick="event.stopPropagation()"><input type="checkbox" class="grp-cb" data-grp="${key}" onchange="toggleGroupPick(this)"${g.recs.length ? '' : ' disabled'}> 全選</label>
+        <span class="chip ${acctChip}">${esc(acct)} ${esc(subjectName(acct))}</span>
+        <span class="chip exp">${esc(PAY_CAT_LABEL[cat])}</span>
+        ${pcnt}
+        <span class="gcard-n">${g.recs.length} 筆 <b>$${fmtN(g.sum)}</b></span>
+        <span class="gcard-arrow">${open ? '▾ 收合' : '▸ 展開'}</span>
+      </div>
+      <div class="gcard-body">${body}</div>
+    </div>`;
+  }).join('')).join('');
+  document.querySelectorAll('.pk-cb').forEach(cb => { if (checkedBefore.has(cb.value)) cb.checked = true; });
   updatePickSummary();
+}
+function toggleGroupCard(key) {
+  STATE.openGrp = STATE.openGrp === key ? null : key;
+  renderPickList();
+}
+/* 手動移組：與自動判定相同→移除覆寫，否則記錄並背景存 D1（失敗僅本次生效） */
+function moveRecGroup(id, cat) {
+  const rec = STATE.records.find(r => String(r.id) === String(id));
+  if (!rec) return;
+  const base = mapCtx(); base.catOverride = null;
+  const auto = resolvePayees(rec, base).payees.map(p => p.payway)
+    .sort((a, b) => PAY_CAT_ORDER.indexOf(a) - PAY_CAT_ORDER.indexOf(b))[0] || '2';
+  if (cat === auto) delete STATE.catOv[id]; else STATE.catOv[id] = cat;
+  renderPickList();
+  putConfig('sba_catov', STATE.catOv);
 }
 /* 全選一律跳過已匯出（反灰）列，要重匯出請逐筆手動勾 */
 function toggleGroupPick(cb) {
@@ -463,7 +502,7 @@ function toggleGroupPick(cb) {
 }
 function toggleAllPick(on) {
   document.querySelectorAll('.pk-cb:not([data-exported])').forEach(cb => { cb.checked = on; });
-  document.querySelectorAll('.grp-cb').forEach(cb => { cb.checked = on; });
+  document.querySelectorAll('.grp-cb:not([disabled])').forEach(cb => { cb.checked = on; });
   updatePickSummary();
 }
 function selectedRecords() {
@@ -478,6 +517,7 @@ function mapCtx(pay7) {
     year: rocYearNow(), payDate7: pay7 || toRoc7(todayIso()),
     postDate7: STATE.postMode === 'posted' ? (pay7 || toRoc7(todayIso())) : '9991231',
     mvchno: STATE.settings.mvchno || '', combine: STATE.combine,
+    catOverride: STATE.catOv,
     bcodeFor, farmCodes, defaultPkind: STATE.settings.pkind || '',
     bankNameByCode: (c) => STATE.bankByCode.get(c) || '',
     nextRecno: () => nextRecnoFor('2'), acctNames: acctNameMap,
@@ -486,22 +526,11 @@ function mapCtx(pay7) {
 function updatePickSummary() {
   const sel = selectedRecords();
   if (!sel.length) { $('pk-summary').textContent = '尚未勾選'; return; }
-  /* 分組預覽：專戶 × 付款類別（農會存帳／電匯／繳費單代繳） */
-  const plan = planGrouping(sel, mapCtx());
-  const nV = STATE.combine ? plan.length : plan.reduce((s, g) => s + g.n, 0);
-  $('pk-summary').innerHTML = plan.map(g =>
-    `<span><span class="chip ${g.acct === '11010202' ? 'cust' : 'fund'}">${esc(g.acct)} ${esc(subjectName(g.acct))}</span>` +
-    `<span class="chip exp">${esc(g.catLabel)}</span> ${g.n} 筆 <b>$${fmtN(g.sum)}</b></span>`
-  ).join('') + `<span>｜合計 ${sel.length} 筆 <b>$${fmtN(sel.reduce((s, r) => s + (+r.total || 0), 0))}</b> → <b>${nV}</b> 張支出傳票</span>`;
+  $('pk-summary').innerHTML = `已勾選 <b>${sel.length}</b> 筆 → 將產生 <b>${planGrouping(sel, mapCtx()).length}</b> 張支出傳票`;
 }
 function setPostMode(m) {
   STATE.postMode = m;
   document.querySelectorAll('#pk-posted-toggle button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
-}
-function setCombine(c) {
-  STATE.combine = c;
-  document.querySelectorAll('#pk-combine-toggle button').forEach(b => b.classList.toggle('on', b.dataset.v === (c ? '1' : '0')));
-  updatePickSummary();
 }
 function nextRecnoFor(kind) {
   const year = rocYearNow();
