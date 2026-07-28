@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.4.2';
+const SBA_CORE_VERSION = '5.4.3';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -187,6 +187,10 @@ function validateVoucher(v, opt) {
         E(`${lt}：固定資產科目須填預算起始年度/計畫類型/種類/代號（23~29欄）`);
       if (!L.name3) W(`${lt}：固定資產科目建議填計畫名稱`);
     }
+    /* v5.4.3 實測：支出傳票借方為 2102 立沖科目時，SBA 匯入「強制」要求沖銷資料（F06），
+       未連結會整批報「沖銷資料[]-序號[0]資料不存在或已註銷」→ 工坊端提前擋 */
+    if (String(v.kind) === '2' && L.dc === 'D' && /^2102/.test(String(L.code)) && !L.offset)
+      E(`${lt}：立沖科目 ${L.code} 須連結沖帳——點該列「沖帳」選原立帳傳票貸方列（SBA 匯入必要）`);
     if (L.offset) {
       if (!/^\d{3}$/.test(L.offset.year) || !L.offset.vchrno || !(+L.offset.seq >= 1))
         E(`${lt}：沖帳關聯資料不完整（年度/傳票號/項次）`);

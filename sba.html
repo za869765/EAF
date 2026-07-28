@@ -841,7 +841,7 @@ function renderPreview() {
         <td><input class="w-amt" value="${L.amt}" onchange="updLine(${vi},${li},'amt',this.value)"></td>
         <td><input class="w-memo" value="${esc(L.memo || '')}" onchange="updLine(${vi},${li},'memo',this.value)"></td>
         <td style="white-space:nowrap;">
-          ${L.dc === 'D' && OFFSETABLE(L.code) ? `<button class="btn btn-sm" onclick="openOffsetModal(${vi},${li})">${L.offset ? '🔗' + esc(L.offset.vchrno) + '#' + esc(String(L.offset.seq)) : '沖帳'}</button>` : ''}
+          ${L.dc === 'D' && OFFSETABLE(L.code) ? `<button class="btn btn-sm${!L.offset && /^2102/.test(String(L.code)) ? ' btn-danger' : ''}" onclick="openOffsetModal(${vi},${li})" title="${!L.offset && /^2102/.test(String(L.code)) ? '立沖科目必須連結沖帳（SBA 匯入必要）' : '沖前立帳連結'}">${L.offset ? '🔗' + esc(L.offset.vchrno) + '#' + esc(String(L.offset.seq)) : '沖帳'}</button>` : ''}
           <button class="btn btn-sm" onclick="delLine(${vi},${li})">✕</button>
         </td>
       </tr>`;
