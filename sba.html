@@ -322,6 +322,7 @@ const STATE = {
   openGrp: null,             /* 目前放大的卡片 'acct|cat'；null=全部縮小 */
   catOv: {},                 /* recId → '1'|'6'|'2' 手動移組覆寫（存 D1 sba_catov） */
   paySkip: new Set(),        /* 不匯入受款人鍵集合（存 D1 sba_payee_skip；反灰沉默） */
+  dupOkKeys: new Set(),      /* 「代碼已存在→自行刪除後匯入」使用者已確認鍵集合（本次工作階段） */
   serials: {},               /* '1152' → 已配最大流水 */
   modalCtx: null,
 };
@@ -1122,9 +1123,9 @@ function renderPayeeDiff() {
     const row = payeeToFnwacxRow(p, farm);
     const rt = revIdx.get(k);
     row[10] = rt === '2' ? '1' : rt === '1' ? '2' : '';
-    /* 代碼已存在 SBA 者預設不勾（可自由勾選——使用者可能先於 SBA 刪舊資料再匯） */
+    /* 代碼已存在 SBA 者預設不勾；使用者按「自行刪除後匯入」確認後才視同一般列 */
     const codeDup = SBA_DB_IDX.payeeCodes && SBA_DB_IDX.payeeCodes.has(String(row[0]).toUpperCase());
-    return { p, row, sel: !skip && !codeDup && !!String(p.code || '').trim(), skip };
+    return { p, row, sel: !skip && (!codeDup || STATE.dupOkKeys.has(k)) && !!String(p.code || '').trim(), skip };
   });
   /* 排除者反灰沉底 */
   PI_ROWS.sort((a, b) => (a.skip ? 1 : 0) - (b.skip ? 1 : 0));
@@ -1134,8 +1135,9 @@ function renderPayeeDiff() {
   $('pi-dl').disabled = PI_ROWS.length === nSkip;
   tb.innerHTML = PI_ROWS.map((x, i) => {
     const r = x.row;
-    /* 代碼已存在 SBA：僅提示不鎖定（使用者可先於 SBA 刪舊資料再匯入） */
+    /* 代碼已存在 SBA：兩個明確選項——不匯入 / 自行刪除後匯入（dupOk） */
     const dupCode = !x.skip && r[0] && SBA_DB_IDX.payeeCodes && SBA_DB_IDX.payeeCodes.has(String(r[0]).toUpperCase());
+    const dupOk = dupCode && STATE.dupOkKeys.has(piKey(x.p));
     const dis = x.skip ? ' disabled' : '';
     const waySel = `<select onchange="piUpd(${i},4,this.value)"${dis}>` + Object.keys(PI_WAY_LABEL).map(c =>
       `<option value="${c}"${c === r[4] ? ' selected' : ''}>${PI_WAY_LABEL[c]}</option>`).join('') + '</select>';
@@ -1144,7 +1146,7 @@ function renderPayeeDiff() {
     const recent = piRecentRecs(x.p).map(rc =>
       `<a href="/?rec=${encodeURIComponent(rc.id)}" target="_blank" data-rid="${esc(String(rc.id))}">${esc(rc.voucherNo)}</a>`).join(' ')
       || '<span class="small" style="color:#bbb;">—</span>';
-    return `<tr${x.skip ? ' class="row-exported"' : dupCode ? ' style="background:#e8f0fa;"' : (r[0] ? '' : ' style="background:#fdf3e7;"')}>
+    return `<tr${x.skip ? ' class="row-exported"' : (dupCode && !dupOk) ? ' style="background:#e8f0fa;"' : (r[0] ? '' : ' style="background:#fdf3e7;"')}>
       <td><input type="checkbox" class="pi-cb" id="pi-cb-${i}"${x.sel ? ' checked' : ''}${dis} onchange="PI_ROWS[${i}].sel=this.checked"></td>
       <td><input class="w-code" value="${esc(r[0])}" placeholder="統編/身分證"${dis} onchange="piUpdCode(${i},this.value)">${r[0] || x.skip ? '' : ' <span class="chip warn">缺</span>'}</td>
       <td>${esc(r[1])}</td>
@@ -1156,15 +1158,32 @@ function renderPayeeDiff() {
       <td>${esc(r[7])}</td>
       <td>${revSel}</td>
       <td style="color:#9e9e9e;">${esc(r[11]) || '—'}</td>
-      <td class="small">${x.skip ? '已排除不匯入' : dupCode
-        ? '⚠️代碼已存在 SBA——若為舊資料請先於 SBA 刪除該代碼舊檔再匯入（否則匯入到此筆會報「代碼重複」中止後續）；或於 SBA「新增」手動加帳戶'
+      <td class="small">${x.skip ? '已排除不匯入' : dupOk
+        ? '✔ 已確認自行刪除 SBA 舊檔——將隨本批匯入'
+        : dupCode
+        ? '⚠️代碼已存在 SBA——請選擇右側「不匯入」或「自行刪除後匯入」（未刪舊檔就匯，該筆起會報「代碼重複」中止）'
         : [r[0] ? '' : '請補代碼後匯出（SBA 現況每筆皆有統編/身分證）',
         farmAcctBad(r) ? '農會帳號應為9碼，請修正（公庫 94275/65012 除外）' : '',
         (r[7] && !STATE.bankByCode.has(r[7])) ? '⚠️分行代號不在SBA金融機構檔（官方手冊：必須已建檔）' : ''].filter(Boolean).join('；')}</td>
-      <td><button class="btn btn-sm" onclick="piSkip(${i},${x.skip ? 'false' : 'true'})" title="${x.skip ? '恢復列入匯出' : '此受款人確定不需匯入，反灰沉默'}">${x.skip ? '↩ 恢復' : '🚫 不匯入'}</button></td></tr>`;
+      <td style="white-space:nowrap;">${x.skip
+        ? `<button class="btn btn-sm" onclick="piSkip(${i},false)" title="恢復列入匯出">↩ 恢復</button>`
+        : (dupCode && !dupOk)
+        ? `<button class="btn btn-sm" onclick="piSkip(${i},true)" title="此受款人不需匯入，反灰沉默">🚫 不匯入</button>
+           <button class="btn btn-sm" style="background:#dfe9da;" onclick="piDupOk(${i},true)" title="我會（已）於 SBA 刪除此代碼舊檔，將此筆列入匯出">✔ 自行刪除後匯入</button>`
+        : (dupCode && dupOk)
+        ? `<button class="btn btn-sm" onclick="piSkip(${i},true)" title="改為不匯入">🚫 不匯入</button>
+           <button class="btn btn-sm" onclick="piDupOk(${i},false)" title="取消「自行刪除後匯入」確認">↩ 取消確認</button>`
+        : `<button class="btn btn-sm" onclick="piSkip(${i},true)" title="此受款人確定不需匯入，反灰沉默">🚫 不匯入</button>`}</td></tr>`;
   }).join('') || '<tr><td colspan="11" class="small">🎉 沒有新受款人——SBA 資料庫已涵蓋本系統全部受款人</td></tr>';
   $('pi-all').checked = false;
   bindRecPopHost('pi-body');
+}
+/* 代碼已存在 → 使用者確認「自行刪除 SBA 舊檔後匯入」 */
+function piDupOk(i, on) {
+  const k = piKey(PI_ROWS[i].p);
+  if (on) { STATE.dupOkKeys.add(k); PI_ROWS[i].sel = true; }
+  else { STATE.dupOkKeys.delete(k); PI_ROWS[i].sel = false; }
+  renderPayeeDiff();
 }
 /* 排除/恢復不匯入名單：存 D1，下次比對自動沉默 */
 function piSkip(i, on) {
@@ -1228,8 +1247,9 @@ async function downloadFnwacx() {
   const badBank = sel.filter(x => x.row[7] && !STATE.bankByCode.has(x.row[7]));
   if (badBank.length && !confirm(`${badBank.length} 筆分行代號不在 SBA 金融機構檔（官方手冊要求必須已建檔，匯入恐失敗）：\n`
     + badBank.map(x => `　${x.row[1]}：${x.row[7]}`).join('\n') + '\n仍要匯出？')) return;
-  /* SBA 匯入對「受款人代碼」查重（實測會中止後續）：提示確認不鎖定（使用者可能已於 SBA 刪舊資料） */
-  const dupExist = sel.filter(x => x.row[0] && SBA_DB_IDX.payeeCodes && SBA_DB_IDX.payeeCodes.has(String(x.row[0]).toUpperCase()));
+  /* SBA 匯入對「受款人代碼」查重（實測會中止後續）：已按「自行刪除後匯入」者不再追問 */
+  const dupExist = sel.filter(x => !STATE.dupOkKeys.has(piKey(x.p))
+    && x.row[0] && SBA_DB_IDX.payeeCodes && SBA_DB_IDX.payeeCodes.has(String(x.row[0]).toUpperCase()));
   if (dupExist.length && !confirm(`以下代碼在上傳的現況檔中已存在（若尚未於 SBA 刪除舊資料，匯入到該筆會報「代碼重複」並中止後續）：\n`
     + dupExist.map(x => `　${x.row[1]}：${x.row[0]}`).join('\n') + '\n已於 SBA 刪除舊資料／確定要匯出？')) return;
   const codeCount = new Map();
