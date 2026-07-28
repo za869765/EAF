@@ -815,6 +815,14 @@ async function aiFixMemos() {
   } catch (e) { $('pv-ai-msg').textContent = '❌ AI 修正失敗：' + e.message; }
 }
 function renderPreview() {
+  /* 舊草稿回填沖帳子目（v5.4.9）：offset.sub 未知者由 D1 分錄補上並同步本列子目 */
+  STATE.drafts.forEach(v => (v.lines || []).forEach(L => {
+    if (!L.offset || L.offset.sub != null) return; /* null=尚未確認，每次重繪重試（新匯 0090 後可補到） */
+    const sub = entrySubCode(L.offset.vchrno, L.offset.seq);
+    if (sub === null) return;
+    L.offset.sub = sub;
+    L.relate = sub;
+  }));
   $('pv-empty').style.display = STATE.drafts.length ? 'none' : 'block';
   $('draft-count').textContent = STATE.drafts.length;
   if (LAST_EXPORT && draftsSig() !== LAST_EXPORT.sig) $('ex-mark').disabled = true;
@@ -1107,15 +1115,26 @@ function offsetAllocated(vchrno, seq, exceptVi, exceptLi) {
   }));
   return s;
 }
+/* 被沖立帳列的子目代碼＝D1 歷史分錄 sub_account 前2碼（如「99 其他」→'99'）；
+   該列存在但無子目→''（F04 須留空）；不在 D1（白名單合成列）→null（無法確認） */
+function entrySubCode(vchrno, seq) {
+  const e = STATE.entries.find(x => String(x.voucher_no) === String(vchrno) && +x.seq === +seq);
+  if (!e) return null;
+  const m = String(e.sub_account || '').match(/^(\d{2})/);
+  return m ? m[1] : '';
+}
 function pickOffset(vchrno, seq, avail) {
   const { vi, li } = STATE.modalCtx;
   const L = STATE.drafts[vi].lines[li];
   const cap = +avail || L.amt;
   if (L.amt > cap)
-    alert(`此立帳可用餘額僅 ${fmtN(cap)}（已扣除本批其他列沖用額），本列金額 ${fmtN(L.amt)} 將只沖 ${fmtN(cap)}，不足部分請另選立帳沖銷`);
+    alert(`此立帳可用餘額僅 ${fmtN(cap)}（已扣除本批其他列沖用額），本列金額 ${fmtN(L.amt)} 將只沖 ${fmtN(cap)}。一列僅能連結一筆立帳——若需足額沖銷，請將明細列拆成兩列、各自連結不同立帳`);
+  const sub = entrySubCode(vchrno, seq);
   L.offset = { year: String(vchrno).slice(0, 3), kind: String(vchrno).slice(3, 4),
     vchrno: String(vchrno), seq,
-    amt: Math.min(L.amt, cap), max: cap };
+    amt: Math.min(L.amt, cap), max: cap, sub };
+  /* 定案規則：F04 沖銷科目子目＝與被沖立帳列子目一致（立帳無子目則留空） */
+  if (sub !== null) L.relate = sub;
   closeModal(); renderPreview();
 }
 function clearOffset() {

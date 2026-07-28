@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.4.8';
+const SBA_CORE_VERSION = '5.4.9';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -197,6 +197,12 @@ function validateVoucher(v, opt) {
       if (L.offset.max != null && +L.offset.amt > +L.offset.max)
         E(`${lt}：沖帳金額 ${L.offset.amt} 超過立帳可沖金額 ${L.offset.max}`);
       if (+L.offset.amt !== +L.amt) W(`${lt}：沖帳金額(${L.offset.amt})與明細金額(${L.amt})不同（部分沖銷）`);
+      /* v5.4.9 實測：F04 沖銷科目子目(relate)須與被沖立帳列子目一致（立帳無子目則須留空），
+         否則 SBA 報「沖銷科目子目[]必須是在沖銷科目子目代碼建檔」 */
+      if (L.offset.sub != null && String(L.relate || '') !== String(L.offset.sub))
+        E(`${lt}：沖銷科目子目(${L.relate || '空'})須與被沖立帳子目(${L.offset.sub || '空'})一致——重選沖帳可自動帶入`);
+      if (L.offset.sub == null && /^2102/.test(String(L.code)))
+        W(`${lt}：被沖立帳不在 D1 歷史分錄，無法確認子目——請核對子目欄（現值「${L.relate || '空'}」）與 SBA 立帳列一致`);
     }
   });
 
