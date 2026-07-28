@@ -285,6 +285,9 @@ window.addEventListener('storage', (ev) => {
       <span class="small">用途別 1XXX 時必填；代碼須存在 SBA 共用項目代碼檔(fnxwanormi)</span></div>
     <div class="toolbar"><label>存帳銀行代碼白名單 <input type="text" id="st-farm" style="width:220px;" value="6180069,6180416,6180427,6180438,6180449"></label>
       <span class="small">佳里區農會本會 6180069＋佳興 6180416／子龍 6180427／塭內 6180438／延平 6180449 四分部皆存帳；其餘有帳號→e電匯、繳費單→自領(代繳)</span></div>
+    <div class="toolbar"><label class="btn btn-sm">📂 匯入立沖餘額表（FNWFRX0100，可多選）
+        <input type="file" accept=".xlsx" multiple style="display:none;" onchange="importOffsetOpen(this.files)"></label>
+      <span class="small" id="st-open-msg"></span></div>
     <h3 style="margin-top:14px;">科目 → 預算科目(bcode) 對照</h3>
     <div class="small" style="margin-bottom:6px;">⚠️ 官方範例 F04 每列均有 bcode。以下種子值為規律推導（第1,2,4碼＋末碼、98→Y），<b>請對照 SBA「常用會計科目設定」逐一核對後儲存</b>。</div>
     <div class="scroll-x" style="max-height:38vh;overflow-y:auto;">
@@ -341,6 +344,8 @@ const STATE = {
   catOv: {},                 /* recId → '1'|'6'|'2' 手動移組覆寫（存 D1 sba_catov） */
   paySkip: new Set(),        /* 不匯入受款人鍵集合（存 D1 sba_payee_skip；反灰沉默） */
   dupOkKeys: new Set(),      /* 「代碼已存在→自行刪除後匯入」使用者已確認鍵集合（本次工作階段） */
+  offsetOpen: null,          /* 官方立沖餘額表白名單 {at, items:[{vch,seq,left,name,desc}]}（D1 sba_offset_open） */
+  entriesKeySet: new Set(),  /* D1 分錄 vch#seq 全集（判斷白名單項是否缺於 D1） */
   serials: {},               /* '1152' → 已配最大流水 */
   modalCtx: null,
 };
@@ -387,6 +392,8 @@ async function boot() {
   if (config && config.sba_exported) STATE.exported = config.sba_exported;
   if (config && config.sba_catov) STATE.catOv = config.sba_catov;
   if (config && Array.isArray(config.sba_payee_skip)) STATE.paySkip = new Set(config.sba_payee_skip);
+  if (config && config.sba_offset_open) STATE.offsetOpen = config.sba_offset_open;
+  STATE.entriesKeySet = new Set(STATE.entries.map(e => String(e.voucher_no) + '#' + e.seq));
   /* 勾選集合開機清理：單已不存在/作廢/已匯出者移除 */
   for (const id of [...STATE.pickSel]) {
     const r = STATE.records.find(x => String(x.id) === id);
@@ -1010,7 +1017,8 @@ function openOffsetModal(vi, li) {
     if (s) return s;
     return String(b.voucher_no).localeCompare(String(a.voucher_no));      /* 組內新到舊 */
   });
-  STATE.modalCands = { cands, rel };
+  const openMap = new Map(((STATE.offsetOpen && STATE.offsetOpen.items) || []).map(o => [o.vch + '#' + o.seq, o]));
+  STATE.modalCands = { cands, rel, openMap, showHist: false };
   $('modal-title').textContent = `選擇沖帳立帳傳票 — ${code} ${subjectName(code)}`;
   $('modal-hint').textContent = `候選＝D1 歷史 SBA 分錄中，同科目家族「歷年」全部貸方（立帳）列，依子目分組${rel ? `、與本列子目 ${rel} 相同者置頂推薦` : ''}、組內新到舊。資料截至最後匯入月份，更新的立帳請先匯入最新 FNWFRX0090 或至 SBA 端手動沖。`;
   $('modal-q').value = '';
@@ -1018,30 +1026,61 @@ function openOffsetModal(vi, li) {
   $('modal-mask').style.display = 'block';
   $('modal-box').style.display = 'block';
 }
+function toggleOffsetHist() {
+  STATE.modalCands.showHist = !STATE.modalCands.showHist;
+  renderOffsetList($('modal-q').value);
+}
 function renderOffsetList(q) {
-  const { cands, rel } = STATE.modalCands || { cands: [], rel: '' };
+  const { cands, rel, openMap, showHist } = STATE.modalCands || { cands: [], rel: '', openMap: new Map(), showHist: false };
   const kw = String(q || '').trim();
-  const list = kw ? cands.filter(e =>
-    (String(e.description || '') + String(e.voucher_no || '') + String(e.sub_account || '')).includes(kw)) : cands;
+  const hit = (s) => !kw || String(s).includes(kw);
   const subOf = (e) => String(e.sub_account || '').slice(0, 2);
-  let lastGrp = null;
-  const CAP = 400;
-  $('modal-body').innerHTML = list.slice(0, CAP).map(e => {
-    const sub = subOf(e);
-    const isRec = rel && sub === rel;
-    const gk = (isRec ? '★' : '') + sub;
-    let head = '';
-    if (gk !== lastGrp) {
-      lastGrp = gk;
-      head = `<tr style="background:#dcd9cc;"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`;
-    }
-    return head + `
-    <tr><td>${esc(e.voucher_no)}</td><td>${esc(String(e.seq))}</td><td>${esc(e.post_date || e.make_date || '')}</td>
+  const useWhitelist = openMap.size > 0;
+  const rowHtml = (e, left, selectable) => `
+    <tr${selectable ? '' : ' class="row-exported"'}><td>${esc(e.voucher_no)}</td><td>${esc(String(e.seq))}</td><td>${esc(e.post_date || e.make_date || '')}</td>
     <td>${esc(e.sub_account || '')}</td><td style="max-width:280px;">${esc(String(e.description || '').slice(0, 40))}</td>
-    <td class="num">${fmtN(e.credit)}</td>
-    <td><button class="btn btn-sm" onclick="pickOffset('${esc(e.voucher_no)}',${+e.seq || 0},${+e.credit || 0})">選此列</button></td></tr>`;
-  }).join('') + (list.length > CAP ? `<tr><td colspan="7" class="small">僅顯示前 ${CAP} 筆（共 ${list.length}），請用搜尋縮小範圍</td></tr>` : '')
-    || '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
+    <td class="num">${fmtN(left != null ? left : e.credit)}${left != null ? ' <span class="small">未沖</span>' : ''}</td>
+    <td>${selectable ? `<button class="btn btn-sm" onclick="pickOffset('${esc(e.voucher_no)}',${+e.seq || 0},${left != null ? left : (+e.credit || 0)})">選此列</button>` : '<span class="small">歷史</span>'}</td></tr>`;
+  const filt = (e) => hit(String(e.description || '') + String(e.voucher_no || '') + String(e.sub_account || ''));
+  let html = '';
+  if (useWhitelist) {
+    /* ① 現行未沖但不在 D1（以官方餘額表為準，仍可選——不讓使用者選不到） */
+    const synth = [...openMap.values()]
+      .filter(o => !STATE.entriesKeySet.has(o.vch + '#' + o.seq))
+      .filter(o => hit(o.desc + o.vch + o.name));
+    if (synth.length) {
+      html += `<tr style="background:#dcd9cc;"><td colspan="7"><b>🆕 現行未沖・不在 D1 歷史檔（依官方餘額表，可選）</b></td></tr>`;
+      html += synth.map(o => rowHtml({ voucher_no: o.vch, seq: o.seq, post_date: '', sub_account: o.name, description: o.desc }, o.left, true)).join('');
+    }
+    /* ② 現行未沖（白名單命中，可選；金額顯示官方未沖額並作為可沖上限） */
+    const current = cands.filter(e => openMap.has(String(e.voucher_no) + '#' + e.seq)).filter(filt);
+    let lastGrp = null;
+    html += current.map(e => {
+      const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
+      let head = '';
+      if (gk !== lastGrp) { lastGrp = gk; head = `<tr style="background:#dcd9cc;"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`; }
+      return head + rowHtml(e, openMap.get(String(e.voucher_no) + '#' + e.seq).left, true);
+    }).join('');
+    /* ③ 歷史（已沖畢/非現行）：預設隱藏，可看不可選 */
+    const hist = cands.filter(e => !openMap.has(String(e.voucher_no) + '#' + e.seq)).filter(filt);
+    html += `<tr><td colspan="7"><button class="btn btn-sm" onclick="toggleOffsetHist()">👁 ${showHist ? '隱藏' : '顯示'}歷史/已沖畢立帳（${hist.length} 筆，不可選）</button></td></tr>`;
+    if (showHist) html += hist.slice(0, 400).map(e => rowHtml(e, null, false)).join('')
+      + (hist.length > 400 ? `<tr><td colspan="7" class="small">歷史僅顯示前 400 筆（共 ${hist.length}），請用搜尋</td></tr>` : '');
+    if (!html) html = '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
+  } else {
+    /* 未匯入餘額表：維持全部可選 */
+    const list = cands.filter(filt);
+    let lastGrp = null;
+    const CAP = 400;
+    html = list.slice(0, CAP).map(e => {
+      const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
+      let head = '';
+      if (gk !== lastGrp) { lastGrp = gk; head = `<tr style="background:#dcd9cc;"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`; }
+      return head + rowHtml(e, null, true);
+    }).join('') + (list.length > CAP ? `<tr><td colspan="7" class="small">僅顯示前 ${CAP} 筆（共 ${list.length}），請用搜尋縮小範圍</td></tr>` : '')
+      || '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
+  }
+  $('modal-body').innerHTML = html;
 }
 function pickOffset(vchrno, seq, credit) {
   const { vi, li } = STATE.modalCtx;
@@ -1228,6 +1267,9 @@ function renderSettings() {
   $('st-mvchno').value = STATE.settings.mvchno || '';
   $('st-pkind').value = STATE.settings.pkind || '';
   $('st-farm').value = STATE.settings.farm || '6180069,6180416,6180427,6180438,6180449';
+  $('st-open-msg').textContent = STATE.offsetOpen && STATE.offsetOpen.items && STATE.offsetOpen.items.length
+    ? `✅ 現行未沖清單 ${STATE.offsetOpen.items.length} 筆・合計 $${fmtN(STATE.offsetOpen.items.reduce((s, o) => s + (+o.left || 0), 0))}（${STATE.offsetOpen.at || ''} 匯入）——沖帳選單僅這些可選，其餘列為歷史可看不可選`
+    : '尚未匯入——沖帳選單將不分現行/歷史（全部可選）。請由 SBA 匯出各立沖科目的 FNWFRX0100 後在此匯入';
   const codes = allKnownSubjectCodes();
   $('st-bcode-body').innerHTML = [...codes.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([code, name]) => `
     <tr><td>${esc(code)}</td><td>${esc(name)}</td>
@@ -1483,6 +1525,38 @@ async function downloadFnwacx() {
   a.click(); URL.revokeObjectURL(a.href);
 }
 
+/* ═══ 立沖餘額表（FNWFRX0100）匯入 → 現行未沖白名單（v5.4.6） ═══ */
+async function importOffsetOpen(files) {
+  if (!files || !files.length) return;
+  try {
+    const items = [];
+    for (const f of files) {
+      const wb = XLSX.read(await f.arrayBuffer());
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
+      for (let r = 0; r < rows.length; r++) {
+        if (String(rows[r][0] || '') !== '會計年度') continue;
+        const d = rows[r + 1] || [];
+        if (!d[3]) continue;
+        const left = +String(d[7] || '0').replace(/,/g, '') || 0;
+        if (left <= 0) continue;
+        let desc = '';
+        for (let k = r + 2; k < Math.min(r + 14, rows.length); k++) {
+          const m = rows[k] || [];
+          if (String(m[1] || '') === '立帳') { desc = String(m[6] || ''); break; }
+          if (String(m[0] || '') === '會計年度') break;
+        }
+        items.push({ vch: String(d[3]), seq: +d[4] || 0, left, name: String(d[5] || ''), desc });
+      }
+    }
+    const seen = new Set();
+    const uniq = items.filter(o => { const k = o.vch + '#' + o.seq; if (seen.has(k)) return false; seen.add(k); return true; });
+    if (!uniq.length) { alert('未解析到任何未沖立帳——請確認為 FNWFRX0100 立沖帳明細表'); return; }
+    STATE.offsetOpen = { at: todayIso(), items: uniq };
+    const ok = await putConfig('sba_offset_open', STATE.offsetOpen);
+    alert(`${ok ? '✅ 已更新現行未沖清單（寫入 D1）' : '⚠️ 已載入但 D1 寫入失敗（僅本次生效）'}：${uniq.length} 筆，未沖合計 $${fmtN(uniq.reduce((s, o) => s + o.left, 0))}`);
+    renderSettings();
+  } catch (e) { alert('解析失敗：' + e.message); }
+}
 async function putConfig(key, value) {
   try {
     const res = await fetch('/api/acc/v2/config/' + key, {
