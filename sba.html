@@ -536,6 +536,7 @@ function renderPickList() {
         <span class="chip ${acctChip}">${esc(acct)} ${esc(subjectName(acct))}</span>
         <span class="chip exp">${esc(PAY_CAT_LABEL[cat])}</span>
         ${pcnt}
+        <span class="chip done pk-selcount" data-grp="${key}" style="display:none;"></span>
         <span class="gcard-n">${g.recs.length} 筆 <b>$${fmtN(g.sum)}</b></span>
         <span class="gcard-arrow">${open ? '▾ 收合' : '▸ 展開'}</span>
       </div>
@@ -655,9 +656,17 @@ function mapCtx(pay7) {
   };
 }
 function updatePickSummary() {
+  /* 各卡片頭「✔已勾 n 筆」即時更新（縮小狀態也看得到勾了什麼） */
+  document.querySelectorAll('.pk-selcount').forEach(elm => {
+    const n = [...document.querySelectorAll(`.pk-cb[data-grp="${elm.dataset.grp}"]`)].filter(c => c.checked).length;
+    elm.style.display = n ? '' : 'none';
+    elm.textContent = `✔ 已勾 ${n} 筆`;
+  });
   const sel = selectedRecords();
   if (!sel.length) { $('pk-summary').textContent = '尚未勾選'; return; }
-  $('pk-summary').innerHTML = `已勾選 <b>${sel.length}</b> 筆 → 將產生 <b>${planGrouping(sel, mapCtx()).length}</b> 張支出傳票`;
+  const nos = sel.map(r => r.voucherNo).filter(Boolean);
+  const shown = nos.slice(0, 12).join('、') + (nos.length > 12 ? `…等共${nos.length}筆` : '');
+  $('pk-summary').innerHTML = `已勾選 <b>${sel.length}</b> 筆（${esc(shown)}）→ 將產生 <b>${planGrouping(sel, mapCtx()).length}</b> 張支出傳票`;
 }
 function nextRecnoFor(kind) {
   const year = rocYearNow();
