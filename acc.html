@@ -625,8 +625,8 @@ window.addEventListener('storage', (ev) => {
     </div>
     <div class="r-card rc-teal">
       <div class="r-num" id="rc-public">—</div>
-      <div class="r-label">💼 公務預算已核銷</div>
-      <div class="r-sub" id="rc-public-sub">21020301 衛生所公務預算</div>
+      <div class="r-label">💼 21020301 公務預算帳上</div>
+      <div class="r-sub" id="rc-public-sub">撥入－支付＝帳上餘額</div>
     </div>
   </div>
 
@@ -2138,19 +2138,32 @@ function updateHomeDashboard(){
   const rcCust = document.getElementById('rc-custodial');
   if(rcCust) rcCust.textContent = fmt(custData.total || 0);
 
-  // 公務預算已核銷
-  const settled = getPubSettled(y);
-  const pubSpent = (_pubRecords||[]).filter(r=>settled.has(String(r.id))).reduce((s,r)=>s+(r.amount||0),0);
-  const rcPub = document.getElementById('rc-public');
-  if(rcPub) rcPub.textContent = pubSpent > 0 ? fmt(pubSpent) : '—';
-  const budget = getPubBudget(y);
-  const rcPubSub = document.getElementById('rc-public-sub');
-  if(rcPubSub && budget > 0) rcPubSub.textContent = `預算 ${fmt(budget)}，剩餘 ${fmt(budget - pubSpent)}`;
-
   // ── 資產科目（v4.7.4：一律從傳票推導、年度隔離、截至選定月份，與各分頁/官方一致）──
   const _assetRows = (pfx) => (window.AccV2 && AccV2.entries)
     ? AccV2.entries({ subjectPrefix: pfx }).filter(e => String(e.ym||'').startsWith(String(y)) && (!e.ym || String(e.ym) <= ym))
     : [];
+
+  // 公務預算（v5.5.1）：大數字＝帳上餘額（傳票 21020301 貸−借，含期初結轉）；副標＝預算・已核銷・可核銷
+  // 首頁自備每年度動支快取（未進公務預算分頁也正確；連線失敗可重試、跨年不混用、回應時已切年不覆蓋畫面）
+  const _phc = window._pubHomeCache || (window._pubHomeCache = {});
+  if(_phc[y] === undefined){
+    _phc[y] = null; /* 載入中 */
+    loadPubRecords(y).then(r => {
+      if(r) _phc[y] = r; else delete _phc[y]; /* null=連線失敗 → 之後可重試 */
+      if(r && r.length && String(getYm().y) === String(y)) updateHomeDashboard();
+    });
+  }
+  const pubRecs = _phc[y] || [];
+  const settled = getPubSettled(y);
+  const pubSpent = pubRecs.filter(r=>settled.has(String(r.id))).reduce((s,r)=>s+(r.amount||0),0);
+  const pubBook = _assetRows('21020301').reduce((s,e)=>s+(e.credit||0)-(e.debit||0),0);
+  const rcPub = document.getElementById('rc-public');
+  if(rcPub) rcPub.textContent = fmt(pubBook);
+  const budget = getPubBudget(y);
+  const rcPubSub = document.getElementById('rc-public-sub');
+  if(rcPubSub) rcPubSub.textContent = budget > 0
+    ? `預算 ${fmt(budget)}・已核銷 ${fmt(pubSpent)}・可核銷 ${fmt(budget - pubSpent)}`
+    : '撥入－支付＝帳上餘額';
   const _mLabel = `${y}/${String(ym).slice(3).replace(/^0/,'')}`;
   // 備抵折讓 110306（contra-asset 貸餘 = Σ貸−借）
   const rcAllow = document.getElementById('rc-allowance');
@@ -3923,6 +3936,7 @@ async function renderPublicTab(){
     return;
   }
   _pubRecords = records;               // 快取供 updatePubTotals 使用
+  (window._pubHomeCache||(window._pubHomeCache={}))[y] = records;   // 同步首頁卡片快取（v5.5.1）
   const settled = getPubSettled(y);   // 本頁自己維護，與 locked/傳票無關
   const budget  = getPubBudget(y);
   const spent   = records.filter(r=>settled.has(String(r.id))).reduce((s,r)=>s+(r.amount||0),0);
