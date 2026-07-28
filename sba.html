@@ -49,12 +49,13 @@ table.grid tr:hover td { background: #f2f0e8; }
 .chip.warn { background: #f3e2c0; color: #7a5b18; }
 tr.row-exported { opacity: .45; filter: grayscale(.7); }
 /* ── 六大格（專戶 × 付款方式）卡片：平時縮小、點擊放大 ── */
-.grp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; }
+.grp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0; align-items: start; }
 .gcard { background: var(--pure-white, #fff); border-radius: var(--r-lg, 12px);
   box-shadow: var(--sh-ring-1, 0 0 0 1px #d1cfc5); overflow: hidden; }
 .gcard.empty { opacity: .55; }
-.gcard.has-sel { box-shadow: 0 0 0 2px #5c8653; }
-.gcard.has-sel .gcard-hd { background: #dfe9da; }
+.gcard.has-sel { box-shadow: 0 0 0 1px #d1cfc5, inset 4px 0 0 var(--terracotta, #c96442); }
+.gcard.has-sel .gcard-hd { background: #f3e3d8; }
+.chip.pk-selcount { background: var(--terracotta, #c96442); color: #fff; font-weight: 700; }
 .gcard-hd { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
   padding: 9px 12px; background: var(--warm-sand, #e8e6dc); cursor: pointer; user-select: none; }
 .gcard-hd label { font-size: 11px; cursor: pointer; }
@@ -545,7 +546,7 @@ function renderPickList() {
         <span class="chip ${acctChip}">${esc(acct)} ${esc(subjectName(acct))}</span>
         <span class="chip exp">${esc(PAY_CAT_LABEL[cat])}</span>
         ${pcnt}
-        <span class="chip done pk-selcount" data-grp="${key}" style="display:none;"></span>
+        <span class="chip pk-selcount" data-grp="${key}" style="display:none;"></span>
         <span class="gcard-n">${g.recs.length} 筆 <b>$${fmtN(g.sum)}</b></span>
         <span class="gcard-arrow">${open ? '▾ 收合' : '▸ 展開'}</span>
       </div>
