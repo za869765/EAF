@@ -972,6 +972,8 @@ function addLine(vi) {
 }
 function delLine(vi, li) {
   const v = STATE.drafts[vi];
+  const L = v.lines[li];
+  if (L && !confirm('刪除明細列 序' + L.seq + '？\n' + (L.code || '') + ' ' + fmtN(L.amt) + '\n' + String(L.memo || '').slice(0, 40))) return;
   v.lines.splice(li, 1);
   v.lines.forEach((L, i) => { L.seq = i + 1; });
   syncBankLine(v);
@@ -985,6 +987,8 @@ function addPayee(vi) {
 }
 function delPayee(vi, pi) {
   const v = STATE.drafts[vi];
+  const P = v.payees[pi];
+  if (P && !confirm('刪除受款人 序' + P.seq + '？\n' + (P.name || '') + ' ' + fmtN(P.amt))) return;
   v.payees.splice(pi, 1);
   v.payees.forEach((P, i) => { P.seq = i + 1; });
   renderPreview();
