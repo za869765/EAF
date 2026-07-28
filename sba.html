@@ -80,6 +80,8 @@ tr.row-sel td { background: #f6e7dc; }
 #pk-groups a { color: var(--terracotta, #c96442); text-decoration: none; font-weight: 600; }
 #pk-groups th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
 #pk-groups th.sortable:hover { background: #dcd9cc; }
+th.pv-sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+th.pv-sortable:hover { background: #dcd9cc; }
 #pk-groups a:hover { text-decoration: underline; }
 /* ── 單據浮標預覽卡 ── */
 #rec-pop { display: none; position: fixed; z-index: 60; width: 380px; max-width: 92vw;
@@ -880,7 +882,14 @@ function renderPreview() {
       </div>
       <div class="toolbar"><label style="flex:1;">摘要 <input class="w-memo" value="${esc(v.memo || '')}" onchange="updV(${vi},'memo',this.value)"></label></div>
       <div class="scroll-x"><table class="grid">
-        <thead><tr><th>序</th><th>借貸</th><th>科目</th><th>bcode</th><th>用途別</th><th>pkind</th><th>子目</th><th>歸屬</th><th class="num">金額</th><th>摘要</th><th></th></tr></thead>
+        <thead><tr><th>序</th><th>借貸</th>
+          <th class="pv-sortable" onclick="sortVLines(${vi},'code')">科目${vSortArrow(v, 'code')}</th>
+          <th>bcode</th><th>用途別</th><th>pkind</th>
+          <th class="pv-sortable" onclick="sortVLines(${vi},'relate')">子目${vSortArrow(v, 'relate')}</th>
+          <th>歸屬</th>
+          <th class="num pv-sortable" onclick="sortVLines(${vi},'amt')">金額${vSortArrow(v, 'amt')}</th>
+          <th class="pv-sortable" onclick="sortVLines(${vi},'memo')">摘要${vSortArrow(v, 'memo')}</th>
+          <th></th></tr></thead>
         <tbody>${linesHtml}</tbody></table></div>
       <div class="toolbar"><button class="btn btn-sm" onclick="addLine(${vi})">＋ 加明細列</button></div>
       ${v.kind === '2' ? `
@@ -894,6 +903,21 @@ function renderPreview() {
       ${!r.errors.length ? '<div class="vmsg okk">✅ 檢核通過</div>' : ''}</div>
     </div>`;
   }).join('');
+}
+/* 傳票明細列排序（科目/子目/金額/摘要；銀行列恆序1）——重編 seq，匯出 F04 依此順序 */
+function vSortArrow(v, k) { return v._sort && v._sort.key === k ? (v._sort.dir > 0 ? ' ▲' : ' ▼') : ''; }
+function sortVLines(vi, key) {
+  const v = STATE.drafts[vi];
+  v._sort = (v._sort && v._sort.key === key) ? { key, dir: -v._sort.dir } : { key, dir: 1 };
+  const isBank = (L) => L.dc === 'C' && /^110102/.test(String(L.code));
+  const bank = v.lines.filter(isBank);
+  const rest = v.lines.filter(L => !isBank(L));
+  rest.sort((a, b) => v._sort.dir * (key === 'amt'
+    ? (+a.amt || 0) - (+b.amt || 0)
+    : String(a[key] || '').localeCompare(String(b[key] || ''), 'zh-Hant')));
+  v.lines = [...bank, ...rest];
+  v.lines.forEach((L, i) => { L.seq = i + 1; });
+  renderPreview();
 }
 /* 序1 貸方銀行列自動同步：金額=Σ借方、摘要=主檔摘要 */
 function syncBankLine(v) {
