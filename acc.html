@@ -8873,19 +8873,23 @@ function updateInvTotal(){
    「稍後」延 5 分鐘：index 填單中 / acc dirty 時直接 reload 會丟資料，需給存檔出路。 */
 (function(){
   let _shown = false;
-  function _selfVer(){
-    /* v5.1.4 中央版號：version.js 載入失敗回空字串＝跳過偵測，不誤彈窗 */
-    return window.APP_VERSION ? 'v' + window.APP_VERSION : '';
+  function _verLt(a, b){
+    const pa = String(a).split('.').map(Number), pb = String(b).split('.').map(Number);
+    for (let i = 0; i < 3; i++){ if ((pa[i] || 0) < (pb[i] || 0)) return true; if ((pa[i] || 0) > (pb[i] || 0)) return false; }
+    return false;
   }
   async function _check(){
     if (_shown || document.hidden) return;
     try {
       const r = await fetch('/version.js?vchk=' + Date.now(), { cache:'no-store' });
       if (!r.ok) return;
-      const m = (await r.text()).match(/APP_VERSION\s*=\s*'([\d.]+)'/);
-      const remote = m ? 'v' + m[1] : '';
-      const cur = _selfVer();
-      if (remote && cur && remote !== cur) _show(remote, cur);
+      const t = await r.text();
+      const m = t.match(/APP_VERSION\s*=\s*'([\d.]+)'/);
+      const f = t.match(/APP_FORCE_VERSION\s*=\s*'([\d.]+)'/);
+      /* v5.1.5 功能性門檻：本頁版本低於 APP_FORCE_VERSION 才提示（小修不打擾）；未宣告門檻＝一律提示 */
+      const force = f ? f[1] : (m ? m[1] : '');
+      if (window.APP_VERSION && force && _verLt(window.APP_VERSION, force))
+        _show('v' + m[1], 'v' + window.APP_VERSION);
     } catch(_){}
   }
   function _show(nv, cur){
@@ -8934,7 +8938,7 @@ function updateInvTotal(){
       setTimeout(function(){ _shown = false; _check(); }, 300000);
     };
   }
-  setInterval(_check, 120000);
+  /* v5.1.5 版本檢查僅於開啟後與回前景時執行（移除每2分鐘輪詢） */
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) setTimeout(_check, 800); });
   setTimeout(_check, 20000);
 })();
