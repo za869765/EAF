@@ -860,6 +860,8 @@ function updPayee(vi, pi, k, val) {
   if (k === 'name' && P.name) P.needsInput = false;
   if (k === 'userbank') P.bankna = STATE.bankByCode.get(P.userbank) || P.bankna || '';
   if (k === 'rev' && P.rev !== '2') delete P.invoices; /* 單據改回 0/1 時清發票，避免殘留誤產 F07 */
+  /* 改付款方式時，劃線/禁背預設同步（自領→0/1；存帳/電匯→1/1），仍可再手動改 */
+  if (k === 'payway') { P.remark1 = P.payway === '2' ? '0' : '1'; P.remark2 = '1'; }
   renderPreview();
 }
 function updInvoice(vi, pi, k, val) {
@@ -884,7 +886,7 @@ function delLine(vi, li) {
 function addPayee(vi) {
   const v = STATE.drafts[vi];
   v.payees.push({ seq: v.payees.length + 1, name: '', account: '', userbank: '', bankna: '',
-    payway: '1', amt: 0, usedoc: '', rev: '0' });
+    payway: '1', amt: 0, usedoc: '', rev: '0', remark1: '1', remark2: '1' });
   renderPreview();
 }
 function delPayee(vi, pi) {

@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.3.3';
+const SBA_CORE_VERSION = '5.3.4';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -634,12 +634,15 @@ function resolvePayees(rec, ctx) {
       }
     }
     const rev = p.receiptType != null && p.receiptType !== '' ? String(p.receiptType) : '0';
+    /* ctx.catOverride[recId]＝sba.html 六大格手動移組覆寫（整單強制同一付款類別） */
+    const payway = (ctx.catOverride && ctx.catOverride[rec.id]) || decidePayway(p, ctx.farmCodes);
     const payee = {
       seq: 0, name: String(p.name || '').trim(),
       account: p.acctNo || '', userbank: bk.code,
       bankna: bk.code ? (ctx.bankNameByCode(bk.code) || bk.name) : bk.name,
-      /* ctx.catOverride[recId]＝sba.html 六大格手動移組覆寫（整單強制同一付款類別） */
-      payway: (ctx.catOverride && ctx.catOverride[rec.id]) || decidePayway(p, ctx.farmCodes), amt,
+      payway, amt,
+      /* 支票劃線/禁背預設（使用者規則）：自領(2)→劃線0否/禁背1是；存帳/電匯→劃線1是/禁背1是 */
+      remark1: payway === '2' ? '0' : '1', remark2: '1',
       usedoc: String(rec.purposeDesc || '').trim(), rev,
       srcType: p.type || '', srcRec: rec.voucherNo,
       /* bill 不再要求人工填名：產傳票時整張併為「交由佳里區農會代繳」單一受款人 */
@@ -790,6 +793,7 @@ function mapRecordsToVouchers(records, ctx) {
     if (cat === '2') {
       v.payees = [{ seq: 1, name: '交由佳里區農會代繳', account: '', userbank: '', bankna: '',
         payway: '2', amt: Math.round(total * 100) / 100,
+        remark1: '0', remark2: '1', /* 自領/代繳：劃線否、禁背是（使用者規則） */
         usedoc: truncBig5(memoParts.filter(Boolean).join('；'), 1000), rev: '0',
         srcType: 'bill-agg', srcRec: '', needsInput: false }];
     }
