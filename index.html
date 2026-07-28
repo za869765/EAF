@@ -3876,19 +3876,33 @@ function validateForm() {
     if (Math.max(0, total) === 0) errors.push('合計金額不得為 $0');
   }
 
-  /* v4.4.86 受款人卡片：選 2.統一發票 時，發票號碼/日期/金額 三格必填 */
-  if (typeof _payeeCards !== 'undefined' && Array.isArray(_payeeCards)) {
-    _payeeCards.forEach((c, idx) => {
-      if ((c.receiptType||'1') !== '2') return;
-      if (!(c.name || c.bank || c.acctNo)) return; // 空卡跳過
+  errors.push(...validatePayeeCards());
+
+  return errors;
+}
+
+/* v4.4.86 受款人卡片：選 2.統一發票 時，發票號碼/日期/金額 三格必填
+   v5.5.3：廠商類選 1.普通收據 時，統一編號必填（8碼），否則請改選 0.其他相關書據。
+   抽成共用：存檔（validateForm）與鎖定模式「更新受款人」（savePayeesOnly）皆須通過 */
+function validatePayeeCards() {
+  const errors = [];
+  if (typeof _payeeCards === 'undefined' || !Array.isArray(_payeeCards)) return errors;
+  const _guiApplies = ['vendor','nonghui'].includes(document.getElementById('payee-type')?.value || '');
+  _payeeCards.forEach((c, idx) => {
+    if (!(c.name || c.bank || c.acctNo)) return; // 空卡跳過
+    const rcpt = c.receiptType || '1';
+    if (rcpt === '2') {
       const miss = [];
       if (!(c.invoiceNo||'').trim())     miss.push('「發票號碼」');
       if (!(c.invoiceDate||'').trim())   miss.push('「發票日期」');
       if (!(c.invoiceAmount||'').trim()) miss.push('「發票金額」');
       if (miss.length) errors.push(`受款人 #${idx+1}（${c.name||'—'}）選統一發票，但 ${miss.join('、')} 未填`);
-    });
-  }
-
+    } else if (rcpt === '1' && _guiApplies) {
+      const g = (c.guiNo||'').trim();
+      if (!g) errors.push(`受款人 #${idx+1}（${c.name||'—'}）選 1.普通收據，請輸入「統一編號」，或改選 0.其他相關書據`);
+      else if (!/^\d{8}$/.test(g)) errors.push(`受款人 #${idx+1}（${c.name||'—'}）統一編號須為 8 碼數字`);
+    }
+  });
   return errors;
 }
 
@@ -5182,6 +5196,11 @@ async function savePayeesOnly() {
     ? getPayeesData()
     : getPayeesData().filter(p => p.name);
   if (!newPayees.length) { showToast('✗ 請先選擇受款人'); return; }
+  /* v5.5.3 鎖定模式更新受款人也須通過卡片驗證（發票三欄/普通收據統編） */
+  if (_pType !== 'bill') {
+    const cardErrs = validatePayeeCards();
+    if (cardErrs.length) { showAlert(cardErrs.join('<br>')); return; }
+  }
   const prevPayees = _prevPayeeCards.map(c => ({
     type: document.getElementById('payee-type').value || '',
     name: c.name, bank: c.bank, acctNo: c.acctNo
@@ -5318,6 +5337,8 @@ function renderPayeeCards() {
   const c = document.getElementById('payees-container');
   if (!c) return;
   const _isLockedForm = document.getElementById('form-page')?.classList.contains('locked') && !_payeeEditMode;
+  /* v5.5.3 統編僅廠商類適用（員工/代墊為自然人無統編） */
+  const _guiApplies = ['vendor','nonghui'].includes(document.getElementById('payee-type')?.value || '');
   c.innerHTML = _payeeCards.map((card, i) => {
     const hasData = card.name || card.bank || card.acctNo;
     const removable = _payeeCards.length > 1;
@@ -5358,6 +5379,10 @@ function renderPayeeCards() {
           <input class="pc-inv-amt" placeholder="發票金額 *" value="${esc(card.invoiceAmount||'')}" ${inpRO}
                  oninput="_payeeCardField(${i}, 'invoiceAmount', this.value)">
         </div>
+        <div class="pc-invoice-row" data-pc-gui="${i}" style="display:${_guiApplies && rcpt==='1'?'flex':'none'}">
+          <input class="pc-gui-no" placeholder="統一編號 *（8碼；無統編請改選 0.其他相關書據）" value="${esc(card.guiNo||'')}" ${inpRO}
+                 oninput="_pcGuiInput(${i}, this)">
+        </div>
       </div>`;
     }
     return `<div class="payee-card" data-idx="${i}">
@@ -5387,6 +5412,12 @@ function _payeeCardField(i, key, val) {
   _payeeCards[i][key] = val;
 }
 
+/* v5.5.3 普通收據統一編號輸入：僅留數字、最長 8 碼 */
+function _pcGuiInput(i, el) {
+  el.value = el.value.replace(/\D/g, '').slice(0, 8);
+  _payeeCardField(i, 'guiNo', el.value);
+}
+
 /* v4.4.86 民國日期 onblur 自動 normalize
    接受：1150414、115/4/14、115/04/14、115-4-14 → 統一輸出 115/04/14
    拒絕：4 位西元年（≥1911）、月>12、日>31，原值返回不轉 */
@@ -5408,9 +5439,19 @@ function normalizeMinguoYYY7(s) {
   }
   return s;
 }
-/* 切換附記事項時 toggle 統一發票三格的顯示 */
+/* 切換附記事項時 toggle 統一發票三格／普通收據統編格的顯示 */
 function _togglePcInvoice(i, type) {
   const c = document.getElementById('payees-container');
+  /* v5.5.3 普通收據（僅廠商類）→ 顯示統一編號格；切離時清空避免殘留 */
+  const grow = c?.querySelector(`.pc-invoice-row[data-pc-gui="${i}"]`);
+  if (grow) {
+    const guiOn = type === '1' && ['vendor','nonghui'].includes(document.getElementById('payee-type')?.value || '');
+    grow.style.display = guiOn ? 'flex' : 'none';
+    if (!guiOn) {
+      if (_payeeCards[i]) _payeeCards[i].guiNo = '';
+      grow.querySelectorAll('input').forEach(el => el.value = '');
+    }
+  }
   const row = c?.querySelector(`.pc-invoice-row[data-pc-inv="${i}"]`);
   if (!row) return;
   row.style.display = (type === '2') ? 'flex' : 'none';
@@ -5504,7 +5545,8 @@ async function _pickPayeeFromBox(i, k) {
     receiptType: prev.receiptType || '1',
     invoiceNo: prev.invoiceNo || '',
     invoiceDate: prev.invoiceDate || '',
-    invoiceAmount: prev.invoiceAmount || ''
+    invoiceAmount: prev.invoiceAmount || '',
+    guiNo: prev.guiNo || ''
   };
   renderPayeeCards();
   updatePayeePrintLine();
@@ -5828,6 +5870,8 @@ function getPayeesData() {
         o.invoiceDate = (c.invoiceDate||'').trim();
         o.invoiceAmount = (c.invoiceAmount||'').trim();
       }
+      /* v5.5.3 普通收據統編（僅廠商類；自然人無統編不儲存） */
+      if (rcpt === '1' && ['vendor','nonghui'].includes(type)) o.guiNo = (c.guiNo||'').trim();
       return o;
     });
 }
@@ -6587,7 +6631,8 @@ function setPayeesData(payees, legacyPayee) {
       receiptType: p.receiptType || '1',
       invoiceNo: p.invoiceNo || '',
       invoiceDate: p.invoiceDate || '',
-      invoiceAmount: p.invoiceAmount || ''
+      invoiceAmount: p.invoiceAmount || '',
+      guiNo: p.guiNo || ''
     }));
   if (!_payeeCards.length) _payeeCards.push({ name:'', bank:'', acctNo:'', isNew:false, expanded:true, kw:'', receiptType:'1' });
   renderPayeeCards();
