@@ -1172,11 +1172,11 @@ function piUpd(i, col, v) { PI_ROWS[i].row[col] = String(v || '').trim(); }
 function farmAcctBad(r) {
   return r[4] === '1' && !/^\d{9}$/.test(r[5]) && !/(94275|65012)$/.test(r[5]);
 }
-/* 受款人代碼＝統一編號：填一格同步兩欄；補上代碼即自動勾選 */
+/* 受款人代碼：填一格自動勾選；統編欄僅在值為合格 8 碼公司統編時同步（SBA 統編欄有邏輯檢查，身分證不可放） */
 function piUpdCode(i, v) {
   const code = String(v || '').trim().toUpperCase();
   PI_ROWS[i].row[0] = code.slice(0, 10);
-  PI_ROWS[i].row[9] = code.slice(0, 12);
+  PI_ROWS[i].row[9] = isValidGui(code) ? code : '';
   if (code && !PI_ROWS[i].sel) { PI_ROWS[i].sel = true; const cb = $('pi-cb-' + i); if (cb) cb.checked = true; }
 }
 function piSelAll(on) {

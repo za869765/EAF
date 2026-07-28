@@ -1233,16 +1233,18 @@ async function exportPayeesSbaXlsx() {
     if (cfg && cfg.sba_settings && cfg.sba_settings.farm) farmStr = cfg.sba_settings.farm;
   } catch (_) {}
   const FARM = new Set(farmStr.split(/[,，\s]+/).filter(Boolean));
-  const rows = PAYEES_ADMIN.filter(p => !p.frozen).map(p => {
-    const bank = String(p.bank || '');
-    const bkCode = (bank.indexOf('-') === 7 && /^\d{7}$/.test(bank.slice(0, 7))) ? bank.slice(0, 7) : '';
-    const bkName = bank.indexOf('-') >= 0 ? bank.slice(bank.indexOf('-') + 1) : bank;
-    const acct = String(p.acctNo || '').replace(/\D/g, '').slice(0, 14);
-    const way = (FARM.has(bkCode) || /佳里區農會/.test(bkName)) ? '1' : (acct ? '6' : '2');
-    const code = String(p.code || '').trim().toUpperCase();
-    return [code.slice(0, 10), (p.name || '').trim(), '', '', way, acct, (p.name || '').trim(),
-      bkCode, '', code.slice(0, 12), '', way === '2' ? '' : '6180069'];
-  });
+  /* v5.1.9 先載 sba-core 再產列：直接用 payeeToFnwacxRow（含統編邏輯檢查——身分證不放統編欄） */
+  try {
+    if (typeof buildFnwacxFromTemplate === 'undefined') {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = '/sba-core.js?v=' + (window.APP_VERSION || '0');
+        s.onload = res; s.onerror = () => rej(new Error('sba-core.js 載入失敗'));
+        document.head.appendChild(s);
+      });
+    }
+  } catch (e) { alert('產檔失敗：' + e.message); return; }
+  const rows = PAYEES_ADMIN.filter(p => !p.frozen).map(p => payeeToFnwacxRow(p, FARM));
   if (!rows.length) { alert('無可匯出的受款人'); return; }
   const missing = rows.filter(r => !r[0]).length;
   if (missing && !confirm(`${missing} 筆缺受款人代碼（SBA 現況每筆皆有代碼，可能拒收），仍要匯出？`)) return;

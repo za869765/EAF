@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.1.8';
+const SBA_CORE_VERSION = '5.1.9';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -469,10 +469,23 @@ const FNWACX_HEADERS = ['受款人代碼\n(長度10)', '受款人名稱\n(長度
   '受款人地址\n(長度200)', '領取方式\n(長度1，參閱備註說明)', '銀行帳號\n(長度14)', '戶名\n(長度200)',
   '金融機構分行代號\n(長度7)', 'email\n(長度50)', '統一編號\n(長度12)', '收據別\n(長度1，參閱備註說明)',
   '指定兌付銀行分行代號\n(長度7)'];
+/** 台灣公司統一編號檢核（8 碼＋加權檢查；第 7 碼為 7 之特例）。
+ *  SBA 匯入對「統一編號」欄做邏輯檢查——身分證字號放進去會整批中止（實測 v5.1.8）。 */
+function isValidGui(no) {
+  if (!/^\d{8}$/.test(no)) return false;
+  const w = [1, 2, 1, 2, 1, 2, 4, 1];
+  let sum = 0;
+  for (let i = 0; i < 8; i++) {
+    const p = +no[i] * w[i];
+    sum += Math.floor(p / 10) + (p % 10);
+  }
+  return sum % 10 === 0 || (no[6] === '7' && (sum + 1) % 10 === 0);
+}
 /**
  * EAF 受款人主檔 → FNWACX0170 12 欄列。
  * 領取方式：佳里區農會帳戶→1 存入受款人帳戶；其他銀行有帳號→6 電匯；無帳號→2 自領。
  * 指定兌付：現況檔慣例，1/6 預設 6180069（佳里區農會），2 留空；可於 UI 逐列改。
+ * 統一編號：僅「合格 8 碼公司統編」才填；身分證只放受款人代碼欄（SBA 統編欄有邏輯檢查）。
  */
 function payeeToFnwacxRow(p, farmCodes) {
   const bk = splitBank(p.bank);
@@ -481,7 +494,7 @@ function payeeToFnwacxRow(p, farmCodes) {
   const way = isFarm ? '1' : (acct ? '6' : '2');
   const code = String(p.code || '').trim().toUpperCase();
   return [code.slice(0, 10), String(p.name || '').trim(), '', '', way, acct,
-    String(p.name || '').trim(), bk.code, '', code.slice(0, 12), '', way === '2' ? '' : '6180069'];
+    String(p.name || '').trim(), bk.code, '', isValidGui(code) ? code : '', '', way === '2' ? '' : '6180069'];
 }
 /** 受款人姓名正規化（比對用）：去空白＋大寫 */
 function normPayeeName(s) { return String(s || '').replace(/\s/g, '').toUpperCase(); }
@@ -794,7 +807,7 @@ if (typeof module !== 'undefined' && module.exports) {
     validateVoucher, validateBatch, guessBcode, FIXED_ASSET_CODES,
     splitBank, decidePayway, mapRecordsToVouchers,
     FNWACX_SHEET, FNWACX_FUND, FNWACX_HEADERS, payeeToFnwacxRow, buildSbaPayeeIndex, payeeExistsInSba, normPayeeName,
-    unzipAll, buildFnwacxFromTemplate,
+    unzipAll, buildFnwacxFromTemplate, isValidGui,
     resolvePayees, planGrouping, PAY_CAT_LABEL, PAY_CAT_ORDER,
     voucherToF03Row, voucherToF04Rows, voucherToF05Rows, voucherToF06Rows, voucherToF07Rows,
     buildExportFiles, crc32, buildZip,
