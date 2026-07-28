@@ -1040,11 +1040,23 @@ function renderOffsetList(q) {
   const hit = (s) => !kw || String(s).includes(kw);
   const subOf = (e) => String(e.sub_account || '').slice(0, 2);
   const useWhitelist = openMap.size > 0;
-  const rowHtml = (e, left, selectable) => `
+  const ctx = STATE.modalCtx || {};
+  const rowHtml = (e, left, selectable) => {
+    /* 估扣：可用＝未沖（或貸方額）− 本批其他列已沖同一立帳的合計，避免超額匯入被 SBA 擋 */
+    const base = left != null ? left : (+e.credit || 0);
+    const used = selectable ? offsetAllocated(e.voucher_no, e.seq, ctx.vi, ctx.li) : 0;
+    const avail = base - used;
+    const amtHtml = fmtN(base) + (left != null ? ' <span class="small">未沖</span>' : '')
+      + (used > 0 ? `<div class="small">−本批已扣 ${fmtN(used)} ＝ 可用 ${fmtN(avail)}</div>` : '');
+    const btn = !selectable ? '<span class="small">歷史</span>'
+      : avail <= 0 ? '<span class="small">已扣完</span>'
+      : `<button class="btn btn-sm" onclick="pickOffset('${esc(e.voucher_no)}',${+e.seq || 0},${avail})">選此列</button>`;
+    return `
     <tr${selectable ? '' : ' class="row-exported"'}><td>${esc(e.voucher_no)}</td><td>${esc(String(e.seq))}</td><td>${esc(e.post_date || e.make_date || '')}</td>
     <td>${esc(e.sub_account || '')}</td><td style="max-width:280px;">${esc(String(e.description || '').slice(0, 40))}</td>
-    <td class="num">${fmtN(left != null ? left : e.credit)}${left != null ? ' <span class="small">未沖</span>' : ''}</td>
-    <td>${selectable ? `<button class="btn btn-sm" onclick="pickOffset('${esc(e.voucher_no)}',${+e.seq || 0},${left != null ? left : (+e.credit || 0)})">選此列</button>` : '<span class="small">歷史</span>'}</td></tr>`;
+    <td class="num">${amtHtml}</td>
+    <td>${btn}</td></tr>`;
+  };
   const filt = (e) => hit(String(e.description || '') + String(e.voucher_no || '') + String(e.sub_account || ''));
   let html = '';
   if (useWhitelist) {
@@ -1086,12 +1098,24 @@ function renderOffsetList(q) {
   }
   $('modal-body').innerHTML = html;
 }
-function pickOffset(vchrno, seq, credit) {
+/* 本批（所有草稿）已分配到某立帳的沖帳合計；except 排除目前編輯中的列 */
+function offsetAllocated(vchrno, seq, exceptVi, exceptLi) {
+  let s = 0;
+  STATE.drafts.forEach((v, vi) => v.lines.forEach((L, li) => {
+    if (vi === exceptVi && li === exceptLi) return;
+    if (L.offset && String(L.offset.vchrno) === String(vchrno) && +L.offset.seq === +seq) s += +L.offset.amt || 0;
+  }));
+  return s;
+}
+function pickOffset(vchrno, seq, avail) {
   const { vi, li } = STATE.modalCtx;
   const L = STATE.drafts[vi].lines[li];
+  const cap = +avail || L.amt;
+  if (L.amt > cap)
+    alert(`此立帳可用餘額僅 ${fmtN(cap)}（已扣除本批其他列沖用額），本列金額 ${fmtN(L.amt)} 將只沖 ${fmtN(cap)}，不足部分請另選立帳沖銷`);
   L.offset = { year: String(vchrno).slice(0, 3), kind: String(vchrno).slice(3, 4),
     vchrno: String(vchrno), seq,
-    amt: Math.min(L.amt, +credit || L.amt), max: +credit || null };
+    amt: Math.min(L.amt, cap), max: cap };
   closeModal(); renderPreview();
 }
 function clearOffset() {
@@ -1182,6 +1206,19 @@ function runBatchValidation() {
   const box = $('ex-validation');
   if (!STATE.drafts.length) { box.innerHTML = '<div class="vmsg wrn">預覽區沒有傳票草稿</div>'; $('ex-mark').disabled = true; return false; }
   const { errors, warnings } = validateBatch(STATE.drafts, { existingRecnos: existingRecnos() });
+  /* 沖帳估扣總檢：同一立帳被本批多列沖用時，合計不得超過官方未沖餘額（超額 SBA 匯入會擋） */
+  const openMap = new Map(((STATE.offsetOpen && STATE.offsetOpen.items) || []).map(o => [o.vch + '#' + o.seq, o]));
+  const alloc = new Map();
+  STATE.drafts.forEach(v => v.lines.forEach(L => {
+    if (!L.offset) return;
+    const k = String(L.offset.vchrno) + '#' + L.offset.seq;
+    alloc.set(k, (alloc.get(k) || 0) + (+L.offset.amt || 0));
+  }));
+  alloc.forEach((sum, k) => {
+    const o = openMap.get(k);
+    if (o && sum > +o.left) errors.push(`沖帳超額：立帳 ${k} 官方未沖 ${fmtN(+o.left)}，本批合計沖 ${fmtN(sum)}，超出 ${fmtN(sum - +o.left)}（SBA 匯入會擋）`);
+    else if (openMap.size && !o) warnings.push(`立帳 ${k} 不在官方未沖清單（可能已沖畢或餘額表過舊），SBA 匯入可能擋`);
+  });
   box.innerHTML = errors.map(e => `<div class="vmsg err">❌ ${esc(e)}</div>`).join('')
     + warnings.map(w => `<div class="vmsg wrn">⚠️ ${esc(w)}</div>`).join('')
     + (!errors.length ? `<div class="vmsg okk">✅ 全批 ${STATE.drafts.length} 張檢核通過</div>` : '');
