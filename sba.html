@@ -63,6 +63,8 @@ tr.row-exported { opacity: .45; filter: grayscale(.7); }
 .gcard-body { display: none; max-height: 46vh; overflow: auto; }
 .gcard.open .gcard-body { display: block; }
 #pk-groups a { color: var(--terracotta, #c96442); text-decoration: none; font-weight: 600; }
+#pk-groups th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+#pk-groups th.sortable:hover { background: #dcd9cc; }
 #pk-groups a:hover { text-decoration: underline; }
 /* ── 單據浮標預覽卡 ── */
 #rec-pop { display: none; position: fixed; z-index: 60; width: 380px; max-width: 92vw;
@@ -315,6 +317,7 @@ const STATE = {
   drafts: [],                /* normalized vouchers (sba-core 模型) */
   combine: true,
   openGrp: null,             /* 目前放大的卡片 'acct|cat'；null=全部縮小 */
+  pickSort: { key: 'date', dir: -1 }, /* 卡片內排序：no/date/amt/payee，dir 1升冪 -1降冪 */
   catOv: {},                 /* recId → '1'|'6'|'2' 手動移組覆寫（存 D1 sba_catov） */
   paySkip: new Set(),        /* 不匯入受款人鍵集合（存 D1 sba_payee_skip；反灰沉默） */
   dupOkKeys: new Set(),      /* 「代碼已存在→自行刪除後匯入」使用者已確認鍵集合（本次工作階段） */
@@ -502,14 +505,20 @@ function renderPickList() {
   $('pk-groups').innerHTML = PAY_CAT_ORDER.map(cat => accts.map(acct => {
     const key = acct + '|' + cat;
     const g = byKey.get(key) || { recs: [], sum: 0 };
-    g.recs.sort((a, b) => (STATE.exported[a.r.id] ? 1 : 0) - (STATE.exported[b.r.id] ? 1 : 0)); /* 已匯出(反灰)墊底 */
+    /* 已匯出(反灰)恆墊底，其餘依表頭選定欄位排序 */
+    g.recs.sort((a, b) => ((STATE.exported[a.r.id] ? 1 : 0) - (STATE.exported[b.r.id] ? 1 : 0)) || pickCmp(a.r, b.r));
     const open = openAll ? g.recs.length > 0 : STATE.openGrp === key;
     const acctChip = acct === '11010202' ? 'cust' : 'fund';
     const pcnt = (cat === '1' || cat === '6')
       ? `<span class="chip" title="農會存帳/電匯 各自統計：兩專戶合計、不重複受款人、排除本所兩專戶、不含已匯出">未出帳受款人(兩專戶合計) <b>${catPayees[cat].size}</b> 人</span>` : '';
     const body = g.recs.length
-      ? `<table class="grid"><thead><tr><th></th><th>單號</th><th>日期</th><th>類型</th><th>科目</th><th>用途/摘要</th>
-          <th class="num">金額</th><th>受款人</th><th>狀態</th><th>移組</th></tr></thead><tbody>`
+      ? `<table class="grid"><thead><tr><th></th>
+          <th class="sortable" onclick="setPickSort('no')">單號${pickSortArrow('no')}</th>
+          <th class="sortable" onclick="setPickSort('date')">日期${pickSortArrow('date')}</th>
+          <th>類型</th><th>科目</th><th>用途/摘要</th>
+          <th class="num sortable" onclick="setPickSort('amt')">金額${pickSortArrow('amt')}</th>
+          <th class="sortable" onclick="setPickSort('payee')">受款人${pickSortArrow('payee')}</th>
+          <th>狀態</th><th>移組</th></tr></thead><tbody>`
         + g.recs.map(({ r, effCat }) => pickRowHtml(r, effCat, key)).join('') + '</tbody></table>'
       : '<div class="small" style="padding:10px 12px;">無單據</div>';
     return `<div class="gcard${open ? ' open' : ''}${g.recs.length ? '' : ' empty'}">
@@ -531,6 +540,24 @@ function renderPickList() {
 function toggleGroupCard(key) {
   STATE.openGrp = STATE.openGrp === key ? null : key;
   renderPickList();
+}
+/* ── 卡片內排序（單號/日期/金額/受款人；同鍵再點切換升降冪，各卡片同步） ── */
+function pickSortArrow(k) { return STATE.pickSort.key === k ? (STATE.pickSort.dir > 0 ? ' ▲' : ' ▼') : ''; }
+function setPickSort(k) {
+  if (STATE.pickSort.key === k) STATE.pickSort.dir = -STATE.pickSort.dir;
+  else STATE.pickSort = { key: k, dir: k === 'date' ? -1 : 1 };
+  renderPickList();
+}
+function pickCmp(a, b) {
+  const { key, dir } = STATE.pickSort;
+  if (key === 'no') return dir * String(a.voucherNo || '').localeCompare(String(b.voucherNo || ''));
+  if (key === 'amt') return dir * ((+a.total || 0) - (+b.total || 0));
+  if (key === 'payee') {
+    const nm = (r) => ((r.payees && r.payees.length) ? r.payees : (r.payee && r.payee.type ? [r.payee] : []))
+      .map(p => p.type === 'bill' ? '繳費單' : (p.name || '')).join('、');
+    return dir * nm(a).localeCompare(nm(b), 'zh-Hant');
+  }
+  return dir * (recDateIso(a) || '').localeCompare(recDateIso(b) || '');
 }
 /* ── 單據浮標預覽（hover 顯示申請單全文；點單號另開填單頁）──
    事件代理繫結一次於 #pk-groups（避免 inline handler 內插 id） */
