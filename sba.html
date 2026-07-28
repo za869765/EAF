@@ -266,8 +266,8 @@ window.addEventListener('storage', (ev) => {
     <div class="toolbar"><label>SBA 製票人帳號(mvchno) <input type="text" id="st-mvchno" style="width:140px;" placeholder="須為 SBA 系統使用者帳號"></label></div>
     <div class="toolbar"><label>用人費用預設人員類別(pkind) <input type="text" id="st-pkind" style="width:80px;" placeholder="如 01"></label>
       <span class="small">用途別 1XXX 時必填；代碼須存在 SBA 共用項目代碼檔(fnxwanormi)</span></div>
-    <div class="toolbar"><label>存帳銀行代碼白名單 <input type="text" id="st-farm" style="width:220px;" value="6180069,6180416"></label>
-      <span class="small">佳里區農會 6180069／佳興分部 6180416；其餘有帳號→e電匯、繳費單→自領(代繳)</span></div>
+    <div class="toolbar"><label>存帳銀行代碼白名單 <input type="text" id="st-farm" style="width:220px;" value="6180069,6180416,6180427,6180438,6180449"></label>
+      <span class="small">佳里區農會本會 6180069＋佳興 6180416／子龍 6180427／塭內 6180438／延平 6180449 四分部皆存帳；其餘有帳號→e電匯、繳費單→自領(代繳)</span></div>
     <h3 style="margin-top:14px;">科目 → 預算科目(bcode) 對照</h3>
     <div class="small" style="margin-bottom:6px;">⚠️ 官方範例 F04 每列均有 bcode。以下種子值為規律推導（第1,2,4碼＋末碼、98→Y），<b>請對照 SBA「常用會計科目設定」逐一核對後儲存</b>。</div>
     <div class="scroll-x" style="max-height:38vh;overflow-y:auto;">
@@ -312,7 +312,7 @@ document.write('<script src="sba-core.js?v=' + (window.APP_VERSION || '0') + '">
 /* ═══════════════ 狀態 ═══════════════ */
 const STATE = {
   records: [], entries: [], subjects: null, banks: [], bankByCode: new Map(), payees: [],
-  config: {}, settings: { mvchno: '', pkind: '', farm: '6180069,6180416', bcodeMap: {} },
+  config: {}, settings: { mvchno: '', pkind: '', farm: '6180069,6180416,6180427,6180438,6180449', bcodeMap: {} },
   exported: {},              /* recId → {recno,batch,at,src} */
   drafts: [],                /* normalized vouchers (sba-core 模型) */
   combine: true,
@@ -1016,7 +1016,7 @@ function renderExportLog() {
 function renderSettings() {
   $('st-mvchno').value = STATE.settings.mvchno || '';
   $('st-pkind').value = STATE.settings.pkind || '';
-  $('st-farm').value = STATE.settings.farm || '6180069,6180416';
+  $('st-farm').value = STATE.settings.farm || '6180069,6180416,6180427,6180438,6180449';
   const codes = allKnownSubjectCodes();
   $('st-bcode-body').innerHTML = [...codes.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([code, name]) => `
     <tr><td>${esc(code)}</td><td>${esc(name)}</td>

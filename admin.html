@@ -1227,7 +1227,7 @@ function hidePayeeRecPop() { document.getElementById('payee-rec-pop').style.disp
 /* ── v5.1.3 匯出 SBA FNWACX0170 受款人匯入格式（未凍結全部；規則與 sba-core.js payeeToFnwacxRow 同步維護） ── */
 async function exportPayeesSbaXlsx() {
   /* 農會白名單與 SBA 工坊共用 D1 設定（sba_settings.farm），讀不到才用預設 */
-  let farmStr = '6180069,6180416';
+  let farmStr = '6180069,6180416,6180427,6180438,6180449'; /* 本會+四分部皆農會存帳 */
   try {
     const cfg = await fetch('/api/acc/v2/config').then(r => r.json());
     if (cfg && cfg.sba_settings && cfg.sba_settings.farm) farmStr = cfg.sba_settings.farm;
