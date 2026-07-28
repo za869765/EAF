@@ -56,6 +56,18 @@ tr.row-exported { opacity: .45; filter: grayscale(.7); }
 .gcard.has-sel { box-shadow: 0 0 0 1px #d1cfc5, inset 4px 0 0 var(--terracotta, #c96442); }
 .gcard.has-sel .gcard-hd { background: #f3e3d8; }
 .chip.pk-selcount { background: var(--terracotta, #c96442); color: #fff; font-weight: 700; }
+tr.row-sel td { background: #f6e7dc; }
+/* 勾選摘要橫幅：依張分組顯示＋更新動畫 */
+#pk-summary { flex-basis: 100%; }
+.sel-banner { background: linear-gradient(90deg, #f6e7dc, #faf6ef); border-left: 4px solid var(--terracotta, #c96442);
+  border-radius: 8px; padding: 8px 12px; font-size: 12px; animation: selPop .35s ease-out; }
+.sel-banner b { color: #a84e2f; }
+.sel-banner .sel-line { margin-top: 4px; padding-left: 2px; }
+@keyframes selPop {
+  0% { transform: scale(.97); opacity: .35; box-shadow: 0 0 0 6px rgba(201,100,66,.25); }
+  60% { transform: scale(1.008); }
+  100% { transform: scale(1); opacity: 1; box-shadow: none; }
+}
 .gcard-hd { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
   padding: 9px 12px; background: var(--warm-sand, #e8e6dc); cursor: pointer; user-select: none; }
 .gcard-hd label { font-size: 11px; cursor: pointer; }
@@ -479,8 +491,9 @@ function pickRowHtml(r, effCat, key) {
   const mv = `<select onchange="moveRecGroup('${esc(r.id)}',this.value)">`
     + PAY_CAT_ORDER.map(c => `<option value="${c}"${c === effCat ? ' selected' : ''}>${PAY_CAT_LABEL[c]}</option>`).join('')
     + `</select>${STATE.catOv[r.id] ? ' <span class="chip warn">手動</span>' : ''}`;
-  return `<tr${exported ? ' class="row-exported"' : ''} data-rid="${esc(String(r.id))}">
-    <td><input type="checkbox" class="pk-cb" value="${esc(r.id)}" data-grp="${key}"${exported ? ' data-exported="1"' : ''}${STATE.pickSel.has(String(r.id)) ? ' checked' : ''} onchange="togglePickRec(this.value,this.checked)"></td>
+  const isSel = STATE.pickSel.has(String(r.id));
+  return `<tr class="${exported ? 'row-exported' : ''}${isSel ? ' row-sel' : ''}" data-rid="${esc(String(r.id))}">
+    <td><input type="checkbox" class="pk-cb" value="${esc(r.id)}" data-grp="${key}"${exported ? ' data-exported="1"' : ''}${isSel ? ' checked' : ''} onchange="togglePickRec(this)"></td>
     <td><a href="/?rec=${encodeURIComponent(r.id)}" target="_blank" title="於填單頁開啟此申請單">${esc(r.voucherNo)}</a></td><td>${esc(recDateIso(r))}</td>
     <td><span class="chip">${r.formType === 'expense' ? '動支' : '請購'}</span></td>
     <td>${esc(r.bpCode)} ${esc(r.bpLabel || '')}</td>
@@ -639,8 +652,10 @@ function moveRecGroup(id, cat) {
 }
 /* 勾選狀態存 localStorage（重整/搜尋不清；僅「清除勾選」或標記已匯出後移除） */
 function savePickSel() { try { localStorage.setItem('sba_pick_sel', JSON.stringify([...STATE.pickSel])); } catch (_) {} }
-function togglePickRec(id, on) {
-  if (on) STATE.pickSel.add(String(id)); else STATE.pickSel.delete(String(id));
+function togglePickRec(cb) {
+  const id = String(cb.value);
+  if (cb.checked) STATE.pickSel.add(id); else STATE.pickSel.delete(id);
+  const tr = cb.closest('tr'); if (tr) tr.classList.toggle('row-sel', cb.checked);
   savePickSel(); updatePickSummary();
 }
 /* 全選此組一律跳過已匯出（反灰）列 */
@@ -649,12 +664,14 @@ function toggleGroupPick(cb) {
     .forEach(x => {
       x.checked = cb.checked;
       if (cb.checked) STATE.pickSel.add(String(x.value)); else STATE.pickSel.delete(String(x.value));
+      const tr = x.closest('tr'); if (tr) tr.classList.toggle('row-sel', cb.checked);
     });
   savePickSel(); updatePickSummary();
 }
 function clearPickSel() {
   STATE.pickSel.clear(); savePickSel();
   document.querySelectorAll('.pk-cb, .grp-cb').forEach(cb => { cb.checked = false; });
+  document.querySelectorAll('tr.row-sel').forEach(tr => tr.classList.remove('row-sel'));
   updatePickSummary();
 }
 function selectedRecords() {
@@ -686,9 +703,16 @@ function updatePickSummary() {
   });
   const sel = selectedRecords();
   if (!sel.length) { $('pk-summary').textContent = '尚未勾選'; return; }
-  const nos = sel.map(r => r.voucherNo).filter(Boolean);
-  const shown = nos.slice(0, 12).join('、') + (nos.length > 12 ? `…等共${nos.length}筆` : '');
-  $('pk-summary').innerHTML = `已勾選 <b>${sel.length}</b> 筆（${esc(shown)}）→ 將產生 <b>${planGrouping(sel, mapCtx()).length}</b> 張支出傳票`;
+  /* 依「將產生的每張支出傳票」分組顯示各自的單號/筆數/金額；重建節點觸發動畫 */
+  const plan = planGrouping(sel, mapCtx());
+  const recById = new Map(sel.map(r => [r.id, r]));
+  const lines = plan.map(g => {
+    const nos = [...g.recIds].map(id => (recById.get(id) || {}).voucherNo).filter(Boolean);
+    const shown = nos.slice(0, 10).join('、') + (nos.length > 10 ? `…等${nos.length}筆` : '');
+    return `<div class="sel-line"><span class="chip ${g.acct === '11010202' ? 'cust' : 'fund'}">${esc(subjectName(g.acct) || g.acct)}</span>
+      <span class="chip exp">${esc(g.catLabel)}</span> ${g.n} 筆 <b>$${fmtN(g.sum)}</b>｜<span class="small">${esc(shown)}</span></div>`;
+  }).join('');
+  $('pk-summary').innerHTML = `<div class="sel-banner"><b>✔ 已勾選 ${sel.length} 筆 → 將產生 ${plan.length} 張支出傳票</b>${lines}</div>`;
 }
 function nextRecnoFor(kind) {
   const year = rocYearNow();
