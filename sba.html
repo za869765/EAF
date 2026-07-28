@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SBA 傳票工坊 — 佳里區衛生所 v1.1.0</title>
+<title>SBA 傳票工坊 — 佳里區衛生所 v5.0.6</title>
 <link rel="stylesheet" href="design.css">
 <style>
 /* ── 沿用 acc.html 視覺語言（parchment / warm charcoal） ── */
@@ -105,7 +105,7 @@ window.addEventListener('storage', (ev) => {
 
 <div id="top-bar">
   <h1>📤 SBA 傳票工坊 — 臺南市佳里區衛生所</h1>
-  <span class="small" id="ver-badge" style="color:#78909c;">v1.1.0</span>
+  <span class="small" id="ver-badge" style="color:#78909c;">v5.0.6</span>
   <a class="tbtn tbtn-gray" href="/acc.html">📒 會計帳務</a>
   <a class="tbtn tbtn-gray" href="/" target="_blank">📝 填單</a>
   <a class="tbtn tbtn-blue" href="/admin.html">⚙️ 後台</a>
@@ -252,8 +252,13 @@ window.addEventListener('storage', (ev) => {
   </div>
 </div>
 
-<script src="sba-core.js"></script>
+<script src="sba-core.js?v=5.0.6"></script>
 <script>
+/* 版本握手：sba-core.js 與本頁必須同版，不一致＝瀏覽器快取到舊檔 */
+(function(){
+  const got = typeof SBA_CORE_VERSION === 'undefined' ? '(舊版)' : 'v' + SBA_CORE_VERSION;
+  if (got !== 'v5.0.6') alert('程式版本不一致（頁面 v5.0.6／核心 ' + got + '），請按 Ctrl+F5 強制重新整理後再使用');
+})();
 /* ═══════════════ 狀態 ═══════════════ */
 const STATE = {
   records: [], entries: [], subjects: null, banks: [], bankByCode: new Map(),

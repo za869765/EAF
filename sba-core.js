@@ -6,6 +6,9 @@
    ═══════════════════════════════════════════════════════════════ */
 'use strict';
 
+/* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
+const SBA_CORE_VERSION = '5.0.6';
+
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
 function rocDate7(d) {
@@ -656,6 +659,7 @@ function mapRecordsToVouchers(records, ctx) {
 /* ── Node 測試支援 ── */
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
+    SBA_CORE_VERSION,
     rocDate7, toRoc7, big5Len, truncBig5, xmlEscape, fmt2, fmt6, buildXml,
     F03_FIELDS, F04_FIELDS, F05_FIELDS, F06_FIELDS, F07_FIELDS,
     validateVoucher, validateBatch, guessBcode, FIXED_ASSET_CODES,
