@@ -677,6 +677,16 @@ function generateVouchers() {
 /* ═══════════════ 🧾 傳票預覽/編輯 ═══════════════ */
 const KIND_NAMES = { '1': '收入傳票', '2': '支出傳票', '3': '轉帳傳票' };
 const OFFSETABLE = (code) => /^(2102|210205|210202|110305|180705)/.test(code);
+/* AI 回傳後再保險清一次：擬支付/支付開頭贅詞、檢附…整句、條列編號 */
+function cleanMemoText(t) {
+  return String(t || '')
+    .replace(/擬?支付/g, '')
+    .replace(/[，、;；。]?\s*檢附[^，。;；]*[。]?/g, '')
+    .replace(/\s+\d{1,2}\.\s+/g, '、')                    /* 句中條列編號（前後空白；不會誤傷 115.7 年月） */
+    .replace(/(^|[，、;；。])\s*\d{1,2}\.\s*(?=\D|$)/g, '$1') /* 句首/標點後條列編號（後面非數字才剝，保護 115.4-6 這類） */
+    .replace(/\s+\d{1,2}\.\s*$/, '')                       /* 句尾殘留條列編號 */
+    .replace(/^[\s，、;；。]+/, '').replace(/[\s，、;；]+$/, '').trim();
+}
 /* ✨ AI 修正摘要（使用者規則）：主檔摘要=概括不含金額；每列明細摘要=含該列明細金額（千分位+元，缺少自動補） */
 async function aiFixMemos() {
   if (!STATE.drafts.length) { alert('尚無傳票草稿'); return; }
@@ -684,7 +694,9 @@ async function aiFixMemos() {
     id: String(i),
     main: v.memo || (v.lines[0] && v.lines[0].memo) || '',
     lines: v.lines.filter(L => L.dc === 'D').map(L => ({ seq: L.seq, text: L.memo || '', amt: +L.amt || 0 })),
-  })).filter(x => (x.main && x.main.trim()) || x.lines.some(L => L.text.trim()));
+    payees: (v.payees || []).filter(P => String(P.usedoc || '').trim())
+      .map(P => ({ seq: P.seq, text: P.usedoc, amt: +P.amt || 0 })),
+  })).filter(x => (x.main && x.main.trim()) || x.lines.some(L => L.text.trim()) || x.payees.length);
   if (!items.length) { alert('無摘要可修正'); return; }
   $('pv-ai-msg').textContent = '⟳ AI 修正中…（Gemini）';
   try {
@@ -699,21 +711,28 @@ async function aiFixMemos() {
     for (const it of (j.items || [])) {
       const v = STATE.drafts[+it.id];
       if (!v) continue;
-      if (it.memo && String(it.memo).trim()) {
-        const m = String(it.memo).trim();
-        v.memo = truncBig5(m, 100);
-        const bank = v.lines.find(L => L.dc === 'C');
-        if (bank) bank.memo = truncBig5(m, 1000);
-      }
+      if (it.memo && String(it.memo).trim()) v.memo = truncBig5(cleanMemoText(it.memo), 100);
       for (const ln of (it.lines || [])) {
         const L = v.lines.find(x => x.dc === 'D' && x.seq === +ln.seq);
         if (!L || !String(ln.text || '').trim()) continue;
-        let t = String(ln.text).trim();
+        let t = cleanMemoText(ln.text);
+        if (!t) continue;
         /* 摘要金額須與明細金額一致：AI 漏寫時自動補上 */
         const amtStr = (+L.amt || 0).toLocaleString('en-US');
         if (!t.includes(amtStr)) t += `，計${amtStr}元`;
         L.memo = truncBig5(t, 1000);
       }
+      /* 受款人支出用途（F05 usedoc）同步修正 */
+      for (const pn of (it.payees || [])) {
+        const P = (v.payees || []).find(x => x.seq === +pn.seq);
+        if (!P || !String(pn.text || '').trim()) continue;
+        let t = cleanMemoText(pn.text);
+        if (!t) continue;
+        const amtStr = (+P.amt || 0).toLocaleString('en-US');
+        if (!t.includes(amtStr)) t += `，計${amtStr}元`;
+        P.usedoc = truncBig5(t, 1000);
+      }
+      syncBankLine(v);
       n++;
     }
     renderPreview();
@@ -729,7 +748,19 @@ function renderPreview() {
   if (STATE.drafts.length) { renderExportLog(); runBatchValidation(); }
   $('pv-list').innerHTML = STATE.drafts.map((v, vi) => {
     const r = validateVoucher(v);
-    const linesHtml = v.lines.map((L, li) => `
+    const linesHtml = v.lines.map((L, li) => {
+      /* 序1 貸方銀行列＝全自動唯讀（金額=Σ借方、摘要=主檔摘要），僅供檢視 */
+      if (L.dc === 'C' && /^110102/.test(String(L.code))) return `
+      <tr style="background:#f4f2ea;">
+        <td>${L.seq}</td><td>貸</td>
+        <td>${esc(L.code)} <span class="small">${esc(subjectName(L.code)).slice(0, 8)}</span></td>
+        <td>${esc(L.bcode || '')}</td><td></td><td></td><td></td>
+        <td>${esc(L.scode1 || '')}</td>
+        <td class="num"><b>${fmtN(L.amt)}</b></td>
+        <td class="small" style="color:#9e9e9e;">（自動＝主檔摘要）</td>
+        <td class="small" style="color:#9e9e9e;">自動</td>
+      </tr>`;
+      return `
       <tr>
         <td>${L.seq}</td>
         <td><select onchange="updLine(${vi},${li},'dc',this.value)"><option value="D"${L.dc === 'D' ? ' selected' : ''}>借</option><option value="C"${L.dc === 'C' ? ' selected' : ''}>貸</option></select></td>
@@ -745,7 +776,8 @@ function renderPreview() {
           ${L.dc === 'D' && OFFSETABLE(L.code) ? `<button class="btn btn-sm" onclick="openOffsetModal(${vi},${li})">${L.offset ? '🔗' + esc(L.offset.vchrno) + '#' + esc(String(L.offset.seq)) : '沖帳'}</button>` : ''}
           <button class="btn btn-sm" onclick="delLine(${vi},${li})">✕</button>
         </td>
-      </tr>`).join('');
+      </tr>`;
+    }).join('');
     const payeesHtml = (v.payees || []).map((P, pi) => `
       <tr${P.needsInput ? ' style="background:#fdf3e7;"' : ''}>
         <td>${P.seq}</td>
@@ -795,15 +827,24 @@ function renderPreview() {
     </div>`;
   }).join('');
 }
+/* 序1 貸方銀行列自動同步：金額=Σ借方、摘要=主檔摘要 */
+function syncBankLine(v) {
+  const bank = v.lines.find(L => L.dc === 'C' && /^110102/.test(String(L.code)));
+  if (!bank) return;
+  bank.amt = Math.round(v.lines.filter(L => L.dc === 'D').reduce((s, L) => s + (+L.amt || 0), 0) * 100) / 100;
+  bank.memo = truncBig5(v.memo || '', 1000);
+}
 function updV(vi, k, val) {
   const v = STATE.drafts[vi];
   if (k === 'rnum') v[k] = +val || 0;
   else v[k] = val.trim();
+  syncBankLine(v);
   renderPreview();
 }
 function updLine(vi, li, k, val) {
   const L = STATE.drafts[vi].lines[li];
   L[k] = k === 'amt' ? (+String(val).replace(/,/g, '') || 0) : val.trim();
+  syncBankLine(STATE.drafts[vi]);
   if (k === 'code') { L.bcode = bcodeFor(L.code); }
   renderPreview();
 }
@@ -831,6 +872,7 @@ function delLine(vi, li) {
   const v = STATE.drafts[vi];
   v.lines.splice(li, 1);
   v.lines.forEach((L, i) => { L.seq = i + 1; });
+  syncBankLine(v);
   renderPreview();
 }
 function addPayee(vi) {
