@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.2.0';
+const SBA_CORE_VERSION = '5.2.1';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -501,17 +501,18 @@ function normPayeeName(s) { return String(s || '').replace(/\s/g, '').toUpperCas
 /** 既有 SBA 受款人現況（12 欄 rows，不含前兩列表頭）→ 比對索引。
  *  帳號鍵＝分行代號|完整帳號數字（不去前導零，避免異行同號誤判） */
 function buildSbaPayeeIndex(rows) {
-  const codes = new Set(), bankAccts = new Set(), names = new Set();
+  const codes = new Set(), bankAccts = new Set(), names = new Set(), payeeCodes = new Set();
   for (const r of rows) {
     if (!r || !r[1]) continue;
-    if (r[0]) codes.add(String(r[0]).trim().toUpperCase());
+    if (r[0]) { codes.add(String(r[0]).trim().toUpperCase()); payeeCodes.add(String(r[0]).trim().toUpperCase()); }
     if (r[9]) codes.add(String(r[9]).trim().toUpperCase());
     const a = String(r[5] || '').replace(/\D/g, '');
     if (a) bankAccts.add(String(r[7] || '').replace(/\D/g, '') + '|' + a);
     names.add(normPayeeName(r[1]));
     if (r[6]) names.add(normPayeeName(r[6]));
   }
-  return { codes, bankAccts, names };
+  /* payeeCodes＝僅「受款人代碼」欄（SBA 匯入對此欄查重；統編欄不算）——實測 v5.1.9：代碼已存在→匯入報重複並中止 */
+  return { codes, bankAccts, names, payeeCodes };
 }
 /** EAF 受款人是否已存在 SBA。
  *  SBA 為「一帳戶一列」（同一人可多列），故有帳號時只認「分行|帳號」——
