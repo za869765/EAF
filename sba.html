@@ -653,12 +653,14 @@ function generateVouchers() {
 /* ═══════════════ 🧾 傳票預覽/編輯 ═══════════════ */
 const KIND_NAMES = { '1': '收入傳票', '2': '支出傳票', '3': '轉帳傳票' };
 const OFFSETABLE = (code) => /^(2102|210205|210202|110305|180705)/.test(code);
-/* ✨ AI 修正摘要：送 /api/gemini（走使用者付費 key，Pages 環境變數 GEMINI_API_KEY），回填後仍可手動編輯 */
+/* ✨ AI 修正摘要（使用者規則）：主檔摘要=概括不含金額；每列明細摘要=含該列明細金額（千分位+元，缺少自動補） */
 async function aiFixMemos() {
   if (!STATE.drafts.length) { alert('尚無傳票草稿'); return; }
-  const items = STATE.drafts
-    .map((v, i) => ({ id: String(i), text: (v.lines[0] && v.lines[0].memo) || v.memo || '' }))
-    .filter(x => x.text.trim());
+  const items = STATE.drafts.map((v, i) => ({
+    id: String(i),
+    main: v.memo || (v.lines[0] && v.lines[0].memo) || '',
+    lines: v.lines.filter(L => L.dc === 'D').map(L => ({ seq: L.seq, text: L.memo || '', amt: +L.amt || 0 })),
+  })).filter(x => (x.main && x.main.trim()) || x.lines.some(L => L.text.trim()));
   if (!items.length) { alert('無摘要可修正'); return; }
   $('pv-ai-msg').textContent = '⟳ AI 修正中…（Gemini）';
   try {
@@ -672,14 +674,26 @@ async function aiFixMemos() {
     let n = 0;
     for (const it of (j.items || [])) {
       const v = STATE.drafts[+it.id];
-      if (!v || !String(it.text || '').trim()) continue;
-      const t = String(it.text).trim();
-      v.memo = truncBig5(t, 100);
-      if (v.lines[0] && v.lines[0].dc === 'C') v.lines[0].memo = truncBig5(t, 1000);
+      if (!v) continue;
+      if (it.memo && String(it.memo).trim()) {
+        const m = String(it.memo).trim();
+        v.memo = truncBig5(m, 100);
+        const bank = v.lines.find(L => L.dc === 'C');
+        if (bank) bank.memo = truncBig5(m, 1000);
+      }
+      for (const ln of (it.lines || [])) {
+        const L = v.lines.find(x => x.dc === 'D' && x.seq === +ln.seq);
+        if (!L || !String(ln.text || '').trim()) continue;
+        let t = String(ln.text).trim();
+        /* 摘要金額須與明細金額一致：AI 漏寫時自動補上 */
+        const amtStr = (+L.amt || 0).toLocaleString('en-US');
+        if (!t.includes(amtStr)) t += `，計${amtStr}元`;
+        L.memo = truncBig5(t, 1000);
+      }
       n++;
     }
     renderPreview();
-    $('pv-ai-msg').textContent = `✅ 已修正 ${n} 張傳票摘要——請逐張確認，仍可手動調整`;
+    $('pv-ai-msg').textContent = `✅ 已修正 ${n} 張（主檔=概括無金額、明細=含該列金額）——請逐張確認，仍可手動調整`;
   } catch (e) { $('pv-ai-msg').textContent = '❌ AI 修正失敗：' + e.message; }
 }
 function renderPreview() {

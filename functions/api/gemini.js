@@ -1,6 +1,8 @@
 /* POST /api/gemini — 傳票摘要 AI 潤飾中繼（需 X-Admin-Pass）
    環境變數：GEMINI_API_KEY（使用者的 Gemini 付費 key，於 Pages 專案設定）
-   請求：{ items: [{ id, text }] } → 回應：{ items: [{ id, text }] }（潤飾後） */
+   請求：{ items: [{ id, main, lines: [{ seq, text, amt }] }] }
+   回應：{ items: [{ id, memo, lines: [{ seq, text }] }] }
+   規則：memo=主檔摘要概括不含金額；lines[].text=明細摘要含該列金額（千分位+元） */
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -17,15 +19,11 @@ export async function onRequestPost({ request, env }) {
   try { body = await request.json(); } catch (_) { return json({ error: 'bad json' }, 400); }
   const items = Array.isArray(body && body.items) ? body.items.slice(0, 30) : [];
   if (!items.length) return json({ error: 'no items' }, 400);
-  const prompt = '你是台灣佳里區衛生所醫療作業基金的會計。以下是支出傳票摘要草稿（由多張動支/請購單摘要串接，常過長、有公文贅詞、可能被截斷）。'
-    + '請依本所「開票習慣」改寫每一則為精簡繁中傳票摘要，長度以 50 字內為原則：\n'
-    + '1. 年月用縮寫：「115.7」或「11507」或「115年7月」；去掉「擬支付/擬支/支原定/檢附○○各1份」等公文贅詞。\n'
-    + '2. 格式偏好「用途-對象-明細」，如「115.01藥品費-裕利-冠脂妥等三件(919+1139=2058)」。\n'
-    + '3. 多筆合併以頓號或&分項；有金額計算式時保留「(a+b=c)」。\n'
-    + '4. 代墊註記保留，如「(由職王聖捷代墊)」。\n'
-    + '本所實際範例：「11501影印機租金(19/48)」「114.12醫療廢棄物清理費」「115年第一季台灣星堡保全費」'
-    + '「11501中華電信市話寬頻費&公務手機&VPN月租(4544+998+1691=7233)」「114年12月門診醫生應診費」「流感疫苗接種加班費」。\n'
-    + '不可捏造內容，只能整理原文。回覆 JSON 陣列，格式 [{"id":"...","text":"..."}]，不要其他文字。\n\n'
+  const prompt = '你是台灣佳里區衛生所醫療作業基金的會計。以下每張支出傳票有「主檔摘要草稿 main」與「明細列 lines（text=摘要草稿、amt=該列明細金額）」，草稿常過長、有公文贅詞。請依本所開票習慣改寫：\n'
+    + '【memo 傳票主檔摘要】概括整張用途即可，「不得出現任何金額數字」，越簡短越好（20 字內），如「11507中華電信費」「115.7藥品費-裕利等三家」。\n'
+    + '【lines[].text 明細摘要】精簡但保留數字明細；每列文字必須含該列 amt 的金額且與 amt 完全一致，金額一律千分位加「元」（1039→1,039元）；組成算式保留並千分位，如 (919+1,139=2,058)。\n'
+    + '共同規則：繁體中文；年月縮寫（115.7／11507／115年7月）；去「擬支付／擬支／支原定／檢附○○各1份」等公文贅詞；代墊註記保留（如「(由職王聖捷代墊)」）；不可捏造內容，只能整理原文。\n'
+    + '回覆 JSON 陣列，格式 [{"id":"...","memo":"...","lines":[{"seq":1,"text":"..."}]}]，不要其他文字。\n\n'
     + JSON.stringify(items);
   const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=' + env.GEMINI_API_KEY, {
     method: 'POST',
@@ -41,5 +39,5 @@ export async function onRequestPost({ request, env }) {
   let out;
   try { out = JSON.parse(txt); } catch (_) { return json({ error: 'AI 回覆非 JSON：' + txt.slice(0, 200) }, 502); }
   if (!Array.isArray(out)) return json({ error: 'AI 回覆格式不符' }, 502);
-  return json({ items: out.filter((x) => x && x.id != null && typeof x.text === 'string') });
+  return json({ items: out.filter((x) => x && x.id != null) });
 }
