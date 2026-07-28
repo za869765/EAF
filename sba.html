@@ -303,6 +303,7 @@ window.addEventListener('storage', (ev) => {
 <div id="modal-box" style="display:none;">
   <h3 id="modal-title">選擇沖帳立帳傳票</h3>
   <div class="small" id="modal-hint"></div>
+  <input type="search" id="modal-q" placeholder="🔍 搜尋 摘要/傳票號/子目（如：周轉金）" style="width:320px;margin-top:8px;" oninput="renderOffsetList(this.value)">
   <div class="scroll-x" style="max-height:52vh;overflow-y:auto;margin-top:8px;">
     <table class="grid"><thead><tr><th>傳票號</th><th>序</th><th>日期</th><th>子目</th><th>摘要</th><th class="num">貸方金額</th><th></th></tr></thead>
     <tbody id="modal-body"></tbody></table>
@@ -994,24 +995,55 @@ function openOffsetModal(vi, li) {
   const code = String(L.code).slice(0, 8);
   const base6 = code.slice(0, 6);
   const year = STATE.drafts[vi].year;
+  const rel = String(L.relate || '');
+  /* 候選＝本年度同科目家族全部貸方列（不再依子目硬過濾、不截舊單——v5.4.4：一月周轉金曾被「最新120筆」擠掉） */
   const cands = STATE.entries.filter(e => {
     const sc = String(e.subject || '').split(' ')[0];
     if (!(sc === code || sc.startsWith(base6))) return false;
     if (!(+e.credit > 0)) return false;
     if (!String(e.voucher_no || '').startsWith(year)) return false;
-    if (L.relate && String(e.sub_account || '').slice(0, 2) !== L.relate) return false;
     return true;
-  }).sort((a, b) => String(b.voucher_no).localeCompare(String(a.voucher_no))).slice(0, 120);
+  });
+  const subOf = (e) => String(e.sub_account || '').slice(0, 2);
+  cands.sort((a, b) => {
+    const am = rel && subOf(a) === rel ? 0 : 1, bm = rel && subOf(b) === rel ? 0 : 1;
+    if (am !== bm) return am - bm;                                        /* 本列子目相同者置頂（推薦） */
+    const s = subOf(a).localeCompare(subOf(b));                           /* 其餘依子目分組 */
+    if (s) return s;
+    return String(b.voucher_no).localeCompare(String(a.voucher_no));      /* 組內新到舊 */
+  });
+  STATE.modalCands = { cands, rel };
   $('modal-title').textContent = `選擇沖帳立帳傳票 — ${code} ${subjectName(code)}`;
-  $('modal-hint').textContent = `候選＝D1 歷史 SBA 分錄中，本年度同科目${L.relate ? `（子目 ${L.relate}）` : ''}之貸方（立帳）列。資料截至最後匯入月份，較新的立帳請至 SBA 端手動沖。`;
-  $('modal-body').innerHTML = cands.map(e => `
+  $('modal-hint').textContent = `候選＝D1 歷史 SBA 分錄中，本年度同科目家族全部貸方（立帳）列，依子目分組${rel ? `、與本列子目 ${rel} 相同者置頂推薦` : ''}。資料截至最後匯入月份，較新的立帳請至 SBA 端手動沖。`;
+  $('modal-q').value = '';
+  renderOffsetList('');
+  $('modal-mask').style.display = 'block';
+  $('modal-box').style.display = 'block';
+}
+function renderOffsetList(q) {
+  const { cands, rel } = STATE.modalCands || { cands: [], rel: '' };
+  const kw = String(q || '').trim();
+  const list = kw ? cands.filter(e =>
+    (String(e.description || '') + String(e.voucher_no || '') + String(e.sub_account || '')).includes(kw)) : cands;
+  const subOf = (e) => String(e.sub_account || '').slice(0, 2);
+  let lastGrp = null;
+  const CAP = 400;
+  $('modal-body').innerHTML = list.slice(0, CAP).map(e => {
+    const sub = subOf(e);
+    const isRec = rel && sub === rel;
+    const gk = (isRec ? '★' : '') + sub;
+    let head = '';
+    if (gk !== lastGrp) {
+      lastGrp = gk;
+      head = `<tr style="background:#dcd9cc;"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`;
+    }
+    return head + `
     <tr><td>${esc(e.voucher_no)}</td><td>${esc(String(e.seq))}</td><td>${esc(e.post_date || e.make_date || '')}</td>
     <td>${esc(e.sub_account || '')}</td><td style="max-width:280px;">${esc(String(e.description || '').slice(0, 40))}</td>
     <td class="num">${fmtN(e.credit)}</td>
-    <td><button class="btn btn-sm" onclick="pickOffset('${esc(e.voucher_no)}',${+e.seq || 0},${+e.credit || 0})">選此列</button></td></tr>`
-  ).join('') || '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
-  $('modal-mask').style.display = 'block';
-  $('modal-box').style.display = 'block';
+    <td><button class="btn btn-sm" onclick="pickOffset('${esc(e.voucher_no)}',${+e.seq || 0},${+e.credit || 0})">選此列</button></td></tr>`;
+  }).join('') + (list.length > CAP ? `<tr><td colspan="7" class="small">僅顯示前 ${CAP} 筆（共 ${list.length}），請用搜尋縮小範圍</td></tr>` : '')
+    || '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
 }
 function pickOffset(vchrno, seq, credit) {
   const { vi, li } = STATE.modalCtx;
