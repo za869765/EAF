@@ -17,8 +17,14 @@ export async function onRequestPost({ request, env }) {
   try { body = await request.json(); } catch (_) { return json({ error: 'bad json' }, 400); }
   const items = Array.isArray(body && body.items) ? body.items.slice(0, 30) : [];
   if (!items.length) return json({ error: 'no items' }, 400);
-  const prompt = '你是台灣公家機關（衛生所醫療作業基金）會計。以下是支出傳票的摘要草稿（由多張動支/請購單摘要串接而成，可能過長、贅字、被截斷）。'
-    + '請將每一則改寫為通順、精簡、保留關鍵資訊（用途、月份、金額可省略）的繁體中文傳票摘要，長度以 50 個中文字內為原則。'
+  const prompt = '你是台灣佳里區衛生所醫療作業基金的會計。以下是支出傳票摘要草稿（由多張動支/請購單摘要串接，常過長、有公文贅詞、可能被截斷）。'
+    + '請依本所「開票習慣」改寫每一則為精簡繁中傳票摘要，長度以 50 字內為原則：\n'
+    + '1. 年月用縮寫：「115.7」或「11507」或「115年7月」；去掉「擬支付/擬支/支原定/檢附○○各1份」等公文贅詞。\n'
+    + '2. 格式偏好「用途-對象-明細」，如「115.01藥品費-裕利-冠脂妥等三件(919+1139=2058)」。\n'
+    + '3. 多筆合併以頓號或&分項；有金額計算式時保留「(a+b=c)」。\n'
+    + '4. 代墊註記保留，如「(由職王聖捷代墊)」。\n'
+    + '本所實際範例：「11501影印機租金(19/48)」「114.12醫療廢棄物清理費」「115年第一季台灣星堡保全費」'
+    + '「11501中華電信市話寬頻費&公務手機&VPN月租(4544+998+1691=7233)」「114年12月門診醫生應診費」「流感疫苗接種加班費」。\n'
     + '不可捏造內容，只能整理原文。回覆 JSON 陣列，格式 [{"id":"...","text":"..."}]，不要其他文字。\n\n'
     + JSON.stringify(items);
   const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=' + env.GEMINI_API_KEY, {
