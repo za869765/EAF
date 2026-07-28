@@ -1123,6 +1123,7 @@ body.sb-resizing * { pointer-events: none !important; }
   #form-page[data-fit="3"] .it tbody tr:not(.print-compact) input { min-height: 4mm !important; line-height: 1.15 !important; }
 }
 </style>
+<script src="/version.js"></script>
 </head>
 <body>
 <div id="toast"></div>
@@ -1147,7 +1148,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <h2><a id="admin-link" href="admin.html" onclick="if(_editingSaved){showUnsavedWarning();return false;" title="管理入口">⚙</a> 臺南市佳里區衛生所動支管理系統</h2>
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
-      <div id="sb-version">v5.1.3</div>
+      <div id="sb-version">v5.1.4</div><!-- 靜態值僅供 v5.1.3 以前舊頁偵測轉換用；實際顯示由 version.js 蓋章，升版不用改這裡 -->
       <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
@@ -7068,17 +7069,18 @@ window.addEventListener('afterprint', () => {
   const _loadTs = Date.now();
   let _shown = false;
   function _selfVer(){
-    const el = document.getElementById('sb-version') || document.getElementById('ver-badge');
-    return el ? ((el.textContent || '').match(/v[\d.]+/) || [''])[0] : '';
+    /* v5.1.4 中央版號：version.js 載入失敗回空字串＝跳過偵測，不誤彈窗 */
+    return window.APP_VERSION ? 'v' + window.APP_VERSION : '';
   }
   async function _check(){
     if (_shown || document.hidden) return;
     try {
-      const r = await fetch('/?vchk=' + Date.now(), { cache:'no-store' });
+      const r = await fetch('/version.js?vchk=' + Date.now(), { cache:'no-store' });
       if (!r.ok) return;
-      const m = (await r.text()).match(/sb-version">\s*(v[\d.]+)/);
+      const m = (await r.text()).match(/APP_VERSION\s*=\s*'([\d.]+)'/);
+      const remote = m ? 'v' + m[1] : '';
       const cur = _selfVer();
-      if (m && cur && m[1] !== cur) _show({ icon:'🚀', title:'系統已更新', desc:'偵測到新版本 <b>' + m[1] + '</b>（目前為 ' + cur + '）' });
+      if (remote && cur && remote !== cur) _show({ icon:'🚀', title:'系統已更新', desc:'偵測到新版本 <b>' + remote + '</b>（目前為 ' + cur + '）' });
     } catch(_){}
   }
   async function _checkSignal(){
@@ -7141,6 +7143,17 @@ window.addEventListener('afterprint', () => {
   document.addEventListener('visibilitychange', function(){ if (!document.hidden){ setTimeout(_check, 800); setTimeout(_checkSignal, 400); } });
   setTimeout(_check, 20000);
   setTimeout(_checkSignal, 8000);
+})();
+</script>
+<script>
+/* 版號蓋章：中央 version.js 唯一來源（升版改 version.js＋sba-core.js 握手常數） */
+(function(){
+  if (!window.APP_VERSION) return;
+  const v = 'v' + window.APP_VERSION;
+  document.title += ' ' + v;
+  for (const id of ['sb-version','ver-badge','login-ver']) {
+    const el = document.getElementById(id); if (el) el.textContent = v;
+  }
 })();
 </script>
 </body>

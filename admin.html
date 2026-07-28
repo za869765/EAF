@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>管理者入口 — 動支單系統 v5.1.3</title>
+<title>管理者入口 — 動支單系統</title>
 <link rel="stylesheet" href="design.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -393,6 +393,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 .byr-add:hover { background:#e8f5e9; border-color:#388e3c; color:#2e7d32; }
 </style>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="/version.js"></script>
 </head>
 <body>
 
@@ -401,7 +402,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
   <div id="login-box">
     <h2>🔒 管理者入口</h2>
     <p>臺南市佳里區衛生所 — 動支單系統</p>
-    <p style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;">v5.1.3</p>
+    <p id="login-ver" style="font-size:11px; color:#b0bec5; margin-top:-18px; margin-bottom:20px; letter-spacing:.5px;"></p>
     <input type="password" id="pass" placeholder="輸入管理密碼"
            onkeydown="if(event.key==='Enter')login()">
     <button id="login-btn" onclick="login()">登入</button>
@@ -418,7 +419,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 <div id="panel">
   <div id="top-bar">
     <h1>⚙️ 動支單 管理者入口</h1>
-    <span id="ver-badge" style="font-size:11px; color:#78909c; letter-spacing:.5px;">v5.1.3</span>
+    <span id="ver-badge" style="font-size:11px; color:#78909c; letter-spacing:.5px;"></span>
     <button id="maint-btn" onclick="toggleMaintenance()" style="padding:4px 14px;font-size:12px;border:none;border-radius:4px;cursor:pointer;font-weight:600;"></button>
     <a class="link-btn" href="/acc.html" style="background:#1b5e20;">📒 會計帳務</a>
     <a class="link-btn" href="/" target="_blank">開啟填單頁面 ↗</a>
@@ -3991,17 +3992,18 @@ function resolveAdminPrompt(ok) {
 (function(){
   let _shown = false;
   function _selfVer(){
-    const el = document.getElementById('sb-version') || document.getElementById('ver-badge');
-    return el ? ((el.textContent || '').match(/v[\d.]+/) || [''])[0] : '';
+    /* v5.1.4 中央版號：version.js 載入失敗回空字串＝跳過偵測，不誤彈窗 */
+    return window.APP_VERSION ? 'v' + window.APP_VERSION : '';
   }
   async function _check(){
     if (_shown || document.hidden) return;
     try {
-      const r = await fetch('/?vchk=' + Date.now(), { cache:'no-store' });
+      const r = await fetch('/version.js?vchk=' + Date.now(), { cache:'no-store' });
       if (!r.ok) return;
-      const m = (await r.text()).match(/sb-version">\s*(v[\d.]+)/);
+      const m = (await r.text()).match(/APP_VERSION\s*=\s*'([\d.]+)'/);
+      const remote = m ? 'v' + m[1] : '';
       const cur = _selfVer();
-      if (m && cur && m[1] !== cur) _show(m[1], cur);
+      if (remote && cur && remote !== cur) _show(remote, cur);
     } catch(_){}
   }
   function _show(nv, cur){
@@ -4053,6 +4055,17 @@ function resolveAdminPrompt(ok) {
   setInterval(_check, 120000);
   document.addEventListener('visibilitychange', function(){ if (!document.hidden) setTimeout(_check, 800); });
   setTimeout(_check, 20000);
+})();
+</script>
+<script>
+/* 版號蓋章：中央 version.js 唯一來源（升版改 version.js＋sba-core.js 握手常數） */
+(function(){
+  if (!window.APP_VERSION) return;
+  const v = 'v' + window.APP_VERSION;
+  document.title += ' ' + v;
+  for (const id of ['sb-version','ver-badge','login-ver']) {
+    const el = document.getElementById(id); if (el) el.textContent = v;
+  }
 })();
 </script>
 </body>

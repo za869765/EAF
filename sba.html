@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SBA 傳票工坊 — 佳里區衛生所 v5.1.3</title>
+<title>SBA 傳票工坊 — 佳里區衛生所</title>
 <link rel="stylesheet" href="design.css">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
@@ -110,6 +110,7 @@ input.w-date { width: 84px; } input.w-memo { width: 100%; min-width: 180px; }
 .scroll-x { overflow-x: auto; }
 @media print { #top-bar, #tab-nav, .btn, .toolbar { display: none !important; } }
 </style>
+<script src="/version.js"></script>
 </head>
 <script>
 /* 登入守門：與 admin.html / acc.html 同一機制 */
@@ -131,7 +132,7 @@ window.addEventListener('storage', (ev) => {
 
 <div id="top-bar">
   <h1>📤 SBA 傳票工坊 — 臺南市佳里區衛生所</h1>
-  <span class="small" id="ver-badge" style="color:#78909c;">v5.1.3</span>
+  <span class="small" id="ver-badge" style="color:#78909c;"></span>
   <a class="tbtn tbtn-gray" href="/acc.html">📒 會計帳務</a>
   <a class="tbtn tbtn-gray" href="/admin.html#payees" target="_blank">💳 受款人資料庫</a>
   <a class="tbtn tbtn-gray" href="/" target="_blank">📝 填單</a>
@@ -152,16 +153,16 @@ window.addEventListener('storage', (ev) => {
 <div class="tab-pane active" id="tab-pick">
   <div class="card">
     <div class="toolbar">
-      <label>期間 <input type="date" id="pk-from"> ～ <input type="date" id="pk-to"></label>
-      <label><input type="checkbox" id="pk-printed" checked> 僅已列印</label>
-      <label><input type="checkbox" id="pk-unexported"> 僅未匯出</label>
+      <label>期間 <input type="date" id="pk-from" onchange="renderPickList()"> ～ <input type="date" id="pk-to" onchange="renderPickList()"></label>
+      <label><input type="checkbox" id="pk-printed" checked onchange="renderPickList()"> 僅已列印</label>
+      <label><input type="checkbox" id="pk-unexported" onchange="renderPickList()"> 僅未匯出</label>
       <label>類型
-        <select id="pk-type"><option value="">全部</option><option value="expense">動支單</option><option value="purchase">請購單</option></select>
+        <select id="pk-type" onchange="renderPickList()"><option value="">全部</option><option value="expense">動支單</option><option value="purchase">請購單</option></select>
       </label>
       <label>專戶
-        <select id="pk-acct"><option value="">全部</option></select>
+        <select id="pk-acct" onchange="renderPickList()"><option value="">全部</option></select>
       </label>
-      <input type="search" id="pk-q" placeholder="搜尋 摘要/受款人；單號末3碼可多筆(空格分隔)" style="width:230px;">
+      <input type="search" id="pk-q" placeholder="搜尋 摘要/受款人；單號末3碼可多筆(空格分隔)" style="width:230px;" oninput="renderPickList()">
       <button class="btn btn-sm" onclick="renderPickList()">🔍 重新整理</button>
     </div>
     <div class="toolbar" style="margin-bottom:2px;">
@@ -296,12 +297,16 @@ window.addEventListener('storage', (ev) => {
 
 <div id="rec-pop"></div>
 
-<script src="sba-core.js?v=5.1.3"></script>
 <script>
-/* 版本握手：sba-core.js 與本頁必須同版，不一致＝瀏覽器快取到舊檔 */
+/* sba-core.js 以中央版號掛載（cache-buster 與頁面版本連動） */
+document.write('<script src="sba-core.js?v=' + (window.APP_VERSION || '0') + '"><\/script>');
+</script>
+<script>
+/* 版本握手：sba-core.js 與中央版號必須同版，不一致＝瀏覽器快取到舊檔 */
 (function(){
+  if (!window.APP_VERSION) return; /* version.js 載入失敗時跳過，不誤報 */
   const got = typeof SBA_CORE_VERSION === 'undefined' ? '(舊版)' : 'v' + SBA_CORE_VERSION;
-  if (got !== 'v5.1.3') alert('程式版本不一致（頁面 v5.1.3／核心 ' + got + '），請按 Ctrl+F5 強制重新整理後再使用');
+  if (got !== 'v' + APP_VERSION) alert('程式版本不一致（頁面 v' + APP_VERSION + '／核心 ' + got + '），請按 Ctrl+F5 強制重新整理後再使用');
 })();
 /* ═══════════════ 狀態 ═══════════════ */
 const STATE = {
@@ -366,8 +371,8 @@ async function boot() {
       if (!(pfx in STATE.serials) || n > STATE.serials[pfx]) STATE.serials[pfx] = n;
     }
   }
-  /* 預設期間：近 60 天 */
-  const d = new Date(); d.setDate(d.getDate() - 60);
+  /* 預設期間：近 45 天 */
+  const d = new Date(); d.setDate(d.getDate() - 45);
   $('pk-from').value = d.toISOString().slice(0, 10);
   $('pk-to').value = todayIso();
   $('pk-paydate').value = todayIso();
@@ -1164,6 +1169,17 @@ boot().catch((e) => {
   console.error(e);
   alert('資料載入失敗：' + e.message + '\n請重新整理；若持續失敗請檢查網路或 D1 狀態。');
 });
+</script>
+<script>
+/* 版號蓋章：中央 version.js 唯一來源（升版改 version.js＋sba-core.js 握手常數） */
+(function(){
+  if (!window.APP_VERSION) return;
+  const v = 'v' + window.APP_VERSION;
+  document.title += ' ' + v;
+  for (const id of ['sb-version','ver-badge','login-ver']) {
+    const el = document.getElementById(id); if (el) el.textContent = v;
+  }
+})();
 </script>
 </body>
 </html>

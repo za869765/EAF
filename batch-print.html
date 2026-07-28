@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>EAF 批次列印 v5.1.3</title>
+<title>EAF 批次列印</title>
 <link rel="stylesheet" href="design.css">
 <link rel="stylesheet" href="eaf-tokens.css">
 <style>
@@ -47,6 +47,7 @@
     #print-area > .form-page-clone:last-child { page-break-after: auto; }
   }
 </style>
+<script src="/version.js"></script>
 </head>
 <body>
 
@@ -166,5 +167,16 @@
 })();
 </script>
 
+<script>
+/* 版號蓋章：中央 version.js 唯一來源（升版改 version.js＋sba-core.js 握手常數） */
+(function(){
+  if (!window.APP_VERSION) return;
+  const v = 'v' + window.APP_VERSION;
+  document.title += ' ' + v;
+  for (const id of ['sb-version','ver-badge','login-ver']) {
+    const el = document.getElementById(id); if (el) el.textContent = v;
+  }
+})();
+</script>
 </body>
 </html>

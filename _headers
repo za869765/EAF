@@ -15,3 +15,6 @@
 
 /
   Cache-Control: no-cache, no-store, must-revalidate
+
+/version.js
+  Cache-Control: no-cache, no-store, must-revalidate
