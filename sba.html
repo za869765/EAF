@@ -144,7 +144,6 @@ window.addEventListener('storage', (ev) => {
   <button class="tab-btn active" data-tab="pick" onclick="switchTab('pick',this)">📋 選單製票</button>
   <button class="tab-btn" data-tab="preview" onclick="switchTab('preview',this)">🧾 傳票預覽 <span id="draft-count" class="chip">0</span></button>
   <button class="tab-btn" data-tab="transfer" onclick="switchTab('transfer',this)">🔁 轉帳傳票</button>
-  <button class="tab-btn" data-tab="export" onclick="switchTab('export',this)">⬇️ 匯出</button>
   <button class="tab-btn" data-tab="paydb" onclick="switchTab('paydb',this)">👥 受款人匯入</button>
   <button class="tab-btn" data-tab="settings" onclick="switchTab('settings',this)">⚙️ 設定</button>
 </div>
@@ -188,6 +187,28 @@ window.addEventListener('storage', (ev) => {
     <span class="small" id="pv-ai-msg">摘要可逐張先看過、手動修改；AI 修正會改寫傳票摘要與銀行列摘要（改完仍可再編輯，匯出前都不定案）</span>
   </div>
   <div id="pv-list"></div>
+  <!-- 匯出區（v5.2.8 併入預覽：有草稿即顯示、自動檢核，通過即可下載） -->
+  <div id="pv-export" style="display:none;">
+    <div class="card">
+      <h3>⬇️ 產生 SBA 匯入檔（ZIP）</h3>
+      <div class="toolbar">
+        <label>處理日期 <input type="date" id="ex-date"></label>
+        <label>批號(2碼) <input type="text" id="ex-batch" value="AA" maxlength="2" style="width:48px;text-transform:uppercase;"></label>
+        <button class="btn" onclick="runBatchValidation()">🧪 重新檢核</button>
+        <button class="btn btn-main" id="ex-dl" onclick="downloadZip()">📦 下載 ZIP</button>
+        <button class="btn" id="ex-mark" onclick="markExported()" disabled>✅ 標記已匯出（寫入 D1）</button>
+      </div>
+      <div id="ex-validation"></div>
+      <div id="ex-files" class="small"></div>
+    </div>
+    <div class="card">
+      <h3>📜 匯出紀錄</h3>
+      <div class="scroll-x" style="max-height:40vh;overflow-y:auto;">
+        <table class="grid"><thead><tr><th>時間</th><th>批號</th><th>匯入序號</th><th>來源單</th></tr></thead>
+        <tbody id="ex-log"></tbody></table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══ 🔁 轉帳傳票 ═══ -->
@@ -208,29 +229,6 @@ window.addEventListener('storage', (ev) => {
       <button class="btn btn-sm" onclick="addTrLine()">＋ 加列</button>
       <span id="tr-balance" class="small"></span>
       <button class="btn btn-main" onclick="addTransferVoucher()">⚡ 加入預覽</button>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ ⬇️ 匯出 ═══ -->
-<div class="tab-pane" id="tab-export">
-  <div class="card">
-    <h3>⬇️ 產生 SBA 匯入檔（ZIP）</h3>
-    <div class="toolbar">
-      <label>處理日期 <input type="date" id="ex-date"></label>
-      <label>批號(2碼) <input type="text" id="ex-batch" value="AA" maxlength="2" style="width:48px;text-transform:uppercase;"></label>
-      <button class="btn" onclick="runBatchValidation()">🧪 全批檢核</button>
-      <button class="btn btn-main" id="ex-dl" onclick="downloadZip()">📦 下載 ZIP</button>
-      <button class="btn" id="ex-mark" onclick="markExported()" disabled>✅ 標記已匯出（寫入 D1）</button>
-    </div>
-    <div id="ex-validation"></div>
-    <div id="ex-files" class="small"></div>
-  </div>
-  <div class="card">
-    <h3>📜 匯出紀錄</h3>
-    <div class="scroll-x" style="max-height:40vh;overflow-y:auto;">
-      <table class="grid"><thead><tr><th>時間</th><th>批號</th><th>匯入序號</th><th>來源單</th></tr></thead>
-      <tbody id="ex-log"></tbody></table>
     </div>
   </div>
 </div>
@@ -340,7 +338,6 @@ function switchTab(name, btn) {
   $('tab-' + name).classList.add('active');
   (btn || document.querySelector(`.tab-btn[data-tab="${name}"]`)).classList.add('active');
   if (name === 'preview') renderPreview();
-  if (name === 'export') { renderExportLog(); runBatchValidation(); }
   if (name === 'paydb') renderPayeeDiff();
   if (name === 'settings') renderSettings();
 }
@@ -700,6 +697,9 @@ function renderPreview() {
   $('pv-empty').style.display = STATE.drafts.length ? 'none' : 'block';
   $('draft-count').textContent = STATE.drafts.length;
   if (LAST_EXPORT && draftsSig() !== LAST_EXPORT.sig) $('ex-mark').disabled = true;
+  /* 匯出區併入預覽（v5.2.8）：有草稿即顯示並自動檢核，通過就能直接下載 */
+  $('pv-export').style.display = STATE.drafts.length ? 'block' : 'none';
+  if (STATE.drafts.length) { renderExportLog(); runBatchValidation(); }
   $('pv-list').innerHTML = STATE.drafts.map((v, vi) => {
     const r = validateVoucher(v);
     const linesHtml = v.lines.map((L, li) => `
