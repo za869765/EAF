@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.4.0';
+const SBA_CORE_VERSION = '5.4.1';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -296,8 +296,9 @@ function voucherToF05Rows(v) {
     fpaylist_userbank: P.userbank || '', fpaylist_bankna: truncBig5(P.bankna || '', 100),
     fpaylist_payway: P.payway || '', fpaylist_amt: fmt2(P.amt),
     fpaylist_usedoc: truncBig5(P.usedoc || '', 1000), fpaylist_memo: truncBig5(P.memo || '', 1000),
-    fpaylist_email: P.email || '', fpaylist_remark1: P.remark1 || '',
-    fpaylist_remark2: P.remark2 || '', fpaylist_checkno: P.checkno || '',
+    /* 劃線/禁背固定規則（使用者指定無例外）：自領→劃線0，其餘→1；禁背一律 1 */
+    fpaylist_email: P.email || '', fpaylist_remark1: P.payway === '2' ? '0' : '1',
+    fpaylist_remark2: '1', fpaylist_checkno: P.checkno || '',
     fpaylist_compno: P.compno || '', fpaylist_rev: P.rev || '',
     /* 規格：rev=2 統一發票 → invno 留空、invdate 留空、invamt=發票總額；rev=0/1 → invdate 可填 */
     fpaylist_invno: '',

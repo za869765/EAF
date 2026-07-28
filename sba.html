@@ -861,12 +861,8 @@ function renderPreview() {
           <input class="w-code" placeholder="發票號" value="${esc((P.invoices && P.invoices[0] && P.invoices[0].invno) || '')}" onchange="updInvoice(${vi},${pi},'invno',this.value)">
           <input class="w-date" placeholder="民國7碼" value="${esc((P.invoices && P.invoices[0] && P.invoices[0].invdate) || '')}" onchange="updInvoice(${vi},${pi},'invdate',this.value)">
           <input class="w-amt" placeholder="金額" value="${(P.invoices && P.invoices[0] && P.invoices[0].invamt) || ''}" onchange="updInvoice(${vi},${pi},'invamt',this.value)">` : ''}</td>
-        <td><select onchange="updPayee(${vi},${pi},'remark1',this.value)" title="支票劃線">
-          ${['', '1', '0'].map(k => `<option value="${k}"${(P.remark1 || '') === k ? ' selected' : ''}>${k === '' ? '—' : k === '1' ? '1是' : '0否'}</option>`).join('')}
-        </select></td>
-        <td><select onchange="updPayee(${vi},${pi},'remark2',this.value)" title="支票禁止背書轉讓">
-          ${['', '1', '0'].map(k => `<option value="${k}"${(P.remark2 || '') === k ? ' selected' : ''}>${k === '' ? '—' : k === '1' ? '1是' : '0否'}</option>`).join('')}
-        </select></td>
+        <td class="small" style="color:#9e9e9e;" title="支票劃線（固定規則：自領否、其餘是）">${P.payway === '2' ? '0否' : '1是'}</td>
+        <td class="small" style="color:#9e9e9e;" title="支票禁止背書轉讓（固定：是）">1是</td>
         <td><input class="w-memo" value="${esc(P.usedoc || '')}" onchange="updPayee(${vi},${pi},'usedoc',this.value)"></td>
         <td><button class="btn btn-sm" onclick="delPayee(${vi},${pi})">✕</button></td>
       </tr>`).join('');
