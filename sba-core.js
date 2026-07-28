@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.1.5';
+const SBA_CORE_VERSION = '5.1.6';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -558,7 +558,8 @@ function resolvePayees(rec, ctx) {
       payway: (ctx.catOverride && ctx.catOverride[rec.id]) || decidePayway(p, ctx.farmCodes), amt,
       usedoc: String(rec.purposeDesc || '').trim(), rev,
       srcType: p.type || '', srcRec: rec.voucherNo,
-      needsInput: p.type === 'bill' || p.type === 'manual' || !p.name,
+      /* bill 不再要求人工填名：產傳票時整張併為「交由佳里區農會代繳」單一受款人 */
+      needsInput: p.type === 'manual' || (!p.name && p.type !== 'bill'),
     };
     if (rev === '2' && (p.invoiceNo || p.invoiceAmount)) {
       payee.invoices = [{ invno: p.invoiceNo || '', invdate: toRoc7(p.invoiceDate || ''),
@@ -566,7 +567,7 @@ function resolvePayees(rec, ctx) {
     }
     if (payee.needsInput)
       issues.push({ recId: rec.id, level: 'error',
-        msg: `${rec.voucherNo}：${p.type === 'bill' ? '持繳費單（代繳）' : '受款人'}需人工填入名稱等欄位` });
+        msg: `${rec.voucherNo}：受款人需人工填入名稱等欄位` });
     return payee;
   });
   const psum = Math.round(payees.reduce((s, p) => s + (+p.amt || 0), 0) * 100) / 100;
@@ -698,8 +699,16 @@ function mapRecordsToVouchers(records, ctx) {
       v.payees.push(...payees);
     }
     bankLine.amt = Math.round(total * 100) / 100;
-    bankLine.memo = truncBig5(`${v.payCatLabel}｜` + memoParts.filter(Boolean).join('；'), 1000);
-    v.memo = truncBig5(`${v.payCatLabel}｜` + memoParts.filter(Boolean).join('；'), 100);
+    /* 摘要不帶「類別｜」前綴（使用者指定；類別已在預覽卡頭標示） */
+    bankLine.memo = truncBig5(memoParts.filter(Boolean).join('；'), 1000);
+    v.memo = truncBig5(memoParts.filter(Boolean).join('；'), 100);
+    /* 使用者規則：自領/代繳整張只掛一個受款人「交由佳里區農會代繳」，金額＝傳票總額，不管來源幾筆 */
+    if (cat === '2') {
+      v.payees = [{ seq: 1, name: '交由佳里區農會代繳', account: '', userbank: '', bankna: '',
+        payway: '2', amt: Math.round(total * 100) / 100,
+        usedoc: truncBig5(memoParts.filter(Boolean).join('；'), 1000), rev: '0',
+        srcType: 'bill-agg', srcRec: '', needsInput: false }];
+    }
     v.payees.forEach((p, i) => { p.seq = i + 1; });
     vouchers.push(v);
   }

@@ -186,6 +186,10 @@ window.addEventListener('storage', (ev) => {
 <!-- ═══ 🧾 傳票預覽 ═══ -->
 <div class="tab-pane" id="tab-preview">
   <div id="pv-empty" class="card small">尚無傳票草稿——請至「📋 選單製票」勾選產生，或於「🔁 轉帳傳票」手動編製。</div>
+  <div class="toolbar">
+    <button class="btn" onclick="aiFixMemos()">✨ AI 修正摘要（Gemini）</button>
+    <span class="small" id="pv-ai-msg">摘要可逐張先看過、手動修改；AI 修正會改寫傳票摘要與銀行列摘要（改完仍可再編輯，匯出前都不定案）</span>
+  </div>
   <div id="pv-list"></div>
 </div>
 
@@ -250,9 +254,9 @@ window.addEventListener('storage', (ev) => {
     <div class="scroll-x" style="max-height:56vh;overflow-y:auto;">
       <table class="grid"><thead><tr>
         <th><input type="checkbox" id="pi-all" onclick="piSelAll(this.checked)"></th>
-        <th>受款人代碼(=統一編號)</th><th>名稱</th><th>領取方式</th><th>銀行帳號</th><th>分行代號</th>
-        <th>收據別</th><th>指定兌付</th><th>提示</th>
-      </tr></thead><tbody id="pi-body"><tr><td colspan="9" class="small">請先上傳現況檔</td></tr></tbody></table>
+        <th>受款人代碼(=統一編號)</th><th>名稱</th><th>最近單據</th><th>領取方式</th><th>銀行帳號</th><th>分行代號</th>
+        <th>收據別</th><th>指定兌付</th><th>提示</th><th></th>
+      </tr></thead><tbody id="pi-body"><tr><td colspan="11" class="small">請先上傳現況檔</td></tr></tbody></table>
     </div>
     <div class="small" style="margin-top:6px;">比對鍵：受款人代碼/統編 → 銀行帳號（去前導零）→ 無代碼無帳號時比姓名。凍結中的受款人不列入。</div>
   </div>
@@ -317,6 +321,7 @@ const STATE = {
   combine: true, postMode: 'posted',
   openGrp: null,             /* 目前放大的卡片 'acct|cat'；null=全部縮小 */
   catOv: {},                 /* recId → '1'|'6'|'2' 手動移組覆寫（存 D1 sba_catov） */
+  paySkip: new Set(),        /* 不匯入受款人鍵集合（存 D1 sba_payee_skip；反灰沉默） */
   serials: {},               /* '1152' → 已配最大流水 */
   modalCtx: null,
 };
@@ -363,6 +368,7 @@ async function boot() {
   if (config && config.sba_settings) Object.assign(STATE.settings, config.sba_settings);
   if (config && config.sba_exported) STATE.exported = config.sba_exported;
   if (config && config.sba_catov) STATE.catOv = config.sba_catov;
+  if (config && Array.isArray(config.sba_payee_skip)) STATE.paySkip = new Set(config.sba_payee_skip);
   /* 序號高水位：從匯出紀錄還原（預設高段 90000 起，杜絕與 SBA 正式號相撞） */
   for (const rec of Object.values(STATE.exported)) {
     const s = String(rec.recno || '');
@@ -524,7 +530,7 @@ function renderPickList() {
     </div>`;
   }).join('')).join('');
   document.querySelectorAll('.pk-cb').forEach(cb => { if (checkedBefore.has(cb.value)) cb.checked = true; });
-  bindRecPopOnce();
+  bindRecPopHost('pk-groups');
   updatePickSummary();
 }
 function toggleGroupCard(key) {
@@ -533,17 +539,17 @@ function toggleGroupCard(key) {
 }
 /* ── 單據浮標預覽（hover 顯示申請單全文；點單號另開填單頁）──
    事件代理繫結一次於 #pk-groups（避免 inline handler 內插 id） */
-let _recPopBound = false;
-function bindRecPopOnce() {
-  if (_recPopBound) return; _recPopBound = true;
-  const host = $('pk-groups');
+const _popHosts = new Set();
+function bindRecPopHost(id) {
+  if (_popHosts.has(id)) return; _popHosts.add(id);
+  const host = $(id);
   host.addEventListener('mouseover', (ev) => {
-    const tr = ev.target.closest('tr[data-rid]');
-    if (tr && !tr.contains(ev.relatedTarget instanceof Node ? ev.relatedTarget : null)) showRecPop(ev, tr.dataset.rid);
-    else if (tr) moveRecPop(ev);
+    const el = ev.target.closest('[data-rid]');
+    if (el && !el.contains(ev.relatedTarget instanceof Node ? ev.relatedTarget : null)) showRecPop(ev, el.dataset.rid);
+    else if (el) moveRecPop(ev);
   });
   host.addEventListener('mousemove', (ev) => {
-    if (ev.target.closest('tr[data-rid]')) moveRecPop(ev); else hideRecPop();
+    if (ev.target.closest('[data-rid]')) moveRecPop(ev); else hideRecPop();
   });
   host.addEventListener('mouseleave', hideRecPop);
 }
@@ -653,6 +659,35 @@ function generateVouchers() {
 /* ═══════════════ 🧾 傳票預覽/編輯 ═══════════════ */
 const KIND_NAMES = { '1': '收入傳票', '2': '支出傳票', '3': '轉帳傳票' };
 const OFFSETABLE = (code) => /^(2102|210205|210202|110305|180705)/.test(code);
+/* ✨ AI 修正摘要：送 /api/gemini（走使用者付費 key，Pages 環境變數 GEMINI_API_KEY），回填後仍可手動編輯 */
+async function aiFixMemos() {
+  if (!STATE.drafts.length) { alert('尚無傳票草稿'); return; }
+  const items = STATE.drafts
+    .map((v, i) => ({ id: String(i), text: (v.lines[0] && v.lines[0].memo) || v.memo || '' }))
+    .filter(x => x.text.trim());
+  if (!items.length) { alert('無摘要可修正'); return; }
+  $('pv-ai-msg').textContent = '⟳ AI 修正中…（Gemini）';
+  try {
+    const r = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Pass': sessionStorage.getItem('adminPass') || '' },
+      body: JSON.stringify({ items }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    let n = 0;
+    for (const it of (j.items || [])) {
+      const v = STATE.drafts[+it.id];
+      if (!v || !String(it.text || '').trim()) continue;
+      const t = String(it.text).trim();
+      v.memo = truncBig5(t, 100);
+      if (v.lines[0] && v.lines[0].dc === 'C') v.lines[0].memo = truncBig5(t, 1000);
+      n++;
+    }
+    renderPreview();
+    $('pv-ai-msg').textContent = `✅ 已修正 ${n} 張傳票摘要——請逐張確認，仍可手動調整`;
+  } catch (e) { $('pv-ai-msg').textContent = '❌ AI 修正失敗：' + e.message; }
+}
 function renderPreview() {
   $('pv-empty').style.display = STATE.drafts.length ? 'none' : 'block';
   $('draft-count').textContent = STATE.drafts.length;
@@ -1048,41 +1083,88 @@ function latestRevDefaults() {
   }
   return byKey;
 }
+/* 受款人識別鍵（排除清單/編輯保留用）：分行|帳號，無帳號用姓名 */
+function piKey(p) {
+  const a = String(p.acctNo || '').replace(/\D/g, '');
+  return a ? splitBank(p.bank).code + '|' + a : 'n|' + normPayeeName(p.name);
+}
+/* 該受款人最近三筆動支/請購單（帳號優先、無帳號比姓名） */
+function piRecentRecs(p) {
+  const a = String(p.acctNo || '').replace(/\D/g, '');
+  const bk = splitBank(p.bank).code;
+  const out = [];
+  const recs = STATE.records
+    .filter(r => !r.voided && ['expense', 'purchase'].includes(r.formType))
+    .sort((x, y) => (recDateIso(y) || '').localeCompare(recDateIso(x) || ''));
+  for (const r of recs) {
+    const ps = (r.payees && r.payees.length) ? r.payees : (r.payee && r.payee.type ? [r.payee] : []);
+    const hit = ps.some(q => {
+      const qa = String(q.acctNo || '').replace(/\D/g, '');
+      return a ? (qa === a && splitBank(q.bank).code === bk) : (normPayeeName(q.name) === normPayeeName(p.name));
+    });
+    if (hit) { out.push(r); if (out.length === 3) break; }
+  }
+  return out;
+}
 function renderPayeeDiff() {
   const tb = $('pi-body');
-  if (!SBA_DB_IDX) { tb.innerHTML = '<tr><td colspan="9" class="small">請先上傳現況檔</td></tr>'; $('pi-dl').disabled = true; return; }
+  if (!SBA_DB_IDX) { tb.innerHTML = '<tr><td colspan="11" class="small">請先上傳現況檔</td></tr>'; $('pi-dl').disabled = true; return; }
   const farm = new Set(String(STATE.settings.farm || '').split(/[,，\s]+/).filter(Boolean));
   const news = STATE.payees.filter(p => !p.frozen && !payeeExistsInSba(p, SBA_DB_IDX));
   const revIdx = latestRevDefaults();
+  /* 重繪保留使用者已編輯的列值（補的代碼/改的領取方式等） */
+  const prev = new Map(PI_ROWS.map(x => [piKey(x.p), x]));
   PI_ROWS = news.map(p => {
+    const k = piKey(p);
+    const skip = STATE.paySkip.has(k);
+    const old = prev.get(k);
+    if (old) return { p, row: old.row, sel: skip ? false : old.sel, skip };
     const row = payeeToFnwacxRow(p, farm);
-    const a = String(p.acctNo || '').replace(/\D/g, '');
-    const rt = revIdx.get(a ? splitBank(p.bank).code + '|' + a : 'n|' + normPayeeName(p.name));
+    const rt = revIdx.get(k);
     row[10] = rt === '2' ? '1' : rt === '1' ? '2' : '';
-    return { p, row, sel: !!String(p.code || '').trim() };
+    return { p, row, sel: !skip && !!String(p.code || '').trim(), skip };
   });
-  $('pi-diff-msg').innerHTML = `本系統受款人 ${STATE.payees.filter(p => !p.frozen).length} 筆（不含凍結）→ SBA 未建 <b>${PI_ROWS.length}</b> 筆（僅列 SBA 沒有的）`;
-  $('pi-dl').disabled = !PI_ROWS.length;
+  /* 排除者反灰沉底 */
+  PI_ROWS.sort((a, b) => (a.skip ? 1 : 0) - (b.skip ? 1 : 0));
+  const nSkip = PI_ROWS.filter(x => x.skip).length;
+  $('pi-diff-msg').innerHTML = `本系統受款人 ${STATE.payees.filter(p => !p.frozen).length} 筆（不含凍結）→ SBA 未建 <b>${PI_ROWS.length - nSkip}</b> 筆`
+    + (nSkip ? `（另 ${nSkip} 筆已排除不匯入）` : '') + '（僅列 SBA 沒有的）';
+  $('pi-dl').disabled = PI_ROWS.length === nSkip;
   tb.innerHTML = PI_ROWS.map((x, i) => {
     const r = x.row;
-    const waySel = `<select onchange="piUpd(${i},4,this.value)">` + Object.keys(PI_WAY_LABEL).map(c =>
+    const dis = x.skip ? ' disabled' : '';
+    const waySel = `<select onchange="piUpd(${i},4,this.value)"${dis}>` + Object.keys(PI_WAY_LABEL).map(c =>
       `<option value="${c}"${c === r[4] ? ' selected' : ''}>${PI_WAY_LABEL[c]}</option>`).join('') + '</select>';
-    const revSel = `<select onchange="piUpd(${i},10,this.value)">` + Object.keys(PI_REV_LABEL).map(c =>
+    const revSel = `<select onchange="piUpd(${i},10,this.value)"${dis}>` + Object.keys(PI_REV_LABEL).map(c =>
       `<option value="${c}"${c === r[10] ? ' selected' : ''}>${PI_REV_LABEL[c]}</option>`).join('') + '</select>';
-    return `<tr${r[0] ? '' : ' style="background:#fdf3e7;"'}>
-      <td><input type="checkbox" class="pi-cb" id="pi-cb-${i}"${x.sel ? ' checked' : ''} onchange="PI_ROWS[${i}].sel=this.checked"></td>
-      <td><input class="w-code" value="${esc(r[0])}" placeholder="統編/身分證" onchange="piUpdCode(${i},this.value)">${r[0] ? '' : ' <span class="chip warn">缺</span>'}</td>
-      <td>${esc(r[1])}</td><td>${waySel}</td>
-      ${farmAcctBad(r)
+    const recent = piRecentRecs(x.p).map(rc =>
+      `<a href="/?rec=${encodeURIComponent(rc.id)}" target="_blank" data-rid="${esc(String(rc.id))}">${esc(rc.voucherNo)}</a>`).join(' ')
+      || '<span class="small" style="color:#bbb;">—</span>';
+    return `<tr${x.skip ? ' class="row-exported"' : (r[0] ? '' : ' style="background:#fdf3e7;"')}>
+      <td><input type="checkbox" class="pi-cb" id="pi-cb-${i}"${x.sel ? ' checked' : ''}${dis} onchange="PI_ROWS[${i}].sel=this.checked"></td>
+      <td><input class="w-code" value="${esc(r[0])}" placeholder="統編/身分證"${dis} onchange="piUpdCode(${i},this.value)">${r[0] || x.skip ? '' : ' <span class="chip warn">缺</span>'}</td>
+      <td>${esc(r[1])}</td>
+      <td style="white-space:nowrap;">${recent}</td>
+      <td>${waySel}</td>
+      ${(!x.skip && farmAcctBad(r))
         ? `<td><input class="w-code" style="background:#fff3b0;" value="${esc(r[5])}" title="農會存入帳戶帳號應為9碼" onchange="piUpd(${i},5,this.value)"></td>`
         : `<td style="font-family:monospace;">${esc(r[5])}</td>`}
       <td>${esc(r[7])}</td>
       <td>${revSel}</td>
       <td style="color:#9e9e9e;">${esc(r[11]) || '—'}</td>
-      <td class="small">${[r[0] ? '' : '請補代碼後匯出（SBA 現況每筆皆有統編/身分證）',
-        farmAcctBad(r) ? '農會帳號應為9碼，請修正（公庫 94275/65012 除外）' : ''].filter(Boolean).join('；')}</td></tr>`;
-  }).join('') || '<tr><td colspan="9" class="small">🎉 沒有新受款人——SBA 資料庫已涵蓋本系統全部受款人</td></tr>';
+      <td class="small">${x.skip ? '已排除不匯入' : [r[0] ? '' : '請補代碼後匯出（SBA 現況每筆皆有統編/身分證）',
+        farmAcctBad(r) ? '農會帳號應為9碼，請修正（公庫 94275/65012 除外）' : ''].filter(Boolean).join('；')}</td>
+      <td><button class="btn btn-sm" onclick="piSkip(${i},${x.skip ? 'false' : 'true'})" title="${x.skip ? '恢復列入匯出' : '此受款人確定不需匯入，反灰沉默'}">${x.skip ? '↩ 恢復' : '🚫 不匯入'}</button></td></tr>`;
+  }).join('') || '<tr><td colspan="11" class="small">🎉 沒有新受款人——SBA 資料庫已涵蓋本系統全部受款人</td></tr>';
   $('pi-all').checked = false;
+  bindRecPopHost('pi-body');
+}
+/* 排除/恢復不匯入名單：存 D1，下次比對自動沉默 */
+function piSkip(i, on) {
+  const k = piKey(PI_ROWS[i].p);
+  if (on) STATE.paySkip.add(k); else STATE.paySkip.delete(k);
+  renderPayeeDiff();
+  putConfig('sba_payee_skip', [...STATE.paySkip]);
 }
 function piUpd(i, col, v) { PI_ROWS[i].row[col] = String(v || '').trim(); }
 /* 佳里區農會「1 存入帳戶」帳號應為 9 碼；公庫 94275／65012 兩戶除外（使用者規則） */
