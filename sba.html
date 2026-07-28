@@ -1153,7 +1153,8 @@ function renderPayeeDiff() {
       <td>${revSel}</td>
       <td style="color:#9e9e9e;">${esc(r[11]) || '—'}</td>
       <td class="small">${x.skip ? '已排除不匯入' : [r[0] ? '' : '請補代碼後匯出（SBA 現況每筆皆有統編/身分證）',
-        farmAcctBad(r) ? '農會帳號應為9碼，請修正（公庫 94275/65012 除外）' : ''].filter(Boolean).join('；')}</td>
+        farmAcctBad(r) ? '農會帳號應為9碼，請修正（公庫 94275/65012 除外）' : '',
+        (r[7] && !STATE.bankByCode.has(r[7])) ? '⚠️分行代號不在SBA金融機構檔（官方手冊：必須已建檔）' : ''].filter(Boolean).join('；')}</td>
       <td><button class="btn btn-sm" onclick="piSkip(${i},${x.skip ? 'false' : 'true'})" title="${x.skip ? '恢復列入匯出' : '此受款人確定不需匯入，反灰沉默'}">${x.skip ? '↩ 恢復' : '🚫 不匯入'}</button></td></tr>`;
   }).join('') || '<tr><td colspan="11" class="small">🎉 沒有新受款人——SBA 資料庫已涵蓋本系統全部受款人</td></tr>';
   $('pi-all').checked = false;
@@ -1209,7 +1210,7 @@ function fnwacxRoundTrip(buf, aoa) {
     return '';
   } catch (e) { return '回讀失敗：' + e.message; }
 }
-function downloadFnwacx() {
+async function downloadFnwacx() {
   const sel = PI_ROWS.filter(x => x.sel);
   if (!sel.length) { alert('請先勾選要匯入的受款人'); return; }
   const missing = sel.filter(x => !x.row[0]).length;
@@ -1217,22 +1218,28 @@ function downloadFnwacx() {
   const badFarm = sel.filter(x => farmAcctBad(x.row));
   if (badFarm.length && !confirm(`${badFarm.length} 筆農會存入帳戶帳號非9碼（公庫 94275/65012 除外）：\n`
     + badFarm.map(x => `　${x.row[1]}：${x.row[5] || '(空)'}`).join('\n') + '\n仍要匯出？')) return;
+  const badBank = sel.filter(x => x.row[7] && !STATE.bankByCode.has(x.row[7]));
+  if (badBank.length && !confirm(`${badBank.length} 筆分行代號不在 SBA 金融機構檔（官方手冊要求必須已建檔，匯入恐失敗）：\n`
+    + badBank.map(x => `　${x.row[1]}：${x.row[7]}`).join('\n') + '\n仍要匯出？')) return;
   const aoa = [['基金：', FNWACX_FUND], FNWACX_HEADERS, ...sel.map(x => x.row)];
   for (let i = 2; i < aoa.length; i++) {
     const e = fnwacxRowErr(aoa[i], i - 2);
     if (e) { alert('匯出前檢核未過，已中止：\n' + e); return; }
   }
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, FNWACX_SHEET);
-  /* bookSST：官方檔字串全為 sharedStrings t="s"；SheetJS 預設 t="str" 恐遭舊匯入程式拒收 */
-  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array', bookSST: true });
+  /* v5.1.8 官方模板重打包：SheetJS 從零產檔於 SBA 匯入無反應 → 改以官方範本為底稿只填 A..L 值 */
+  let buf;
+  try {
+    const tplR = await fetch('/sba-fnwacx-template.xlsx?v=' + (window.APP_VERSION || '0'));
+    if (!tplR.ok) throw new Error('讀不到官方範本 sba-fnwacx-template.xlsx（HTTP ' + tplR.status + '）');
+    buf = await buildFnwacxFromTemplate(new Uint8Array(await tplR.arrayBuffer()), aoa.slice(2));
+  } catch (e) { alert('產檔失敗：' + e.message); return; }
   const rt = fnwacxRoundTrip(buf, aoa);
   if (rt) { alert('產出檔回讀驗證未過，已中止：\n' + rt); return; }
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a = document.createElement('a');
+  /* 檔名純 ASCII（舊系統對中文檔名可能悶死），比照官方 310400121_xxx.xlsx 命名 */
   a.href = URL.createObjectURL(blob);
-  a.download = `${FNWACX_FUND}_FNWACX0170_新受款人_${toRoc7(todayIso())}.xlsx`;
+  a.download = `${FNWACX_FUND}_FNWACX0170_${toRoc7(todayIso())}.xlsx`;
   a.click(); URL.revokeObjectURL(a.href);
 }
 

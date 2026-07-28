@@ -1260,25 +1260,36 @@ async function exportPayeesSbaXlsx() {
     if (bad) { alert(`匯出前檢核未過，已中止：第 ${i + 1} 筆(${r[1] || '?'})：${bad}`); return; }
   }
   const aoa = [['基金：', '310400121'], HEAD, ...rows];
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, '受(繳)款人匯入');
-  /* bookSST：官方檔字串全為 sharedStrings t="s"；SheetJS 預設 t="str" 恐遭舊匯入程式拒收 */
-  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array', bookSST: true });
+  /* v5.1.8 官方模板重打包（共用 sba-core.js，按需載入；SheetJS 從零產檔於 SBA 匯入無反應） */
+  let buf;
+  try {
+    if (typeof buildFnwacxFromTemplate === 'undefined') {
+      await new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = '/sba-core.js?v=' + (window.APP_VERSION || '0');
+        s.onload = res; s.onerror = () => rej(new Error('sba-core.js 載入失敗'));
+        document.head.appendChild(s);
+      });
+    }
+    const tplR = await fetch('/sba-fnwacx-template.xlsx?v=' + (window.APP_VERSION || '0'));
+    if (!tplR.ok) throw new Error('讀不到官方範本（HTTP ' + tplR.status + '）');
+    buf = await buildFnwacxFromTemplate(new Uint8Array(await tplR.arrayBuffer()), rows);
+  } catch (e) { alert('產檔失敗：' + e.message); return; }
   /* 回讀驗證：每格值（含前導零）須與送出一致 */
   try {
     const back = XLSX.utils.sheet_to_json(XLSX.read(buf).Sheets['受(繳)款人匯入'], { header: 1, raw: true, defval: '' });
     for (let i = 0; i < aoa.length; i++) for (let j = 0; j < 12; j++) {
-      const want = String(aoa[i][j] == null ? '' : aoa[i][j]);
+      const want = String(aoa[i][j] == null ? '' : aoa[i][j]).trim();
       const got = back[i] ? String(back[i][j] == null ? '' : back[i][j]) : '';
       if (want !== got) { alert(`產出檔回讀驗證未過，已中止：列${i + 1} 欄${j + 1}（${want} → ${got}）`); return; }
     }
   } catch (e) { alert('產出檔回讀驗證失敗，已中止：' + e.message); return; }
   const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  /* 檔名純 ASCII（舊系統對中文檔名可能悶死） */
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `310400121_FNWACX0170_受款人_${ymd}.xlsx`;
+  a.download = `310400121_FNWACX0170_${ymd}.xlsx`;
   a.click(); URL.revokeObjectURL(a.href);
 }
 

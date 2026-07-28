@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.1.7';
+const SBA_CORE_VERSION = '5.1.8';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -511,6 +511,76 @@ function payeeExistsInSba(p, idx) {
   return idx.names.has(normPayeeName(p.name));
 }
 
+/* ── FNWACX0170 官方模板重打包（v5.1.8）：資料填進範本原封 zip，結構=官方檔 ──
+   背景：SheetJS 從零產檔於 SBA 匯入「無反應」；改以官方範本為底稿只填 A..L 值。 */
+async function _inflateRaw(bytes) {
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+/** 解 zip（store/deflate）→ { name: Uint8Array }，保持中央目錄順序 */
+async function unzipAll(u8) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  let eocd = -1;
+  for (let i = u8.length - 22; i >= 0; i--) { if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; } }
+  if (eocd < 0) throw new Error('非 zip 檔');
+  const n = dv.getUint16(eocd + 10, true);
+  let off = dv.getUint32(eocd + 16, true);
+  const out = {}, td = new TextDecoder();
+  for (let k = 0; k < n; k++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) throw new Error('zip 中央目錄損壞');
+    const method = dv.getUint16(off + 10, true);
+    const csize = dv.getUint32(off + 20, true);
+    const nameLen = dv.getUint16(off + 28, true), extraLen = dv.getUint16(off + 30, true), cmtLen = dv.getUint16(off + 32, true);
+    const lho = dv.getUint32(off + 42, true);
+    const name = td.decode(u8.subarray(off + 46, off + 46 + nameLen));
+    const lNameLen = dv.getUint16(lho + 26, true), lExtraLen = dv.getUint16(lho + 28, true);
+    const dataStart = lho + 30 + lNameLen + lExtraLen;
+    const comp = u8.subarray(dataStart, dataStart + csize);
+    out[name] = method === 0 ? comp.slice() : await _inflateRaw(comp);
+    off += 46 + nameLen + extraLen + cmtLen;
+  }
+  return out;
+}
+/** 官方 FNWACX0170 範本 bytes + 12 欄資料列 → 匯入檔 bytes（僅填 A..L；rows 由第 3 列起） */
+async function buildFnwacxFromTemplate(tplU8, rows) {
+  const files = await unzipAll(tplU8);
+  if (!files['xl/sharedStrings.xml'] || !files['xl/worksheets/sheet1.xml']) throw new Error('範本結構不符（缺 sharedStrings/sheet1）');
+  const td = new TextDecoder();
+  let ss = td.decode(files['xl/sharedStrings.xml']);
+  let sh = td.decode(files['xl/worksheets/sheet1.xml']);
+  const baseUnique = +ss.match(/uniqueCount="(\d+)"/)[1];
+  const baseCount = +ss.match(/ count="(\d+)"/)[1];
+  const addIdx = new Map();
+  let refs = 0;
+  const idxOf = (v) => { refs++; if (!addIdx.has(v)) addIdx.set(v, baseUnique + addIdx.size); return addIdx.get(v); };
+  const COLS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+  for (let i = 0; i < rows.length; i++) {
+    const r = 3 + i;
+    const cells = COLS.map((col, j) => {
+      const v = String(rows[i][j] == null ? '' : rows[i][j]).trim();
+      return v ? `<c r="${col}${r}" s="2" t="s"><v>${idxOf(v)}</v></c>` : `<c r="${col}${r}" s="2"/>`;
+    }).join('');
+    const rowRe = new RegExp('(<row r="' + r + '"[^>]*>)([\\s\\S]*?)(</row>)');
+    if (rowRe.test(sh)) {
+      /* 既有列：移除原空白 A..L 儲存格、插入資料格（單字母欄名不會誤中 AA 等雙字母欄） */
+      sh = sh.replace(rowRe, (_, open, body, close) =>
+        open + cells + body.replace(new RegExp('<c r="[A-L]' + r + '"[^>]*?(?:/>|>[\\s\\S]*?</c>)', 'g'), '') + close);
+    } else {
+      sh = sh.replace('</sheetData>', `<row r="${r}">${cells}</row></sheetData>`);
+    }
+  }
+  const lastRow = Math.max(10, 2 + rows.length);
+  sh = sh.replace(/<dimension ref="A1:AI\d+"\/>/, `<dimension ref="A1:AI${lastRow}"/>`);
+  const sis = [...addIdx.keys()].map((v) => `<si><t xml:space="preserve">${xmlEscape(v)}</t></si>`).join('');
+  ss = ss.replace(/ count="\d+"/, ` count="${baseCount + refs}"`)
+    .replace(/uniqueCount="\d+"/, `uniqueCount="${baseUnique + addIdx.size}"`)
+    .replace('</sst>', sis + '</sst>');
+  const enc = new TextEncoder();
+  files['xl/sharedStrings.xml'] = enc.encode(ss);
+  files['xl/worksheets/sheet1.xml'] = enc.encode(sh);
+  return buildZip(files);
+}
+
 /* 付款類別（＝分組維度）：1 農會存帳／6 電匯(e企)／2 繳費單代繳 */
 const PAY_CAT_LABEL = { '1': '農會存帳', '6': '電匯(e企)', '2': '繳費單/代繳' };
 const PAY_CAT_ORDER = ['1', '6', '2'];
@@ -724,6 +794,7 @@ if (typeof module !== 'undefined' && module.exports) {
     validateVoucher, validateBatch, guessBcode, FIXED_ASSET_CODES,
     splitBank, decidePayway, mapRecordsToVouchers,
     FNWACX_SHEET, FNWACX_FUND, FNWACX_HEADERS, payeeToFnwacxRow, buildSbaPayeeIndex, payeeExistsInSba, normPayeeName,
+    unzipAll, buildFnwacxFromTemplate,
     resolvePayees, planGrouping, PAY_CAT_LABEL, PAY_CAT_ORDER,
     voucherToF03Row, voucherToF04Rows, voucherToF05Rows, voucherToF06Rows, voucherToF07Rows,
     buildExportFiles, crc32, buildZip,
