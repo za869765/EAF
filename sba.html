@@ -173,10 +173,7 @@ window.addEventListener('storage', (ev) => {
     <div class="grp-grid" id="pk-groups"></div>
     <div class="toolbar">
       <label>製票日期 <input type="date" id="pk-paydate"></label>
-      <span class="pill-toggle" id="pk-posted-toggle">
-        <button class="on" data-v="posted" onclick="setPostMode('posted')">已入帳(同製票日)</button>
-        <button data-v="unposted" onclick="setPostMode('unposted')">未入帳(9991231)</button>
-      </span>
+      <span class="small">入帳日期＝製票日期（一律已入帳）</span>
       <button class="btn btn-main" onclick="generateVouchers()">⚡ 產生支出傳票 → 預覽</button>
     </div>
     <div id="pk-issues"></div>
@@ -318,7 +315,7 @@ const STATE = {
   config: {}, settings: { mvchno: '', pkind: '', farm: '6180069,6180416', bcodeMap: {} },
   exported: {},              /* recId → {recno,batch,at,src} */
   drafts: [],                /* normalized vouchers (sba-core 模型) */
-  combine: true, postMode: 'posted',
+  combine: true,
   openGrp: null,             /* 目前放大的卡片 'acct|cat'；null=全部縮小 */
   catOv: {},                 /* recId → '1'|'6'|'2' 手動移組覆寫（存 D1 sba_catov） */
   paySkip: new Set(),        /* 不匯入受款人鍵集合（存 D1 sba_payee_skip；反灰沉默） */
@@ -616,7 +613,7 @@ function mapCtx(pay7) {
   for (const a of new Set(STATE.records.map(r => r.acctCode).filter(Boolean))) acctNameMap[a] = subjectName(a);
   return {
     year: rocYearNow(), payDate7: pay7 || toRoc7(todayIso()),
-    postDate7: STATE.postMode === 'posted' ? (pay7 || toRoc7(todayIso())) : '9991231',
+    postDate7: pay7 || toRoc7(todayIso()), /* 一律已入帳＝同製票日（使用者指定，未入帳9991231選項已移除） */
     mvchno: STATE.settings.mvchno || '', combine: STATE.combine,
     catOverride: STATE.catOv,
     bcodeFor, farmCodes, defaultPkind: STATE.settings.pkind || '',
@@ -628,10 +625,6 @@ function updatePickSummary() {
   const sel = selectedRecords();
   if (!sel.length) { $('pk-summary').textContent = '尚未勾選'; return; }
   $('pk-summary').innerHTML = `已勾選 <b>${sel.length}</b> 筆 → 將產生 <b>${planGrouping(sel, mapCtx()).length}</b> 張支出傳票`;
-}
-function setPostMode(m) {
-  STATE.postMode = m;
-  document.querySelectorAll('#pk-posted-toggle button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
 }
 function nextRecnoFor(kind) {
   const year = rocYearNow();
