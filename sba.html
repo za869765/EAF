@@ -795,6 +795,12 @@ function renderPreview() {
           <input class="w-code" placeholder="發票號" value="${esc((P.invoices && P.invoices[0] && P.invoices[0].invno) || '')}" onchange="updInvoice(${vi},${pi},'invno',this.value)">
           <input class="w-date" placeholder="民國7碼" value="${esc((P.invoices && P.invoices[0] && P.invoices[0].invdate) || '')}" onchange="updInvoice(${vi},${pi},'invdate',this.value)">
           <input class="w-amt" placeholder="金額" value="${(P.invoices && P.invoices[0] && P.invoices[0].invamt) || ''}" onchange="updInvoice(${vi},${pi},'invamt',this.value)">` : ''}</td>
+        <td><select onchange="updPayee(${vi},${pi},'remark1',this.value)" title="支票劃線">
+          ${['', '1', '0'].map(k => `<option value="${k}"${(P.remark1 || '') === k ? ' selected' : ''}>${k === '' ? '—' : k === '1' ? '1是' : '0否'}</option>`).join('')}
+        </select></td>
+        <td><select onchange="updPayee(${vi},${pi},'remark2',this.value)" title="支票禁止背書轉讓">
+          ${['', '1', '0'].map(k => `<option value="${k}"${(P.remark2 || '') === k ? ' selected' : ''}>${k === '' ? '—' : k === '1' ? '1是' : '0否'}</option>`).join('')}
+        </select></td>
         <td><input class="w-memo" value="${esc(P.usedoc || '')}" onchange="updPayee(${vi},${pi},'usedoc',this.value)"></td>
         <td><button class="btn btn-sm" onclick="delPayee(${vi},${pi})">✕</button></td>
       </tr>`).join('');
@@ -818,7 +824,7 @@ function renderPreview() {
       ${v.kind === '2' ? `
       <h3 style="margin-top:8px;">受款人（F05）</h3>
       <div class="scroll-x"><table class="grid">
-        <thead><tr><th>序</th><th>名稱</th><th>帳號</th><th>銀行代碼</th><th>付款方式</th><th class="num">金額</th><th>單據</th><th>發票(統一發票時)</th><th>支出用途</th><th></th></tr></thead>
+        <thead><tr><th>序</th><th>名稱</th><th>帳號</th><th>銀行代碼</th><th>付款方式</th><th class="num">金額</th><th>單據</th><th>發票(統一發票時)</th><th>劃線</th><th>禁背</th><th>支出用途</th><th></th></tr></thead>
         <tbody>${payeesHtml}</tbody></table></div>
       <div class="toolbar"><button class="btn btn-sm" onclick="addPayee(${vi})">＋ 加受款人</button></div>` : ''}
       <div>${r.errors.map(e => `<div class="vmsg err">❌ ${esc(e)}</div>`).join('')}
