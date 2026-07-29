@@ -3891,7 +3891,7 @@ function validatePayeeCards() {
   _payeeCards.forEach((c, idx) => {
     if (!(c.name || c.bank || c.acctNo)) return; // 空卡跳過
     const rcpt = c.receiptType || '1';
-    const who = `受款人 #${idx+1}（${esc(c.name||'—')}）`;   /* 名稱經 esc——訊息會進 showAlert innerHTML */
+    const who = `受款人 #${idx+1}（${c.name||'—'}）`;   /* 保持原文：confirmSave/savePayeesOnly 各自顯示端跳脫一次 */
     if (rcpt === '2') {
       const miss = [];
       if (!(c.invoiceNo||'').trim())     miss.push('「發票號碼」');
@@ -5213,7 +5213,7 @@ async function savePayeesOnly() {
   /* v5.5.3 鎖定模式更新受款人也須通過卡片驗證（發票三欄/普通收據統編） */
   if (_pType !== 'bill') {
     const cardErrs = validatePayeeCards();
-    if (cardErrs.length) { showAlert(cardErrs.join('<br>')); return; }
+    if (cardErrs.length) { showAlert(cardErrs.map(esc).join('<br>')); return; }
   }
   const prevPayees = _prevPayeeCards.map(c => ({
     type: document.getElementById('payee-type').value || '',
