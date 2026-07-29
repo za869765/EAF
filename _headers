@@ -16,5 +16,14 @@
 /
   Cache-Control: no-cache, no-store, must-revalidate
 
+/sba.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/sba
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/sba-core.js
+  Cache-Control: no-cache, no-store, must-revalidate
+
 /version.js
   Cache-Control: no-cache, no-store, must-revalidate
