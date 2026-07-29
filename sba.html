@@ -510,12 +510,13 @@ function pickRowHtml(r, effCat, key) {
     exported ? `<span class="chip done">已匯出 ${esc(exported.recno)}</span>` : '',
   ].join(' ');
   /* 移組：系統可能分錯，可手動改付款方式（同步影響開票分組與 F05 payway） */
-  const mv = `<select onchange="moveRecGroup('${esc(r.id)}',this.value)">`
+  /* 單號走 data-*（列上已有 data-rid）＋事件委派，不內插進 inline handler */
+  const mv = `<select class="mv-cat">`
     + PAY_CAT_ORDER.map(c => `<option value="${c}"${c === effCat ? ' selected' : ''}>${PAY_CAT_LABEL[c]}</option>`).join('')
     + `</select>${STATE.catOv[r.id] ? ' <span class="chip warn">手動</span>' : ''}`;
   const isSel = STATE.pickSel.has(String(r.id));
   return `<tr class="${exported ? 'row-exported' : ''}${isSel ? ' row-sel' : ''}" data-rid="${esc(String(r.id))}">
-    <td><input type="checkbox" class="pk-cb" value="${esc(r.id)}" data-grp="${key}"${exported ? ' data-exported="1"' : ''}${isSel ? ' checked' : ''} onchange="togglePickRec(this)"></td>
+    <td><input type="checkbox" class="pk-cb" value="${esc(r.id)}" data-grp="${esc(key)}"${exported ? ' data-exported="1"' : ''}${isSel ? ' checked' : ''} onchange="togglePickRec(this)"></td>
     <td><a href="/?rec=${encodeURIComponent(r.id)}" target="_blank" title="於填單頁開啟此申請單">${esc(r.voucherNo)}</a></td><td>${esc(recDateIso(r))}</td>
     <td><span class="chip">${r.formType === 'expense' ? '動支' : '請購'}</span></td>
     <td>${esc(r.bpCode)} ${esc(r.bpLabel || '')}</td>
@@ -576,12 +577,12 @@ function renderPickList() {
         + g.recs.map(({ r, effCat }) => pickRowHtml(r, effCat, key)).join('') + '</tbody></table>'
       : '<div class="small" style="padding:10px 12px;">無單據</div>';
     return `<div class="gcard${open ? ' open' : ''}${g.recs.length ? '' : ' empty'}">
-      <div class="gcard-hd" onclick="toggleGroupCard('${key}')">
-        <label onclick="event.stopPropagation()"><input type="checkbox" class="grp-cb" data-grp="${key}" onchange="toggleGroupPick(this)"${g.recs.length ? '' : ' disabled'}> 全選</label>
+      <div class="gcard-hd" data-grp="${esc(key)}">
+        <label onclick="event.stopPropagation()"><input type="checkbox" class="grp-cb" data-grp="${esc(key)}" onchange="toggleGroupPick(this)"${g.recs.length ? '' : ' disabled'}> 全選</label>
         <span class="chip ${acctChip}">${esc(acct)} ${esc(subjectName(acct))}</span>
         <span class="chip exp">${esc(PAY_CAT_LABEL[cat])}</span>
         ${pcnt}
-        <span class="chip pk-selcount" data-grp="${key}" style="display:none;"></span>
+        <span class="chip pk-selcount" data-grp="${esc(key)}" style="display:none;"></span>
         <span class="gcard-n">${g.recs.length} 筆 <b>$${fmtN(g.sum)}</b></span>
         <span class="gcard-arrow">${open ? '▾ 收合' : '▸ 展開'}</span>
       </div>
@@ -589,7 +590,27 @@ function renderPickList() {
     </div>`;
   }).join('')).join('');
   bindRecPopHost('pk-groups');
+  bindPickDelegates();
   updatePickSummary();
+}
+/* 移組下拉改事件委派（id 只走 data-rid，避免 record 資料成為可執行程式碼） */
+let _pkDelBound = false;
+function bindPickDelegates() {
+  if (_pkDelBound) return;
+  const host = $('pk-groups');
+  if (!host || !host.addEventListener) return;
+  host.addEventListener('change', (ev) => {
+    const sel = ev.target;
+    if (!sel || !sel.classList || !sel.classList.contains('mv-cat')) return;
+    const tr = sel.closest && sel.closest('tr[data-rid]');
+    if (tr) moveRecGroup(tr.dataset.rid, sel.value);
+  });
+  /* 卡片展開／收合：key 走 data-grp（label 內的 stopPropagation 仍擋住全選框誤觸） */
+  host.addEventListener('click', (ev) => {
+    const hd = ev.target && ev.target.closest && ev.target.closest('.gcard-hd[data-grp]');
+    if (hd) toggleGroupCard(hd.dataset.grp);
+  });
+  _pkDelBound = true;
 }
 function toggleGroupCard(key) {
   STATE.openGrp = STATE.openGrp === key ? null : key;
@@ -682,7 +703,10 @@ function togglePickRec(cb) {
 }
 /* 全選此組一律跳過已匯出（反灰）列 */
 function toggleGroupPick(cb) {
-  document.querySelectorAll(`.pk-cb[data-grp="${cb.dataset.grp}"]:not([data-exported])`)
+  /* 用 JS 過濾而非把 dataset 值內插進選擇器：acctCode 來自 /api/records（無認證可寫），
+     值含引號會讓 querySelectorAll 拋 SyntaxError、整個勾選功能中斷 */
+  [...document.querySelectorAll('.pk-cb')]
+    .filter(x => x.dataset.grp === cb.dataset.grp && !x.hasAttribute('data-exported'))
     .forEach(x => {
       x.checked = cb.checked;
       if (cb.checked) STATE.pickSel.add(String(x.value)); else STATE.pickSel.delete(String(x.value));
@@ -728,11 +752,20 @@ function payeeGuiOf(bankCode, acctNo, name) {
 function updatePickSummary() {
   /* 各卡片頭「✔已勾 n 筆」即時更新＋有勾選的卡片綠框綠頭（縮小狀態也明顯） */
   document.querySelectorAll('.pk-selcount').forEach(elm => {
-    const n = [...document.querySelectorAll(`.pk-cb[data-grp="${elm.dataset.grp}"]`)].filter(c => c.checked).length;
+    const mine = [...document.querySelectorAll('.pk-cb')].filter(c => c.dataset.grp === elm.dataset.grp);
+    const n = mine.filter(c => c.checked).length;
     elm.style.display = n ? '' : 'none';
     elm.textContent = `✔ 已勾 ${n} 筆`;
     const card = elm.closest('.gcard');
     if (card) card.classList.toggle('has-sel', n > 0);
+    /* 「全選」框依實況重算：部分勾選＝半選，避免取消個別列後表頭仍顯示全選而誤導 */
+    const gcb = [...document.querySelectorAll('.grp-cb')].find(c => c.dataset.grp === elm.dataset.grp);
+    if (gcb) {
+      const sel2 = mine.filter(c => !c.hasAttribute('data-exported'));   /* 全選此組跳過已匯出，基準一致 */
+      const on = sel2.filter(c => c.checked).length;
+      gcb.checked = sel2.length > 0 && on === sel2.length;
+      gcb.indeterminate = on > 0 && on < sel2.length;
+    }
   });
   const sel = selectedRecords();
   if (!sel.length) { $('pk-summary').textContent = '尚未勾選'; return; }
@@ -1090,7 +1123,9 @@ function renderOffsetList(q) {
       + (used > 0 ? `<div class="small">−本批已扣 ${fmtN(used)} ＝ 可用 ${fmtN(avail)}</div>` : '');
     const btn = !selectable ? '<span class="small">歷史</span>'
       : avail <= 0 ? '<span class="small">已扣完</span>'
-      : `<button class="btn btn-sm" onclick="pickOffset('${esc(e.voucher_no)}',${+e.seq || 0},${avail})">選此列</button>`;
+      /* 傳票號走 data-* 不內插進 inline handler：HTML 屬性會先解碼字元參照再編譯 JS，
+         esc() 的 &#39; 到那時已還原成 '，單引號仍可跳脫字串（故改事件委派） */
+      : `<button class="btn btn-sm off-pick" data-vno="${esc(e.voucher_no)}" data-seq="${+e.seq || 0}" data-avail="${avail}">選此列</button>`;
     return `
     <tr${selectable ? '' : ' class="row-exported"'}><td>${esc(e.voucher_no)}</td><td>${esc(String(e.seq))}</td><td>${esc(e.post_date || e.make_date || '')}</td>
     <td>${esc(e.sub_account || '')}</td><td style="max-width:280px;">${esc(String(e.description || '').slice(0, 40))}</td>
@@ -1137,6 +1172,20 @@ function renderOffsetList(q) {
       || '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
   }
   $('modal-body').innerHTML = html;
+  bindOffsetPick();
+}
+/* 「選此列」改事件委派：資料只走 data-*，不進 inline handler（防傳票號含引號跳脫字串） */
+let _offBound = false;
+function bindOffsetPick() {
+  if (_offBound) return;
+  const tb = $('modal-body');
+  if (!tb || !tb.addEventListener) return;
+  tb.addEventListener('click', (ev) => {
+    const b = ev.target && ev.target.closest && ev.target.closest('button.off-pick');
+    if (!b) return;
+    pickOffset(b.dataset.vno, +b.dataset.seq || 0, +b.dataset.avail || 0);
+  });
+  _offBound = true;
 }
 /* 本批（所有草稿）已分配到某立帳的沖帳合計；except 排除目前編輯中的列 */
 function offsetAllocated(vchrno, seq, exceptVi, exceptLi) {
