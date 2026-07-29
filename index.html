@@ -3891,19 +3891,33 @@ function validatePayeeCards() {
   _payeeCards.forEach((c, idx) => {
     if (!(c.name || c.bank || c.acctNo)) return; // 空卡跳過
     const rcpt = c.receiptType || '1';
+    const who = `受款人 #${idx+1}（${esc(c.name||'—')}）`;   /* 名稱經 esc——訊息會進 showAlert innerHTML */
     if (rcpt === '2') {
       const miss = [];
       if (!(c.invoiceNo||'').trim())     miss.push('「發票號碼」');
       if (!(c.invoiceDate||'').trim())   miss.push('「發票日期」');
       if (!(c.invoiceAmount||'').trim()) miss.push('「發票金額」');
-      if (miss.length) errors.push(`受款人 #${idx+1}（${c.name||'—'}）選統一發票，但 ${miss.join('、')} 未填`);
+      if (miss.length) errors.push(`${who}選統一發票，但 ${miss.join('、')} 未填`);
     } else if (rcpt === '1' && _guiApplies) {
       const g = (c.guiNo||'').trim();
-      if (!g) errors.push(`受款人 #${idx+1}（${c.name||'—'}）選 1.普通收據，請輸入「統一編號」，或改選 0.其他相關書據`);
-      else if (!/^\d{8}$/.test(g)) errors.push(`受款人 #${idx+1}（${c.name||'—'}）統一編號須為 8 碼數字`);
+      if (!g) errors.push(`${who}選 1.普通收據，請輸入「統一編號」，或改選 0.其他相關書據`);
+      else if (!/^\d{8}$/.test(g)) errors.push(`${who}統一編號須為 8 碼數字`);
+      else if (!_isValidGui(g)) errors.push(`${who}統一編號 ${g} 檢核碼不符，請核對收據上的統編（SBA 匯入會擋不合格統編）`);
     }
   });
   return errors;
+}
+
+/* v5.5.4 台灣公司統編加權檢核（與 sba-core isValidGui 同邏輯；index 不載 sba-core 故留複本） */
+function _isValidGui(no) {
+  if (!/^\d{8}$/.test(no)) return false;
+  const w = [1, 2, 1, 2, 1, 2, 4, 1];
+  let sum = 0;
+  for (let i = 0; i < 8; i++) {
+    const p = +no[i] * w[i];
+    sum += Math.floor(p / 10) + (p % 10);
+  }
+  return sum % 10 === 0 || (no[6] === '7' && (sum + 1) % 10 === 0);
 }
 
 /* ── 扣繳自動拆分（9A / 50所得） ── */

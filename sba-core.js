@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.5.3';
+const SBA_CORE_VERSION = '5.5.4';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -32,11 +32,14 @@ function toRoc7(s) {
   return '';
 }
 
-/** 民國7碼日期差（b−a 天數）；任一無效回 null */
+/** 民國7碼日期差（b−a 天數）；任一無效（含 1150231 這類不存在日期）回 null */
 function roc7DiffDays(a, b) {
   const p = (s) => {
     const m = String(s || '').match(/^(\d{3})(\d{2})(\d{2})$/);
-    return m ? Date.UTC(+m[1] + 1911, +m[2] - 1, +m[3]) : null;
+    if (!m) return null;
+    const t = Date.UTC(+m[1] + 1911, +m[2] - 1, +m[3]);
+    const d = new Date(t);
+    return (d.getUTCMonth() + 1 === +m[2] && d.getUTCDate() === +m[3]) ? t : null;
   };
   const da = p(a), db = p(b);
   return da == null || db == null ? null : Math.round((db - da) / 86400000);

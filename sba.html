@@ -394,11 +394,12 @@ async function boot() {
   if (config && Array.isArray(config.sba_payee_skip)) STATE.paySkip = new Set(config.sba_payee_skip);
   if (config && config.sba_offset_open) STATE.offsetOpen = config.sba_offset_open;
   STATE.entriesKeySet = new Set(STATE.entries.map(e => String(e.voucher_no) + '#' + e.seq));
-  /* v5.5.2 受款人主檔統編查找表（帳號優先、姓名後備）：F05 受款人統編 + F07 發票統編/營業人名稱 */
+  /* v5.5.2 受款人主檔統編查找表（帳號優先、姓名後備）：F05 受款人統編 + F07 發票統編/營業人名稱
+     v5.5.4 建表時即以 isValidGui 過濾（身分證/壞碼不進表，避免佔住鍵遮蔽同鍵合格統編） */
   STATE.payeeGuiMap = new Map();
   for (const p of STATE.payees) {
     const code = String(p.code || '').trim();
-    if (!code) continue;
+    if (!code || !isValidGui(code)) continue;
     const bk = String(p.bank || '').split('-')[0].trim();
     const ac = String(p.acctNo || '').replace(/\D/g, '');
     if (bk && ac && !STATE.payeeGuiMap.has(bk + '|' + ac)) STATE.payeeGuiMap.set(bk + '|' + ac, code);
