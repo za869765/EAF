@@ -1,3 +1,44 @@
+# 專案接力記錄 — 2026/07/29（v5.5.6 / v5.5.7）
+
+> 換台電腦繼續：先 `git -C .../EAF pull`。暗號「**佳里ACC，接力**」。
+
+## ⚠️ 最重要：動 EAF 前一定要先 `git pull`
+本輪實際踩到——這台在舊 base（v5.0.5）上重做了「版次同步」與「六組分區」，
+推版時才發現**遠端已被另一台/另一 session 推進 46 個 commit 到 v5.5.5**，
+且那兩件事遠端早在 **v5.0.6／v5.0.7** 就做過（還進化成 v5.0.8 六大格卡片矩陣）。
+＝整輪重工，且硬推會覆蓋遠端 1590 行進展。**使用者已明確要求：這台動 EAF 前先 pull。**
+- 舊 base 的成果留在分支 `wip-local-v506`（內容已被遠端更完整實作取代，**確認無誤後可刪**）。
+- 本檔 **v5.0.6 ～ v5.5.5 期間未留接力記錄**（另一 session 未補），該段請直接看 `git log --oneline`。
+
+## v5.5.6 選單頁注入面收斂（Codex review 指正）
+全部走 record 資料，而 **`/api/records` 無認證即可寫入** → 屬可利用面：
+- **三處 inline handler 內插字串型資料 → 改事件委派（資料只走 `data-*`）**
+  - 沖帳「選此列」`pickOffset('${esc(voucher_no)}',…)` → `data-vno/seq/avail` + `bindOffsetPick()`
+  - 移組下拉 `moveRecGroup('${esc(r.id)}',…)` → 用列上既有 `data-rid` + `bindPickDelegates()`
+  - 卡片展開 `toggleGroupCard('${key}')` → `data-grp` + 同一委派
+  - ⚠️ **關鍵觀念**：`esc()` 的 `&#39;` **對 inline handler 無效**——HTML 屬性值會先解碼字元參照，
+    才把內容當 JS 編譯，到那時已還原成 `'`，字串照樣被跳脫。**只加跳脫擋不住，必須不內插**。
+- **兩處 `querySelectorAll` 內插 dataset 值當選擇器 → 改 JS 精確比對過濾**
+  （`acctCode` 含雙引號會拋 SyntaxError，整個勾選功能中斷）
+- **四處 `data-grp` 統一 `esc()`**：第一版只修了資料列、漏了卡片頭的 `.grp-cb`／`.pk-selcount`，
+  Codex 覆審指出**編碼不一致會讓新加的精確比對一筆都找不到，反而讓全選/計數/半選整張卡失效**。
+- **全選框加 `indeterminate`**：部分勾選＝半選；基準與「全選跳過已匯出」一致。
+
+## v5.5.7 `_headers` 補 sba 頁面 no-cache
+`acc.html`/`admin.html`/`index.html`/`version.js` 都有 no-cache，唯獨 **SBA 工坊三個路徑漏列**
+（`/sba.html`、`/sba` clean URL、`/sba-core.js`）→ 修正可能被 CDN 邊緣快取擋住，
+或 sba.html 與 sba-core.js 新舊錯配（repo 既有的**版本握手哨**正是為此症狀，這裡補的是來源）。
+- 線上已驗證四個路徑皆 `no-cache, no-store, must-revalidate`（邊緣傳播約需 1~2 分鐘）。
+- 版號：`APP_VERSION` 5.5.7、`APP_FORCE_VERSION` 維持 5.5.6（純部署設定非功能性，不打擾使用中頁面）。
+
+## 給下一棒的操作備忘
+- 驗證線上內容要用 `curl -L`：`/sba.html` 會 **308 導向 clean URL `/sba`**，不跟隨會抓到空 body 誤判。
+- 版號規則見 `version.js` 檔頭：任何改動升 `APP_VERSION` patch 並同步 `sba-core.js` 的
+  `SBA_CORE_VERSION`（握手哨）；功能性更新才一併設 `APP_FORCE_VERSION`。
+- Codex 複審：`codex review --uncommitted`（本輪跑到收斂，最後一輪回報無功能回歸）。
+
+---
+
 # 專案接力記錄 — 2026/07/27（v5.0.5／SBA 傳票工坊 v1.1.0）
 
 ## v1.1.0 分組規則改版（使用者指定）
