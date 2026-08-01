@@ -11,6 +11,12 @@
 <style>
 /* ── Reset ── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* 全站按鈕回饋：inline-style 上色的按鈕也吃得到（filter 不會被 inline background 蓋掉） */
+button { transition: filter .12s, background .15s, color .15s; }
+button:not(:disabled):hover { filter: brightness(.94); }
+button:not(:disabled):active { filter: brightness(.86); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+button:focus-visible { outline: 2px solid #3898ec; outline-offset: 1px; }
 body {
   /* Claude design 套用：parchment 紙背景、serif 報表標題、warm 中性色 */
   font-family: '標楷體','DFKai-SB','BiauKai','KaiTi', var(--font-serif, serif);
@@ -60,7 +66,7 @@ body {
 
 /* sync status */
 #sync-status {
-  font-size: 10px; padding: 4px 14px 5px;
+  font-size: 11px; padding: 4px 14px 5px;
   color: #78909c; border-bottom: 1px solid #2e3f52; flex-shrink: 0;
 }
 #sync-status.ok   { color: #66bb6a; }
@@ -87,7 +93,7 @@ body {
 #sf-keyword:focus { border-color: #5b8db8; }
 .sf-select {
   background: #1e2e3e; border: 1px solid #3a4f63; border-radius: 4px;
-  color: #b0bec5; font-size: 10px; padding: 3px 4px; outline: none;
+  color: #b0bec5; font-size: 11px; padding: 3px 4px; outline: none;
   font-family: inherit; max-width: 110px;
 }
 .sf-select:focus { border-color: #5b8db8; }
@@ -96,7 +102,7 @@ body {
   cursor: pointer; padding: 2px 4px; line-height: 1;
 }
 #sf-clear:hover { color: #fff; }
-#online-count { font-size: 9px; color: #5a7080; margin-left: 6px; }
+#online-count { font-size: 11px; color: #5a7080; margin-left: 6px; }
 
 .h-item {
   background: #263545; border-radius: 5px; padding: 8px 10px;
@@ -201,7 +207,7 @@ body.sb-resizing * { pointer-events: none !important; }
   position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
   background: #323232; color: #fff; padding: 10px 22px; border-radius: 6px;
   font-size: 13px; z-index: 9999; opacity: 0; transition: opacity .3s;
-  pointer-events: none; white-space: nowrap;
+  pointer-events: none; max-width: 90vw; white-space: normal; text-align: center;
 }
 #toast.show { opacity: 1; }
 
@@ -745,7 +751,7 @@ body.sb-resizing * { pointer-events: none !important; }
 }
 #payee-section .payee-btn-new:hover { background: #1b5e20; }
 #payee-section .payee-list {
-  max-height: 200px; overflow-y: auto; border: 1px solid #e0e0e0;
+  max-height: 40vh; overflow-y: auto; border: 1px solid #e0e0e0;
   border-radius: 4px; margin-top: 6px; background: #fafafa;
 }
 #payee-section .payee-item {
@@ -814,7 +820,7 @@ body.sb-resizing * { pointer-events: none !important; }
   font-size: 13px;
 }
 #payee-section .payee-card .pc-list {
-  max-height: 180px; overflow-y: auto; border: 1px solid #e0e0e0;
+  max-height: 40vh; overflow-y: auto; border: 1px solid #e0e0e0;
   border-radius: 4px; margin-top: 4px; background: #fff;
 }
 #payee-section .payee-card .pc-selected {
@@ -1149,7 +1155,7 @@ body.sb-resizing * { pointer-events: none !important; }
     </div>
     <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px; gap:8px;">
       <div id="sb-version">v5.1.4</div><!-- 靜態值僅供 v5.1.3 以前舊頁偵測轉換用；實際顯示由 version.js 蓋章，升版不用改這裡 -->
-      <div style="font-size:9px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
+      <div style="font-size:10.5px; color:#4a6278; line-height:1.4; text-align:right; flex-shrink:1;">嚴正聲明：本系統僅限<br>臺南市佳里區衛生所同仁內部使用。</div>
     </div>
     <div id="sb-btns">
       <button class="new-btn" id="new-purchase" onclick="newForm('purchase')"><span style="font-size:20px;">🛒</span>新增請購單</button>
@@ -1160,10 +1166,10 @@ body.sb-resizing * { pointer-events: none !important; }
     ● 連線中…<span id="online-count"></span>
     <button id="open-payee-db-btn" type="button" onclick="openPayeeDb()"
             title="瀏覽 / 新增 / 凍結 受款人資料庫"
-            style="margin-left:8px; padding:2px 8px; font-size:10px; cursor:pointer;
+            style="margin-left:8px; padding:3px 9px; font-size:11.5px; cursor:pointer;
                    background:#1565c0; color:#fff; border:none; border-radius:3px;">💳 受款人資料庫</button>
   </div>
-  <div style="font-size:10px; color:#4a6278; padding:5px 14px 2px; flex-shrink:0;">📋 動支單/🛒請購單申請紀錄</div>
+  <div style="font-size:11px; color:#4a6278; padding:5px 14px 2px; flex-shrink:0;">📋 動支單/🛒請購單申請紀錄</div>
   <div id="sidebar-filter">
     <div class="sf-row">
       <input type="text" id="sf-keyword" placeholder="🔍 關鍵字搜尋（編號/科目/品名…）" oninput="applyHistoryFilter()">
@@ -2149,8 +2155,11 @@ function clearHistoryFilter() {
 /* ══════════════════════
    AUTO VOUCHER
    ══════════════════════ */
+function localIsoDate(d) { d = d || new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }   /* 本地日期（toISOString 是 UTC，凌晨 0~8 點會差一天） */
 function generateVoucherNo(records) {
-  const rocYear = new Date().getFullYear() - 1911;
+  /* 取號年度以申請日期為準（跨年補登不掛到系統年）；無申請日期才用系統年 */
+  const adv = document.getElementById('apply-date-input')?.value;
+  const rocYear = (adv ? new Date(adv + 'T00:00:00').getFullYear() : new Date().getFullYear()) - 1911;
   const prefix  = String(rocYear) + '-';
   let max = 0;
   (records||[]).forEach(r => {
@@ -2178,7 +2187,7 @@ async function exportCSV() {
     const csv = '\uFEFF' + hdr.join(',') + '\n' + rows.join('\n');
     const a = Object.assign(document.createElement('a'),{
       href:URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
-      download:'動支申請紀錄_'+new Date().toISOString().slice(0,10)+'.csv'});
+      download:'動支申請紀錄_'+localIsoDate()+'.csv'});
     a.click(); URL.revokeObjectURL(a.href);
     setSyncStatus('● 已連線','ok');
     showToast('✓ 已匯出 CSV');
@@ -3172,12 +3181,12 @@ function calcTotal() {
    ══════════════════════ */
 function setTodayDate() {
   const today = new Date();
-  document.getElementById('apply-date-input').value = today.toISOString().slice(0,10);
+  document.getElementById('apply-date-input').value = localIsoDate(today);
   updateRocDate();
   /* v4.4.97 交貨日期預設：與申請日期同一天 */
   const ddEl = document.getElementById('delivery-date');
   if (ddEl && !ddEl.value) {
-    ddEl.value = today.toISOString().slice(0,10);
+    ddEl.value = localIsoDate(today);
     updateDeliveryDate();
   }
 }
@@ -3490,19 +3499,26 @@ async function _confirmItemPayeeCountMismatch(data) {
 }
 
 async function saveRecord() {
+  if (window._saveBusy) return;   /* 取號＋寫入期間防連點（連按會重複取號建檔） */
+  window._saveBusy = true;
+  const _saveBtn = document.getElementById('save-btn');
+  if (_saveBtn) _saveBtn.disabled = true;
+  const _saveDone = () => { window._saveBusy = false; if (_saveBtn) _saveBtn.disabled = false; };
   const _preData = getFormData();
   if (!validatePayeeBeforeSave(_preData)) {
     setSyncStatus('● 已連線', 'ok');
+    _saveDone();
     return;
   }
   /* v4.9.1 公務預算用途別拆分未分配/超出 → 擋存檔（拆分合計須＝本單金額） */
   if (!validatePubSplitBeforeSave(_preData)) {
     setSyncStatus('● 已連線', 'ok');
+    _saveDone();
     return;
   }
   /* v4.2.23 人數不一致善意提醒（非強制），確認取消則中止存檔 */
   const ok = await _confirmItemPayeeCountMismatch(_preData);
-  if (!ok) { setSyncStatus('● 已連線', 'ok'); return; }
+  if (!ok) { setSyncStatus('● 已連線', 'ok'); _saveDone(); return; }
   /* v4.2.31 其他說明事項提醒：有填寫時告知不會被【複製前次單】帶走 */
   const _notesVal = (_preData.notes || '').trim();
   if (_notesVal) {
@@ -3512,7 +3528,7 @@ async function saveRecord() {
       '<span style="color:#78909c; font-size:12px;">（可直接確定繼續存檔）</span>',
       { title: '⚠️ 其他說明事項有填寫', okText: '✓ 繼續存檔', cancelText: '✗ 返回修改' }
     );
-    if (!_notesOk) { setSyncStatus('● 已連線', 'ok'); return; }
+    if (!_notesOk) { setSyncStatus('● 已連線', 'ok'); _saveDone(); return; }
   }
   setSyncStatus('⟳ 儲存中…', 'busy');
   const data = _preData;
@@ -3524,7 +3540,10 @@ async function saveRecord() {
       if (!data.voucherNo) {
         /* v4.2.17 改由 server 撈 max（掃全部，含封存/作廢），避免封存後同號重用 */
         try {
-          const r = await fetch('/api/records?next-voucher=1');
+          /* 取號年度以申請日期為準（server 端點支援 ?year=；不帶時預設系統年，跨年補登會掛錯年段） */
+          const _adv = document.getElementById('apply-date-input')?.value;
+          const _vy = (_adv ? new Date(_adv + 'T00:00:00').getFullYear() : new Date().getFullYear()) - 1911;
+          const r = await fetch('/api/records?next-voucher=1&year=' + _vy);
           if (r.ok) {
             const j = await r.json();
             if (j && j.next) data.voucherNo = j.next;
@@ -3605,6 +3624,7 @@ async function saveRecord() {
       showMsg('✗ 儲存失敗');
     }
   }
+  _saveDone();
 }
 
 async function voidRecord(id, e) {
@@ -4507,12 +4527,14 @@ function doCopyByNo() {
   if (!rec && /^\d+$/.test(raw) && raw.length <= 4) {
     const inputNum    = parseInt(raw, 10);
     const curRocYear  = new Date().getFullYear() - 1911;   /* 當前民國年 */
-    const hits = _copyBase.filter(r => {
+    const hitsInYear  = (y) => _copyBase.filter(r => {
       const parts = (r.voucherNo || '').split('-');
       if (parts.length < 2) return false;
-      return parseInt(parts[0], 10) === curRocYear        /* 限當年度 */
+      return parseInt(parts[0], 10) === y
           && parseInt(parts[parts.length - 1], 10) === inputNum;
     });
+    let hits = hitsInYear(curRocYear);                     /* 先限當年度 */
+    if (!hits.length) hits = hitsInYear(curRocYear - 1);   /* 查無 → 退查前一年（年初複製去年單最常見） */
     if (hits.length === 1) {
       rec = hits[0];
     } else if (hits.length > 1) {
@@ -4568,7 +4590,7 @@ function _doCopyRecord(includePayees) {
   if (!rec) return;
   const copy = JSON.parse(JSON.stringify(rec));
   copy.voucherNo    = '';
-  copy.applyDateRaw = new Date().toISOString().slice(0,10);
+  copy.applyDateRaw = localIsoDate();
   copy.notes        = '';   /* 清空其他說明事項，避免舊折讓說明殘留 */
   delete copy.id; delete copy.savedAt;
   if (!includePayees) {
@@ -4684,6 +4706,7 @@ function updateBudgetInfo() {
   const budgetYear   = applyDateVal
     ? String(new Date(applyDateVal + 'T00:00:00').getFullYear() - 1911)
     : sysRocYear;
+  const hasYrBudget = !!(s.budgets && s.budgets[budgetYear]);   /* 該年度是否真的設過預算（否則 fallback 舊年度僅供估算） */
   const yr  = s.budgets?.[budgetYear] || s.budgets?.[sysRocYear] || s.budgets?.['115'] || {};
   /* values: new year-based structure → fallback to old flat keys → hardcoded defaults */
   const _b = (yKey, flatKey, def) => yr[yKey] ?? s[flatKey] ?? def;
@@ -4731,6 +4754,7 @@ function updateBudgetInfo() {
         <span style="font-weight:600;">${budgetYear}年預算　${label}</span>
         <span style="color:${color}; font-weight:700;">${rawPct.toFixed(1)}%</span>
       </div>
+      ${hasYrBudget ? '' : `<div style="color:#c62828; font-weight:600; margin-bottom:3px;">⚠ ${budgetYear}年預算尚未設定——以下額度沿用舊年度僅供參考，請至管理後台新增本年度預算</div>`}
       <div style="background:#d0d8ee; border-radius:3px; height:6px; margin-bottom:4px; overflow:hidden;">
         <div style="width:${barPct}%; height:100%; background:${color}; border-radius:3px;"></div>
       </div>
@@ -5447,6 +5471,7 @@ function normalizeMinguoYYY7(s) {
   if (m) {
     const y = parseInt(m[1], 10), mo = parseInt(m[2], 10), d = parseInt(m[3], 10);
     if (y >= 1911) return s;
+    if (y < 100 || y > 130) return s;   /* 年碼合理範圍外（如漏打 1 的「26/7/23」）不整形，留給檢核擋下 */
     if (mo < 1 || mo > 12) return s;
     if (d < 1 || d > 31) return s;
     return m[1] + '/' + String(mo).padStart(2,'0') + '/' + String(d).padStart(2,'0');
@@ -6215,10 +6240,11 @@ function exportCurrentRecordForAccounting() {
   const purposeDesc = (document.getElementById('purpose-desc')?.value || '').trim();
   const totalNum = parseInt((document.getElementById('amount-disp')?.textContent || '$0').replace(/[^\d]/g,''), 10) || 0;
   const voucherNo = (document.getElementById('voucher-no')?.value || '').trim();
-  const applyDateRaw = (document.getElementById('apply-date')?.value || '').trim();
+  /* 開立日期取自申請日期欄（原誤讀不存在的 #apply-date，P 欄恆空白）：ISO → 民國7碼 */
+  const applyDateRaw = (document.getElementById('apply-date-input')?.value || '').trim();
   let applyRoc = '';
-  const adm = applyDateRaw.match(/^(\d{1,3})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
-  if (adm) applyRoc = adm[1].padStart(3,'0') + adm[2].padStart(2,'0') + adm[3].padStart(2,'0');
+  const adm = applyDateRaw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (adm) applyRoc = String(+adm[1] - 1911).padStart(3,'0') + adm[2] + adm[3];
 
   /* === 蒐集當次發票（receiptType=2 + 至少一格有值）=== */
   const invoiceRows = [];
@@ -7096,7 +7122,8 @@ window.addEventListener('afterprint', () => {
     <input id="copy-kw-input" type="text" placeholder="輸入任意關鍵字…"
            style="width:100%; box-sizing:border-box; padding:9px 12px;
                   border:1.5px solid #90a4ae; border-radius:6px;
-                  font-size:15px; font-family:inherit; outline:none; margin-bottom:8px;"
+                  font-size:15px; font-family:inherit; margin-bottom:8px;"
+           onfocus="this.style.borderColor='#1565c0'" onblur="this.style.borderColor='#90a4ae'"
            oninput="kwSearchCopy()">
     <div id="copy-kw-results" style="max-height:calc(80vh - 260px); overflow-y:auto; margin-bottom:10px; flex:1;"></div>
 
@@ -7107,7 +7134,8 @@ window.addEventListener('afterprint', () => {
     <input id="copy-no-input" type="text" placeholder="例：115-0001 或後4碼 0001"
            style="width:100%; box-sizing:border-box; padding:9px 12px;
                   border:1.5px solid #1565c0; border-radius:6px;
-                  font-size:15px; font-family:inherit; outline:none; margin-bottom:8px;"
+                  font-size:15px; font-family:inherit; margin-bottom:8px;"
+           onfocus="this.style.boxShadow='0 0 0 2px rgba(21,101,192,.25)'" onblur="this.style.boxShadow='none'"
            onkeydown="if(event.key==='Enter') doCopyByNo()">
     <div id="copy-no-err" style="display:none; color:#c62828; font-size:13px; margin-bottom:8px;"></div>
 

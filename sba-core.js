@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.5.7';
+const SBA_CORE_VERSION = '5.6.0';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -21,10 +21,11 @@ function rocDate7(d) {
 function toRoc7(s) {
   if (!s) return '';
   s = String(s).trim();
-  if (/^\d{7}$/.test(s)) return s;
+  if (/^\d{7}$/.test(s)) return (+s.slice(0, 3) >= 100 && +s.slice(0, 3) <= 130) ? s : '';   /* 7碼也驗年段：擋 0260723 這類漏打 1 */
   let m = s.match(/^(\d{2,3})[\/年.\-](\d{1,2})[\/月.\-](\d{1,2})日?$/);
   if (m) {
     let y = +m[1]; if (y > 1911) y -= 1911;
+    if (y < 100 || y > 130) return '';   /* 年碼合理範圍檢查：擋「26/7/23」這類漏打 1 的輸入（產出民國 26 年會直通 F05/F07） */
     return String(y).padStart(3, '0') + String(+m[2]).padStart(2, '0') + String(+m[3]).padStart(2, '0');
   }
   m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -153,6 +154,9 @@ function validateVoucher(v, opt) {
   if (!/^\d{7}$/.test(v.postDate)) E(`${tag}：入帳日期須為民國7碼（未入帳填9991231）`);
   if (String(v.kind) === '3' && v.postDate !== v.payDate)
     W(`${tag}：轉帳傳票入帳日期應同製票日期（規格 F03 欄06 註2）`);
+  if (/^\d{7}$/.test(String(v.payDate)) && /^\d{3}$/.test(String(v.year)) && String(v.payDate).slice(0, 3) !== String(v.year))
+    W(`${tag}：製票日期年度(${String(v.payDate).slice(0, 3)})與會計年度(${v.year})不一致——跨年補帳請確認年度`);
+  if (big5Len(v.memo) > 100) W(`${tag}：傳票總摘要超過100位元組，將截斷（明細摘要上限1000B、總摘要僅100B）`);
 
   const lines = v.lines || [];
   if (!lines.length) { E(`${tag}：無明細`); return { errors, warnings }; }
@@ -235,6 +239,11 @@ function validateVoucher(v, opt) {
           if (Math.round(isum * 100) !== Math.round((+P.amt || 0) * 100))
             E(`${pt}：發票金額合計 ${isum} ≠ 應領金額 ${P.amt}`);
           invs.forEach((iv) => {
+            /* F07 發票日期必填且須為「存在的」民國7碼日期（年段 100~130）：缺漏、漏打 1（0260723）、
+               或不存在日期（1150231/1151332，用 roc7DiffDays 自比對驗曆法）SBA 匯入會被拒 */
+            const d7 = String(iv.invdate || '');
+            if (!/^\d{7}$/.test(d7) || +d7.slice(0, 3) < 100 || +d7.slice(0, 3) > 130 || roc7DiffDays(d7, d7) !== 0)
+              E(`${pt}：發票 ${iv.invno || '(未填號碼)'} 日期缺漏或無效（${d7 || '空白'}，須為存在的民國7碼日期如 1150723）`);
             const gap = roc7DiffDays(iv.invdate, v.payDate);
             if (gap != null && gap > 15 && !iv.reason)
               W(`${pt}：發票日期 ${iv.invdate} 距製票日逾15日（${gap}天），F07 將自動填制式原因（採購法73-1）`);
@@ -825,7 +834,7 @@ function mapRecordsToVouchers(records, ctx) {
     bankLine.amt = Math.round(total * 100) / 100;
     /* 摘要不帶「類別｜」前綴（使用者指定；類別已在預覽卡頭標示） */
     bankLine.memo = truncBig5(memoParts.filter(Boolean).join('；'), 1000);
-    v.memo = truncBig5(memoParts.filter(Boolean).join('；'), 100);
+    v.memo = memoParts.filter(Boolean).join('；');   /* 不先截斷：validateVoucher 才警告得到過長，F03 寫檔時再 truncBig5(100) */
     /* 使用者規則：自領/代繳整張只掛一個受款人「交由佳里區農會代繳」，金額＝傳票總額，不管來源幾筆 */
     if (cat === '2') {
       v.payees = [{ seq: 1, name: '交由佳里區農會代繳', account: '', userbank: '', bankna: '',

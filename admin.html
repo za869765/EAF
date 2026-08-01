@@ -7,6 +7,12 @@
 <link rel="stylesheet" href="design.css">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* 全站按鈕回饋：hover/active/focus 一致（inline 上色的按鈕 filter 也吃得到） */
+button { transition: filter .12s, background .15s, color .15s; }
+button:not(:disabled):hover { filter: brightness(.94); }
+button:not(:disabled):active { filter: brightness(.86); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+button:focus-visible { outline: 2px solid #3898ec; outline-offset: 1px; }
 /* Claude design：admin 頁改 parchment 暖色調 */
 body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-serif); font-size: 14px;
        background: var(--parchment, #f5f4ed); color: var(--near-black, #141413); }
@@ -123,7 +129,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 .purpose-tag.form-pur-only  { background:#e8f5e9; color:#2e7d32; }
 .purpose-tag.form-hidden    { background:#eceff1; color:#90a4ae; text-decoration:line-through; opacity:0.75; }
 .purpose-tag .scope-badge {
-  font-size:9px; font-weight:700; padding:0 4px; border-radius:6px;
+  font-size:10.5px; font-weight:700; padding:0 4px; border-radius:6px;
   background:rgba(0,0,0,0.08); margin-right:2px;
 }
 .add-purpose-btn {
@@ -292,7 +298,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 .export-section h4 { font-size:14px; font-weight:600; color:#1e2a38; margin-bottom:10px; }
 .export-toolbar { display:flex; align-items:center; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
 .sel-count { font-size:12px; color:#546e7a; margin-left:4px; }
-.export-table-wrap { overflow-x:auto; max-height:400px; overflow-y:auto; }
+.export-table-wrap { overflow-x:auto; max-height:min(70vh, 900px); overflow-y:auto; }
 .export-table { width:100%; border-collapse:collapse; font-size:12px; }
 .export-table th { background:#263545; color:#cfd8dc; padding:7px 10px;
                    text-align:left; font-size:11px; font-weight:600; position:sticky; top:0; z-index:1; }
@@ -317,7 +323,7 @@ body { font-family: var(--font-sans, 'Segoe UI', 'Microsoft JhengHei', sans-seri
 .cashier-chart-title { font-size:13px; font-weight:600; color:#37474f; margin-bottom:14px; }
 .cashier-bars-wrap { display:flex; align-items:flex-end; height:140px; gap:4px; border-bottom:2px solid #cfd8dc; padding-top:16px; }
 .cbar-col { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; position:relative; }
-.cbar-amt-lbl { font-size:9px; color:#1565c0; white-space:nowrap; text-align:center; position:absolute; top:0; left:50%; transform:translateX(-50%); pointer-events:none; line-height:1.2; }
+.cbar-amt-lbl { font-size:10.5px; color:#1565c0; white-space:nowrap; text-align:center; position:absolute; top:0; left:50%; transform:translateX(-50%); pointer-events:none; line-height:1.2; }
 .cbar-bar-inner { width:80%; background:linear-gradient(to top,#1565c0,#64b5f6); border-radius:2px 2px 0 0; }
 .cbar-month-lbl { font-size:10px; color:#78909c; margin-top:5px; white-space:nowrap; }
 .pm-sel { font-size:12px; padding:2px 4px; border:1px solid #cfd8dc; border-radius:4px; cursor:pointer; }
@@ -1593,6 +1599,7 @@ function updateSubjLockUI() {
 
 async function saveSubjects() {
   if (!subjects) return;
+  if (window._subjSaving) { window._subjQueued = true; return; }   /* 進行中：排入佇列，完成後自動補存最新內容（不丟棄後續變更） */
   /* v4.8.7 C3：若目前不是從 D1 載入（靜態備份/載入失敗），儲存會用舊內容覆蓋線上設定→先攔截確認 */
   if (_subjectsSource !== 'd1') {
     if (!confirm('⚠ 目前科目設定不是從線上 D1 讀取（可能是靜態備份或先前載入失敗）。\n現在儲存會用「畫面上的內容」整包覆蓋線上 D1，可能吃掉線上較新的科目/預算設定（例如公務預算業務費用途別）。\n\n建議先重新整理、確認從 D1 載入後再改。仍要強制儲存？')) {
@@ -1600,6 +1607,7 @@ async function saveSubjects() {
       return;
     }
   }
+  window._subjSaving = true;
   setMsg('subj-msg', '⟳ 儲存中…', false);
   try {
     const r = await fetch('/api/subjects', {
@@ -1612,6 +1620,9 @@ async function saveSubjects() {
     else        setMsg('subj-msg', '❌ 儲存失敗', true);
   } catch (_) {
     setMsg('subj-msg', '❌ 連線失敗', true);
+  } finally {
+    window._subjSaving = false;
+    if (window._subjQueued) { window._subjQueued = false; saveSubjects(); }   /* 補存佇列中的最新內容 */
   }
 }
 
@@ -2692,9 +2703,13 @@ function getRecordBudgetYear(r) {
 function renderBudgetChart() {
   const s = subjects?.settings || {};
 
-  /* 取得可用年度清單（從 budgets 物件的 key） */
-  const availYears = Object.keys(s.budgets || {}).sort().reverse();
-  if (!availYears.length) availYears.push(_budgetViewYear);
+  /* 取得可用年度清單（從 budgets 物件的 key）＋一定納入今年與目前檢視年：
+     否則只設過舊年度時，選單根本選不到新年度，「本年度未設定」警示永遠不會出現 */
+  const availYears = Object.keys(s.budgets || {});
+  const _curRocY = String(new Date().getFullYear() - 1911);
+  if (!availYears.includes(_curRocY)) availYears.push(_curRocY);
+  if (!availYears.includes(_budgetViewYear)) availYears.push(_budgetViewYear);
+  availYears.sort().reverse();
 
   /* 同步 & 填充年度選擇器 */
   const sel = document.getElementById('budget-year-sel');
@@ -2712,6 +2727,7 @@ function renderBudgetChart() {
   }
 
   const rocYear = _budgetViewYear;
+  const hasYr = !!(s.budgets && s.budgets[rocYear]);   /* 該年度是否真的設過預算 */
   const yr = s.budgets?.[rocYear] || s.budgets?.['115'] || {};
   /* fall back to old flat keys for backward compat */
   const b1301         = yr.b1301         ?? s.budget1301         ?? 140000;
@@ -2728,10 +2744,13 @@ function renderBudgetChart() {
                                .reduce((sum, r) => sum + (Number(r.total)||0), 0);
 
   const titleEl = document.getElementById('budget-chart-title');
-  if (titleEl) titleEl.textContent = rocYear + '年預算執行率';
+  if (titleEl) titleEl.textContent = rocYear + '年預算執行率' + (hasYr ? '' : '（⚠ 本年度預算未設定）');
 
   const wrap = document.getElementById('budget-chart-wrap');
   if (!wrap) return;
+  const noBudgetWarn = hasYr ? '' :
+    `<div style="background:#fff3e0;border:1px solid #ffb74d;border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#e65100;font-weight:600;">
+      ⚠ ${rocYear} 年預算尚未設定——以下額度沿用舊年度僅供參考，請至下方「年度預算」新增 ${rocYear} 年。</div>`;
 
   const items = [
     { label: '1301 延長工時加班費',       code: '1301', acctType: null,   budget: b1301 },
@@ -2777,6 +2796,7 @@ function renderBudgetChart() {
         </div>
       </div>`;
   }).join('');
+  wrap.innerHTML = noBudgetWarn + wrap.innerHTML;
 
   renderBudgetRecList(rocYear, availYears);
 }

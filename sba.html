@@ -40,7 +40,7 @@ table.grid th { background: var(--warm-sand, #e8e6dc); color: var(--charcoal-war
 table.grid td { padding: 4px 7px; border-bottom: 1px solid var(--border-cream, #f0eee6); vertical-align: top; }
 table.grid tr:hover td { background: #f2f0e8; }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
-.chip { display: inline-block; padding: 0 6px; border-radius: 8px; font-size: 10px;
+.chip { display: inline-block; padding: 0 6px; border-radius: 8px; font-size: 11px;
   background: var(--warm-sand, #e8e6dc); color: var(--charcoal-warm, #4d4c48); white-space: nowrap; }
 .chip.fund { background: #dde8d9; color: #3c5a34; }
 .chip.cust { background: #e3e0f0; color: #4a4470; }
@@ -76,7 +76,7 @@ tr.row-sel td { background: #f6e7dc; }
 .gcard-n { margin-left: auto; font-size: 12px; white-space: nowrap; }
 .gcard-arrow { font-size: 11px; color: var(--stone-gray, #87867f); white-space: nowrap; }
 .gcard-body { display: none; max-height: 46vh; overflow: auto; }
-.gcard.open .gcard-body { display: block; }
+.gcard.open .gcard-body { display: block; max-height: 75vh; }   /* 放大檢視時同步放寬清單高度 */
 #pk-groups a { color: var(--terracotta, #c96442); text-decoration: none; font-weight: 600; }
 #pk-groups th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
 #pk-groups th.sortable:hover { background: #dcd9cc; }
@@ -100,12 +100,17 @@ input.w-code { width: 82px; } input.w-4 { width: 56px; } input.w-2 { width: 44px
 input.w-date { width: 84px; } input.w-memo { width: 100%; min-width: 180px; }
 .btn { padding: 5px 14px; border: none; border-radius: var(--r-md, 8px); cursor: pointer;
   font-size: 12px; font-family: inherit; background: var(--warm-sand, #e8e6dc);
-  color: var(--charcoal-warm, #4d4c48); box-shadow: var(--sh-ring-1, 0 0 0 1px #d1cfc5); }
+  color: var(--charcoal-warm, #4d4c48); box-shadow: var(--sh-ring-1, 0 0 0 1px #d1cfc5);
+  transition: background .15s, filter .12s; }
 .btn:hover { background: #dedcd0; }
+.btn:active { filter: brightness(.9); }
+.btn:disabled { opacity: .55; cursor: not-allowed; filter: none; }
+.btn:focus-visible { outline: 2px solid var(--focus-blue, #3898ec); outline-offset: 1px; }
 .btn-main { background: var(--terracotta, #c96442); color: var(--ivory, #faf9f5); box-shadow: none; }
 .btn-main:hover { background: var(--terracotta-deep, #a84e2f); }
 .btn-sm { padding: 2px 8px; font-size: 11px; }
 .btn-danger { background: #b53333; color: #fff; box-shadow: none; }
+.btn-danger:hover { background: #9e2b2b; }   /* 蓋回 .btn:hover 的淺沙底，維持紅底白字 */
 .vmsg { font-size: 12px; padding: 3px 8px; border-radius: 6px; margin: 2px 0; }
 .vmsg.err { background: #f6e0e0; color: #8c2323; }
 .vmsg.wrn { background: #f3ecd2; color: #7a5b18; }
@@ -127,7 +132,12 @@ input.w-date { width: 84px; } input.w-memo { width: 100%; min-width: 180px; }
 .voucher-card.k3 { border-left-color: #5c8653; }
 .small { font-size: 11px; color: var(--stone-gray, #87867f); }
 .scroll-x { overflow-x: auto; }
-@media print { #top-bar, #tab-nav, .btn, .toolbar { display: none !important; } }
+@media print {
+  /* 只藏按鈕，保留 .toolbar 內的摘要/匯入序號/製票日等欄位（input 會印出其值） */
+  #top-bar, #tab-nav, .btn, .toolbar .pill-toggle { display: none !important; }
+  .gcard-body, .scroll-x { max-height: none !important; overflow: visible !important; }   /* 捲動容器全量列印不裁切 */
+  .toolbar input, .toolbar select { border: none; box-shadow: none; }
+}
 </style>
 <script src="/version.js"></script>
 </head>
@@ -202,7 +212,7 @@ window.addEventListener('storage', (ev) => {
 <div class="tab-pane" id="tab-preview">
   <div id="pv-empty" class="card small">尚無傳票草稿——請至「📋 選單製票」勾選產生，或於「🔁 轉帳傳票」手動編製。</div>
   <div class="toolbar">
-    <button class="btn" onclick="aiFixMemos()">✨ AI 修正摘要（Gemini）</button>
+    <button class="btn" onclick="aiFixMemos(this)">✨ AI 修正摘要（Gemini）</button>
     <span class="small" id="pv-ai-msg">摘要可逐張先看過、手動修改；AI 修正會改寫傳票摘要與銀行列摘要（改完仍可再編輯，匯出前都不定案）</span>
   </div>
   <div id="pv-list"></div>
@@ -352,8 +362,26 @@ const STATE = {
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const fmtN = (n) => (+n || 0).toLocaleString('zh-TW');
-const todayIso = () => new Date().toISOString().slice(0, 10);
+const todayIso = () => { const d = new Date(), p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };   /* 本地日期（toISOString 是 UTC，台灣 0~8 點會差一天） */
 const rocYearNow = () => String(new Date().getFullYear() - 1911);
+/* Big5 字集（/big5.json，13,742 字對照）：SBA 為 Big5 後端，範圍外字元（如「堃」）匯入會變 ? 或整批被剔退。
+   開機非同步載入；載入失敗（false）時跳過檢查不擋操作 */
+let BIG5SET = null;
+async function loadBig5() {
+  if (BIG5SET !== null) return BIG5SET;
+  try {
+    const r = await fetch('/big5.json?v=' + (window.APP_VERSION || '0'));
+    BIG5SET = r.ok ? new Set(Object.keys(await r.json())) : false;
+  } catch (_) { BIG5SET = false; }
+  return BIG5SET;
+}
+loadBig5();
+function nonBig5Chars(s) {
+  const out = [];
+  if (!(BIG5SET instanceof Set)) return out;
+  for (const ch of String(s || '')) if (ch.codePointAt(0) > 0x7f && !BIG5SET.has(ch)) out.push(ch);
+  return out;
+}
 
 function logout() {
   sessionStorage.removeItem('adminPass');
@@ -423,7 +451,7 @@ async function boot() {
   }
   /* 預設期間：近 45 天 */
   const d = new Date(); d.setDate(d.getDate() - 45);
-  $('pk-from').value = d.toISOString().slice(0, 10);
+  $('pk-from').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;   /* 本地日期，與 todayIso 一致 */
   $('pk-to').value = todayIso();
   $('pk-paydate').value = todayIso();
   $('tr-date').value = todayIso();
@@ -728,15 +756,16 @@ function mapCtx(pay7) {
   const farmCodes = new Set(String(STATE.settings.farm || '').split(/[,，\s]+/).filter(Boolean));
   const acctNameMap = {};
   for (const a of new Set(STATE.records.map(r => r.acctCode).filter(Boolean))) acctNameMap[a] = subjectName(a);
+  const pd7 = pay7 || toRoc7(todayIso());
   return {
-    year: rocYearNow(), payDate7: pay7 || toRoc7(todayIso()),
-    postDate7: pay7 || toRoc7(todayIso()), /* 一律已入帳＝同製票日（使用者指定，未入帳9991231選項已移除） */
+    year: pd7.slice(0, 3), payDate7: pd7,   /* 會計年度隨製票日期走（跨年補帳不再掛到系統年） */
+    postDate7: pd7, /* 一律已入帳＝同製票日（使用者指定，未入帳9991231選項已移除） */
     mvchno: STATE.settings.mvchno || '', combine: STATE.combine,
     catOverride: STATE.catOv,
     bcodeFor, farmCodes, defaultPkind: STATE.settings.pkind || '',
     bankNameByCode: (c) => STATE.bankByCode.get(c) || '',
     payeeGuiFor: (p) => payeeGuiOf(String(p.bank || '').split('-')[0].trim(), p.acctNo, p.name),
-    nextRecno: () => nextRecnoFor('2'), acctNames: acctNameMap,
+    nextRecno: () => nextRecnoFor('2', pd7.slice(0, 3)), acctNames: acctNameMap,
   };
 }
 /* 受款人統編查找（v5.5.2）：帳號優先、姓名後備；僅回合格公司統編（isValidGui） */
@@ -781,8 +810,8 @@ function updatePickSummary() {
   const total = sel.reduce((s, r) => s + (+r.total || 0), 0);
   $('pk-summary').innerHTML = `<div class="sel-banner"><b>✔ 已勾選 ${sel.length} 筆・合計 $${fmtN(total)} → 將產生 ${plan.length} 張支出傳票</b>${lines}</div>`;
 }
-function nextRecnoFor(kind) {
-  const year = rocYearNow();
+function nextRecnoFor(kind, year) {
+  year = year || rocYearNow();   /* 序號年段與傳票年度一致（validateVoucher 檢核 importrecno 前4碼＝year+kind） */
   const pfx = year + String(kind);
   let base = STATE.serials[pfx] || 90000;
   for (const v of STATE.drafts) {
@@ -797,6 +826,10 @@ function generateVouchers() {
   if (!sel.length) { alert('請先勾選單據'); return; }
   const payIso = $('pk-paydate').value;
   if (!payIso) { alert('請選製票日期'); return; }
+  /* 防重複產票：勾選單據已在既有草稿中時先確認（重按會把同一批再產一份、各配新序號） */
+  const drafted = new Set(STATE.drafts.flatMap(v => (v.sourceIds || []).map(String)));
+  const dup = sel.filter(r => drafted.has(String(r.id)));
+  if (dup.length && !confirm(`有 ${dup.length} 筆勾選單據已產過傳票草稿（${dup.slice(0, 5).map(r => r.voucherNo).filter(Boolean).join('、')}${dup.length > 5 ? '…' : ''}）。\n再產一次會出現重複草稿，確定繼續？`)) return;
   const { vouchers, issues } = mapRecordsToVouchers(sel, mapCtx(toRoc7(payIso)));
   STATE.drafts.push(...vouchers);
   $('pk-issues').innerHTML = issues.map(i =>
@@ -819,7 +852,8 @@ function cleanMemoText(t) {
     .replace(/^[\s，、;；。]+/, '').replace(/[\s，、;；]+$/, '').trim();
 }
 /* ✨ AI 修正摘要（使用者規則）：主檔摘要=概括不含金額；每列明細摘要=含該列明細金額（千分位+元，缺少自動補） */
-async function aiFixMemos() {
+async function aiFixMemos(btn) {
+  if (btn && btn.disabled) return;
   if (!STATE.drafts.length) { alert('尚無傳票草稿'); return; }
   const items = STATE.drafts.map((v, i) => ({
     id: String(i),
@@ -829,6 +863,7 @@ async function aiFixMemos() {
       .map(P => ({ seq: P.seq, text: P.usedoc, amt: +P.amt || 0 })),
   })).filter(x => (x.main && x.main.trim()) || x.lines.some(L => L.text.trim()) || x.payees.length);
   if (!items.length) { alert('無摘要可修正'); return; }
+  if (btn) btn.disabled = true;   /* fetch 期間鎖鈕防連點重送 */
   $('pv-ai-msg').textContent = '⟳ AI 修正中…（Gemini）';
   try {
     const r = await fetch('/api/gemini', {
@@ -842,7 +877,7 @@ async function aiFixMemos() {
     for (const it of (j.items || [])) {
       const v = STATE.drafts[+it.id];
       if (!v) continue;
-      if (it.memo && String(it.memo).trim()) v.memo = truncBig5(cleanMemoText(it.memo), 100);
+      if (it.memo && String(it.memo).trim()) v.memo = cleanMemoText(it.memo);   /* 不先截斷：檢核警告過長，F03 寫檔時再 truncBig5(100) */
       for (const ln of (it.lines || [])) {
         const L = v.lines.find(x => x.dc === 'D' && x.seq === +ln.seq);
         if (!L || !String(ln.text || '').trim()) continue;
@@ -869,6 +904,7 @@ async function aiFixMemos() {
     renderPreview();
     $('pv-ai-msg').textContent = `✅ 已修正 ${n} 張（主檔=概括無金額、明細=含該列金額）——請逐張確認，仍可手動調整`;
   } catch (e) { $('pv-ai-msg').textContent = '❌ AI 修正失敗：' + e.message; }
+  finally { if (btn) btn.disabled = false; }
 }
 function renderPreview() {
   /* 舊草稿回填沖帳子目（v5.4.9）：offset.sub 未知者由 D1 分錄補上並同步本列子目 */
@@ -1286,8 +1322,9 @@ function addTransferVoucher() {
   const ls = trLines();
   if (!ls.length) { alert('請先輸入分錄'); return; }
   const pay7 = toRoc7($('tr-date').value);
+  const yr = (pay7 && pay7.slice(0, 3)) || rocYearNow();   /* 年度隨傳票日期走 */
   const v = {
-    year: rocYearNow(), kind: '3', importrecno: nextRecnoFor('3'),
+    year: yr, kind: '3', importrecno: nextRecnoFor('3', yr),
     mvchno: STATE.settings.mvchno || '', payDate: pay7, postDate: pay7,
     memo: $('tr-memo').value.trim(), rnum: 0, urgent: '', scode1: '1',
     lines: ls, payees: [], sourceIds: [], acctCode: '', acctName: '轉帳',
@@ -1306,6 +1343,22 @@ function runBatchValidation() {
   const box = $('ex-validation');
   if (!STATE.drafts.length) { box.innerHTML = '<div class="vmsg wrn">預覽區沒有傳票草稿</div>'; $('ex-mark').disabled = true; return false; }
   const { errors, warnings } = validateBatch(STATE.drafts, { existingRecnos: existingRecnos() });
+  /* Big5 範圍外字元逐欄檢查（姓名/摘要/用途）：SBA 端會變 ? 或整批被拒，提前警示 */
+  if (BIG5SET instanceof Set) {
+    const bad = new Map();
+    STATE.drafts.forEach((v, i) => {
+      const label = `第${i + 1}張(${v.importrecno || ''})`;
+      const chk = (txt, where) => nonBig5Chars(txt).forEach(ch => { if (!bad.has(ch)) bad.set(ch, label + where); });
+      chk(v.memo, '主檔摘要');
+      (v.lines || []).forEach(L => chk(L.memo, `明細${L.seq}摘要`));
+      (v.payees || []).forEach(P => { chk(P.name, `受款人${P.seq}姓名`); chk(P.usedoc, `受款人${P.seq}用途`); });
+    });
+    bad.forEach((where, ch) => warnings.push(`「${ch}」不在 Big5 字集（${where}）——SBA 匯入會變「?」或被剔退，請改用替代字`));
+  } else if (BIG5SET === null) {
+    warnings.push('Big5 字集載入中——罕用字檢查將於「下載 ZIP」時補跑');
+  } else {
+    warnings.push('Big5 字集檔（/big5.json）載入失敗——本批未執行罕用字檢查');
+  }
   /* 沖帳估扣總檢：同一立帳被本批多列沖用時，合計不得超過官方未沖餘額（超額 SBA 匯入會擋） */
   const openMap = new Map(((STATE.offsetOpen && STATE.offsetOpen.items) || []).map(o => [o.vch + '#' + o.seq, o]));
   const alloc = new Map();
@@ -1326,7 +1379,8 @@ function runBatchValidation() {
 }
 let LAST_EXPORT = null;
 function draftsSig() { return JSON.stringify(STATE.drafts); }
-function downloadZip() {
+async function downloadZip() {
+  await loadBig5();   /* 匯出前確保 Big5 字集就緒（載入失敗＝false 時跳過檢查並在警告列註明） */
   if (!runBatchValidation()) { alert('檢核未通過，請先修正紅色項目'); return; }
   const proc7 = toRoc7($('ex-date').value);
   const batch = $('ex-batch').value.trim().toUpperCase();
@@ -1338,7 +1392,7 @@ function downloadZip() {
   const blob = new Blob([zip], { type: 'application/zip' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `SBA匯入傳票_${proc7}${batch}.zip`;
+  a.download = `SBAIMP_${proc7}${batch}.zip`;   /* 純 ASCII 檔名（比照 FNWACX 準則：舊系統對中文檔名可能悶死） */
   a.click();
   URL.revokeObjectURL(a.href);
   $('ex-files').innerHTML = '已產生：' + Object.entries(files).map(([n, c]) =>
@@ -1359,6 +1413,7 @@ async function markExported() {
     $('ex-mark').disabled = true;
     return;
   }
+  $('ex-mark').disabled = true;   /* putConfig 期間鎖鈕；失敗才解鎖重試 */
   const { batch, at, snapshot } = LAST_EXPORT;
   for (const v of snapshot) {
     for (const id of v.sourceIds) {
@@ -1383,6 +1438,7 @@ async function markExported() {
     renderExportLog(); renderPickList(); runBatchValidation();
   } else {
     alert('寫入 D1 失敗（密碼或連線問題），請重試');
+    $('ex-mark').disabled = false;
   }
 }
 function renderExportLog() {
@@ -1624,6 +1680,7 @@ function fnwacxRoundTrip(buf, aoa) {
   } catch (e) { return '回讀失敗：' + e.message; }
 }
 async function downloadFnwacx() {
+  const db = $('pi-dl'); if (db && db.dataset.busy) return;
   const sel = PI_ROWS.filter(x => x.sel);
   if (!sel.length) { alert('請先勾選要匯入的受款人'); return; }
   const missing = sel.filter(x => !x.row[0]).length;
@@ -1651,19 +1708,22 @@ async function downloadFnwacx() {
   }
   /* v5.1.8 官方模板重打包：SheetJS 從零產檔於 SBA 匯入無反應 → 改以官方範本為底稿只填 A..L 值 */
   let buf;
+  if (db) { db.dataset.busy = '1'; db.disabled = true; }   /* 範本 fetch 期間鎖鈕防連點 */
   try {
-    const tplR = await fetch('/sba-fnwacx-template.xlsx?v=' + (window.APP_VERSION || '0'));
-    if (!tplR.ok) throw new Error('讀不到官方範本 sba-fnwacx-template.xlsx（HTTP ' + tplR.status + '）');
-    buf = await buildFnwacxFromTemplate(new Uint8Array(await tplR.arrayBuffer()), aoa.slice(2));
-  } catch (e) { alert('產檔失敗：' + e.message); return; }
-  const rt = fnwacxRoundTrip(buf, aoa);
-  if (rt) { alert('產出檔回讀驗證未過，已中止：\n' + rt); return; }
-  const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const a = document.createElement('a');
-  /* 檔名純 ASCII（舊系統對中文檔名可能悶死），比照官方 310400121_xxx.xlsx 命名 */
-  a.href = URL.createObjectURL(blob);
-  a.download = `${FNWACX_FUND}_FNWACX0170_${toRoc7(todayIso())}.xlsx`;
-  a.click(); URL.revokeObjectURL(a.href);
+    try {
+      const tplR = await fetch('/sba-fnwacx-template.xlsx?v=' + (window.APP_VERSION || '0'));
+      if (!tplR.ok) throw new Error('讀不到官方範本 sba-fnwacx-template.xlsx（HTTP ' + tplR.status + '）');
+      buf = await buildFnwacxFromTemplate(new Uint8Array(await tplR.arrayBuffer()), aoa.slice(2));
+    } catch (e) { alert('產檔失敗：' + e.message); return; }
+    const rt = fnwacxRoundTrip(buf, aoa);
+    if (rt) { alert('產出檔回讀驗證未過，已中止：\n' + rt); return; }
+    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const a = document.createElement('a');
+    /* 檔名純 ASCII（舊系統對中文檔名可能悶死），比照官方 310400121_xxx.xlsx 命名 */
+    a.href = URL.createObjectURL(blob);
+    a.download = `${FNWACX_FUND}_FNWACX0170_${toRoc7(todayIso())}.xlsx`;
+    a.click(); URL.revokeObjectURL(a.href);
+  } finally { if (db) { delete db.dataset.busy; db.disabled = false; } }
 }
 
 /* ═══ 立沖餘額表（FNWFRX0100）匯入 → 現行未沖白名單（v5.4.6） ═══ */

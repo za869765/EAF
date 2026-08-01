@@ -13,6 +13,12 @@
 <link rel="stylesheet" href="eaf-tokens.css?v=4.4.31">
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* 全站按鈕回饋：hover/active/focus 一致（inline 上色的按鈕 filter 也吃得到） */
+button { transition: filter .12s, background .15s, color .15s; }
+button:not(:disabled):hover { filter: brightness(.94); }
+button:not(:disabled):active { filter: brightness(.86); }
+button:disabled { opacity: .55; cursor: not-allowed; }
+button:focus-visible { outline: 2px solid var(--coral, #d97757); outline-offset: 1px; }
 /* Claude design：帳冊頁改 parchment；top-bar / tab-nav / 深色區換 warm charcoal
    所有 #1e2a38 / #263545 / #1e2e3e / #3a4f63 / #455a64 / #37474f 等 cool navy 換 warm 炭
    #cfd8dc / #90a4ae cool gray 換 ring-warm / stone-gray */
@@ -96,8 +102,8 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
   border-top: 4px solid #e0e0e0; text-align: center; cursor: default;
 }
 .r-num   { font-size: 18px; font-weight: 700; line-height: 1.2; }
-.r-label { font-size: 10px; color: #78909c; margin-top: 3px; }
-.r-sub   { font-size: 10px; color: #aaa; margin-top: 2px; }
+.r-label { font-size: 11.5px; color: #6a7f8d; margin-top: 3px; }
+.r-sub   { font-size: 11px; color: #98a2a8; margin-top: 2px; }
 .rc-pink   { border-top-color: #ad1457; } .rc-pink .r-num   { color: #880e4f; }
 .rc-teal   { border-top-color: #00897b; } .rc-teal .r-num   { color: #00695c; }
 .rc-orange { border-top-color: #fb8c00; } .rc-orange .r-num { color: #e65100; }
@@ -163,6 +169,7 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
 .bt-pysup { background: #e3f2fd; color: #1565c0; }
 .bt-pyded { background: #fff3e0; color: #e65100; }
 .del-btn  { background: none; border: none; color: #ef5350; cursor: pointer; font-size: 13px; padding: 2px 4px; }
+.del-btn:hover { color: #c62828; background: #ffebee; border-radius: 3px; }
 .rest-inv-btn { background: none; border: none; color: #1976d2; cursor: pointer; font-size: 13px; padding: 2px 4px; opacity:.7; }
 .rest-inv-btn:hover { opacity:1; }
 /* 軟性作廢列 */
@@ -185,8 +192,8 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
 .v-inp { border: 1px solid #cfd8dc; border-radius: 3px; padding: 2px 5px; font-size: 12px; font-family: inherit; background: #fafafa; width: 100%; outline: none; }
 .v-inp:focus { border-color: #42a5f5; background: #fff; }
 .v-inp.v-num { text-align: right; width: 80px; }
-.v-type-sel { font-size: 10px; padding: 1px 3px; border: 1px solid #cfd8dc; border-radius: 3px; background: #fafafa; cursor: pointer; }
-.v-del-btn { background: #ffebee; border: 1px solid #ef9a9a; border-radius: 3px; cursor: pointer; font-size: 10px; padding: 1px 5px; color: #c62828; }
+.v-type-sel { font-size: 11px; padding: 2px 4px; border: 1px solid #cfd8dc; border-radius: 3px; background: #fafafa; cursor: pointer; }
+.v-del-btn { background: #ffebee; border: 1px solid #ef9a9a; border-radius: 3px; cursor: pointer; font-size: 11.5px; padding: 3px 8px; color: #c62828; }
 .v-del-btn:hover { background: #ffcdd2; }
 
 /* ── 存摺式帳 ── */
@@ -252,6 +259,7 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
 #pk-head { background: #1e2a38; color: #fff; padding: 12px 18px; border-radius: 12px 12px 0 0; display: flex; align-items: center; gap: 10px; }
 #pk-head h3 { flex: 1; font-size: 14px; }
 .pk-close { background: rgba(255,255,255,.15); border: none; color: #fff; border-radius: 4px; padding: 3px 10px; cursor: pointer; font-size: 12px; }
+.pk-close:hover { background: rgba(255,255,255,.3); }
 #pk-filter { padding: 8px 14px; border-bottom: 1px solid #e0e0e0; display: flex; gap: 8px; }
 .pk-in { padding: 5px 9px; border: 1.5px solid #cfd8dc; border-radius: 5px; font-size: 12px; outline: none; font-family: inherit; flex: 1; }
 .pk-in:focus { border-color: #1976d2; }
@@ -311,7 +319,9 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
 .pub-add-btn { padding:3px 12px; border:1px solid #1976d2; border-radius:4px; background:#e3f2fd; color:#1565c0; font-size:11px; cursor:pointer; font-family:inherit; }
 .pub-add-btn:hover { background:#bbdefb; }
 .pub-save-btn { padding:3px 12px; border:1px solid #2e7d32; border-radius:4px; background:#e8f5e9; color:#1b5e20; font-size:11px; cursor:pointer; font-family:inherit; }
-.pub-del-btn { background:#ffebee; border:1px solid #ef9a9a; border-radius:3px; cursor:pointer; font-size:10px; padding:1px 5px; color:#c62828; }
+.pub-save-btn:hover { background:#c8e6c9; }
+.pub-del-btn { background:#ffebee; border:1px solid #ef9a9a; border-radius:3px; cursor:pointer; font-size:11.5px; padding:3px 8px; color:#c62828; }
+.pub-del-btn:hover { background:#ffcdd2; }
 .pub-print-title { display:none; }
 @media print {
   #top-bar, #ym-bar, #ym-global-bar, #tab-nav, .toolbar { display:none !important; }
@@ -331,6 +341,12 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
   #tab-recon button { display:none !important; }
   /* v4.8.6 B6：公務預算列印標題（螢幕隱藏、renderPublicTab 產生於可列印的 #pub-sections 內） */
   .pub-print-title { display:block !important; }
+  /* 深色表頭/橫幅全面淺底深字（B5 只救了 pub 系列；傳票/明細帳/調整表/卡頭/餘額橫幅同病） */
+  .voucher-table th, .ledger-table th, .adj-table th { background:#e8e8e8 !important; color:#000 !important; border-bottom:1px solid #000 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .card-hd { background:#eceff1 !important; color:#000 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .card-hd * { color:#000 !important; }
+  .balance-banner { background:#fff !important; }
+  .balance-banner * { color:#000 !important; }
 }
 /* ── 公務預算結束 ── */
 
@@ -367,7 +383,7 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
   #ver-badge { display: none; }
   #ym-bar { padding: 4px 10px; }
   #content { padding: 8px 10px; }
-  #tab-nav { padding: 0 8px; }
+  #tab-nav { padding: 0 8px; position: static; }   /* top-bar 換行變高後 sticky top:50px 會蓋住分頁列，手機版取消 sticky */
   .tab-btn { padding: 8px 10px; font-size: 11px; min-height: 44px; }
   .card-hd { font-size: 13px; padding: 9px 12px; }
   .card-bd { padding: 12px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -389,8 +405,8 @@ body { font-family: var(--font-sans, 'Segoe UI','Microsoft JhengHei',sans-serif)
 }
 /* v4.4.57：獎勵金計算表 醫療折讓欄行內切換按鈕（門診⇄衛保） */
 .alloc-btn{display:inline-flex;align-items:center;justify-content:center;
-  width:18px;height:18px;border:1px solid #cfd8dc;border-radius:3px;
-  background:#fff;color:#90a4ae;font-size:11px;cursor:pointer;
+  width:24px;height:24px;border:1px solid #cfd8dc;border-radius:4px;
+  background:#fff;color:#90a4ae;font-size:12px;cursor:pointer;
   margin-right:4px;vertical-align:middle;padding:0;line-height:1;
   transition:all .15s;}
 .alloc-btn:hover{border-color:#1565c0;color:#1565c0;background:#e3f2fd;}
@@ -578,10 +594,7 @@ window.addEventListener('storage', (ev) => {
 <div id="ym-global-bar" style="display:none;align-items:center;gap:8px;padding:5px 20px;background:#1e2a38;border-bottom:1px solid #0d1921;">
   <span style="font-size:11px;color:#78909c;">年度</span>
   <select class="ym-sel" id="sel-year" onchange="onYmChange()" style="font-size:13px;padding:3px 8px;font-weight:700;">
-    <option value="114">114</option>
-    <option value="115" selected>115</option>
-    <option value="116">116</option>
-    <option value="117">117</option>
+    <!-- 選項由 JS 動態產生（114 ～ 今年+1），避免寫死年份到期後自動選年失效 -->
   </select>
   <span style="font-size:11px;color:#78909c;">月份</span>
   <select class="ym-sel" id="sel-month" onchange="onYmChange()" style="font-size:13px;padding:3px 8px;font-weight:700;min-width:52px;">
@@ -887,7 +900,7 @@ window.addEventListener('storage', (ev) => {
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;">
         <label>基準值：<input id="depr-base-input" type="number" min="0" style="width:90px;padding:3px 6px;" value="2193"></label>
         <span style="color:#78909c;font-size:11px;">（未設定變更點時，每月都用此金額）</span>
-        <button class="btn btn-gray" style="font-size:11px;padding:3px 10px;" onclick="saveDeprSchedule()">💾 儲存</button>
+        <button class="btn btn-gray" style="font-size:11px;padding:3px 10px;" onclick="saveDeprSchedule(this)">💾 儲存</button>
       </div>
       <div style="margin-top:10px;">
         <div style="font-size:12px;color:#cfd8dc;margin-bottom:6px;">📅 變更點（自該年月起生效，可疊加多筆）</div>
@@ -1021,7 +1034,7 @@ window.addEventListener('storage', (ev) => {
           <input id="allow-rate-input" type="number" step="0.0001" min="0" style="width:100px;padding:3px 6px;" placeholder="0.0572">
           <span style="color:#78909c;font-size:11px;">（如 0.0345 代表 3.45%）</span>
         </label>
-        <button class="btn btn-gray" style="font-size:11px;padding:3px 10px;" onclick="saveAllowRate()">💾 儲存</button>
+        <button class="btn btn-gray" style="font-size:11px;padding:3px 10px;" onclick="saveAllowRate(this)">💾 儲存</button>
         <span id="allow-rate-hint" style="color:#80cbc4;font-size:11px;"></span>
       </div>
       <div style="margin-top:14px;border-top:1px dashed #37474f;padding-top:10px;">
@@ -1673,8 +1686,21 @@ function pad(n){ return String(n).padStart(2,'0'); }
 function getYm(){ const y=document.getElementById('sel-year').value; const m=document.getElementById('sel-month').value; return {y,m,ym:`${y}${pad(m)}`,label:`${y} 年 ${m} 月`}; }
 function showSaveMsg(msg='✓ 已儲存', ok=true){
   const el=document.getElementById('save-msg');
-  el.textContent=msg; el.style.color=ok?'#66bb6a':'#ef5350';
-  setTimeout(()=>el.textContent='',2500);
+  if(el){
+    el.textContent=msg; el.style.color=ok?'#66bb6a':'#ef5350';
+    setTimeout(()=>el.textContent='',2500);
+    return;
+  }
+  /* #save-msg 已隨舊 #ym-bar 移除：改浮動訊息（原本這裡直接解參考會 TypeError，
+     連帶 saveMonthData 的 promise reject → 鎖定鈕永遠卡「🔒 鎖定中…」） */
+  let t=document.getElementById('save-msg-float');
+  if(!t){
+    t=document.createElement('div'); t.id='save-msg-float';
+    t.style.cssText='position:fixed;bottom:26px;left:50%;transform:translateX(-50%);z-index:9999;padding:9px 20px;border-radius:8px;background:#1e2a38;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.3);pointer-events:none;transition:opacity .25s;';
+    document.body.appendChild(t);
+  }
+  t.textContent=msg; t.style.color=ok?'#66bb6a':'#ef5350'; t.style.opacity='1';
+  clearTimeout(t._tm); t._tm=setTimeout(()=>{t.style.opacity='0';},2500);
 }
 
 /* ════════════════════════════════════════════
@@ -2184,7 +2210,7 @@ function updateHomeDashboard(){
   const rcPropDate = document.getElementById('rc-prop-date'); if(rcPropDate) rcPropDate.textContent = _mLabel;
 
   // 累積賸餘（期初 + 本年度 330101 淨增加，直接從傳票，不依賴 surplus 分頁 DOM）
-  const surplusInit = +(localStorage.getItem('acc_surplus_init') || 3432043);
+  const surplusInit = getSurplusOpeningBalance(y);   /* 分年度期初（{y}300001 推導；僅 115 後備舊值） */
   const surpRows = (window.AccV2 && AccV2.entries)
     ? AccV2.entries({ yearPrefix:String(y), subjectPrefix:'330101' }).filter(e => !isYearOpeningVoucher(e.voucher_no))
     : [];
@@ -2628,7 +2654,7 @@ function confirmPicker(){
   pl.innerHTML = items.map(r=>`<span>${r.yearMonth} ${r.purposeDesc} $${fmt(r.amount)}</span>`).join('');
   // 更新折���後淨值
   const depr = pnum(document.getElementById('exp-depr').value);
-  document.getElementById('exp-depr-balance').value = fmt(STATE.property.currentBalance - depr);
+  document.getElementById('exp-depr-balance').value = STATE.property.currentBalance == null ? '—' : fmt(STATE.property.currentBalance - depr);
   closePicker();
   // 自動偵測行動醫院動支單 → 衛生保健支出 + 加班費
   let hExpSum = 0, otSum = 0;
@@ -3330,14 +3356,18 @@ function renderVouchers(){
 // v4.4.29 折讓率 + 110305 應收醫療帳款 聚合
 const ALLOW_RATE_KEY = 'acc_allowance_rate';
 function getAllowRate(){ return Number(localStorage.getItem(ALLOW_RATE_KEY)) || 0; }
-async function saveAllowRate(){
+async function saveAllowRate(btn){
+  if(btn && btn.disabled) return;
   const v = Number(document.getElementById('allow-rate-input').value);
   if(!(v >= 0)) { alert('折讓率必須 >= 0'); return; }
   /* v4.4.29 bug #5: 改走 accSave 同步寫 D1（原本只 localStorage，換裝置全丟）
      v4.4.29 修：改 await 並依結果顯示真實狀態，避免 D1 失敗仍顯示「已儲存」 */
-  const ok = await accSave(ALLOW_RATE_KEY, String(v));
-  renderAllowanceRateAndAR();
-  alert(ok ? '✅ 已存 D1' : '⚠️ 僅存本機（D1 寫入失敗，請檢查網路或重新登入 admin）');
+  if(btn){ btn.disabled = true; btn.textContent = '💾 儲存中…'; }
+  try{
+    const ok = await accSave(ALLOW_RATE_KEY, String(v));
+    renderAllowanceRateAndAR();
+    alert(ok ? '✅ 已存 D1' : '⚠️ 僅存本機（D1 寫入失敗，請檢查網路或重新登入 admin）');
+  } finally { if(btn){ btn.disabled = false; btn.textContent = '💾 儲存'; } }
 }
 function renderAllowanceRateAndAR(){
   const rate = getAllowRate();
@@ -3563,7 +3593,7 @@ function exportCustodialCsv(){
 }
 function exportSurplusCsv(){
   const {y} = getYm();
-  const initVal = +(localStorage.getItem('acc_surplus_init')||3432043);
+  const initVal = getSurplusOpeningBalance(y);   /* 分年度期初（{y}300001 推導；僅 115 後備舊值） */
   /* v4.6.0：同 renderSurplusTab，從匯入傳票 330101 推導 */
   const rows330 = (window.AccV2 && AccV2.entries)
     ? AccV2.entries({ yearPrefix: String(y), subjectPrefix:'330101' }).filter(e => !isYearOpeningVoucher(e.voucher_no))
@@ -4078,7 +4108,17 @@ function getAllowInit(){ const v=localStorage.getItem('acc_allow_init'); return 
 function saveAllowInit(raw){ const v=+(String(raw).replace(/,/g,'')); if(!isNaN(v)) accSave('acc_allow_init',String(v)); }
 function initAllowInitInp(){
   const inp=document.getElementById('al-initial-inp');
-  if(inp){ inp.value=fmt(getAllowInit()); }
+  if(!inp) return;
+  const {y}=getYm();
+  if(String(y)==='115'){   /* 手動期初僅適用 115（其他年度由 {y}300001 結轉推導、輸入值不採計） */
+    inp.disabled=false; inp.style.opacity='';
+    inp.value=fmt(getAllowInit());
+    inp.title='直接輸入期初餘額（Enter 確認）';
+  } else {
+    inp.disabled=true; inp.style.opacity='.5';
+    inp.value='—';
+    inp.title=y+' 年期初由年初結轉傳票（'+y+'300001 之 110306）推導，手動期初僅適用 115 年';
+  }
 }
 function loadAllowLedger(){
   const raw=localStorage.getItem('acc_allow_ledger');
@@ -4098,7 +4138,7 @@ function renderAllowLedger(){
   const openRows = all306.filter(e => isYearOpeningVoucher(e.voucher_no));
   const initBal = openRows.length
     ? openRows.reduce((s,e)=>s+(+e.credit||0)-(+e.debit||0),0)   /* 期初 = 年初結轉 110306 貸−借 */
-    : getAllowInit();                                            /* 無結轉傳票才退回手動期初 */
+    : (String(y) === '115' ? getAllowInit() : 0);                /* 手動期初是 115 年基準：僅 115 後備（比照銀行 v4.8.7 R2），其他年度無結轉回 0 */
   const rows = all306
     .filter(e => !isYearOpeningVoucher(e.voucher_no) && (!e.ym || String(e.ym) <= filterYm))
     .sort((a,b)=> String(a.ym||'').localeCompare(String(b.ym||''))
@@ -4110,7 +4150,7 @@ function renderAllowLedger(){
     <td><span class="badge-type bt-sup">期初餘額</span></td>
     <td class="credit-cell" style="text-align:right;">+${fmt(initBal)}</td>
     <td class="balance-cell" style="text-align:right;">${fmt(initBal)}</td>
-    <td style="font-size:11px;color:#546e7a;">115年1月1日期初備抵醫療折讓（傳票結轉）</td>
+    <td style="font-size:11px;color:#546e7a;">${y}年1月1日期初備抵醫療折讓（傳票結轉）</td>
     <td></td></tr>`;
   rows.forEach(e => {
     const cr = +e.credit||0, dr = +e.debit||0;
@@ -6538,6 +6578,7 @@ const _CUSTODIAL_SEED_DELETED = null;  /*
 /* 自動帶入 Q1 三個月累積賸餘 + 繳局統籌款 + 員工款 */
 function seedYearQ1Data(){
   const {y} = getYm();
+  if(String(y) !== '115') return;   /* 種子是 115 年 Q1 實測值：僅 115 可種，避免把 115 數字寫進其他年度的 acc_yeardata_{y} 並同步 D1 */
   // 旗標設定但資料遺失時也要重新補種
   if(localStorage.getItem('acc_fix_yearq1_302') && localStorage.getItem('acc_yeardata_'+y)) return;
   const yrRaw = localStorage.getItem('acc_yeardata_'+y);
@@ -6551,7 +6592,7 @@ function seedYearQ1Data(){
   const q1staff = { '11501':54561, '11502':231, '11503':23565 };
   ['11501','11502','11503'].forEach(ym=>{
     if(!yd[ym]) yd[ym] = {};
-    yd[ym].fund5 = q1fund5[ym];
+    if(yd[ym].fund5 == null) yd[ym].fund5 = q1fund5[ym];   /* 已有使用者自填值不覆寫（原本無保護，重種會蓋掉） */
     if(!yd[ym].bureau) yd[ym].bureau = q1bureau[ym];
     if(!yd[ym].staff)  yd[ym].staff  = q1staff[ym];
   });
@@ -6751,8 +6792,8 @@ function renderCustodial(){
 
 /* ════ 累積賸餘 330101 明細帳 ════ */
 function renderSurplusTab(){
-  const initVal = +(localStorage.getItem('acc_surplus_init') || 3432043);
   const {y} = getYm();
+  const initVal = getSurplusOpeningBalance(y);   /* 分年度期初（{y}300001 推導；僅 115 後備舊值） */
   const tbody = document.getElementById('surplus-tbody');
   if(!tbody) return;
   /* v4.6.0：改從匯入傳票推導 330101（排除年初結轉傳票，避免與期初雙計）；
@@ -6841,6 +6882,16 @@ function getBankOpeningBalance(y, acct){
   /* v4.8.7 R2：localStorage 期初值是 115 年初基準；僅 115 年可後備，其他年度無結轉傳票時回 0，
      避免選到 116（D1 尚無 116300001）誤用 115 期初值 */
   return String(y) === '115' ? +(localStorage.getItem(acct.initKey) || 0) : 0;
+}
+/* 累積賸餘期初：比照 getBankOpeningBalance 分年度推導 — 取該年度年初結轉傳票（{y}300001）330101 淨貸方。
+   無結轉傳票時僅 115 後備 localStorage（115 年初基準值），其他年度回 0（修正單一 key 不分年度、切他年仍用 115 期初的問題） */
+function getSurplusOpeningBalance(y){
+  const fallback = () => String(y) === '115' ? +(localStorage.getItem('acc_surplus_init') || 3432043) : 0;
+  if(!(window.AccV2 && AccV2.entries)) return fallback();
+  const openVno = String(y) + '300001';
+  const openRows = AccV2.entries({ subjectPrefix: '330101' }).filter(e => String(e.voucher_no) === openVno);
+  if(openRows.length) return openRows.reduce((s,e) => s + (e.credit||0) - (e.debit||0), 0);
+  return fallback();
 }
 function renderBankDeposit(){
   const {y, m, ym, label} = getYm();
@@ -7793,9 +7844,11 @@ function toggleSectionLock(name){
     if(name==='adj') setAdjTableReadonly(true);
     btn.textContent = '🔒 鎖定中…';
     btn.classList.add('locked');
+    btn.disabled = true;   /* 存檔進行中鎖鈕：再點會走「解鎖」分支，畫面狀態與實際錯亂 */
     if(ts){ ts.textContent = '⏳ 寫入 D1…'; ts.style.color = '#ff8f00'; }
     /* v4.3.1：等 server 真的回 200 才顯示時間戳，不再假裝成功 */
     Promise.resolve(saveMonthData()).then(ok => {
+      btn.disabled = false;
       if (ok) {
         btn.textContent = '🔒 已鎖定';
         const now = new Date();
@@ -7920,15 +7973,19 @@ function getMonthlyDepr(ym){
     .sort((a,b)=>String(b.from_ym).localeCompare(String(a.from_ym)))[0];
   return applicable ? Number(applicable.value) : s.base;
 }
-async function saveDeprSchedule(){
+async function saveDeprSchedule(btn){
+  if(btn && btn.disabled) return;
   const base = Number(document.getElementById('depr-base-input').value) || 0;
   const existing = getDeprSchedule();
   const next = { base, changes: existing.changes };
   /* v4.4.29: await + 真實狀態 */
-  const ok = await accSave(DEPR_KEY, next);
-  renderDeprSchedule();
-  updateDeprBalance();
-  alert(ok ? '✅ 已存 D1' : '⚠️ 僅存本機（D1 寫入失敗）');
+  if(btn){ btn.disabled = true; btn.textContent = '💾 儲存中…'; }
+  try{
+    const ok = await accSave(DEPR_KEY, next);
+    renderDeprSchedule();
+    updateDeprBalance();
+    alert(ok ? '✅ 已存 D1' : '⚠️ 僅存本機（D1 寫入失敗）');
+  } finally { if(btn){ btn.disabled = false; btn.textContent = '💾 儲存'; } }
 }
 async function addDeprChange(){
   const ym = document.getElementById('depr-new-ym').value.trim();
@@ -7980,6 +8037,17 @@ function renderDeprSchedule(){
 /* v4.4.64：年初帳面淨值（115/1/1）作為計算起點 */
 const PROP_INIT_BAL_YEAR_START = 87205;
 const PROP_INIT_ORIGINAL_COST  = 320557;
+/* 年初帳面淨值分年度推導：115＝實測常數；其他年度依官方權威鏈——
+   該年 1 月官方「上期結轉」→ 前一年 12 月官方結存 → 皆無回 null（不冒用 115 常數） */
+function propInitNetOf(y){
+  if(String(y) === '115') return PROP_INIT_BAL_YEAR_START;
+  const off = loadPropOfficial();
+  const jan = off[String(y) + '01'];
+  if(jan && jan.carry != null) return Number(jan.carry);   /* 官方報表已匯入即信任其值——carry 合法可為 0 */
+  const prevDec = off[String(+y - 1) + '12'];
+  if(prevDec && prevDec.bal != null) return Number(prevDec.bal);
+  return null;
+}
 
 /* v4.7.7：財產分類量值統計表官方逐月結存（什項設備），成為權威值
    結構 { '11501': {carry, add, sub, depr, bal}, ... }；bal＝本期結存(帳面淨值) */
@@ -7998,12 +8066,13 @@ function getPropDeprForMonth(y, m){
    m=0 回年初值 */
 function getPropNetThroughMonth(y, m){
   const off = loadPropOfficial();
-  let net = PROP_INIT_BAL_YEAR_START;
+  const init = propInitNetOf(y);                     /* 分年度年初（null＝該年無官方依據） */
+  let net = init;
   for(let mm=1; mm<=m; mm++){
     const ym = String(y) + String(mm).padStart(2,'0');
     const o = off[ym];
     if(o && o.bal != null) net = Number(o.bal);      /* 官方權威：重設基準 */
-    else net -= getMonthlyDepr(ym);                  /* 缺月：計算延伸 */
+    else if(net != null) net -= getMonthlyDepr(ym);  /* 缺月：計算延伸（無基準時維持 null） */
   }
   return net;
 }
@@ -8024,24 +8093,26 @@ function updateDeprBalance(){
   /* v4.4.64：用動態計算取代寫死的 STATE.property.currentBalance（原 82,819 = 2月底，
      看 4/5 月就會錯。改成依年初 + 1月到上月累計折舊推算。 */
   const prevBalDyn = getPropPrevMonthBal(y, m);
-  STATE.property.currentBalance = prevBalDyn;
-  const balance = getPropNetThroughMonth(y, m);   /* v4.7.7：官方結存為權威（缺月＝prevBalDyn−depr） */
+  STATE.property.currentBalance = prevBalDyn;   /* null＝該年無官方依據：保留未知狀態，消費端各自防呆（不可硬轉 0 造成負值假象） */
+  const balance = getPropNetThroughMonth(y, m);   /* v4.7.7：官方結存為權威（缺月＝prevBalDyn−depr）；null＝該年無官方依據 */
   const _deprBalEl = document.getElementById('exp-depr-balance');
-  if(_deprBalEl) _deprBalEl.value = fmt(balance);
+  if(_deprBalEl) _deprBalEl.value = balance == null ? '—' : fmt(balance);
   const _deprLblEl = document.getElementById('depr-balance-label');
   if(_deprLblEl) _deprLblEl.textContent = `（${y}年${m}月期末）`;
   const _deprHintEl = document.getElementById('depr-balance-hint');
-  if(_deprHintEl) _deprHintEl.textContent  = `帳面淨值：${fmt(balance)} 元`;
+  if(_deprHintEl) _deprHintEl.textContent  = balance == null
+    ? `⚠ 尚未匯入 ${y} 年官方財產結存（或前一年12月結存），年初帳面無法推導`
+    : `帳面淨值：${fmt(balance)} 元`;
   // 財產管理頁標籤 + 數值
   const curLabel  = document.getElementById('prop-cur-label');
   const prevLabel = document.getElementById('prop-prev-label');
   const curBal    = document.getElementById('prop-balance');
   const prevBal   = document.getElementById('prop-prev-bal');
   const curIsOff = loadPropOfficial()[String(y)+String(m).padStart(2,'0')]?.bal != null;   /* v4.7.7 */
-  if(curLabel)  curLabel.textContent  = `🏚️ ${m}月期末（元）` + (curIsOff ? '｜官方' : '｜計算');
+  if(curLabel)  curLabel.textContent  = `🏚️ ${m}月期末（元）` + (balance == null ? '｜待官方結存' : (curIsOff ? '｜官方' : '｜計算'));
   if(prevLabel) prevLabel.textContent = `${prevM}月期末（元）`;
-  if(curBal)    curBal.textContent    = fmt(balance);
-  if(prevBal)   prevBal.textContent   = fmt(prevBalDyn);
+  if(curBal)    curBal.textContent    = balance == null ? '—' : fmt(balance);      /* null 不可餵 fmt（會顯示成 0 的假餘額） */
+  if(prevBal)   prevBal.textContent   = prevBalDyn == null ? '—' : fmt(prevBalDyn);
   /* v4.7.4：首頁卡 rc-property 改由 updateHomeDashboard 以傳票值(130x01−130x03)設定，此處不再覆寫 */
   /* v4.4.64：折舊存摺自動延伸到選定月份 */
   if(typeof renderDeprLedgerDynamic === 'function') renderDeprLedgerDynamic();
@@ -8052,16 +8123,19 @@ function renderDeprLedgerDynamic(){
   const tbody = document.getElementById('prop-tbody');
   if(!tbody) return;
   const {y, m} = getYm();
-  const initBal      = PROP_INIT_BAL_YEAR_START;
-  const initOriginal = PROP_INIT_ORIGINAL_COST;
-  const initAccum    = initOriginal - initBal;
+  const initBal      = propInitNetOf(y);   /* 分年度年初帳面（null＝該年無官方依據，不冒用 115 常數） */
+  const initOriginal = String(y) === '115' ? PROP_INIT_ORIGINAL_COST : null;
+  const initAccum    = (initBal != null && initOriginal != null) ? initOriginal - initBal : null;
+  const F = v => v == null ? '—' : fmt(v);
   let html = `<tr>
     <td>期初</td>
-    <td style="text-align:right; color:#546e7a;">${fmt(initOriginal)}</td>
+    <td style="text-align:right; color:#546e7a;">${F(initOriginal)}</td>
     <td style="text-align:right;">-</td>
-    <td style="text-align:right; color:#ef9a9a;">${fmt(initAccum)}</td>
-    <td class="balance-cell" style="text-align:right;">${fmt(initBal)}</td>
-    <td style="font-size:11px; color:#546e7a;">${y}年1月1日帳面淨值（${y}300001年結轉）</td>
+    <td style="text-align:right; color:#ef9a9a;">${F(initAccum)}</td>
+    <td class="balance-cell" style="text-align:right;">${F(initBal)}</td>
+    <td style="font-size:11px; color:#546e7a;">${initBal == null
+      ? `⚠ ${y}年年初帳面待推導：請匯入 ${y}年1月（或 ${+y-1}年12月）財產分類量值統計表`
+      : `${y}年1月1日帳面淨值（官方結轉）`}</td>
     <td></td>
   </tr>`;
   const official = loadPropOfficial();   /* v4.7.7：官方結存為權威 */
@@ -8072,16 +8146,16 @@ function renderDeprLedgerDynamic(){
     const depr = getPropDeprForMonth(y, mm);
     if(!hasOff && depr === 0) continue;
     const bal = getPropNetThroughMonth(y, mm);       /* 官方權威、缺月計算延伸 */
-    const cumDepr = initOriginal - bal;               /* 累折＝原始成本−帳面淨值 */
+    const cumDepr = (initOriginal != null && bal != null) ? initOriginal - bal : null;   /* 累折＝原始成本−帳面淨值 */
     const badge = hasOff
       ? `<span style="font-size:10px;background:#e3f2fd;color:#1565c0;border-radius:3px;padding:1px 6px;margin-left:6px;">官方</span>`
       : `<span style="font-size:10px;background:#eceff1;color:#90a4ae;border-radius:3px;padding:1px 6px;margin-left:6px;">計算</span>`;
     html += `<tr>
       <td>${monthYm}</td>
-      <td style="text-align:right; color:#546e7a;">${fmt(initOriginal)}</td>
+      <td style="text-align:right; color:#546e7a;">${F(initOriginal)}</td>
       <td class="debit-cell" style="text-align:right;">-${fmt(depr)}</td>
-      <td style="text-align:right; color:#ef9a9a;">${fmt(cumDepr)}</td>
-      <td class="balance-cell" style="text-align:right;">${fmt(bal)}</td>
+      <td style="text-align:right; color:#ef9a9a;">${F(cumDepr)}</td>
+      <td class="balance-cell" style="text-align:right;">${F(bal)}</td>
       <td style="font-size:11px; color:#546e7a;">${monthYm}雜項設備折舊${fmt(depr)}元${badge}</td>
       <td></td>
     </tr>`;
@@ -8542,6 +8616,16 @@ function logout(){
     const curM  = String(today.getMonth() + 1);
     const ySel  = document.getElementById('sel-year');
     const mSel  = document.getElementById('sel-month');
+    /* 年度選項動態產生：114 ～ max(今年+1, 117)——原寫死到 117，118 年起自動選年會靜默停在預設 */
+    if (ySel && !ySel.options.length) {
+      const maxY = Math.max(+rocY + 1, 117);
+      for (let yy = 114; yy <= maxY; yy++) {
+        const o = document.createElement('option');
+        o.value = String(yy); o.textContent = String(yy);
+        if (String(yy) === '115') o.selected = true;
+        ySel.appendChild(o);
+      }
+    }
     if (ySel && [...ySel.options].some(o => o.value === rocY)) ySel.value = rocY;
     if (mSel) mSel.value = curM;
     const label = `${rocY} 年 ${curM} 月`;
@@ -8549,6 +8633,9 @@ function logout(){
     if (gLab) gLab.textContent = label;
     const wTitle = document.getElementById('work-month-title');
     if (wTitle) wTitle.textContent = `${label} 月底結算`;
+    /* 收支對帳月份預設帶今日年月（原寫死「115年6月」，跨年易誤植；「載入範例」鈕仍為 115年6月 示範值） */
+    const rcnMon = document.getElementById('rcn-mon');
+    if (rcnMon) rcnMon.value = `${rocY}年${curM}月`;
   } catch(_) {}
   // ① 先從 D1 同步（以雲端資料覆寫 localStorage，確保換裝置或清 Cookie 後資料不遺失）
   //    v4.4.29 round-2 修：accInitSync 內部已 hard-skip DEAD_KEYS（acc_payable/acc_custodial）
