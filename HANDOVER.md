@@ -1,3 +1,14 @@
+# 專案接力記錄 — 2026/08/01（v5.6.0 三系統巡檢修復）
+
+> 6 個巡查 agent（EAF/ACC/SALARY × UI/邏輯）確認 60 項 → 修 55 項 → **codex review 三輪收斂**（P1×4/P2×9/P3×1 全修）。
+> 本 repo 修 51 項（EAF 24＋ACC 27），**逐條細節見 `docs/v5.6.0_修改細節報告.md`**（含 SALARY 18 項）。
+> 重點：傳票年度隨製票日期（跨年補帳）＋next-voucher 帶 ?year=；新增 **big5.json 字集檢查**（匯出前具名警示罕用字，下載 ZIP 前 await 就緒）；
+> UTC 日期全改本地；acc showSaveMsg TypeError（鎖定鈕卡死根因）修復；累積賸餘/財產折舊/備抵折讓**期初全面分年度化**（{y}300001 推導、僅 115 後備、未知顯示「—」不顯示假 0）；
+> seedYearQ1Data 鎖 115；年度下拉動態化；防連點全面補齊；列印深色表頭淺化；發票日期曆法驗證（1150231 擋下）。
+> 版號：APP_VERSION＝APP_FORCE_VERSION＝5.6.0、SBA_CORE_VERSION＝5.6.0。push 後 Pages 自動部署已驗證（version.js 5.6.0）。
+
+---
+
 # 專案接力記錄 — 2026/07/29（v5.5.6 / v5.5.7）
 
 > 換台電腦繼續：先 `git -C .../EAF pull`。暗號「**佳里ACC，接力**」。
