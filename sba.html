@@ -269,7 +269,7 @@ window.addEventListener('storage', (ev) => {
     <div class="card">
       <h3>📜 匯出紀錄</h3>
       <div class="scroll-x" style="max-height:40vh;overflow-y:auto;">
-        <table class="grid"><thead><tr><th>時間</th><th>批號</th><th>匯入序號</th><th>來源單</th></tr></thead>
+        <table class="grid"><thead><tr><th>時間</th><th>批號</th><th>類別</th><th>匯入序號</th><th>來源單</th></tr></thead>
         <tbody id="ex-log"></tbody></table>
       </div>
     </div>
@@ -1538,10 +1538,16 @@ function renderExportLog() {
       byRecno.get(r.recno).srcs.push(rec ? rec.voucherNo : r.id);
     }
   }
+  /* 類別＝匯入序號第4碼（年3+類1+流水5）：2支出/3轉帳/1收入 */
+  const kindChip = (recno) => {
+    const k = String(recno || '').charAt(3);
+    const nm = { '1': '收入', '2': '支出', '3': '轉帳' }[k] || '—';
+    return `<span class="chip ${k === '3' ? 'fund' : k === '2' ? 'exp' : ''}">${nm}</span>`;
+  };
   $('ex-log').innerHTML = [...byRecno.values()].map(r =>
     `<tr><td>${esc(String(r.at || '').slice(0, 16).replace('T', ' '))}</td><td>${esc(r.batch || '')}</td>
-     <td>${esc(r.recno)}</td><td>${esc(r.srcs.join('、') || '手動編製')}</td></tr>`).join('')
-    || '<tr><td colspan="4" class="small">尚無匯出紀錄</td></tr>';
+     <td>${kindChip(r.recno)}</td><td>${esc(r.recno)}</td><td>${esc(r.srcs.join('、') || '手動編製')}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="small">尚無匯出紀錄</td></tr>';
 }
 
 /* ═══════════════ ⚙️ 設定 ═══════════════ */
