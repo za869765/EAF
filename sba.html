@@ -172,13 +172,19 @@ window.addEventListener('storage', (ev) => {
 <div id="tab-nav">
   <button class="tab-btn active" data-tab="pick" onclick="switchTab('pick',this)">📋 選單製票</button>
   <button class="tab-btn" data-tab="preview" onclick="switchTab('preview',this)">🧾 傳票預覽 <span id="draft-count" class="chip">0</span></button>
-  <button class="tab-btn" data-tab="transfer" onclick="switchTab('transfer',this)">🔁 轉帳傳票</button>
   <button class="tab-btn" data-tab="paydb" onclick="switchTab('paydb',this)">👥 受款人匯入</button>
   <button class="tab-btn" data-tab="settings" onclick="switchTab('settings',this)">⚙️ 設定</button>
 </div>
 
-<!-- ═══ 📋 選單製票 ═══ -->
+<!-- ═══ 📋 選單製票（頁內切換：支出傳票／轉帳傳票） ═══ -->
 <div class="tab-pane active" id="tab-pick">
+  <div class="toolbar">
+    <span class="pill-toggle" id="pick-mode">
+      <button class="on" data-mode="expense" onclick="setPickMode('expense')">💰 支出傳票</button>
+      <button data-mode="transfer" onclick="setPickMode('transfer')">🔁 轉帳傳票</button>
+    </span>
+  </div>
+  <div id="pick-expense">
   <div class="card">
     <div class="toolbar">
       <label>期間 <input type="date" id="pk-from" onchange="renderPickList()"> ～ <input type="date" id="pk-to" onchange="renderPickList()"></label>
@@ -206,11 +212,32 @@ window.addEventListener('storage', (ev) => {
     </div>
     <div id="pk-issues"></div>
   </div>
+  </div>
+  <div id="pick-transfer" style="display:none;">
+  <div class="card">
+    <h3>🔁 快速編製轉帳傳票（調整分錄）</h3>
+    <div class="toolbar">
+      <label>製票日期(=入帳日) <input type="date" id="tr-date"></label>
+      <label>傳票摘要 <input type="text" id="tr-memo" style="width:320px;" placeholder="例：11507 月底應付費用立帳"></label>
+    </div>
+    <div class="scroll-x">
+      <table class="grid" id="tr-table">
+        <thead><tr><th>#</th><th>借/貸</th><th>科目</th><th>bcode</th><th>用途別</th><th>子目</th><th>歸屬</th><th class="num">金額</th><th>摘要</th><th></th></tr></thead>
+        <tbody id="tr-body"></tbody>
+      </table>
+    </div>
+    <div class="toolbar">
+      <button class="btn btn-sm" onclick="addTrLine()">＋ 加列</button>
+      <span id="tr-balance" class="small"></span>
+      <button class="btn btn-main" onclick="addTransferVoucher()">⚡ 加入預覽</button>
+    </div>
+  </div>
+  </div>
 </div>
 
 <!-- ═══ 🧾 傳票預覽 ═══ -->
 <div class="tab-pane" id="tab-preview">
-  <div id="pv-empty" class="card small">尚無傳票草稿——請至「📋 選單製票」勾選產生，或於「🔁 轉帳傳票」手動編製。</div>
+  <div id="pv-empty" class="card small">尚無傳票草稿——請至「📋 選單製票」勾選產生支出傳票，或於同頁切換「🔁 轉帳傳票」手動編製。</div>
   <div class="toolbar">
     <button class="btn" onclick="aiFixMemos(this)">✨ AI 修正摘要（Gemini）</button>
     <span class="small" id="pv-ai-msg">摘要可逐張先看過、手動修改；AI 修正會改寫傳票摘要與銀行列摘要（改完仍可再編輯，匯出前都不定案）</span>
@@ -236,28 +263,6 @@ window.addEventListener('storage', (ev) => {
         <table class="grid"><thead><tr><th>時間</th><th>批號</th><th>匯入序號</th><th>來源單</th></tr></thead>
         <tbody id="ex-log"></tbody></table>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══ 🔁 轉帳傳票 ═══ -->
-<div class="tab-pane" id="tab-transfer">
-  <div class="card">
-    <h3>🔁 快速編製轉帳傳票（調整分錄）</h3>
-    <div class="toolbar">
-      <label>製票日期(=入帳日) <input type="date" id="tr-date"></label>
-      <label>傳票摘要 <input type="text" id="tr-memo" style="width:320px;" placeholder="例：11507 月底應付費用立帳"></label>
-    </div>
-    <div class="scroll-x">
-      <table class="grid" id="tr-table">
-        <thead><tr><th>#</th><th>借/貸</th><th>科目</th><th>bcode</th><th>用途別</th><th>子目</th><th>歸屬</th><th class="num">金額</th><th>摘要</th><th></th></tr></thead>
-        <tbody id="tr-body"></tbody>
-      </table>
-    </div>
-    <div class="toolbar">
-      <button class="btn btn-sm" onclick="addTrLine()">＋ 加列</button>
-      <span id="tr-balance" class="small"></span>
-      <button class="btn btn-main" onclick="addTransferVoucher()">⚡ 加入預覽</button>
     </div>
   </div>
 </div>
@@ -396,6 +401,12 @@ function switchTab(name, btn) {
   if (name === 'preview') renderPreview();
   if (name === 'paydb') renderPayeeDiff();
   if (name === 'settings') renderSettings();
+}
+/* 選單製票頁內切換：支出傳票（勾選單據）／轉帳傳票（手動分錄） */
+function setPickMode(mode) {
+  $('pick-expense').style.display = mode === 'expense' ? '' : 'none';
+  $('pick-transfer').style.display = mode === 'transfer' ? '' : 'none';
+  document.querySelectorAll('#pick-mode button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode));
 }
 
 /* ═══════════════ 開機載入 ═══════════════ */
