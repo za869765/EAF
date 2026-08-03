@@ -1297,12 +1297,24 @@ function buildTrCopyOptions() {
     g.n += 1; g.d += +e.debit || 0;
     if (+e.seq === 1) g.desc = String(e.description || '').replace(/\s+/g, ' ');
   }
+  /* 依月份(ym)分組：新月在前、組內傳票號新→舊 */
+  const byYm = new Map();
   for (const vno of [...byV.keys()].sort((a, b) => b.localeCompare(a))) {
-    const g = byV.get(vno);
-    const o = document.createElement('option');
-    o.value = vno;
-    o.textContent = `${vno}（${g.ym}）$${fmtN(g.d)}・${g.n}列 ${g.desc.slice(0, 22)}`;
-    sel.appendChild(o);
+    const ym = byV.get(vno).ym || '（無月份）';
+    if (!byYm.has(ym)) byYm.set(ym, []);
+    byYm.get(ym).push(vno);
+  }
+  for (const ym of [...byYm.keys()].sort((a, b) => b.localeCompare(a))) {
+    const og = document.createElement('optgroup');
+    og.label = /^\d{5}$/.test(ym) ? `📅 ${ym.slice(0, 3)} 年 ${ym.slice(3)} 月（${byYm.get(ym).length} 張）` : ym;
+    for (const vno of byYm.get(ym)) {
+      const g = byV.get(vno);
+      const o = document.createElement('option');
+      o.value = vno;
+      o.textContent = `${vno} $${fmtN(g.d)}・${g.n}列 ${g.desc.slice(0, 24)}`;
+      og.appendChild(o);
+    }
+    sel.appendChild(og);
   }
 }
 function applyTrCopy() {
