@@ -226,6 +226,13 @@ window.addEventListener('storage', (ev) => {
       <span class="small" id="tr-copy-msg"></span>
     </div>
     <div class="toolbar">
+      <label>🗓 月份取代 <input type="text" id="tr-ym-from" class="w-4" maxlength="5" placeholder="11506"> → <input type="text" id="tr-ym-to" class="w-4" maxlength="5" placeholder="11507"></label>
+      <button class="btn btn-sm" onclick="trBumpYm()">套用到全部摘要</button>
+      <label style="margin-left:10px;">🔢 數字取代 <input type="text" id="tr-num-from" class="w-amt" placeholder="舊數字"> → <input type="text" id="tr-num-to" class="w-amt" placeholder="新數字"></label>
+      <button class="btn btn-sm" onclick="trReplaceNum()">替換金額＋摘要</button>
+      <span class="small" id="tr-tool-msg"></span>
+    </div>
+    <div class="toolbar">
       <label>製票日期(=入帳日) <input type="date" id="tr-date"></label>
       <label>傳票摘要 <input type="text" id="tr-memo" style="width:320px;" placeholder="例：11507 月底應付費用立帳"></label>
     </div>
@@ -1346,6 +1353,12 @@ function applyTrCopy() {
   }
   if (!$('tr-memo').value.trim()) $('tr-memo').value = String(src[0].description || '').replace(/\s+/g, ' ');
   trBalance();
+  /* 自動偵測摘要中最常出現的民國年月 → 預填「月份取代」為 舊→下一月（可手改） */
+  const cnt = new Map();
+  const ymRe = new RegExp('(?<!\\d)' + YM_RE_SRC + '(?!\\d)', 'g');
+  for (const e of src) for (const m of String(e.description || '').matchAll(ymRe)) cnt.set(m[0], (cnt.get(m[0]) || 0) + 1);
+  const top = [...cnt.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (top) { $('tr-ym-from').value = top[0]; $('tr-ym-to').value = nextYmOf(top[0]); }
   $('tr-copy-msg').textContent = `✔ 已套入 ${vno} 共 ${src.length} 列——請調整年月、金額與摘要後「⚡ 加入預覽」`;
 }
 function addTrLine() {
@@ -1361,9 +1374,55 @@ function addTrLine() {
     <td><input class="w-4 tr-scode1" value="00001"></td>
     <td><input class="w-amt tr-amt" onchange="trBalance()"></td>
     <td><input class="w-memo tr-memo"></td>
-    <td><button class="btn btn-sm" onclick="this.closest('tr').remove();trBalance()">✕</button></td>`;
+    <td style="white-space:nowrap;"><button class="btn btn-sm" title="上移" onclick="trMove(this,-1)">↑</button><button class="btn btn-sm" title="下移" onclick="trMove(this,1)">↓</button><button class="btn btn-sm" onclick="this.closest('tr').remove();trRenum();trBalance()">✕</button></td>`;
   tb.appendChild(tr);
+  trRenum();
   ensureSubjectDatalist();
+}
+/* 列挪移（↑↓）＋序號重編（刪列/挪移/加列後 # 欄即時重排；匯出 seq 本就依畫面順序） */
+function trMove(btn, dir) {
+  const tr = btn.closest('tr'), tb = tr.parentElement;
+  if (dir < 0 && tr.previousElementSibling) tb.insertBefore(tr, tr.previousElementSibling);
+  else if (dir > 0 && tr.nextElementSibling) tb.insertBefore(tr.nextElementSibling, tr);
+  trRenum();
+}
+function trRenum() {
+  [...$('tr-body').children].forEach((tr, i) => { tr.firstElementChild.textContent = i + 1; });
+}
+/* 月份一鍵取代：全部列摘要＋傳票摘要中的民國5碼年月（含跨年 11512→11601 進位預填） */
+function nextYmOf(ym) {
+  const y = +String(ym).slice(0, 3), m = +String(ym).slice(3);
+  return m >= 12 ? (y + 1) + '01' : y + String(m + 1).padStart(2, '0');
+}
+const YM_RE_SRC = '1[0-3]\\d(?:0[1-9]|1[0-2])';   /* 民國 100~139 年 + 01~12 月，排除 17178 這類金額 */
+function trBumpYm() {
+  const from = $('tr-ym-from').value.trim(), to = $('tr-ym-to').value.trim();
+  const ok = (s) => new RegExp('^' + YM_RE_SRC + '$').test(s);
+  if (!ok(from) || !ok(to)) { alert('月份格式須為民國5碼年月，如 11506'); return; }
+  const re = new RegExp('(?<!\\d)' + from + '(?!\\d)', 'g');
+  let n = 0;
+  const repl = (s) => s.replace(re, () => (n++, to));
+  document.querySelectorAll('#tr-body .tr-memo').forEach(inp => { inp.value = repl(inp.value); });
+  $('tr-memo').value = repl($('tr-memo').value);
+  $('tr-tool-msg').textContent = n ? `✔ ${from} → ${to} 共取代 ${n} 處` : `找不到「${from}」`;
+}
+/* 數字快速取代：金額欄等值者直接換，摘要內同數字（含千分位寫法）一併換 */
+function trReplaceNum() {
+  const from = $('tr-num-from').value.replace(/[,\s]/g, ''), to = $('tr-num-to').value.replace(/[,\s]/g, '');
+  if (!/^\d+$/.test(from) || !/^\d+$/.test(to)) { alert('請輸入純數字（可含千分位逗號）'); return; }
+  const reFmt = new RegExp('(?<![\\d,])' + fmtN(+from) + '(?![\\d,])', 'g');
+  const reRaw = new RegExp('(?<![\\d,])' + from + '(?![\\d,])', 'g');
+  let nAmt = 0, nMemo = 0;
+  const repl = (s) => s.replace(reFmt, () => (nMemo++, fmtN(+to))).replace(reRaw, () => (nMemo++, to));
+  for (const tr of $('tr-body').children) {
+    const amt = tr.querySelector('.tr-amt');
+    if (String(amt.value).replace(/,/g, '') === from) { amt.value = to; nAmt++; }
+    const memo = tr.querySelector('.tr-memo');
+    memo.value = repl(memo.value);
+  }
+  $('tr-memo').value = repl($('tr-memo').value);
+  trBalance();
+  $('tr-tool-msg').textContent = (nAmt || nMemo) ? `✔ ${fmtN(+from)} → ${fmtN(+to)}：金額 ${nAmt} 列、摘要 ${nMemo} 處` : `找不到「${fmtN(+from)}」`;
 }
 function ensureSubjectDatalist() {
   if ($('subject-list')) return;
