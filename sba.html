@@ -332,7 +332,7 @@ window.addEventListener('storage', (ev) => {
   <div class="small" id="modal-hint"></div>
   <input type="search" id="modal-q" placeholder="🔍 搜尋 摘要/傳票號/子目（如：周轉金）" style="width:320px;margin-top:8px;" oninput="renderOffsetList(this.value)">
   <div class="scroll-x" style="max-height:52vh;overflow-y:auto;margin-top:8px;">
-    <table class="grid"><thead><tr><th>傳票號</th><th>序</th><th>日期</th><th>子目</th><th>摘要</th><th class="num">貸方金額</th><th></th></tr></thead>
+    <table class="grid"><thead><tr><th>傳票號</th><th>序</th><th>日期</th><th>子目</th><th>摘要</th><th class="num">立帳金額</th><th></th></tr></thead>
     <tbody id="modal-body"></tbody></table>
   </div>
   <div class="toolbar" style="margin-top:10px;">
@@ -862,6 +862,8 @@ function generateVouchers() {
 /* ═══════════════ 🧾 傳票預覽/編輯 ═══════════════ */
 const KIND_NAMES = { '1': '收入傳票', '2': '支出傳票', '3': '轉帳傳票' };
 const OFFSETABLE = (code) => /^(2102|210205|210202|110305|180705)/.test(code);
+/* 立沖科目「沖帳」方向依科目性質：負債(2102 應付/代收)＝貸立帳借沖；資產(110305 應收/180705 保證金)＝借立帳貸沖 */
+const OFFSET_DC = (code) => /^(110305|180705)/.test(String(code)) ? 'C' : 'D';
 /* AI 回傳後再保險清一次：擬支付/支付開頭贅詞、檢附…整句、條列編號 */
 function cleanMemoText(t) {
   return String(t || '')
@@ -979,7 +981,7 @@ function renderPreview() {
         <td><input class="w-amt" value="${L.amt}" onchange="updLine(${vi},${li},'amt',this.value)"></td>
         <td><input class="w-memo" value="${esc(L.memo || '')}" onchange="updLine(${vi},${li},'memo',this.value)"></td>
         <td style="white-space:nowrap;">
-          ${L.dc === 'D' && OFFSETABLE(L.code) ? `<button class="btn btn-sm${!L.offset && /^2102/.test(String(L.code)) ? ' btn-danger' : ''}" onclick="openOffsetModal(${vi},${li})" title="${!L.offset && /^2102/.test(String(L.code)) ? '立沖科目必須連結沖帳（SBA 匯入必要）' : '沖前立帳連結'}">${L.offset ? '🔗' + esc(L.offset.vchrno) + '#' + esc(String(L.offset.seq)) : '沖帳'}</button>` : ''}
+          ${L.dc === OFFSET_DC(L.code) && OFFSETABLE(L.code) ? `<button class="btn btn-sm${!L.offset && L.dc === 'D' && /^2102/.test(String(L.code)) ? ' btn-danger' : ''}" onclick="openOffsetModal(${vi},${li})" title="${!L.offset && L.dc === 'D' && /^2102/.test(String(L.code)) ? '立沖科目必須連結沖帳（SBA 匯入必要）' : '沖前立帳連結'}">${L.offset ? '🔗' + esc(L.offset.vchrno) + '#' + esc(String(L.offset.seq)) : '沖帳'}</button>` : ''}
           <button class="btn btn-sm" onclick="delLine(${vi},${li})">✕</button>
         </td>
       </tr>`;
@@ -1136,11 +1138,13 @@ function openOffsetModal(vi, li) {
   const code = String(L.code).slice(0, 8);
   const base6 = code.slice(0, 6);
   const rel = String(L.relate || '');
-  /* 候選＝同科目家族「歷年」全部貸方列（v5.4.5 連年度限制也移除——跨年度沖銷實際存在，原則：寧可多列不可選不到） */
+  /* 候選＝同科目家族「歷年」全部立帳列（v5.4.5 連年度限制也移除——跨年度沖銷實際存在，原則：寧可多列不可選不到）
+     立帳方向依科目性質：負債(沖=借)立帳=貸方列；資產(沖=貸，如 110305 應收)立帳=借方列 */
+  const estField = OFFSET_DC(code) === 'D' ? 'credit' : 'debit';
   const cands = STATE.entries.filter(e => {
     const sc = String(e.subject || '').split(' ')[0];
     if (!(sc === code || sc.startsWith(base6))) return false;
-    if (!(+e.credit > 0)) return false;
+    if (!(+e[estField] > 0)) return false;
     return true;
   });
   const subOf = (e) => String(e.sub_account || '').slice(0, 2);
@@ -1154,7 +1158,7 @@ function openOffsetModal(vi, li) {
   const openMap = new Map(((STATE.offsetOpen && STATE.offsetOpen.items) || []).map(o => [o.vch + '#' + o.seq, o]));
   STATE.modalCands = { cands, rel, openMap, showHist: false };
   $('modal-title').textContent = `選擇沖帳立帳傳票 — ${code} ${subjectName(code)}`;
-  $('modal-hint').textContent = `候選＝D1 歷史 SBA 分錄中，同科目家族「歷年」全部貸方（立帳）列，依子目分組${rel ? `、與本列子目 ${rel} 相同者置頂推薦` : ''}、組內新到舊。資料截至最後匯入月份，更新的立帳請先匯入最新 FNWFRX0090 或至 SBA 端手動沖。`;
+  $('modal-hint').textContent = `候選＝D1 歷史 SBA 分錄中，同科目家族「歷年」全部${estField === 'credit' ? '貸方' : '借方'}（立帳）列，依子目分組${rel ? `、與本列子目 ${rel} 相同者置頂推薦` : ''}、組內新到舊。資料截至最後匯入月份，更新的立帳請先匯入最新 FNWFRX0090 或至 SBA 端手動沖。`;
   $('modal-q').value = '';
   renderOffsetList('');
   $('modal-mask').style.display = 'block';
@@ -1172,8 +1176,8 @@ function renderOffsetList(q) {
   const useWhitelist = openMap.size > 0;
   const ctx = STATE.modalCtx || {};
   const rowHtml = (e, left, selectable) => {
-    /* 估扣：可用＝未沖（或貸方額）− 本批其他列已沖同一立帳的合計，避免超額匯入被 SBA 擋 */
-    const base = left != null ? left : (+e.credit || 0);
+    /* 估扣：可用＝未沖（或立帳額，依科目性質取貸/借方）− 本批其他列已沖同一立帳的合計，避免超額匯入被 SBA 擋 */
+    const base = left != null ? left : (+e.credit || +e.debit || 0);
     const used = selectable ? offsetAllocated(e.voucher_no, e.seq, ctx.vi, ctx.li) : 0;
     const avail = base - used;
     const amtHtml = fmtN(base) + (left != null ? ' <span class="small">未沖</span>' : '')

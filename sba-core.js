@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.6.4';
+const SBA_CORE_VERSION = '5.6.5';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -208,9 +208,11 @@ function validateVoucher(v, opt) {
        未連結會整批報「沖銷資料[]-序號[0]資料不存在或已註銷」→ 工坊端提前擋 */
     if (String(v.kind) === '2' && L.dc === 'D' && /^2102/.test(String(L.code)) && !L.offset)
       E(`${lt}：立沖科目 ${L.code} 須連結沖帳——點該列「沖帳」選原立帳傳票貸方列（SBA 匯入必要）`);
-    /* 轉帳傳票借方立沖科目：SBA 立沖管制依科目不分傳票類別，未連結先警告（kind2 實測必擋、kind3 未實測故不硬擋） */
-    if (String(v.kind) === '3' && L.dc === 'D' && /^2102/.test(String(L.code)) && !L.offset)
-      W(`${lt}：轉帳傳票借方立沖科目 ${L.code} 未連結沖帳——建議於預覽點「沖帳」連結原立帳，SBA 端可能要求 F06 沖銷資料`);
+    /* 轉帳傳票沖方立沖科目未連結先警告（kind2 借方2102實測必擋、kind3 未實測故不硬擋）：
+       負債(2102)沖=借方；資產(110305應收/180705保證金)沖=貸方（借方=立帳，不需沖帳） */
+    if (String(v.kind) === '3' && !L.offset
+      && ((L.dc === 'D' && /^2102/.test(String(L.code))) || (L.dc === 'C' && /^(110305|180705)/.test(String(L.code)))))
+      W(`${lt}：轉帳傳票${L.dc === 'D' ? '借' : '貸'}方立沖科目 ${L.code} 未連結沖帳——建議於預覽點「沖帳」連結原立帳，SBA 端可能要求 F06 沖銷資料`);
     if (L.offset) {
       if (!/^\d{3}$/.test(L.offset.year) || !L.offset.vchrno || !(+L.offset.seq >= 1))
         E(`${lt}：沖帳關聯資料不完整（年度/傳票號/項次）`);
