@@ -264,8 +264,8 @@ window.addEventListener('storage', (ev) => {
     <div class="card">
       <h3>⬇️ 產生 SBA 匯入檔（ZIP）</h3>
       <div class="toolbar">
-        <label>處理日期 <input type="date" id="ex-date"></label>
-        <label>批號(2碼) <input type="text" id="ex-batch" value="AA" maxlength="2" style="width:48px;text-transform:uppercase;"></label>
+        <label>處理日期 <input type="date" id="ex-date" onchange="suggestBatch();runBatchValidation()"></label>
+        <label>批號(2碼) <input type="text" id="ex-batch" value="AA" maxlength="2" style="width:48px;text-transform:uppercase;" onchange="runBatchValidation()"></label>
         <button class="btn" onclick="runBatchValidation()">🧪 重新檢核</button>
         <button class="btn btn-main" id="ex-dl" onclick="downloadZip()">📦 下載 ZIP</button>
         <button class="btn" id="ex-mark" onclick="markExported()" disabled>✅ 標記已匯出（寫入 D1）</button>
@@ -483,6 +483,7 @@ async function boot() {
   $('pk-paydate').value = todayIso();
   $('tr-date').value = todayIso();
   $('ex-date').value = todayIso();
+  suggestBatch();
   buildAcctFilter();
   buildTrCopyOptions();
   renderPickList();
@@ -1135,7 +1136,27 @@ function delPayee(vi, pi) {
 function delVoucher(vi) {
   if (!confirm('刪除這張傳票草稿？')) return;
   STATE.drafts.splice(vi, 1);
+  compactDraftSerials();
   renderPreview();
+}
+/* 刪除草稿後匯入序號緊湊重編：各字首(年3+類1)由匯出紀錄高水位(預設90000)接續、依草稿現有順序補位；
+   同步重建 STATE.serials（新草稿接續正確、刪光後不留空洞）。⚠️手改過的序號在下次刪除時會被重編 */
+function compactDraftSerials() {
+  const base = {};
+  for (const rec of Object.values(STATE.exported)) {
+    const s = String(rec.recno || '');
+    if (/^\d{9}$/.test(s)) { const p = s.slice(0, 4), n = +s.slice(4); if (!(p in base) || n > base[p]) base[p] = n; }
+  }
+  const counter = {};
+  for (const v of STATE.drafts) {
+    const s = String(v.importrecno || '');
+    if (!/^\d{9}$/.test(s)) continue;
+    const p = s.slice(0, 4);
+    if (!(p in counter)) counter[p] = base[p] || 90000;
+    counter[p] += 1;
+    v.importrecno = p + String(counter[p]).padStart(5, '0');
+  }
+  STATE.serials = { ...base, ...counter };
 }
 
 /* ── 沖帳 modal：從歷史 SBA 分錄找同科目貸方立帳列 ── */
@@ -1483,6 +1504,24 @@ function addTransferVoucher() {
 function existingRecnos() {
   return Object.values(STATE.exported).map(e => String(e.recno));
 }
+/* SBA 已用批號（處理日期7碼+批號2碼）不可再用。種子＝使用者提供 1150728 已用清單（含工坊外直接在 SBA 端用掉的）；
+   工坊自己匯出過的由匯出紀錄 batch 欄自動納入 */
+const SEED_USED_BATCHES = ['11507281A', '11507282A', '1150728AA', '1150728AB', '1150728AC'];
+function usedBatchSet() {
+  const s = new Set(SEED_USED_BATCHES);
+  for (const e of Object.values(STATE.exported)) if (e && e.batch) s.add(String(e.batch));
+  return s;
+}
+/* 依處理日期自動帶第一個未用批號（AA→AB→…→AZ→BA…；可手改，檢核仍會擋已用） */
+function suggestBatch() {
+  const proc7 = toRoc7($('ex-date').value);
+  if (!proc7) return;
+  const used = usedBatchSet();
+  const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  for (const c1 of A) for (const c2 of A) {
+    if (!used.has(proc7 + c1 + c2)) { $('ex-batch').value = c1 + c2; return; }
+  }
+}
 function runBatchValidation() {
   const box = $('ex-validation');
   if (!STATE.drafts.length) { box.innerHTML = '<div class="vmsg wrn">預覽區沒有傳票草稿</div>'; $('ex-mark').disabled = true; return false; }
@@ -1516,6 +1555,10 @@ function runBatchValidation() {
     if (o && sum > +o.left) errors.push(`沖帳超額：立帳 ${k} 官方未沖 ${fmtN(+o.left)}，本批合計沖 ${fmtN(sum)}，超出 ${fmtN(sum - +o.left)}（SBA 匯入會擋）`);
     else if (openMap.size && !o) warnings.push(`立帳 ${k} 不在官方未沖清單（可能已沖畢或餘額表過舊），SBA 匯入可能擋`);
   });
+  /* 批號防重複：處理日期+批號 已用過（含 SBA 端種子清單與工坊匯出紀錄）即擋 */
+  const _proc7 = toRoc7($('ex-date').value), _batch = $('ex-batch').value.trim().toUpperCase();
+  if (_proc7 && _batch && usedBatchSet().has(_proc7 + _batch))
+    errors.push(`處理日期 ${_proc7} 批號 ${_batch} 已使用過——SBA 同日同批號會衝突，請換批號（改處理日期會自動帶建議）`);
   box.innerHTML = errors.map(e => `<div class="vmsg err">❌ ${esc(e)}</div>`).join('')
     + warnings.map(w => `<div class="vmsg wrn">⚠️ ${esc(w)}</div>`).join('')
     + (!errors.length ? `<div class="vmsg okk">✅ 全批 ${STATE.drafts.length} 張檢核通過</div>` : '');
@@ -1529,6 +1572,12 @@ async function downloadZip() {
   const proc7 = toRoc7($('ex-date').value);
   const batch = $('ex-batch').value.trim().toUpperCase();
   if (!/^[1-9A-Z]{2}$/.test(batch)) { alert('批號須為 2 碼（1-9、A-Z）'); return; }
+  if (usedBatchSet().has(proc7 + batch)) {
+    suggestBatch();
+    alert(`批號 ${batch} 於處理日期 ${proc7} 已使用過——已自動改為建議批號 ${$('ex-batch').value}，請確認後重新下載`);
+    runBatchValidation();
+    return;
+  }
   let files;
   try { ({ files } = buildExportFiles(STATE.drafts, proc7, batch)); }
   catch (e) { alert(e.message); return; }
@@ -1579,7 +1628,7 @@ async function markExported() {
     LAST_EXPORT = null;
     $('draft-count').textContent = '0';
     $('ex-mark').disabled = true;
-    renderExportLog(); renderPickList(); runBatchValidation();
+    renderExportLog(); renderPickList(); suggestBatch(); runBatchValidation();
   } else {
     alert('寫入 D1 失敗（密碼或連線問題），請重試');
     $('ex-mark').disabled = false;
