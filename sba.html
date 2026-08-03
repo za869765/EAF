@@ -217,6 +217,12 @@ window.addEventListener('storage', (ev) => {
   <div class="card">
     <h3>🔁 快速編製轉帳傳票（調整分錄）</h3>
     <div class="toolbar">
+      <label>📋 複製前次票
+        <select id="tr-copy" style="min-width:360px;"><option value="">— 選歷史轉帳傳票（D1 官方傳票明細） —</option></select></label>
+      <button class="btn btn-sm" onclick="applyTrCopy()">⚡ 套入</button>
+      <span class="small" id="tr-copy-msg"></span>
+    </div>
+    <div class="toolbar">
       <label>製票日期(=入帳日) <input type="date" id="tr-date"></label>
       <label>傳票摘要 <input type="text" id="tr-memo" style="width:320px;" placeholder="例：11507 月底應付費用立帳"></label>
     </div>
@@ -468,6 +474,7 @@ async function boot() {
   $('tr-date').value = todayIso();
   $('ex-date').value = todayIso();
   buildAcctFilter();
+  buildTrCopyOptions();
   renderPickList();
   addTrLine(); addTrLine();
 }
@@ -1276,6 +1283,52 @@ function closeModal() {
 }
 
 /* ═══════════════ 🔁 轉帳傳票 ═══════════════ */
+/* 複製前次票：D1 官方傳票明細（FNWFRX0090 匯入）中的歷史轉帳傳票 → 套入編輯列
+   來源欄位：subject「代碼 名稱」/purpose「用途別 名稱」/sub_account「子目 名稱」皆取首段代碼 */
+function buildTrCopyOptions() {
+  const sel = $('tr-copy');
+  if (!sel) return;
+  const byV = new Map();   /* vno → {ym, n, d, desc} */
+  for (const e of STATE.entries) {
+    const vno = String(e.voucher_no || '');
+    if (vno.length !== 9 || vno.charAt(3) !== '3') continue;
+    if (!byV.has(vno)) byV.set(vno, { ym: String(e.ym || ''), n: 0, d: 0, desc: '' });
+    const g = byV.get(vno);
+    g.n += 1; g.d += +e.debit || 0;
+    if (+e.seq === 1) g.desc = String(e.description || '').replace(/\s+/g, ' ');
+  }
+  for (const vno of [...byV.keys()].sort((a, b) => b.localeCompare(a))) {
+    const g = byV.get(vno);
+    const o = document.createElement('option');
+    o.value = vno;
+    o.textContent = `${vno}（${g.ym}）$${fmtN(g.d)}・${g.n}列 ${g.desc.slice(0, 22)}`;
+    sel.appendChild(o);
+  }
+}
+function applyTrCopy() {
+  const vno = $('tr-copy').value;
+  if (!vno) { alert('請先選擇要複製的轉帳傳票'); return; }
+  const src = STATE.entries.filter(e => String(e.voucher_no) === vno).sort((a, b) => a.seq - b.seq);
+  if (!src.length) { alert('D1 找不到此傳票分錄'); return; }
+  if (trLines().length && !confirm('目前已輸入的分錄列將被清空並套入所選傳票，繼續？')) return;
+  $('tr-body').innerHTML = '';
+  for (const e of src) {
+    addTrLine();
+    const tr = $('tr-body').lastElementChild;
+    const code = String(e.subject || '').trim().split(/\s+/)[0] || '';
+    tr.querySelector('.tr-dc').value = (+e.debit > 0) ? 'D' : 'C';
+    tr.querySelector('.tr-code').value = code;
+    tr.querySelector('.tr-name').textContent = subjectName(code).slice(0, 10);
+    tr.querySelector('.tr-bcode').value = bcodeFor(code);
+    tr.querySelector('.tr-use').value = String(e.purpose || '').trim().split(/\s+/)[0] || '';
+    tr.querySelector('.tr-relate').value = String(e.sub_account || '').trim().split(/\s+/)[0] || '';
+    tr.querySelector('.tr-amt').value = (+e.debit > 0 ? +e.debit : +e.credit) || 0;
+    tr.querySelector('.tr-memo').value = String(e.description || '');
+  }
+  if (!$('tr-memo').value.trim()) $('tr-memo').value = String(src[0].description || '').replace(/\s+/g, ' ');
+  trBalance();
+  $('tr-copy-msg').textContent = `✔ 已套入 ${vno} 共 ${src.length} 列——請調整年月、金額與摘要後「⚡ 加入預覽」`;
+}
 function addTrLine() {
   const tb = $('tr-body');
   const i = tb.children.length;
@@ -1332,6 +1385,8 @@ function trBalance() {
 function addTransferVoucher() {
   const ls = trLines();
   if (!ls.length) { alert('請先輸入分錄'); return; }
+  /* 用途別 1XXX 用人費用 → 帶設定頁預設人員類別（與選單製票同規則；預覽可逐列改） */
+  for (const L of ls) if (/^1\d{3}$/.test(L.use) && !L.pkind) L.pkind = STATE.settings.pkind || '';
   const pay7 = toRoc7($('tr-date').value);
   const yr = (pay7 && pay7.slice(0, 3)) || rocYearNow();   /* 年度隨傳票日期走 */
   const v = {
