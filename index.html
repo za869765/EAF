@@ -1086,6 +1086,9 @@ body.sb-resizing * { pointer-events: none !important; }
      多行規格/品名第二行起被 overflow:hidden 裁掉；加此屬性讓 auto 高度真正依列印寬度/字級折行計算 */
   .it td.td-name textarea, .it td.td-spec textarea {
     field-sizing: content;
+    /* v5.7.1 字頂保護墊：data-fit 2/3 行高壓到 1.2/1.15 時，標楷體字頂會超出首行行盒，
+       盒高剛好等於內容的多行格會被 overflow:hidden 削頭（∠700 現象）；padding 算進 field-sizing 高度 */
+    padding: 2px 0 1px !important;
     max-height: 5em !important; overflow: hidden !important;
   }
   /* v4.4.92 採購品名很多筆時自動縮 row 高度，避免下方核章/受款人被擠出頁面
