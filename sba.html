@@ -545,6 +545,74 @@ function recDateIso(r) {
   return '';
 }
 
+/* ── 已立應付偵測（v5.7.7）：D1 匯入的轉帳傳票中「借成本費用＋票內含 2102 家族貸方（立應付/代收）」
+   的借方分錄，以 金額＋用途別代碼＋月份(±1 容忍跨月立帳) 對應單據，摘要相似度擇優、單/分錄各至多配一。
+   純提示：此單成本已入帳，付款製票時應改借應付科目並連結沖帳，勿再借成本重複入帳 ── */
+let _apEstMap = null;
+function rocYmOf(iso) {
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})/);
+  return m ? String(+m[1] - 1911) + m[2] : '';
+}
+function ymNear(a, b) {
+  if (!a || !b || a.length < 5 || b.length < 5) return false;
+  const n = (s) => (+s.slice(0, 3)) * 12 + (+s.slice(3));
+  return Math.abs(n(a) - n(b)) <= 1;
+}
+/* 摘要相似度：去空白/標點/數字後的字元 bigram 重疊率（數字剔除＝金額千分位與月份寫法差異不干擾） */
+function descSim(a, b) {
+  const norm = (s) => String(s || '').replace(/[\s\d,，、。.()（）:：;；!！?？~－—-]/g, '');
+  const A = norm(a), B = norm(b);
+  if (A.length < 2 || B.length < 2) return 0;
+  const grams = new Set();
+  for (let i = 0; i < A.length - 1; i++) grams.add(A.slice(i, i + 2));
+  let hit = 0;
+  for (let i = 0; i < B.length - 1; i++) if (grams.has(B.slice(i, i + 2))) hit++;
+  return hit / (B.length - 1);
+}
+function apEstFor(id) {
+  if (!_apEstMap) {
+    _apEstMap = new Map();
+    /* 候選分錄：轉帳傳票且同票含 2102 家族貸方，取其非 2102 借方（成本/費用）列 */
+    const byVch = new Map();
+    for (const e of STATE.entries) {
+      if (String(e.voucher_type || '') !== '轉帳') continue;
+      if (!byVch.has(e.voucher_no)) byVch.set(e.voucher_no, []);
+      byVch.get(e.voucher_no).push(e);
+    }
+    const lines = [];
+    for (const es of byVch.values()) {
+      if (!es.some(e => +e.credit > 0 && /^2102/.test(String(e.subject || '')))) continue;
+      for (const e of es) if (+e.debit > 0 && !/^2102/.test(String(e.subject || ''))) lines.push(e);
+    }
+    /* 全部 (單, 分錄) 命中組合先打分，再依分數高→低一對一配對 */
+    const pairs = [];
+    for (const r of STATE.records) {
+      if (r.voided || STATE.exported[r.id]) continue;
+      if (!['expense', 'purchase'].includes(r.formType)) continue;
+      const rym = rocYmOf(recDateIso(r));
+      for (const e of lines) {
+        if (+e.debit !== (+r.total || 0)) continue;
+        if (!ymNear(String(e.ym || ''), rym)) continue;
+        const pCode = String(e.purpose || '').trim().split(/\s+/)[0] || '';
+        const pSame = !!(r.purposeCode && pCode && pCode === String(r.purposeCode));
+        const sim = descSim(r.purposeDesc, e.description);
+        /* 用途別可能在製票端被會計重分類（如 2505→2502）：不符時需摘要高度相似才視為同一筆 */
+        if (!pSame && r.purposeCode && pCode && sim < 0.5) continue;
+        pairs.push({ id: String(r.id), e, score: (String(e.ym) === rym ? 1 : 0) + (pSame ? 1 : 0) + sim });
+      }
+    }
+    pairs.sort((a, b) => b.score - a.score);
+    const usedLine = new Set();
+    for (const p of pairs) {
+      const lk = String(p.e.voucher_no) + '#' + p.e.seq;
+      if (_apEstMap.has(p.id) || usedLine.has(lk)) continue;
+      _apEstMap.set(p.id, { vch: String(p.e.voucher_no), seq: p.e.seq });
+      usedLine.add(lk);
+    }
+  }
+  return _apEstMap.get(String(id)) || null;
+}
+
 /* ═══════════════ 📋 選單製票 ═══════════════ */
 function buildAcctFilter() {
   const sel = $('pk-acct');
@@ -584,9 +652,11 @@ function pickRowHtml(r, effCat, key) {
   const exported = STATE.exported[r.id];
   const payeeTxt = (r.payees || []).map(p => p.type === 'bill' ? '💳繳費單' : (p.name || '')).filter(Boolean).join('、')
     || (r.payee && r.payee.name) || (r.payee && r.payee.type === 'bill' ? '💳繳費單' : '') || '—';
+  const apEst = exported ? null : apEstFor(r.id);
   const st = [
     r.printed ? '<span class="chip done">已列印</span>' : '<span class="chip warn">未列印</span>',
     exported ? `<span class="chip done">已匯出 ${esc(exported.recno)}</span>` : '',
+    apEst ? `<span class="chip warn" title="偵測：金額/用途別/月份與轉帳傳票 ${esc(apEst.vch)} 第 ${esc(String(apEst.seq))} 列（借 ${esc(r.bpCode)}）吻合，該票已貸 2102 應付立帳。付款製票時請改借應付科目並連結沖帳，勿再借成本重複入帳">已立應付 ${esc(apEst.vch)}</span>` : '',
   ].join(' ');
   /* 移組：系統可能分錯，可手動改付款方式（同步影響開票分組與 F05 payway） */
   /* 單號走 data-*（列上已有 data-rid）＋事件委派，不內插進 inline handler */
@@ -739,10 +809,12 @@ function showRecPop(ev, id) {
     `${p.bank ? '<br>' + esc(p.bank) : ''}${p.acctNo ? '<br>帳號 ' + esc(p.acctNo) : ''}</div>`).join('')
     || '<div class="small">無受款人資料</div>';
   const exported = STATE.exported[r.id];
+  const apEst = exported ? null : apEstFor(r.id);
   $('rec-pop').innerHTML = `
     <h4>${esc(r.voucherNo)} <span class="chip">${r.formType === 'expense' ? '動支單' : '請購單'}</span>
       ${r.printed ? '<span class="chip done">已列印</span>' : '<span class="chip warn">未列印</span>'}
-      ${exported ? `<span class="chip done">已匯出 ${esc(exported.recno)}</span>` : ''}</h4>
+      ${exported ? `<span class="chip done">已匯出 ${esc(exported.recno)}</span>` : ''}
+      ${apEst ? `<span class="chip warn">已立應付 ${esc(apEst.vch)}</span>` : ''}</h4>
     <div class="rp-row">${esc(recDateIso(r))}｜<span class="chip ${r.acctCode === '11010202' ? 'cust' : 'fund'}">${esc(r.acctCode)} ${esc(subjectName(r.acctCode))}</span> ${esc(r.bpCode)} ${esc(r.bpLabel || '')}</div>
     <div class="rp-row">${esc(String(r.purposeDesc || ''))}</div>
     <div class="rp-row"><b>$${fmtN(r.total)}</b></div>
