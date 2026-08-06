@@ -489,8 +489,8 @@ async function boot() {
       if (!(pfx in STATE.serials) || n > STATE.serials[pfx]) STATE.serials[pfx] = n;
     }
   }
-  /* 預設期間：近 45 天 */
-  const d = new Date(); d.setDate(d.getDate() - 45);
+  /* 預設期間：近 35 天（v5.7.12 由 45 天縮短，使用者指定） */
+  const d = new Date(); d.setDate(d.getDate() - 35);
   $('pk-from').value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;   /* 本地日期，與 todayIso 一致 */
   $('pk-to').value = todayIso();
   $('pk-paydate').value = todayIso();
