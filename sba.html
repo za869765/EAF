@@ -422,6 +422,10 @@ const STATE = {
   serials: {},               /* '1152' → 已配最大流水 */
   modalCtx: null,
 };
+/* v5.7.20 舊草稿移轉：v5.7.16 拆列曾標 manual（可編輯），v5.7.18 起拆列不再標——
+   舊拆列已連結沖帳或摘要含「(分攤)」者視為衍生列，清 manual 回復唯讀檢視（真正手動加的空白列不受影響） */
+for (const v of STATE.drafts) for (const L of (v.lines || []))
+  if (L.manual && (L.offset || /\(分攤\)/.test(String(L.memo || '')))) delete L.manual;
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const fmtN = (n) => (+n || 0).toLocaleString('zh-TW');
