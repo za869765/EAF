@@ -1222,7 +1222,27 @@ function openOffsetModal(vi, li) {
   }
   const lineUse = String(L.use || '').trim();
   const openMap = new Map(((STATE.offsetOpen && STATE.offsetOpen.items) || []).map(o => [o.vch + '#' + o.seq, o]));
-  STATE.modalCands = { cands, rel, openMap, showHist: false, lineUse,
+  /* v5.7.5 白名單↔D1 配對：0100 的序號＝SBA 官方分錄序，但 0090 報表無序號欄、acc 匯入以列序推算，
+     大張傳票會整批位移（實例 115300004 官方#31=D1#28）→ 先 exact vch#seq，配不到再「同傳票＋金額==未沖額」
+     兩邊唯一才配。配對後列顯示用 D1 資料、F06 匯出一律帶官方序號（帶 D1 位移序號 SBA 會報沖銷資料不存在） */
+  const matchOf = new Map();      /* D1 key vch#seq → 官方 item */
+  const itemMatched = new Set();  /* 已配對官方 item key */
+  for (const e of cands) {
+    const k = String(e.voucher_no) + '#' + e.seq;
+    if (openMap.has(k)) { matchOf.set(k, openMap.get(k)); itemMatched.add(k); }
+  }
+  for (const o of openMap.values()) {
+    const ok = o.vch + '#' + o.seq;
+    if (itemMatched.has(ok)) continue;
+    const hits = cands.filter(e => String(e.voucher_no) === String(o.vch)
+      && !matchOf.has(String(e.voucher_no) + '#' + e.seq)
+      && (+e[estField] || 0) === +o.left);
+    if (hits.length === 1) {
+      matchOf.set(String(hits[0].voucher_no) + '#' + hits[0].seq, o);
+      itemMatched.add(ok);
+    }
+  }
+  STATE.modalCands = { cands, rel, openMap, matchOf, itemMatched, code, showHist: false, lineUse,
     useFilter: !!(lineUse && cands.some(e => e._use === lineUse)) };
   $('modal-title').textContent = `選擇沖帳立帳傳票 — ${code} ${subjectName(code)}`;
   $('modal-hint').textContent = `候選＝D1 歷史 SBA 分錄中，同科目家族「歷年」全部${estField === 'credit' ? '貸方' : '借方'}（立帳）列，依子目分組${rel ? `、與本列子目 ${rel} 相同者置頂推薦` : ''}、組內新到舊。資料截至最後匯入月份，更新的立帳請先匯入最新 FNWFRX0090 或至 SBA 端手動沖。`;
@@ -1240,17 +1260,24 @@ function toggleOffsetUse() {
   renderOffsetList($('modal-q').value);
 }
 function renderOffsetList(q) {
-  const { cands, rel, openMap, showHist, lineUse, useFilter } = STATE.modalCands || { cands: [], rel: '', openMap: new Map(), showHist: false, lineUse: '', useFilter: false };
+  const { cands, rel, openMap, matchOf, itemMatched, code, showHist, lineUse, useFilter } = STATE.modalCands || { cands: [], rel: '', openMap: new Map(), matchOf: new Map(), itemMatched: new Set(), code: '', showHist: false, lineUse: '', useFilter: false };
   const kw = String(q || '').trim();
   const hit = (s) => !kw || String(s).includes(kw);
   const useHit = (e) => !(useFilter && lineUse) || e._use === lineUse;
   const subOf = (e) => String(e.sub_account || '').slice(0, 2);
-  const useWhitelist = openMap.size > 0;
+  const keyOf = (e) => String(e.voucher_no) + '#' + e.seq;
   const ctx = STATE.modalCtx || {};
-  const rowHtml = (e, left, selectable) => {
-    /* 估扣：可用＝未沖（或立帳額，依科目性質取貸/借方）− 本批其他列已沖同一立帳的合計，避免超額匯入被 SBA 擋 */
+  /* v5.7.5 家族白名單＝有配對命中或有同科目 synth 項才算；否則此科目視同未匯 0100 → 全部可選不鎖 */
+  const subjName = subjectName(code);
+  const famSynth = [...openMap.values()].filter(o => !itemMatched.has(o.vch + '#' + o.seq))
+    .filter(o => !o.name || !subjName || o.name === subjName);
+  const useWhitelist = (cands.some(e => matchOf.has(keyOf(e))) || famSynth.length > 0);
+  const rowHtml = (e, left, selectable, oseq) => {
+    /* 估扣：可用＝未沖（或立帳額，依科目性質取貸/借方）− 本批其他列已沖同一立帳的合計，避免超額匯入被 SBA 擋
+       oseq＝官方序號（0100）；匯出/估扣皆用官方序號，顯示仍列 D1 序號供對照 */
+    const xseq = oseq != null ? oseq : (+e.seq || 0);
     const base = left != null ? left : (+e.credit || +e.debit || 0);
-    const used = selectable ? offsetAllocated(e.voucher_no, e.seq, ctx.vi, ctx.li) : 0;
+    const used = selectable ? offsetAllocated(e.voucher_no, xseq, ctx.vi, ctx.li) : 0;
     const avail = base - used;
     const amtHtml = fmtN(base) + (left != null ? ' <span class="small">未沖</span>' : '')
       + (used > 0 ? `<div class="small">−本批已扣 ${fmtN(used)} ＝ 可用 ${fmtN(avail)}</div>` : '');
@@ -1258,9 +1285,9 @@ function renderOffsetList(q) {
       : avail <= 0 ? '<span class="small">已扣完</span>'
       /* 傳票號走 data-* 不內插進 inline handler：HTML 屬性會先解碼字元參照再編譯 JS，
          esc() 的 &#39; 到那時已還原成 '，單引號仍可跳脫字串（故改事件委派） */
-      : `<button class="btn btn-sm off-pick" data-vno="${esc(e.voucher_no)}" data-seq="${+e.seq || 0}" data-avail="${avail}">選此列</button>`;
+      : `<button class="btn btn-sm off-pick" data-vno="${esc(e.voucher_no)}" data-seq="${xseq}" data-dseq="${+e.seq || 0}" data-avail="${avail}">選此列</button>`;
     return `
-    <tr${selectable ? '' : ' class="row-exported"'}><td>${esc(e.voucher_no)}</td><td>${esc(String(e.seq))}</td><td>${esc(e.post_date || e.make_date || '')}</td>
+    <tr${selectable ? '' : ' class="row-exported"'}><td>${esc(e.voucher_no)}</td><td>${esc(String(xseq))}${oseq != null && +oseq !== (+e.seq || 0) ? `<span class="small" title="0100 官方序號與 D1 明細列序不同（0090 無序號欄），匯出以官方序號為準">（D1#${esc(String(e.seq))}）</span>` : ''}</td><td>${esc(e.post_date || e.make_date || '')}</td>
     <td>${esc(e.sub_account || '')}</td><td style="max-width:280px;">${esc(String(e.description || '').slice(0, 40))}</td>
     <td class="num">${amtHtml}</td>
     <td>${btn}</td></tr>`;
@@ -1268,27 +1295,27 @@ function renderOffsetList(q) {
   const filt = (e) => hit(String(e.description || '') + String(e.voucher_no || '') + String(e.sub_account || ''));
   let html = '';
   if (useWhitelist) {
-    /* ① 現行未沖但不在 D1（以官方餘額表為準，仍可選——不讓使用者選不到） */
-    const synth = [...openMap.values()]
-      .filter(o => !STATE.entriesKeySet.has(o.vch + '#' + o.seq))
-      .filter(o => hit(o.desc + o.vch + o.name));
+    /* ① 現行未沖但配不到 D1 列（含 D1 沒匯那段年度、或同傳票多筆同額無法唯一配對）：
+       以官方餘額表為準仍可選；僅列同科目項（v5.7.5 防跨科目誤選） */
+    const synth = famSynth.filter(o => hit(o.desc + o.vch + o.name));
     if (synth.length) {
-      html += `<tr style="background:#dcd9cc;"><td colspan="7"><b>🆕 現行未沖・不在 D1 歷史檔（依官方餘額表，可選）</b></td></tr>`;
+      html += `<tr style="background:#dcd9cc;"><td colspan="7"><b>🆕 現行未沖・D1 無對應列（依官方餘額表，可選）</b></td></tr>`;
       html += synth.map(o => rowHtml({ voucher_no: o.vch, seq: o.seq, post_date: '', sub_account: o.name, description: o.desc }, o.left, true)).join('');
     }
-    /* ② 現行未沖（白名單命中，可選；金額顯示官方未沖額並作為可沖上限） */
-    const current = cands.filter(e => openMap.has(String(e.voucher_no) + '#' + e.seq)).filter(filt).filter(useHit);
+    /* ② 現行未沖（白名單配對命中，可選；金額顯示官方未沖額並作為可沖上限；匯出帶官方序號） */
+    const current = cands.filter(e => matchOf.has(keyOf(e))).filter(filt).filter(useHit);
     let lastGrp = null;
     html += current.map(e => {
       const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
       let head = '';
       if (gk !== lastGrp) { lastGrp = gk; head = `<tr style="background:#dcd9cc;"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`; }
-      return head + rowHtml(e, openMap.get(String(e.voucher_no) + '#' + e.seq).left, true);
+      const o = matchOf.get(keyOf(e));
+      return head + rowHtml(e, o.left, true, +o.seq || 0);
     }).join('');
     /* ③ 白名單未命中拆兩類（v5.7.4）：立帳日期晚於白名單最新未沖日＝餘額表沒涵蓋到的新立帳
        （如匯了新月份 0090 但 0100 還是舊版）→ 仍可選，官方未沖額未知以立帳額為上限；其餘＝歷史/已沖畢不可選 */
-    const restAll = cands.filter(e => !openMap.has(String(e.voucher_no) + '#' + e.seq)).filter(filt).filter(useHit);
-    const maxHitDate = cands.filter(e => openMap.has(String(e.voucher_no) + '#' + e.seq))
+    const restAll = cands.filter(e => !matchOf.has(keyOf(e))).filter(filt).filter(useHit);
+    const maxHitDate = cands.filter(e => matchOf.has(keyOf(e)))
       .map(e => String(e.post_date || e.make_date || '')).sort().pop() || '';
     const newerKeys = new Set(maxHitDate
       ? restAll.filter(e => String(e.post_date || e.make_date || '') > maxHitDate).map(e => String(e.voucher_no) + '#' + e.seq)
@@ -1304,17 +1331,19 @@ function renderOffsetList(q) {
       + (hist.length > 400 ? `<tr><td colspan="7" class="small">歷史僅顯示前 400 筆（共 ${hist.length}），請用搜尋</td></tr>` : '');
     if (!html) html = '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
   } else {
-    /* 未匯入餘額表：維持全部可選 */
+    /* 未匯入餘額表（或 v5.7.5 此科目家族無任何白名單項）：維持全部可選 */
+    if (openMap.size > 0)
+      html += `<tr><td colspan="7" class="small">此科目無立沖餘額表資料（0100 未涵蓋）——全部立帳可選，請自行確認未沖；建議由 SBA 匯出本科目 FNWFRX0100 後於設定頁匯入</td></tr>`;
     const list = cands.filter(filt).filter(useHit);
     let lastGrp = null;
     const CAP = 400;
-    html = list.slice(0, CAP).map(e => {
+    html += list.slice(0, CAP).map(e => {
       const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
       let head = '';
       if (gk !== lastGrp) { lastGrp = gk; head = `<tr style="background:#dcd9cc;"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`; }
       return head + rowHtml(e, null, true);
-    }).join('') + (list.length > CAP ? `<tr><td colspan="7" class="small">僅顯示前 ${CAP} 筆（共 ${list.length}），請用搜尋縮小範圍</td></tr>` : '')
-      || '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
+    }).join('') + (list.length > CAP ? `<tr><td colspan="7" class="small">僅顯示前 ${CAP} 筆（共 ${list.length}），請用搜尋縮小範圍</td></tr>` : '');
+    if (!html) html = '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
   }
   /* v5.7.4 用途別預設過濾：本列有用途別且反查得到同用途別立帳時預設勾選，可取消看全部 */
   if (lineUse && cands.some(e => e._use === lineUse)) {
@@ -1332,7 +1361,7 @@ function bindOffsetPick() {
   tb.addEventListener('click', (ev) => {
     const b = ev.target && ev.target.closest && ev.target.closest('button.off-pick');
     if (!b) return;
-    pickOffset(b.dataset.vno, +b.dataset.seq || 0, +b.dataset.avail || 0);
+    pickOffset(b.dataset.vno, +b.dataset.seq || 0, +b.dataset.avail || 0, b.dataset.dseq);
   });
   _offBound = true;
 }
@@ -1353,13 +1382,14 @@ function entrySubCode(vchrno, seq) {
   const m = String(e.sub_account || '').match(/^(\d{2})/);
   return m ? m[1] : '';
 }
-function pickOffset(vchrno, seq, avail) {
+function pickOffset(vchrno, seq, avail, dseq) {
   const { vi, li } = STATE.modalCtx;
   const L = STATE.drafts[vi].lines[li];
   const cap = +avail || L.amt;
   if (L.amt > cap)
     alert(`此立帳可用餘額僅 ${fmtN(cap)}（已扣除本批其他列沖用額），本列金額 ${fmtN(L.amt)} 將只沖 ${fmtN(cap)}。一列僅能連結一筆立帳——若需足額沖銷，請將明細列拆成兩列、各自連結不同立帳`);
-  const sub = entrySubCode(vchrno, seq);
+  /* v5.7.5 seq＝匯出用官方序號（0100）；dseq＝D1 明細列序（兩者可能位移），子目查 D1 用 dseq */
+  const sub = entrySubCode(vchrno, dseq != null && dseq !== '' ? dseq : seq);
   L.offset = { year: String(vchrno).slice(0, 3), kind: String(vchrno).slice(3, 4),
     vchrno: String(vchrno), seq,
     amt: Math.min(L.amt, cap), max: cap, sub };
