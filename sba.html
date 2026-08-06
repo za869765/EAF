@@ -1118,17 +1118,20 @@ function renderPreview() {
         <td class="small" style="color:#9e9e9e;">（自動＝主檔摘要）</td>
         <td class="small" style="color:#9e9e9e;">自動</td>
       </tr>`;
+      /* v5.7.15 衍生欄位唯讀（使用者指示）：bcode/用途別/pkind/子目/歸屬/金額由單據與沖帳自動帶出，
+         純檢視防誤改；手動加列（manual）與轉帳傳票（kind 3）保留可編輯（拆列/手工分錄需要） */
+      const ro = v.kind !== '3' && !L.manual;
       return `
       <tr>
         <td>${L.seq}</td>
         <td><select onchange="updLine(${vi},${li},'dc',this.value)"><option value="D"${L.dc === 'D' ? ' selected' : ''}>借</option><option value="C"${L.dc === 'C' ? ' selected' : ''}>貸</option></select></td>
         <td><select class="w-subj" onchange="updLine(${vi},${li},'code',this.value)" title="${esc(L.code)} ${esc(subjectName(L.code))}">${subjOpts.some(([c]) => c === String(L.code)) ? '' : `<option value="${esc(L.code)}" selected>${esc(L.code)} ${esc(subjectName(L.code))}</option>`}${subjOpts.map(([c, n]) => `<option value="${esc(c)}"${c === String(L.code) ? ' selected' : ''}>${esc(c)} ${esc(n)}</option>`).join('')}</select></td>
-        <td><input class="w-4" value="${esc(L.bcode || '')}" onchange="updLine(${vi},${li},'bcode',this.value)"><br><span class="small code-zh" title="${esc(bcodeNames.get(String(L.bcode || '')) || '')}">${esc((bcodeNames.get(String(L.bcode || '')) || '').slice(0, 6))}</span></td>
-        <td><input class="w-4" value="${esc(L.use || '')}" onchange="updLine(${vi},${li},'use',this.value)"><br><span class="small code-zh" title="${esc(useNames.get(String(L.use || '')) || '')}">${esc((useNames.get(String(L.use || '')) || '').slice(0, 6))}</span></td>
-        <td>${/^1\d{3}$/.test(L.use || '') ? `<input class="w-2" value="${esc(L.pkind || '')}" placeholder="pkind" onchange="updLine(${vi},${li},'pkind',this.value)">` : ''}</td>
-        <td><input class="w-2" value="${esc(L.relate || '')}" onchange="updLine(${vi},${li},'relate',this.value)"></td>
-        <td><input class="w-4" value="${esc(L.scode1 || '')}" onchange="updLine(${vi},${li},'scode1',this.value)"></td>
-        <td><input class="w-amt" value="${L.amt}" onchange="updLine(${vi},${li},'amt',this.value)"></td>
+        <td>${ro ? esc(L.bcode || '') : `<input class="w-4" value="${esc(L.bcode || '')}" onchange="updLine(${vi},${li},'bcode',this.value)">`}<br><span class="small code-zh" title="${esc(bcodeNames.get(String(L.bcode || '')) || '')}">${esc((bcodeNames.get(String(L.bcode || '')) || '').slice(0, 6))}</span></td>
+        <td>${ro ? esc(L.use || '') : `<input class="w-4" value="${esc(L.use || '')}" onchange="updLine(${vi},${li},'use',this.value)">`}<br><span class="small code-zh" title="${esc(useNames.get(String(L.use || '')) || '')}">${esc((useNames.get(String(L.use || '')) || '').slice(0, 6))}</span></td>
+        <td>${ro ? esc(L.pkind || '') : (/^1\d{3}$/.test(L.use || '') ? `<input class="w-2" value="${esc(L.pkind || '')}" placeholder="pkind" onchange="updLine(${vi},${li},'pkind',this.value)">` : '')}</td>
+        <td>${ro ? esc(L.relate || '') : `<input class="w-2" value="${esc(L.relate || '')}" onchange="updLine(${vi},${li},'relate',this.value)">`}</td>
+        <td>${ro ? esc(L.scode1 || '') : `<input class="w-4" value="${esc(L.scode1 || '')}" onchange="updLine(${vi},${li},'scode1',this.value)">`}</td>
+        <td class="num">${ro ? fmtN(L.amt) : `<input class="w-amt" value="${L.amt}" onchange="updLine(${vi},${li},'amt',this.value)">`}</td>
         <td><input class="w-memo" value="${esc(L.memo || '')}" onchange="updLine(${vi},${li},'memo',this.value)"></td>
         <td style="white-space:nowrap;">
           ${L.dc === OFFSET_DC(L.code) && OFFSETABLE(L.code) ? `<button class="btn btn-sm${!L.offset && L.dc === 'D' && /^2102/.test(String(L.code)) ? ' btn-danger' : ''}" onclick="openOffsetModal(${vi},${li})" title="${!L.offset && L.dc === 'D' && /^2102/.test(String(L.code)) ? '立沖科目必須連結沖帳（SBA 匯入必要）' : '沖前立帳連結'}">${L.offset ? '🔗' + esc(L.offset.vchrno) + '#' + esc(String(L.offset.seq)) : '沖帳'}</button>` : ''}
@@ -1307,7 +1310,7 @@ function updInvoice(vi, pi, k, val) {
 function addLine(vi) {
   const v = STATE.drafts[vi];
   v.lines.push({ seq: v.lines.length + 1, dc: 'D', code: '', bcode: '', use: '', relate: '',
-    scode1: '00001', amt: 0, ttype: v.kind === '3' ? '' : '2', memo: '' });
+    scode1: '00001', amt: 0, ttype: v.kind === '3' ? '' : '2', memo: '', manual: true /* v5.7.15 手動列保留可編輯 */ });
   renderPreview();
 }
 function delLine(vi, li) {
