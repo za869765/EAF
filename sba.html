@@ -97,6 +97,7 @@ input, select, textarea { font-family: inherit; font-size: 12px; padding: 3px 6p
 input:focus, select:focus { outline: 2px solid var(--focus-blue, #3898ec); outline-offset: -1px; }
 input.w-amt { width: 92px; text-align: right; }
 input.w-code { width: 82px; } input.w-4 { width: 56px; } input.w-2 { width: 44px; }
+select.w-subj { width: 168px; }
 input.w-date { width: 84px; } input.w-memo { width: 100%; min-width: 180px; }
 .btn { padding: 5px 14px; border: none; border-radius: var(--r-md, 8px); cursor: pointer;
   font-size: 12px; font-family: inherit; background: var(--warm-sand, #e8e6dc);
@@ -962,6 +963,7 @@ function renderPreview() {
   $('pv-export').style.display = STATE.drafts.length ? 'block' : 'none';
   if (STATE.drafts.length) { renderExportLog(); runBatchValidation(); }
   saveDrafts(); /* 每次重繪即持久化（所有草稿變動都會經過 renderPreview） */
+  const subjOpts = [...allKnownSubjectCodes()].sort((a, b) => a[0].localeCompare(b[0]));
   $('pv-list').innerHTML = STATE.drafts.map((v, vi) => {
     const r = validateVoucher(v);
     const linesHtml = v.lines.map((L, li) => {
@@ -980,7 +982,7 @@ function renderPreview() {
       <tr>
         <td>${L.seq}</td>
         <td><select onchange="updLine(${vi},${li},'dc',this.value)"><option value="D"${L.dc === 'D' ? ' selected' : ''}>借</option><option value="C"${L.dc === 'C' ? ' selected' : ''}>貸</option></select></td>
-        <td><input class="w-code" value="${esc(L.code)}" onchange="updLine(${vi},${li},'code',this.value)" title="${esc(subjectName(L.code))}"> <span class="small">${esc(subjectName(L.code)).slice(0, 8)}</span></td>
+        <td><select class="w-subj" onchange="updLine(${vi},${li},'code',this.value)" title="${esc(L.code)} ${esc(subjectName(L.code))}">${subjOpts.some(([c]) => c === String(L.code)) ? '' : `<option value="${esc(L.code)}" selected>${esc(L.code)} ${esc(subjectName(L.code))}</option>`}${subjOpts.map(([c, n]) => `<option value="${esc(c)}"${c === String(L.code) ? ' selected' : ''}>${esc(c)} ${esc(n)}</option>`).join('')}</select></td>
         <td><input class="w-4" value="${esc(L.bcode || '')}" onchange="updLine(${vi},${li},'bcode',this.value)"></td>
         <td><input class="w-4" value="${esc(L.use || '')}" onchange="updLine(${vi},${li},'use',this.value)"></td>
         <td>${/^1\d{3}$/.test(L.use || '') ? `<input class="w-2" value="${esc(L.pkind || '')}" placeholder="pkind" onchange="updLine(${vi},${li},'pkind',this.value)">` : ''}</td>
