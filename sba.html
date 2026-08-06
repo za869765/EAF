@@ -500,6 +500,12 @@ async function boot() {
   if (config && config.sba_offset_open) STATE.offsetOpen = config.sba_offset_open;
   if (config && Array.isArray(config.sba_used_batches)) STATE.usedBatch2 = new Set(config.sba_used_batches.map(String));
   STATE.entriesKeySet = new Set(STATE.entries.map(e => String(e.voucher_no) + '#' + e.seq));
+  /* v5.7.22 沖帳自動修復（使用者指示）：草稿沖帳連結對最新 0100 白名單重驗，
+     超額自動縮列＋拆列改連同科目有餘額的立帳；有動作時彈窗列明細 */
+  const _offFixes = autoRepairOffsets();
+  if (_offFixes.length) setTimeout(() => confirmAnim(
+    `<b>🔧 沖帳自動修復（依最新 0100 未沖清單）</b><br><br>${_offFixes.map(esc).join('<br>')}`,
+    '知道了', '關閉'), 400);
   /* v5.5.2 受款人主檔統編查找表（帳號優先、姓名後備）：F05 受款人統編 + F07 發票統編/營業人名稱
      v5.5.4 建表時即以 isValidGui 過濾（身分證/壞碼不進表，避免佔住鍵遮蔽同鍵合格統編） */
   STATE.payeeGuiMap = new Map();
@@ -1760,6 +1766,57 @@ async function offsetItemDone(okey) {
   await putConfig('sba_offset_open', STATE.offsetOpen);
   const { vi, li } = STATE.modalCtx;
   openOffsetModal(vi, li);
+}
+/* v5.7.22 沖帳自動修復：草稿所有沖帳連結對最新 0100 白名單重驗（冪等，boot 時執行）。
+   ①offset.max 同步官方未沖額 ②依草稿順序逐標的累計：超額列縮至可用額＋餘額拆新列、
+   標的用光的整列改連——替代目標＝同科目「剩餘最大」的立帳（子目自 D1 帶）；無可用→留紅沖帳鈕手選 */
+function autoRepairOffsets() {
+  const items = (STATE.offsetOpen && STATE.offsetOpen.items) || [];
+  if (!items.length || !STATE.drafts.length) return [];
+  const byKey = new Map(items.map(o => [o.vch + '#' + o.seq, o]));
+  const used = new Map();
+  const roomOf = (o) => (+o.left || 0) - (used.get(o.vch + '#' + o.seq) || 0);
+  const linkTo = (L, t, amt) => {
+    L.offset = { year: String(t.vch).slice(0, 3), kind: String(t.vch).slice(3, 4),
+      vchrno: String(t.vch), seq: t.seq, amt, max: +t.left, sub: null };
+    const sub = entrySubCode(t.vch, t.seq);
+    if (sub !== null) { L.offset.sub = sub; L.relate = sub; }
+    used.set(t.vch + '#' + t.seq, (used.get(t.vch + '#' + t.seq) || 0) + amt);
+  };
+  const fixes = [];
+  STATE.drafts.forEach((v) => {
+    for (let li = 0; li < v.lines.length; li++) {
+      const L = v.lines[li];
+      if (!L.offset) continue;
+      const k = String(L.offset.vchrno) + '#' + L.offset.seq;
+      const it = byKey.get(k);
+      if (!it) continue;   /* 不在白名單（已沖畢等）→ 匯出檢核警告處理，不自作主張 */
+      if (+L.offset.max !== +it.left) L.offset.max = +it.left;
+      const want = +L.offset.amt || 0;
+      const avail = roomOf(it);
+      if (want <= avail) { used.set(k, (used.get(k) || 0) + want); continue; }
+      const rest = Math.round((want - Math.max(avail, 0)) * 100) / 100;
+      const alt = items.filter(o => o.name === it.name && o !== it && roomOf(o) >= rest)
+        .sort((a, b) => roomOf(b) - roomOf(a))[0];
+      if (avail <= 0) {
+        if (alt) { linkTo(L, alt, want); fixes.push(`${v.importrecno} 列${L.seq}（${fmtN(want)}）：${k} 已無餘額 → 整列改沖 ${alt.vch}#${alt.seq}`); }
+        else { delete L.offset; fixes.push(`${v.importrecno} 列${L.seq}（${fmtN(want)}）：${k} 已無餘額且無同科目可用立帳，請手動選沖帳`); }
+        continue;
+      }
+      L.amt = avail; L.offset.amt = avail;
+      used.set(k, +it.left);
+      const clone = { ...L, amt: rest };
+      delete clone.offset;
+      if (alt) { linkTo(clone, alt, rest); fixes.push(`${v.importrecno} 列${L.seq}：${k} 未沖僅 ${fmtN(+it.left)} → 本列縮為 ${fmtN(avail)}，拆 ${fmtN(rest)} 改沖 ${alt.vch}#${alt.seq}`); }
+      else { fixes.push(`${v.importrecno} 列${L.seq}：${k} 未沖僅 ${fmtN(+it.left)} → 本列縮為 ${fmtN(avail)}，拆出 ${fmtN(rest)} 請手動選沖帳`); }
+      v.lines.splice(li + 1, 0, clone);
+      v.lines.forEach((x, i) => { x.seq = i + 1; });
+      syncBankLine(v);
+      li++;   /* 跳過剛插入的餘額列（已配好或留手選） */
+    }
+  });
+  if (fixes.length) saveDrafts();
+  return fixes;
 }
 async function pickOffset(vchrno, seq, avail, dseq) {
   const { vi, li } = STATE.modalCtx;
