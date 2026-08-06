@@ -114,6 +114,11 @@ select.w-subj { width: 168px; }
 /* v5.7.18 沖帳選單容器識別／本批已扣醒目／工具列 */
 .off-toolbar td { background: #f3f1e8; padding: 6px 10px; font-size: 13px; position: sticky; top: 0; }
 .off-h td { padding: 6px 10px; font-size: 13px; }
+.off-stats { float: right; display: inline-flex; gap: 6px; font-weight: normal; }
+.off-st { font-size: 12px; background: rgba(255,255,255,.8); border-radius: 8px; padding: 1px 8px; color: #455a64; white-space: nowrap; }
+.off-st b { color: #1e2a38; }
+.off-st.st-used b { color: #ef6c00; }
+.off-st.st-left b { color: #2e7d32; }
 .off-h-rec td { background: #fff3d6; border-left: 5px solid #f9a825; }
 .off-h-syn td { background: #e3f0fa; border-left: 5px solid #1976d2; }
 .off-h-cur td { background: #e8f3e6; border-left: 5px solid #2e7d32; }
@@ -1158,7 +1163,7 @@ function renderPreview() {
       <tr>
         <td>${L.seq}</td>
         <td><select onchange="updLine(${vi},${li},'dc',this.value)"><option value="D"${L.dc === 'D' ? ' selected' : ''}>借</option><option value="C"${L.dc === 'C' ? ' selected' : ''}>貸</option></select></td>
-        <td><select class="w-subj" onchange="updLine(${vi},${li},'code',this.value)" title="${esc(L.code)} ${esc(subjectName(L.code))}">${subjOpts.some(([c]) => c === String(L.code)) ? '' : `<option value="${esc(L.code)}" selected>${esc(L.code)} ${esc(subjectName(L.code))}</option>`}${subjOpts.map(([c, n]) => `<option value="${esc(c)}"${c === String(L.code) ? ' selected' : ''}>${esc(c)} ${esc(n)}</option>`).join('')}</select></td>
+        <td><select class="w-subj" onchange="updLine(${vi},${li},'code',this.value)" title="${esc(L.code)} ${esc(subjectName(L.code))}">${subjOpts.some(([c]) => c === String(L.code)) ? '' : `<option value="${esc(L.code)}" selected>${esc(L.code)} ${esc(subjectName(L.code))}</option>`}<optgroup label="⚡ 暫付／暫收（先立帳後沖轉）">${SBA_ONLY_SUBJECTS.map(([c, n]) => `<option value="${esc(c)}"${c === String(L.code) ? ' selected' : ''}>${esc(c)} ${esc(n)}</option>`).join('')}</optgroup><optgroup label="全部科目">${subjOpts.filter(([c]) => !SBA_ONLY_SUBJECTS.some(([p]) => p === c)).map(([c, n]) => `<option value="${esc(c)}"${c === String(L.code) ? ' selected' : ''}>${esc(c)} ${esc(n)}</option>`).join('')}</optgroup></select></td>
         <td>${ro ? esc(L.bcode || '') : `<input class="w-4" value="${esc(L.bcode || '')}" onchange="updLine(${vi},${li},'bcode',this.value)">`}<br><span class="small code-zh" title="${esc(bcodeNames.get(String(L.bcode || '')) || '')}">${esc((bcodeNames.get(String(L.bcode || '')) || '').slice(0, 6))}</span></td>
         <td>${ro ? esc(L.use || '') : `<input class="w-4" value="${esc(L.use || '')}" onchange="updLine(${vi},${li},'use',this.value)">`}<br><span class="small code-zh" title="${esc(useNames.get(String(L.use || '')) || '')}">${esc((useNames.get(String(L.use || '')) || '').slice(0, 6))}</span></td>
         <td>${ro ? esc(L.pkind || '') : (/^1\d{3}$/.test(L.use || '') ? `<input class="w-2" value="${esc(L.pkind || '')}" placeholder="pkind" onchange="updLine(${vi},${li},'pkind',this.value)">` : '')}</td>
@@ -1459,7 +1464,7 @@ function openOffsetModal(vi, li) {
   STATE.modalCands = { cands, rel, openMap, matchOf, itemMatched, code, showHist: false, lineUse,
     useFilter: !!(lineUse && cands.some(e => e._use === lineUse)) };
   $('modal-title').textContent = `選擇沖帳立帳傳票 — ${code} ${subjectName(code)}`;
-  $('modal-hint').textContent = `候選＝D1 歷史 SBA 分錄中，同科目家族「歷年」全部${estField === 'credit' ? '貸方' : '借方'}（立帳）列，依子目分組${rel ? `、與本列子目 ${rel} 相同者置頂推薦` : ''}、組內新到舊。資料截至最後匯入月份，更新的立帳請先匯入最新 FNWFRX0090 或至 SBA 端手動沖。`;
+  $('modal-hint').textContent = '';   /* v5.7.19 使用者指示：長說明移除，資訊改由各容器統計列呈現 */
   $('modal-q').value = '';
   renderOffsetList('');
   $('modal-mask').style.display = 'block';
@@ -1506,6 +1511,13 @@ function renderOffsetList(q) {
     <td class="num">${amtHtml}</td>
     <td style="white-space:nowrap;">${btn}${okey && selectable ? ` <button class="btn btn-sm off-edit" data-okey="${esc(okey)}" title="修改官方未沖額（0100 過時時手動校正）">✏️</button><button class="btn btn-sm off-done" data-okey="${esc(okey)}" title="標記已沖畢（自未沖清單移除）">✔</button>` : ''}</td></tr>`;
   };
+  /* v5.7.19 容器統計列（使用者指示）：每桶標題直接顯示 總額／本批已沖 n 筆／剩餘 */
+  const usedOfK = (vno, xseq) => offsetAllocated(vno, xseq, ctx.vi, ctx.li);
+  const grpHeader = (cls, title, st) => {
+    const t = st.reduce((s, x) => s + (+x.base || 0), 0), u = st.reduce((s, x) => s + (+x.used || 0), 0);
+    const n = st.filter(x => x.used > 0).length;
+    return `<tr class="off-h ${cls}"><td colspan="7"><b>${title}</b><span class="off-stats"><span class="off-st">總額 <b>${fmtN(t)}</b></span><span class="off-st st-used">本批已沖 ${n} 筆 <b>${fmtN(u)}</b></span><span class="off-st st-left">剩餘 <b>${fmtN(t - u)}</b></span></span></td></tr>`;
+  };
   /* v5.7.14 高機率吻合（使用者需求：金額名目相近難挑）：本列金額＝立帳額或官方未沖額，
      且摘要 bigram 相似（金額同→門檻低 0.15；金額不同→需高相似 0.6）→ 🎯 置頂建議＋原列淡橘醒目 */
   const _line = ((STATE.drafts[ctx.vi] || {}).lines || [])[ctx.li] || {};
@@ -1546,22 +1558,34 @@ function renderOffsetList(q) {
     if (top.length) html += recHeader + top.map(x => x.row()).join('');
     if (synth.length) {
       const synthS = sortAmt ? [...synth].sort((a, b) => (+b.left || 0) - (+a.left || 0)) : synth;
-      html += `<tr class="off-h off-h-syn"><td colspan="7"><b>🆕 現行未沖・D1 無對應列（依官方餘額表，可選）</b></td></tr>`;
+      html += grpHeader('off-h-syn', '🆕 現行未沖・D1 無對應列（依官方餘額表，可選）',
+        synthS.map(o => ({ base: +o.left || 0, used: usedOfK(o.vch, +o.seq || 0) })));
       html += synthS.map(o => rowHtml({ voucher_no: o.vch, seq: o.seq, post_date: '', sub_account: o.name, description: o.desc }, o.left, true, undefined, hotKeys.has(o.vch + '#' + o.seq), o.vch + '#' + o.seq)).join('');
     }
     const currentS = sortAmt ? [...current].sort((a, b) => (+matchOf.get(keyOf(b)).left || 0) - (+matchOf.get(keyOf(a)).left || 0)) : current;
-    if (sortAmt && currentS.length) html += `<tr class="off-h off-h-cur"><td colspan="7"><b>✅ 現行未沖（金額大→小）</b></td></tr>`;
-    let lastGrp = null;
-    html += currentS.map(e => {
-      const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
-      let head = '';
-      if (!sortAmt && gk !== lastGrp) { lastGrp = gk; head = `<tr class="off-h ${isRec ? 'off-h-rec' : 'off-h-cur'}"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `✅ 未沖・子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`; }
-      const o = matchOf.get(keyOf(e));
-      return head + rowHtml(e, o.left, true, +o.seq || 0, hotKeys.has(keyOf(e)), o.vch + '#' + o.seq);
-    }).join('');
+    const curRow = (e) => { const o = matchOf.get(keyOf(e)); return rowHtml(e, o.left, true, +o.seq || 0, hotKeys.has(keyOf(e)), o.vch + '#' + o.seq); };
+    const curSt = (arr) => arr.map(e => { const o = matchOf.get(keyOf(e)); return { base: +o.left || 0, used: usedOfK(e.voucher_no, +o.seq || 0) }; });
+    if (sortAmt) {
+      if (currentS.length) html += grpHeader('off-h-cur', '✅ 現行未沖（金額大→小）', curSt(currentS)) + currentS.map(curRow).join('');
+    } else {
+      const grps = [];
+      let g = null;
+      for (const e of currentS) {
+        const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
+        if (!g || g.gk !== gk) { g = { gk, isRec, subAcc: e.sub_account, rows: [] }; grps.push(g); }
+        g.rows.push(e);
+      }
+      for (const gr of grps) {
+        html += grpHeader(gr.isRec ? 'off-h-rec' : 'off-h-cur',
+          gr.isRec ? `⭐ 推薦：子目 ${esc(gr.subAcc || rel)}（與本列相同）` : `✅ 未沖・子目 ${esc(gr.subAcc || '（無子目）')}`,
+          curSt(gr.rows));
+        html += gr.rows.map(curRow).join('');
+      }
+    }
     if (newer.length) {
       const newerS = sortAmt ? [...newer].sort((a, b) => amtOfE(b) - amtOfE(a)) : newer;
-      html += `<tr class="off-h off-h-new"><td colspan="7"><b>🕓 晚於餘額表的新立帳（官方未沖額未知，請確認未在 SBA 端沖過）</b></td></tr>`;
+      html += grpHeader('off-h-new', '🕓 晚於餘額表的新立帳（官方未沖額未知，請確認未在 SBA 端沖過）',
+        newerS.map(e => ({ base: amtOfE(e), used: usedOfK(e.voucher_no, +e.seq || 0) })));
       html += newerS.map(e => rowHtml(e, null, true, undefined, hotKeys.has(keyOf(e)))).join('');
     }
     html += `<tr class="off-h off-h-hist"><td colspan="7"><button class="btn btn-sm" onclick="toggleOffsetHist()">👁 ${showHist ? '隱藏' : '顯示'}歷史/已沖畢立帳（${hist.length} 筆，不可選）</button></td></tr>`;
@@ -1580,15 +1604,28 @@ function renderOffsetList(q) {
     const top = recs.slice(0, 3);
     const hotKeys = new Set(top.map(x => x.key));
     if (top.length) html += recHeader + top.map(x => x.row()).join('');
-    let lastGrp = null;
     const CAP = 400;
-    const listS = sortAmt ? [...list].sort((a, b) => amtOfE(b) - amtOfE(a)) : list;
-    html += listS.slice(0, CAP).map(e => {
-      const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
-      let head = '';
-      if (!sortAmt && gk !== lastGrp) { lastGrp = gk; head = `<tr class="off-h ${isRec ? 'off-h-rec' : 'off-h-cur'}"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`; }
-      return head + rowHtml(e, null, true, undefined, hotKeys.has(keyOf(e)));
-    }).join('') + (listS.length > CAP ? `<tr><td colspan="7" class="small">僅顯示前 ${CAP} 筆（共 ${listS.length}），請用搜尋縮小範圍</td></tr>` : '');
+    const listS = (sortAmt ? [...list].sort((a, b) => amtOfE(b) - amtOfE(a)) : list).slice(0, CAP);
+    const eSt = (arr) => arr.map(e => ({ base: amtOfE(e), used: usedOfK(e.voucher_no, +e.seq || 0) }));
+    const eRow = (e) => rowHtml(e, null, true, undefined, hotKeys.has(keyOf(e)));
+    if (sortAmt) {
+      if (listS.length) html += grpHeader('off-h-cur', '立帳（金額大→小）', eSt(listS)) + listS.map(eRow).join('');
+    } else {
+      const grps = [];
+      let g = null;
+      for (const e of listS) {
+        const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
+        if (!g || g.gk !== gk) { g = { gk, isRec, subAcc: e.sub_account, rows: [] }; grps.push(g); }
+        g.rows.push(e);
+      }
+      for (const gr of grps) {
+        html += grpHeader(gr.isRec ? 'off-h-rec' : 'off-h-cur',
+          gr.isRec ? `⭐ 推薦：子目 ${esc(gr.subAcc || rel)}（與本列相同）` : `子目 ${esc(gr.subAcc || '（無子目）')}`,
+          eSt(gr.rows));
+        html += gr.rows.map(eRow).join('');
+      }
+    }
+    html += (list.length > CAP ? `<tr><td colspan="7" class="small">僅顯示前 ${CAP} 筆（共 ${list.length}），請用搜尋縮小範圍</td></tr>` : '');
     if (!html) html = '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
   }
   /* v5.7.4 用途別預設過濾＋v5.7.18 金額排序：工具列恆顯示 */
