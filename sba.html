@@ -503,12 +503,18 @@ async function boot() {
   addTrLine(); addTrLine();
 }
 
+/* v5.7.17 傳票工坊限定立沖科目（使用者指定：不進 EAF 填單頁，僅工坊科目下拉與立沖）：
+   180705 暫付及待結轉帳項（資產：借立帳、貸沖）＝公務預算款未到但存款足夠時先墊付；
+   280705 暫收及待結轉款項（負債：貸立帳、借沖）＝款項先入待結轉。皆為先立帳、後收沖轉正 */
+const SBA_ONLY_SUBJECTS = [['180705', '暫付及待結轉帳項'], ['280705', '暫收及待結轉款項']];
 function subjectName(code) {
   if (!STATE.subjects) return '';
   for (const ma of STATE.subjects.mainAccounts || []) {
     if (ma.code === code) return ma.name;
     for (const bp of ma.businessPlans || []) if (bp.code === code) return bp.name;
   }
+  const so = SBA_ONLY_SUBJECTS.find(x => x[0] === String(code));
+  if (so) return so[1];
   const e = STATE.entries.find(x => (x.subject || '').startsWith(code + ' '));
   return e ? e.subject.slice(code.length + 1) : '';
 }
@@ -522,6 +528,7 @@ function allKnownSubjectCodes() {
     const m = String(e.subject || '').match(/^(\S+)\s+(.*)$/);
     if (m && !set.has(m[1])) set.set(m[1], m[2]);
   }
+  for (const [c, n] of SBA_ONLY_SUBJECTS) if (!set.has(c)) set.set(c, n); /* 工坊限定科目恆可選 */
   return set;
 }
 function bcodeFor(code) {
@@ -1009,7 +1016,7 @@ function generateVouchers() {
 
 /* ═══════════════ 🧾 傳票預覽/編輯 ═══════════════ */
 const KIND_NAMES = { '1': '收入傳票', '2': '支出傳票', '3': '轉帳傳票' };
-const OFFSETABLE = (code) => /^(2102|210205|210202|110305|180705)/.test(code);
+const OFFSETABLE = (code) => /^(2102|210205|210202|110305|180705|280705)/.test(code);
 /* 立沖科目「沖帳」方向依科目性質：負債(2102 應付/代收)＝貸立帳借沖；資產(110305 應收/180705 保證金)＝借立帳貸沖 */
 const OFFSET_DC = (code) => /^(110305|180705)/.test(String(code)) ? 'C' : 'D';
 /* AI 回傳後再保險清一次：擬支付/支付開頭贅詞、檢附…整句、條列編號 */
