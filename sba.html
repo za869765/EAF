@@ -1821,7 +1821,7 @@ function runBatchValidation() {
   alloc.forEach((sum, k) => {
     const o = openMap.get(k);
     if (o && sum > +o.left) errors.push(`沖帳超額：立帳 ${k} 官方未沖 ${fmtN(+o.left)}，本批合計沖 ${fmtN(sum)}，超出 ${fmtN(sum - +o.left)}（SBA 匯入會擋）`);
-    else if (openMap.size && !o) warnings.push(`立帳 ${k} 不在官方未沖清單（可能已沖畢或餘額表過舊），SBA 匯入可能擋`);
+    /* v5.7.11「不在官方未沖清單」警告移除（使用者指示）：新立帳晚於 0100 屬常態；超額硬檢查保留 */
   });
   /* 批號防重複（v5.7.6 全域流水）：2 碼任一處理日期用過即擋（含 SBA 端種子、匯出紀錄、下載消耗集） */
   const _batch = $('ex-batch').value.trim().toUpperCase();

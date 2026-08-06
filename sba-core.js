@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.7.10';
+const SBA_CORE_VERSION = '5.7.11';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -156,7 +156,7 @@ function validateVoucher(v, opt) {
     W(`${tag}：轉帳傳票入帳日期應同製票日期（規格 F03 欄06 註2）`);
   if (/^\d{7}$/.test(String(v.payDate)) && /^\d{3}$/.test(String(v.year)) && String(v.payDate).slice(0, 3) !== String(v.year))
     W(`${tag}：製票日期年度(${String(v.payDate).slice(0, 3)})與會計年度(${v.year})不一致——跨年補帳請確認年度`);
-  if (big5Len(v.memo) > 100) W(`${tag}：傳票總摘要超過100位元組，將截斷（明細摘要上限1000B、總摘要僅100B）`);
+  /* v5.7.11 總摘要>100B 截斷警告移除（使用者指示）：F03 寫檔仍自動 truncBig5(100)，行為不變 */
 
   const lines = v.lines || [];
   if (!lines.length) { E(`${tag}：無明細`); return { errors, warnings }; }
