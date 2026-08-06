@@ -99,6 +99,31 @@ input.w-amt { width: 92px; text-align: right; }
 input.w-code { width: 82px; } input.w-4 { width: 56px; } input.w-2 { width: 44px; }
 select.w-subj { width: 168px; }
 .code-zh { color: #8d6e63; white-space: nowrap; }
+/* v5.7.18 CSS 動畫確認彈窗（取代原生 confirm；多筆沖帳拆列用） */
+.cfm-mask { position: fixed; inset: 0; background: rgba(30,42,56,.45); z-index: 999; display: flex; align-items: center; justify-content: center; animation: cfmFade .18s ease; }
+.cfm-box { background: #fff; border-radius: 12px; padding: 20px 22px; max-width: 460px; width: 92%; box-shadow: 0 18px 60px rgba(0,0,0,.3); animation: cfmPop .24s cubic-bezier(.34,1.56,.64,1); }
+.cfm-body { font-size: 14px; line-height: 1.8; }
+.cfm-btns { margin-top: 16px; display: flex; gap: 10px; justify-content: flex-end; }
+.cfm-btns .cfm-ok { background: #1e2a38; color: #fff; border-color: #1e2a38; }
+.cfm-mask.out { animation: cfmFadeOut .16s ease forwards; }
+.cfm-mask.out .cfm-box { animation: cfmPopOut .16s ease forwards; }
+@keyframes cfmFade { from { opacity: 0; } }
+@keyframes cfmPop { from { opacity: 0; transform: scale(.85) translateY(14px); } }
+@keyframes cfmFadeOut { to { opacity: 0; } }
+@keyframes cfmPopOut { to { opacity: 0; transform: scale(.94); } }
+/* v5.7.18 沖帳選單容器識別／本批已扣醒目／工具列 */
+.off-toolbar td { background: #f3f1e8; padding: 6px 10px; font-size: 13px; position: sticky; top: 0; }
+.off-h td { padding: 6px 10px; font-size: 13px; }
+.off-h-rec td { background: #fff3d6; border-left: 5px solid #f9a825; }
+.off-h-syn td { background: #e3f0fa; border-left: 5px solid #1976d2; }
+.off-h-cur td { background: #e8f3e6; border-left: 5px solid #2e7d32; }
+.off-h-new td { background: #fdf0dc; border-left: 5px solid #ef6c00; }
+.off-h-hist td { background: #ececec; border-left: 5px solid #9e9e9e; }
+.off-tag-open { display: inline-block; font-size: 11px; background: #e8f3e6; color: #2e7d32; border: 1px solid #a5d6a7; border-radius: 8px; padding: 0 6px; }
+.off-tag-done { display: inline-block; font-size: 11px; background: #fdecea; color: #c62828; border: 1px solid #ef9a9a; border-radius: 8px; padding: 1px 7px; white-space: nowrap; }
+.off-used { font-size: 12px; color: #b26500; margin-top: 2px; }
+.off-used b.off-ok { color: #2e7d32; }
+.off-used b.off-zero { color: #c62828; }
 input.w-date { width: 84px; } input.w-memo { width: 100%; min-width: 180px; }
 .btn { padding: 5px 14px; border: none; border-radius: var(--r-md, 8px); cursor: pointer;
   font-size: 12px; font-family: inherit; background: var(--warm-sand, #e8e6dc);
@@ -1126,7 +1151,8 @@ function renderPreview() {
         <td class="small" style="color:#9e9e9e;">自動</td>
       </tr>`;
       /* v5.7.15 衍生欄位唯讀（使用者指示）：bcode/用途別/pkind/子目/歸屬/金額由單據與沖帳自動帶出，
-         純檢視防誤改；手動加列（manual）與轉帳傳票（kind 3）保留可編輯（拆列/手工分錄需要） */
+         純檢視防誤改；手動加列（manual）與轉帳傳票（kind 3）保留可編輯。
+         v5.7.18 拆列餘額列改繼承原列屬性（使用者指示：衍生列一樣唯讀檢視，不再標 manual） */
       const ro = v.kind !== '3' && !L.manual;
       return `
       <tr>
@@ -1460,17 +1486,17 @@ function renderOffsetList(q) {
   const famSynth = [...openMap.values()].filter(o => !itemMatched.has(o.vch + '#' + o.seq))
     .filter(o => !o.name || !subjName || o.name === subjName);
   const useWhitelist = (cands.some(e => matchOf.has(keyOf(e))) || famSynth.length > 0);
-  const rowHtml = (e, left, selectable, oseq, hot) => {
+  const rowHtml = (e, left, selectable, oseq, hot, okey) => {
     /* 估扣：可用＝未沖（或立帳額，依科目性質取貸/借方）− 本批其他列已沖同一立帳的合計，避免超額匯入被 SBA 擋
        oseq＝官方序號（0100）；匯出/估扣皆用官方序號，顯示仍列 D1 序號供對照 */
     const xseq = oseq != null ? oseq : (+e.seq || 0);
     const base = left != null ? left : (+e.credit || +e.debit || 0);
     const used = selectable ? offsetAllocated(e.voucher_no, xseq, ctx.vi, ctx.li) : 0;
     const avail = base - used;
-    const amtHtml = fmtN(base) + (left != null ? ' <span class="small">未沖</span>' : '')
-      + (used > 0 ? `<div class="small">−本批已扣 ${fmtN(used)} ＝ 可用 ${fmtN(avail)}</div>` : '');
+    const amtHtml = `<b>${fmtN(base)}</b>` + (left != null ? ' <span class="off-tag-open">未沖</span>' : '')
+      + (used > 0 ? `<div class="off-used">−本批已扣 ${fmtN(used)} → 可用 <b class="${avail <= 0 ? 'off-zero' : 'off-ok'}">${fmtN(avail)}</b></div>` : '');
     const btn = !selectable ? '<span class="small">歷史</span>'
-      : avail <= 0 ? '<span class="small">已扣完</span>'
+      : avail <= 0 ? '<span class="off-tag-done">已扣完</span>'
       /* 傳票號走 data-* 不內插進 inline handler：HTML 屬性會先解碼字元參照再編譯 JS，
          esc() 的 &#39; 到那時已還原成 '，單引號仍可跳脫字串（故改事件委派） */
       : `<button class="btn btn-sm off-pick" data-vno="${esc(e.voucher_no)}" data-seq="${xseq}" data-dseq="${+e.seq || 0}" data-avail="${avail}">選此列</button>`;
@@ -1478,7 +1504,7 @@ function renderOffsetList(q) {
     <tr${selectable ? '' : ' class="row-exported"'}${hot ? ' style="background:#f6e7dc;"' : ''}><td>${esc(e.voucher_no)}</td><td>${esc(String(xseq))}${oseq != null && +oseq !== (+e.seq || 0) ? `<span class="small" title="0100 官方序號與 D1 明細列序不同（0090 無序號欄），匯出以官方序號為準">（D1#${esc(String(e.seq))}）</span>` : ''}</td><td>${esc(e.post_date || e.make_date || '')}</td>
     <td>${esc(e.sub_account || '')}</td><td style="max-width:280px;">${hot ? '🎯 ' : ''}${esc(String(e.description || '').slice(0, 40))}</td>
     <td class="num">${amtHtml}</td>
-    <td>${btn}</td></tr>`;
+    <td style="white-space:nowrap;">${btn}${okey && selectable ? ` <button class="btn btn-sm off-edit" data-okey="${esc(okey)}" title="修改官方未沖額（0100 過時時手動校正）">✏️</button><button class="btn btn-sm off-done" data-okey="${esc(okey)}" title="標記已沖畢（自未沖清單移除）">✔</button>` : ''}</td></tr>`;
   };
   /* v5.7.14 高機率吻合（使用者需求：金額名目相近難挑）：本列金額＝立帳額或官方未沖額，
      且摘要 bigram 相似（金額同→門檻低 0.15；金額不同→需高相似 0.6）→ 🎯 置頂建議＋原列淡橘醒目 */
@@ -1489,7 +1515,9 @@ function renderOffsetList(q) {
     return { rec: amtEq ? sim >= 0.15 : sim >= 0.6, score: (amtEq ? 1 : 0) + sim };
   };
   const filt = (e) => hit(String(e.description || '') + String(e.voucher_no || '') + String(e.sub_account || ''));
-  const recHeader = `<tr style="background:#f3e3d8;"><td colspan="7"><b>🎯 高機率吻合（金額/摘要與本列相符，請確認後選用）</b></td></tr>`;
+  const recHeader = `<tr class="off-h off-h-rec"><td colspan="7"><b>🎯 高機率吻合（金額/摘要與本列相符，請確認後選用）</b></td></tr>`;
+  const sortAmt = !!(STATE.modalCands && STATE.modalCands.sortAmt);
+  const amtOfE = (e) => +e.credit || +e.debit || 0;
   let html = '';
   if (useWhitelist) {
     /* ① 現行未沖但配不到 D1 列（含 D1 沒匯那段年度、或同傳票多筆同額無法唯一配對）：
@@ -1509,30 +1537,34 @@ function renderOffsetList(q) {
     const hist = restAll.filter(e => !newerKeys.has(String(e.voucher_no) + '#' + e.seq));
     /* 🎯 三個可選區各自打分，取最高前 3 置頂 */
     const recs = [];
-    for (const o of synth) { const s = _scoreOf(o.desc, o.left, o.left); if (s.rec) recs.push({ score: s.score, key: o.vch + '#' + o.seq, row: () => rowHtml({ voucher_no: o.vch, seq: o.seq, post_date: '', sub_account: o.name, description: o.desc }, o.left, true, undefined, true) }); }
-    for (const e of current) { const o = matchOf.get(keyOf(e)); const s = _scoreOf(e.description, (+e.credit || +e.debit || 0), o.left); if (s.rec) recs.push({ score: s.score, key: keyOf(e), row: () => rowHtml(e, o.left, true, +o.seq || 0, true) }); }
+    for (const o of synth) { const s = _scoreOf(o.desc, o.left, o.left); if (s.rec) recs.push({ score: s.score, key: o.vch + '#' + o.seq, row: () => rowHtml({ voucher_no: o.vch, seq: o.seq, post_date: '', sub_account: o.name, description: o.desc }, o.left, true, undefined, true, o.vch + '#' + o.seq) }); }
+    for (const e of current) { const o = matchOf.get(keyOf(e)); const s = _scoreOf(e.description, (+e.credit || +e.debit || 0), o.left); if (s.rec) recs.push({ score: s.score, key: keyOf(e), row: () => rowHtml(e, o.left, true, +o.seq || 0, true, o.vch + '#' + o.seq) }); }
     for (const e of newer) { const s = _scoreOf(e.description, (+e.credit || +e.debit || 0), null); if (s.rec) recs.push({ score: s.score, key: keyOf(e), row: () => rowHtml(e, null, true, undefined, true) }); }
     recs.sort((a, b) => b.score - a.score);
     const top = recs.slice(0, 3);
     const hotKeys = new Set(top.map(x => x.key));
     if (top.length) html += recHeader + top.map(x => x.row()).join('');
     if (synth.length) {
-      html += `<tr style="background:#dcd9cc;"><td colspan="7"><b>🆕 現行未沖・D1 無對應列（依官方餘額表，可選）</b></td></tr>`;
-      html += synth.map(o => rowHtml({ voucher_no: o.vch, seq: o.seq, post_date: '', sub_account: o.name, description: o.desc }, o.left, true, undefined, hotKeys.has(o.vch + '#' + o.seq))).join('');
+      const synthS = sortAmt ? [...synth].sort((a, b) => (+b.left || 0) - (+a.left || 0)) : synth;
+      html += `<tr class="off-h off-h-syn"><td colspan="7"><b>🆕 現行未沖・D1 無對應列（依官方餘額表，可選）</b></td></tr>`;
+      html += synthS.map(o => rowHtml({ voucher_no: o.vch, seq: o.seq, post_date: '', sub_account: o.name, description: o.desc }, o.left, true, undefined, hotKeys.has(o.vch + '#' + o.seq), o.vch + '#' + o.seq)).join('');
     }
+    const currentS = sortAmt ? [...current].sort((a, b) => (+matchOf.get(keyOf(b)).left || 0) - (+matchOf.get(keyOf(a)).left || 0)) : current;
+    if (sortAmt && currentS.length) html += `<tr class="off-h off-h-cur"><td colspan="7"><b>✅ 現行未沖（金額大→小）</b></td></tr>`;
     let lastGrp = null;
-    html += current.map(e => {
+    html += currentS.map(e => {
       const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
       let head = '';
-      if (gk !== lastGrp) { lastGrp = gk; head = `<tr style="background:#dcd9cc;"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`; }
+      if (!sortAmt && gk !== lastGrp) { lastGrp = gk; head = `<tr class="off-h ${isRec ? 'off-h-rec' : 'off-h-cur'}"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `✅ 未沖・子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`; }
       const o = matchOf.get(keyOf(e));
-      return head + rowHtml(e, o.left, true, +o.seq || 0, hotKeys.has(keyOf(e)));
+      return head + rowHtml(e, o.left, true, +o.seq || 0, hotKeys.has(keyOf(e)), o.vch + '#' + o.seq);
     }).join('');
     if (newer.length) {
-      html += `<tr style="background:#dcd9cc;"><td colspan="7"><b>🕓 晚於餘額表的新立帳（官方未沖額未知，請確認未在 SBA 端沖過）</b></td></tr>`;
-      html += newer.map(e => rowHtml(e, null, true, undefined, hotKeys.has(keyOf(e)))).join('');
+      const newerS = sortAmt ? [...newer].sort((a, b) => amtOfE(b) - amtOfE(a)) : newer;
+      html += `<tr class="off-h off-h-new"><td colspan="7"><b>🕓 晚於餘額表的新立帳（官方未沖額未知，請確認未在 SBA 端沖過）</b></td></tr>`;
+      html += newerS.map(e => rowHtml(e, null, true, undefined, hotKeys.has(keyOf(e)))).join('');
     }
-    html += `<tr><td colspan="7"><button class="btn btn-sm" onclick="toggleOffsetHist()">👁 ${showHist ? '隱藏' : '顯示'}歷史/已沖畢立帳（${hist.length} 筆，不可選）</button></td></tr>`;
+    html += `<tr class="off-h off-h-hist"><td colspan="7"><button class="btn btn-sm" onclick="toggleOffsetHist()">👁 ${showHist ? '隱藏' : '顯示'}歷史/已沖畢立帳（${hist.length} 筆，不可選）</button></td></tr>`;
     if (showHist) html += hist.slice(0, 400).map(e => rowHtml(e, null, false)).join('')
       + (hist.length > 400 ? `<tr><td colspan="7" class="small">歷史僅顯示前 400 筆（共 ${hist.length}），請用搜尋</td></tr>` : '');
     if (!html) html = '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
@@ -1550,20 +1582,27 @@ function renderOffsetList(q) {
     if (top.length) html += recHeader + top.map(x => x.row()).join('');
     let lastGrp = null;
     const CAP = 400;
-    html += list.slice(0, CAP).map(e => {
+    const listS = sortAmt ? [...list].sort((a, b) => amtOfE(b) - amtOfE(a)) : list;
+    html += listS.slice(0, CAP).map(e => {
       const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
       let head = '';
-      if (gk !== lastGrp) { lastGrp = gk; head = `<tr style="background:#dcd9cc;"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`; }
+      if (!sortAmt && gk !== lastGrp) { lastGrp = gk; head = `<tr class="off-h ${isRec ? 'off-h-rec' : 'off-h-cur'}"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`; }
       return head + rowHtml(e, null, true, undefined, hotKeys.has(keyOf(e)));
-    }).join('') + (list.length > CAP ? `<tr><td colspan="7" class="small">僅顯示前 ${CAP} 筆（共 ${list.length}），請用搜尋縮小範圍</td></tr>` : '');
+    }).join('') + (listS.length > CAP ? `<tr><td colspan="7" class="small">僅顯示前 ${CAP} 筆（共 ${listS.length}），請用搜尋縮小範圍</td></tr>` : '');
     if (!html) html = '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
   }
-  /* v5.7.4 用途別預設過濾：本列有用途別且反查得到同用途別立帳時預設勾選，可取消看全部 */
-  if (lineUse && cands.some(e => e._use === lineUse)) {
-    html = `<tr><td colspan="7"><label class="small" style="cursor:pointer;"><input type="checkbox"${useFilter ? ' checked' : ''} onchange="toggleOffsetUse()"> 只看用途別 ${esc(lineUse)} 的立帳（由同傳票同額對向列反查；取消顯示全部）</label></td></tr>` + html;
-  }
+  /* v5.7.4 用途別預設過濾＋v5.7.18 金額排序：工具列恆顯示 */
+  const tb = [];
+  if (lineUse && cands.some(e => e._use === lineUse))
+    tb.push(`<label style="cursor:pointer;"><input type="checkbox"${useFilter ? ' checked' : ''} onchange="toggleOffsetUse()"> 只看用途別 ${esc(lineUse)}（同傳票同額對向列反查）</label>`);
+  tb.push(`<label style="cursor:pointer;"><input type="checkbox"${sortAmt ? ' checked' : ''} onchange="toggleOffsetSort()"> 立帳金額大→小</label>`);
+  html = `<tr class="off-toolbar"><td colspan="7">${tb.join('　')}</td></tr>` + html;
   $('modal-body').innerHTML = html;
   bindOffsetPick();
+}
+function toggleOffsetSort() {
+  STATE.modalCands.sortAmt = !STATE.modalCands.sortAmt;
+  renderOffsetList($('modal-q').value);
 }
 /* 「選此列」改事件委派：資料只走 data-*，不進 inline handler（防傳票號含引號跳脫字串） */
 let _offBound = false;
@@ -1572,7 +1611,12 @@ function bindOffsetPick() {
   const tb = $('modal-body');
   if (!tb || !tb.addEventListener) return;
   tb.addEventListener('click', (ev) => {
-    const b = ev.target && ev.target.closest && ev.target.closest('button.off-pick');
+    const t = ev.target;
+    const be = t && t.closest && t.closest('button.off-edit');
+    if (be) { offsetItemEdit(be.dataset.okey); return; }
+    const bd = t && t.closest && t.closest('button.off-done');
+    if (bd) { offsetItemDone(bd.dataset.okey); return; }
+    const b = t && t.closest && t.closest('button.off-pick');
     if (!b) return;
     pickOffset(b.dataset.vno, +b.dataset.seq || 0, +b.dataset.avail || 0, b.dataset.dseq);
   });
@@ -1595,7 +1639,67 @@ function entrySubCode(vchrno, seq) {
   const m = String(e.sub_account || '').match(/^(\d{2})/);
   return m ? m[1] : '';
 }
-function pickOffset(vchrno, seq, avail, dseq) {
+/* v5.7.18 CSS 動畫確認彈窗（Promise 版 confirm；使用者指定拆列改此樣式） */
+function confirmAnim(html, okText, cancelText) {
+  return new Promise((resolve) => {
+    const mask = document.createElement('div');
+    mask.className = 'cfm-mask';
+    mask.innerHTML = `<div class="cfm-box"><div class="cfm-body">${html}</div>
+      <div class="cfm-btns"><button class="btn cfm-ok">${esc(okText || '確定')}</button>
+      <button class="btn cfm-no">${esc(cancelText || '取消')}</button></div></div>`;
+    document.body.appendChild(mask);
+    const done = (val) => { mask.classList.add('out'); setTimeout(() => mask.remove(), 170); resolve(val); };
+    mask.querySelector('.cfm-ok').onclick = () => done(true);
+    mask.querySelector('.cfm-no').onclick = () => done(false);
+    mask.addEventListener('click', (ev) => { if (ev.target === mask) done(false); });
+  });
+}
+/* v5.7.18 動畫輸入彈窗（修改官方未沖額用） */
+function promptAnim(html, defVal) {
+  return new Promise((resolve) => {
+    const mask = document.createElement('div');
+    mask.className = 'cfm-mask';
+    mask.innerHTML = `<div class="cfm-box"><div class="cfm-body">${html}</div>
+      <input class="cfm-input" value="${esc(String(defVal == null ? '' : defVal))}" style="margin-top:10px;width:100%;font-size:16px;padding:6px 8px;box-sizing:border-box;">
+      <div class="cfm-btns"><button class="btn cfm-ok">確定</button><button class="btn cfm-no">取消</button></div></div>`;
+    document.body.appendChild(mask);
+    const inp = mask.querySelector('.cfm-input');
+    const done = (val) => { mask.classList.add('out'); setTimeout(() => mask.remove(), 170); resolve(val); };
+    mask.querySelector('.cfm-ok').onclick = () => done(inp.value);
+    mask.querySelector('.cfm-no').onclick = () => done(null);
+    inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') done(inp.value); });
+    mask.addEventListener('click', (ev) => { if (ev.target === mask) done(null); });
+    setTimeout(() => { inp.focus(); inp.select(); }, 60);
+  });
+}
+/* v5.7.18 白名單手動維護（使用者需求：0100 產出後才沖掉的立帳，官方未沖額已過時——
+   實例 115100035#7 1,348 已被 115200062#2 沖、#2 10,000 已被 115200063 分三筆沖）：
+   ✏️＝修改官方未沖額；✔＝標記已沖畢（自未沖清單移除→該列落回歷史不可選）。皆寫回 D1，匯入新版 0100 會整份重建 */
+function offsetItemOf(okey) {
+  return ((STATE.offsetOpen && STATE.offsetOpen.items) || []).find(o => o.vch + '#' + o.seq === okey);
+}
+async function offsetItemEdit(okey) {
+  const o = offsetItemOf(okey);
+  if (!o) return;
+  const val = await promptAnim(`<b>修改官方未沖額</b> — 立帳 ${esc(o.vch)}#${esc(String(o.seq))}<br><span class="small">${esc((o.desc || '').slice(0, 40))}</span><br>現值 <b>${fmtN(o.left)}</b>，請輸入正確未沖金額：`, o.left);
+  if (val == null) return;
+  const n = +String(val).replace(/,/g, '');
+  if (!(n >= 0)) { alert('金額不正確'); return; }
+  o.left = n; o.manual = true;
+  await putConfig('sba_offset_open', STATE.offsetOpen);
+  const { vi, li } = STATE.modalCtx;
+  openOffsetModal(vi, li);   /* 金額變動影響模糊配對，整個重建 */
+}
+async function offsetItemDone(okey) {
+  const o = offsetItemOf(okey);
+  if (!o) return;
+  if (!await confirmAnim(`確定將立帳 <b>${esc(o.vch)}#${esc(String(o.seq))}</b>（未沖 ${fmtN(o.left)}）<br><span class="small">${esc((o.desc || '').slice(0, 40))}</span><br>標記為<b>已沖畢</b>？將自未沖清單移除（之後匯入新版 0100 會重建）`, '✔ 已沖畢', '取消')) return;
+  STATE.offsetOpen.items = STATE.offsetOpen.items.filter(x => x.vch + '#' + x.seq !== okey);
+  await putConfig('sba_offset_open', STATE.offsetOpen);
+  const { vi, li } = STATE.modalCtx;
+  openOffsetModal(vi, li);
+}
+async function pickOffset(vchrno, seq, avail, dseq) {
   const { vi, li } = STATE.modalCtx;
   const v = STATE.drafts[vi];
   const L = v.lines[li];
@@ -1603,11 +1707,14 @@ function pickOffset(vchrno, seq, avail, dseq) {
   /* v5.7.5 seq＝匯出用官方序號（0100）；dseq＝D1 明細列序（兩者可能位移），子目查 D1 用 dseq */
   const sub = entrySubCode(vchrno, dseq != null && dseq !== '' ? dseq : seq);
   /* v5.7.16 一鍵拆列（使用者需求）：可用額不足時拆成「可用額列沖此立帳」＋「餘額新列」，
-     餘額列標 manual（可編輯）並接著自動開沖帳視窗選下一筆立帳 */
-  if (L.amt > cap && confirm(`此立帳可用餘額僅 ${fmtN(cap)}，本列金額 ${fmtN(L.amt)}。\n\n確定＝自動拆成兩列：本列改 ${fmtN(cap)} 沖此立帳，餘額 ${fmtN(L.amt - cap)} 成新列、接著選它的立帳。\n取消＝不拆列，整列僅沖 ${fmtN(cap)}。`)) {
+     接著自動開沖帳視窗選下一筆立帳。v5.7.18 餘額列繼承原列屬性（衍生列一樣唯讀檢視）、確認改動畫彈窗 */
+  if (L.amt > cap && await confirmAnim(
+    `<b>此立帳可用餘額僅 ${fmtN(cap)}</b>，本列金額 <b>${fmtN(L.amt)}</b>。<br><br>`
+    + `✂️ <b>拆列</b>＝本列改 ${fmtN(cap)} 沖此立帳，餘額 <b>${fmtN(L.amt - cap)}</b> 成新列、接著選它的立帳（可用額不夠時也可把新列科目改 180705 暫付）。<br>`
+    + `不拆＝整列僅沖 ${fmtN(cap)}。`, '✂️ 拆列', '不拆')) {
     const rest = Math.round((L.amt - cap) * 100) / 100;
     L.amt = cap;
-    const clone = { ...L, amt: rest, manual: true };
+    const clone = { ...L, amt: rest };
     delete clone.offset;
     v.lines.splice(li + 1, 0, clone);
     v.lines.forEach((x, i) => { x.seq = i + 1; });
