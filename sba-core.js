@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.7.9';
+const SBA_CORE_VERSION = '5.7.10';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -812,6 +812,7 @@ function mapRecordsToVouchers(records, ctx) {
       const base = {
         dc: 'D', code: rec.bpCode, use: useOf(rec), relate: relateOf(rec),
         scode1: '00001' /* 歸屬性質：本基金代碼檔=00001.一般（官方範例的 55000 與本基金不符，實測 v5.3.1） */, bcode: ctx.bcodeFor(rec.bpCode), ttype: '2',
+        srcRec: rec.id, /* v5.7.10 來源單據 id：sba.html 產票後依已立應付偵測改掛應付科目用 */
       };
       if (base.use && /^1\d{3}$/.test(base.use)) base.pkind = ctx.defaultPkind || '';
       /* purposeSplits 多用途 → 每拆分一列（僅本張承擔整單金額時才展開） */

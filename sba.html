@@ -140,6 +140,8 @@ input.w-date { width: 84px; } input.w-memo { width: 100%; min-width: 180px; }
 .drag-grip:active { cursor: grabbing; }
 .voucher-card.dragging { opacity: .45; }
 .voucher-card.drag-over { outline: 2px dashed var(--terracotta, #c96442); outline-offset: 2px; }
+/* 收合＝只留第一列工具列（v5.7.10：卡片太長拖不過去，收合後好換順序） */
+.voucher-card.collapsed > *:not(:first-child) { display: none; }
 .small { font-size: 11px; color: var(--stone-gray, #87867f); }
 .scroll-x { overflow-x: auto; }
 @media print {
@@ -263,6 +265,8 @@ window.addEventListener('storage', (ev) => {
   <div id="pv-empty" class="card small">尚無傳票草稿——請至「📋 選單製票」勾選產生支出傳票，或於同頁切換「🔁 轉帳傳票」手動編製。</div>
   <div class="toolbar">
     <button class="btn" onclick="aiFixMemos(this)">✨ AI 修正摘要（Gemini）</button>
+    <button class="btn btn-sm" onclick="setAllVCollapse(true)" title="全部收合成單列，方便拖拉換順序">▸ 全部收合</button>
+    <button class="btn btn-sm" onclick="setAllVCollapse(false)">▾ 全部展開</button>
     <span class="small" id="pv-ai-msg">摘要可逐張先看過、手動修改；AI 修正會改寫傳票摘要與銀行列摘要（改完仍可再編輯，匯出前都不定案）</span>
   </div>
   <div id="pv-list"></div>
@@ -584,10 +588,19 @@ function apEstFor(id) {
       if (!byVch.has(e.voucher_no)) byVch.set(e.voucher_no, []);
       byVch.get(e.voucher_no).push(e);
     }
-    const lines = [];
+    const lines = [];   /* {e:成本借方列, ap:同票同額 2102 貸方列|null（自動沖帳連結用）} */
     for (const es of byVch.values()) {
-      if (!es.some(e => +e.credit > 0 && /^2102/.test(String(e.subject || '')))) continue;
-      for (const e of es) if (+e.debit > 0 && !/^2102/.test(String(e.subject || ''))) lines.push(e);
+      const aps = es.filter(e => +e.credit > 0 && /^2102/.test(String(e.subject || '')));
+      if (!aps.length) continue;
+      const usedAp = new Set();
+      for (const e of es) {
+        if (!(+e.debit > 0) || /^2102/.test(String(e.subject || ''))) continue;
+        /* 配對應付貸方列：優先緊鄰其後（立帳票借貸成對慣例），其次任一未用同額列 */
+        const ap = aps.find(c => !usedAp.has(c.seq) && +c.credit === +e.debit && +c.seq === (+e.seq + 1))
+                || aps.find(c => !usedAp.has(c.seq) && +c.credit === +e.debit) || null;
+        if (ap) usedAp.add(ap.seq);
+        lines.push({ e, ap });
+      }
     }
     /* 全部 (單, 分錄) 命中組合先打分，再依分數高→低一對一配對 */
     const pairs = [];
@@ -595,7 +608,8 @@ function apEstFor(id) {
       if (r.voided || STATE.exported[r.id]) continue;
       if (!['expense', 'purchase'].includes(r.formType)) continue;
       const rym = rocYmOf(recDateIso(r));
-      for (const e of lines) {
+      for (const cand of lines) {
+        const e = cand.e;
         if (+e.debit !== (+r.total || 0)) continue;
         if (!ymNear(String(e.ym || ''), rym)) continue;
         const pCode = String(e.purpose || '').trim().split(/\s+/)[0] || '';
@@ -603,15 +617,16 @@ function apEstFor(id) {
         const sim = descSim(r.purposeDesc, e.description);
         /* 用途別可能在製票端被會計重分類（如 2505→2502）：不符時需摘要高度相似才視為同一筆 */
         if (!pSame && r.purposeCode && pCode && sim < 0.5) continue;
-        pairs.push({ id: String(r.id), e, score: (String(e.ym) === rym ? 1 : 0) + (pSame ? 1 : 0) + sim });
+        pairs.push({ id: String(r.id), cand, score: (String(e.ym) === rym ? 1 : 0) + (pSame ? 1 : 0) + sim });
       }
     }
     pairs.sort((a, b) => b.score - a.score);
     const usedLine = new Set();
     for (const p of pairs) {
-      const lk = String(p.e.voucher_no) + '#' + p.e.seq;
+      const lk = String(p.cand.e.voucher_no) + '#' + p.cand.e.seq;
       if (_apEstMap.has(p.id) || usedLine.has(lk)) continue;
-      _apEstMap.set(p.id, { vch: String(p.e.voucher_no), seq: p.e.seq });
+      _apEstMap.set(p.id, { vch: String(p.cand.e.voucher_no), seq: p.cand.e.seq,
+        ap: p.cand.ap ? { seq: p.cand.ap.seq, code: String(p.cand.ap.subject || '').split(' ')[0] } : null });
       usedLine.add(lk);
     }
   }
@@ -963,6 +978,24 @@ function generateVouchers() {
     return;
   }
   const { vouchers, issues } = mapRecordsToVouchers(fresh, mapCtx(toRoc7(payIso)));
+  /* v5.7.10 已立應付單據：借方自動改掛偵測到的應付科目並連結沖帳（成本已由轉帳傳票入帳，勿重複借成本）
+     offset.seq＝D1 明細列序；官方 0100 序號若有位移，匯入新餘額表後可於沖帳視窗重選（同手動新立帳情境） */
+  for (const v of vouchers) {
+    for (const L of v.lines) {
+      if (L.dc !== 'D' || !L.srcRec) continue;
+      const est = apEstFor(L.srcRec);
+      if (!est || !est.ap) continue;
+      const sub = entrySubCode(est.vch, est.ap.seq);
+      L.code = est.ap.code;
+      L.bcode = bcodeFor(est.ap.code);
+      L.offset = { year: est.vch.slice(0, 3), kind: est.vch.slice(3, 4), vchrno: est.vch,
+        seq: est.ap.seq, amt: +L.amt || 0, max: +L.amt || 0, sub };
+      if (sub !== null) L.relate = sub;
+      const rec = fresh.find(x => String(x.id) === String(L.srcRec));
+      issues.push({ recId: L.srcRec, level: 'warn',
+        msg: `${(rec && rec.voucherNo) || ''}：偵測已立應付——借方自動改掛 ${est.ap.code} ${subjectName(est.ap.code)} 並連結沖帳 ${est.vch}#${est.ap.seq}，請於預覽確認` });
+    }
+  }
   if (dup.length) {
     const nos = dup.map(r => r.voucherNo).filter(Boolean);
     issues.unshift({ level: 'warn', msg: `已略過 ${dup.length} 筆已產過草稿的單據（${nos.slice(0, 10).join('、')}${nos.length > 10 ? `…等${nos.length}筆` : ''}）；若要重產請先於「傳票預覽」刪除舊草稿` });
@@ -1125,12 +1158,14 @@ function renderPreview() {
         <td><input class="w-memo" value="${esc(P.usedoc || '')}" onchange="updPayee(${vi},${pi},'usedoc',this.value)"></td>
         <td><button class="btn btn-sm" onclick="delPayee(${vi},${pi})">✕</button></td>
       </tr>`).join('');
-    return `<div class="card voucher-card${v.kind === '3' ? ' k3' : ''}" data-vi="${vi}">
+    return `<div class="card voucher-card${v.kind === '3' ? ' k3' : ''}${v._collapsed ? ' collapsed' : ''}" data-vi="${vi}">
       <div class="toolbar">
         <span class="drag-grip" title="拖拉調整順序（放開後匯入序號依新順序連號重編）">⠿</span>
+        <button class="btn btn-sm" onclick="toggleVCollapse(${vi})" title="收合/展開此張">${v._collapsed ? '▸' : '▾'}</button>
         <b>${KIND_NAMES[v.kind] || v.kind}</b>
         <span class="chip ${v.acctCode === '11010202' ? 'cust' : 'fund'}">${esc(v.acctName || '')}</span>
         ${v.payCatLabel ? `<span class="chip exp">${esc(v.payCatLabel)}</span>` : ''}
+        ${v._collapsed ? `<span class="chip">${v.lines.filter(L => L.dc === 'D').length} 列 <b>$${fmtN(v.lines.filter(L => L.dc === 'D').reduce((s, L) => s + (+L.amt || 0), 0))}</b></span>${r.errors.length ? '<span class="chip warn">❌ 檢核未過</span>' : '<span class="chip done">✅</span>'}` : ''}
         <label>匯入序號 <input class="w-code" style="width:100px;" value="${esc(v.importrecno)}" onchange="updV(${vi},'importrecno',this.value)"></label>
         <label>製票日 <input class="w-date" value="${esc(v.payDate)}" onchange="updV(${vi},'payDate',this.value)"></label>
         <label>入帳日 <input class="w-date" value="${esc(v.postDate)}" onchange="updV(${vi},'postDate',this.value)" title="未入帳填 9991231"></label>
@@ -1163,6 +1198,9 @@ function renderPreview() {
   }).join('');
   bindPvDrag();
 }
+/* 卡片收合/展開（v5.7.10）：收合＝只留頭列（顯示筆數/金額/檢核狀態），拖拉換順序不用捲過整張卡 */
+function toggleVCollapse(vi) { const v = STATE.drafts[vi]; if (v) { v._collapsed = !v._collapsed; renderPreview(); } }
+function setAllVCollapse(on) { STATE.drafts.forEach(v => { v._collapsed = on; }); renderPreview(); }
 /* ── 傳票卡拖拉排序（v5.7.9）：抓 ⠿ 把手拖曳整卡，放到目標卡位置；
    放開後 compactDraftSerials() 依新順序連號重編各字首匯入序號（同刪票後的重編規則）。
    把手 mousedown 才開 draggable，避免卡內輸入框選字被拖曳劫持 ── */
