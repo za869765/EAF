@@ -949,11 +949,19 @@ function generateVouchers() {
   if (!sel.length) { alert('請先勾選單據'); return; }
   const payIso = $('pk-paydate').value;
   if (!payIso) { alert('請選製票日期'); return; }
-  /* 防重複產票：勾選單據已在既有草稿中時先確認（重按會把同一批再產一份、各配新序號） */
+  /* 防重複產票（v5.7.8）：已產過草稿的單據自動略過、只產未重複的；要重產請先刪舊草稿 */
   const drafted = new Set(STATE.drafts.flatMap(v => (v.sourceIds || []).map(String)));
   const dup = sel.filter(r => drafted.has(String(r.id)));
-  if (dup.length && !confirm(`有 ${dup.length} 筆勾選單據已產過傳票草稿（${dup.slice(0, 5).map(r => r.voucherNo).filter(Boolean).join('、')}${dup.length > 5 ? '…' : ''}）。\n再產一次會出現重複草稿，確定繼續？`)) return;
-  const { vouchers, issues } = mapRecordsToVouchers(sel, mapCtx(toRoc7(payIso)));
+  const fresh = sel.filter(r => !drafted.has(String(r.id)));
+  if (!fresh.length) {
+    alert(`勾選的 ${sel.length} 筆全部已產過傳票草稿，未產生新傳票。\n若要重產，請先到「傳票預覽」刪除舊草稿。`);
+    return;
+  }
+  const { vouchers, issues } = mapRecordsToVouchers(fresh, mapCtx(toRoc7(payIso)));
+  if (dup.length) {
+    const nos = dup.map(r => r.voucherNo).filter(Boolean);
+    issues.unshift({ level: 'warn', msg: `已略過 ${dup.length} 筆已產過草稿的單據（${nos.slice(0, 10).join('、')}${nos.length > 10 ? `…等${nos.length}筆` : ''}）；若要重產請先於「傳票預覽」刪除舊草稿` });
+  }
   STATE.drafts.push(...vouchers);
   $('pk-issues').innerHTML = issues.map(i =>
     `<div class="vmsg ${i.level === 'error' ? 'err' : 'wrn'}">${esc(i.msg)}</div>`).join('');
