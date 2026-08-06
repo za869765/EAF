@@ -382,7 +382,7 @@ const STATE = {
   drafts: (() => { try { return JSON.parse(localStorage.getItem('sba_drafts') || '[]'); } catch (_) { return []; } })(),
   combine: true,
   openGrp: null,             /* 目前放大的卡片 'acct|cat'；null=全部縮小 */
-  pickSort: { key: 'date', dir: -1 }, /* 卡片內排序：no/date/amt/payee，dir 1升冪 -1降冪 */
+  pickSort: { key: 'amt', dir: -1 }, /* 卡片內排序：no/date/amt/payee，dir 1升冪 -1降冪；預設金額大→小（v5.7.13 使用者指定） */
   catOv: {},                 /* recId → '1'|'6'|'2' 手動移組覆寫（存 D1 sba_catov） */
   paySkip: new Set(),        /* 不匯入受款人鍵集合（存 D1 sba_payee_skip；反灰沉默） */
   dupOkKeys: new Set(),      /* 「代碼已存在→自行刪除後匯入」使用者已確認鍵集合（本次工作階段） */
@@ -789,7 +789,7 @@ function toggleGroupCard(key) {
 function pickSortArrow(k) { return STATE.pickSort.key === k ? (STATE.pickSort.dir > 0 ? ' ▲' : ' ▼') : ''; }
 function setPickSort(k) {
   if (STATE.pickSort.key === k) STATE.pickSort.dir = -STATE.pickSort.dir;
-  else STATE.pickSort = { key: k, dir: k === 'date' ? -1 : 1 };
+  else STATE.pickSort = { key: k, dir: (k === 'date' || k === 'amt') ? -1 : 1 }; /* 日期新→舊、金額大→小起手 */
   renderPickList();
 }
 function pickCmp(a, b) {
