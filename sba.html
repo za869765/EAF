@@ -135,6 +135,11 @@ input.w-date { width: 84px; } input.w-memo { width: 100%; min-width: 180px; }
 #pick-mode button { font-size: 15px; font-weight: 700; padding: 10px 28px; }
 .voucher-card { border-left: 4px solid var(--terracotta, #c96442); }
 .voucher-card.k3 { border-left-color: #5c8653; }
+/* 傳票卡拖拉排序（v5.7.9）：抓把手整卡拖曳，放開後匯入序號依新順序連號重編 */
+.drag-grip { cursor: grab; user-select: none; color: var(--stone-gray, #87867f); font-size: 15px; padding: 0 4px; }
+.drag-grip:active { cursor: grabbing; }
+.voucher-card.dragging { opacity: .45; }
+.voucher-card.drag-over { outline: 2px dashed var(--terracotta, #c96442); outline-offset: 2px; }
 .small { font-size: 11px; color: var(--stone-gray, #87867f); }
 .scroll-x { overflow-x: auto; }
 @media print {
@@ -1120,8 +1125,9 @@ function renderPreview() {
         <td><input class="w-memo" value="${esc(P.usedoc || '')}" onchange="updPayee(${vi},${pi},'usedoc',this.value)"></td>
         <td><button class="btn btn-sm" onclick="delPayee(${vi},${pi})">✕</button></td>
       </tr>`).join('');
-    return `<div class="card voucher-card${v.kind === '3' ? ' k3' : ''}">
+    return `<div class="card voucher-card${v.kind === '3' ? ' k3' : ''}" data-vi="${vi}">
       <div class="toolbar">
+        <span class="drag-grip" title="拖拉調整順序（放開後匯入序號依新順序連號重編）">⠿</span>
         <b>${KIND_NAMES[v.kind] || v.kind}</b>
         <span class="chip ${v.acctCode === '11010202' ? 'cust' : 'fund'}">${esc(v.acctName || '')}</span>
         ${v.payCatLabel ? `<span class="chip exp">${esc(v.payCatLabel)}</span>` : ''}
@@ -1155,6 +1161,58 @@ function renderPreview() {
       ${!r.errors.length ? '<div class="vmsg okk">✅ 檢核通過</div>' : ''}</div>
     </div>`;
   }).join('');
+  bindPvDrag();
+}
+/* ── 傳票卡拖拉排序（v5.7.9）：抓 ⠿ 把手拖曳整卡，放到目標卡位置；
+   放開後 compactDraftSerials() 依新順序連號重編各字首匯入序號（同刪票後的重編規則）。
+   把手 mousedown 才開 draggable，避免卡內輸入框選字被拖曳劫持 ── */
+let _pvDragBound = false, _pvDragFrom = null;
+function bindPvDrag() {
+  if (_pvDragBound) return; _pvDragBound = true;
+  const host = $('pv-list');
+  host.addEventListener('mousedown', (ev) => {
+    const grip = ev.target.closest && ev.target.closest('.drag-grip');
+    if (!grip) return;
+    const card = grip.closest('.voucher-card[data-vi]');
+    if (card) card.draggable = true;
+  });
+  host.addEventListener('mouseup', () => {
+    host.querySelectorAll('.voucher-card[draggable="true"]').forEach(c => { c.draggable = false; });
+  });
+  host.addEventListener('dragstart', (ev) => {
+    const card = ev.target.closest && ev.target.closest('.voucher-card[data-vi]');
+    if (!card || !card.draggable) return;
+    _pvDragFrom = +card.dataset.vi;
+    card.classList.add('dragging');
+    ev.dataTransfer.effectAllowed = 'move';
+    try { ev.dataTransfer.setData('text/plain', String(_pvDragFrom)); } catch (_) {}
+  });
+  host.addEventListener('dragover', (ev) => {
+    if (_pvDragFrom === null) return;
+    const card = ev.target.closest && ev.target.closest('.voucher-card[data-vi]');
+    if (!card) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    host.querySelectorAll('.voucher-card.drag-over').forEach(c => c.classList.remove('drag-over'));
+    if (+card.dataset.vi !== _pvDragFrom) card.classList.add('drag-over');
+  });
+  host.addEventListener('drop', (ev) => {
+    if (_pvDragFrom === null) return;
+    const card = ev.target.closest && ev.target.closest('.voucher-card[data-vi]');
+    if (!card) return;
+    ev.preventDefault();
+    const from = _pvDragFrom, to = +card.dataset.vi;
+    _pvDragFrom = null;
+    if (from === to || !STATE.drafts[from]) { renderPreview(); return; }
+    const [moved] = STATE.drafts.splice(from, 1);
+    STATE.drafts.splice(to, 0, moved);
+    compactDraftSerials();
+    renderPreview();
+  });
+  host.addEventListener('dragend', () => {
+    /* 取消拖曳（ESC/放到卡片外）：清狀態並重繪還原樣式 */
+    if (_pvDragFrom !== null) { _pvDragFrom = null; renderPreview(); }
+  });
 }
 /* 傳票明細列排序（科目/子目/金額/摘要；銀行列恆序1）——重編 seq，匯出 F04 依此順序 */
 function vSortArrow(v, k) { return v._sort && v._sort.key === k ? (v._sort.dir > 0 ? ' ▲' : ' ▼') : ''; }
