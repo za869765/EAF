@@ -1450,7 +1450,7 @@ function renderOffsetList(q) {
   const famSynth = [...openMap.values()].filter(o => !itemMatched.has(o.vch + '#' + o.seq))
     .filter(o => !o.name || !subjName || o.name === subjName);
   const useWhitelist = (cands.some(e => matchOf.has(keyOf(e))) || famSynth.length > 0);
-  const rowHtml = (e, left, selectable, oseq) => {
+  const rowHtml = (e, left, selectable, oseq, hot) => {
     /* 估扣：可用＝未沖（或立帳額，依科目性質取貸/借方）− 本批其他列已沖同一立帳的合計，避免超額匯入被 SBA 擋
        oseq＝官方序號（0100）；匯出/估扣皆用官方序號，顯示仍列 D1 序號供對照 */
     const xseq = oseq != null ? oseq : (+e.seq || 0);
@@ -1465,31 +1465,28 @@ function renderOffsetList(q) {
          esc() 的 &#39; 到那時已還原成 '，單引號仍可跳脫字串（故改事件委派） */
       : `<button class="btn btn-sm off-pick" data-vno="${esc(e.voucher_no)}" data-seq="${xseq}" data-dseq="${+e.seq || 0}" data-avail="${avail}">選此列</button>`;
     return `
-    <tr${selectable ? '' : ' class="row-exported"'}><td>${esc(e.voucher_no)}</td><td>${esc(String(xseq))}${oseq != null && +oseq !== (+e.seq || 0) ? `<span class="small" title="0100 官方序號與 D1 明細列序不同（0090 無序號欄），匯出以官方序號為準">（D1#${esc(String(e.seq))}）</span>` : ''}</td><td>${esc(e.post_date || e.make_date || '')}</td>
-    <td>${esc(e.sub_account || '')}</td><td style="max-width:280px;">${esc(String(e.description || '').slice(0, 40))}</td>
+    <tr${selectable ? '' : ' class="row-exported"'}${hot ? ' style="background:#f6e7dc;"' : ''}><td>${esc(e.voucher_no)}</td><td>${esc(String(xseq))}${oseq != null && +oseq !== (+e.seq || 0) ? `<span class="small" title="0100 官方序號與 D1 明細列序不同（0090 無序號欄），匯出以官方序號為準">（D1#${esc(String(e.seq))}）</span>` : ''}</td><td>${esc(e.post_date || e.make_date || '')}</td>
+    <td>${esc(e.sub_account || '')}</td><td style="max-width:280px;">${hot ? '🎯 ' : ''}${esc(String(e.description || '').slice(0, 40))}</td>
     <td class="num">${amtHtml}</td>
     <td>${btn}</td></tr>`;
   };
+  /* v5.7.14 高機率吻合（使用者需求：金額名目相近難挑）：本列金額＝立帳額或官方未沖額，
+     且摘要 bigram 相似（金額同→門檻低 0.15；金額不同→需高相似 0.6）→ 🎯 置頂建議＋原列淡橘醒目 */
+  const _line = ((STATE.drafts[ctx.vi] || {}).lines || [])[ctx.li] || {};
+  const _scoreOf = (desc, est, left) => {
+    const amtEq = (+est > 0 && +est === +_line.amt) || (left != null && +left === +_line.amt);
+    const sim = descSim(String(_line.memo || ''), String(desc || ''));
+    return { rec: amtEq ? sim >= 0.15 : sim >= 0.6, score: (amtEq ? 1 : 0) + sim };
+  };
   const filt = (e) => hit(String(e.description || '') + String(e.voucher_no || '') + String(e.sub_account || ''));
+  const recHeader = `<tr style="background:#f3e3d8;"><td colspan="7"><b>🎯 高機率吻合（金額/摘要與本列相符，請確認後選用）</b></td></tr>`;
   let html = '';
   if (useWhitelist) {
     /* ① 現行未沖但配不到 D1 列（含 D1 沒匯那段年度、或同傳票多筆同額無法唯一配對）：
        以官方餘額表為準仍可選；僅列同科目項（v5.7.5 防跨科目誤選） */
     const synth = famSynth.filter(o => hit(o.desc + o.vch + o.name));
-    if (synth.length) {
-      html += `<tr style="background:#dcd9cc;"><td colspan="7"><b>🆕 現行未沖・D1 無對應列（依官方餘額表，可選）</b></td></tr>`;
-      html += synth.map(o => rowHtml({ voucher_no: o.vch, seq: o.seq, post_date: '', sub_account: o.name, description: o.desc }, o.left, true)).join('');
-    }
     /* ② 現行未沖（白名單配對命中，可選；金額顯示官方未沖額並作為可沖上限；匯出帶官方序號） */
     const current = cands.filter(e => matchOf.has(keyOf(e))).filter(filt).filter(useHit);
-    let lastGrp = null;
-    html += current.map(e => {
-      const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
-      let head = '';
-      if (gk !== lastGrp) { lastGrp = gk; head = `<tr style="background:#dcd9cc;"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`; }
-      const o = matchOf.get(keyOf(e));
-      return head + rowHtml(e, o.left, true, +o.seq || 0);
-    }).join('');
     /* ③ 白名單未命中拆兩類（v5.7.4）：立帳日期晚於白名單最新未沖日＝餘額表沒涵蓋到的新立帳
        （如匯了新月份 0090 但 0100 還是舊版）→ 仍可選，官方未沖額未知以立帳額為上限；其餘＝歷史/已沖畢不可選 */
     const restAll = cands.filter(e => !matchOf.has(keyOf(e))).filter(filt).filter(useHit);
@@ -1499,11 +1496,32 @@ function renderOffsetList(q) {
       ? restAll.filter(e => String(e.post_date || e.make_date || '') > maxHitDate).map(e => String(e.voucher_no) + '#' + e.seq)
       : []);
     const newer = restAll.filter(e => newerKeys.has(String(e.voucher_no) + '#' + e.seq));
+    const hist = restAll.filter(e => !newerKeys.has(String(e.voucher_no) + '#' + e.seq));
+    /* 🎯 三個可選區各自打分，取最高前 3 置頂 */
+    const recs = [];
+    for (const o of synth) { const s = _scoreOf(o.desc, o.left, o.left); if (s.rec) recs.push({ score: s.score, key: o.vch + '#' + o.seq, row: () => rowHtml({ voucher_no: o.vch, seq: o.seq, post_date: '', sub_account: o.name, description: o.desc }, o.left, true, undefined, true) }); }
+    for (const e of current) { const o = matchOf.get(keyOf(e)); const s = _scoreOf(e.description, (+e.credit || +e.debit || 0), o.left); if (s.rec) recs.push({ score: s.score, key: keyOf(e), row: () => rowHtml(e, o.left, true, +o.seq || 0, true) }); }
+    for (const e of newer) { const s = _scoreOf(e.description, (+e.credit || +e.debit || 0), null); if (s.rec) recs.push({ score: s.score, key: keyOf(e), row: () => rowHtml(e, null, true, undefined, true) }); }
+    recs.sort((a, b) => b.score - a.score);
+    const top = recs.slice(0, 3);
+    const hotKeys = new Set(top.map(x => x.key));
+    if (top.length) html += recHeader + top.map(x => x.row()).join('');
+    if (synth.length) {
+      html += `<tr style="background:#dcd9cc;"><td colspan="7"><b>🆕 現行未沖・D1 無對應列（依官方餘額表，可選）</b></td></tr>`;
+      html += synth.map(o => rowHtml({ voucher_no: o.vch, seq: o.seq, post_date: '', sub_account: o.name, description: o.desc }, o.left, true, undefined, hotKeys.has(o.vch + '#' + o.seq))).join('');
+    }
+    let lastGrp = null;
+    html += current.map(e => {
+      const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
+      let head = '';
+      if (gk !== lastGrp) { lastGrp = gk; head = `<tr style="background:#dcd9cc;"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`; }
+      const o = matchOf.get(keyOf(e));
+      return head + rowHtml(e, o.left, true, +o.seq || 0, hotKeys.has(keyOf(e)));
+    }).join('');
     if (newer.length) {
       html += `<tr style="background:#dcd9cc;"><td colspan="7"><b>🕓 晚於餘額表的新立帳（官方未沖額未知，請確認未在 SBA 端沖過）</b></td></tr>`;
-      html += newer.map(e => rowHtml(e, null, true)).join('');
+      html += newer.map(e => rowHtml(e, null, true, undefined, hotKeys.has(keyOf(e)))).join('');
     }
-    const hist = restAll.filter(e => !newerKeys.has(String(e.voucher_no) + '#' + e.seq));
     html += `<tr><td colspan="7"><button class="btn btn-sm" onclick="toggleOffsetHist()">👁 ${showHist ? '隱藏' : '顯示'}歷史/已沖畢立帳（${hist.length} 筆，不可選）</button></td></tr>`;
     if (showHist) html += hist.slice(0, 400).map(e => rowHtml(e, null, false)).join('')
       + (hist.length > 400 ? `<tr><td colspan="7" class="small">歷史僅顯示前 400 筆（共 ${hist.length}），請用搜尋</td></tr>` : '');
@@ -1513,13 +1531,20 @@ function renderOffsetList(q) {
     if (openMap.size > 0)
       html += `<tr><td colspan="7" class="small">此科目無立沖餘額表資料（0100 未涵蓋）——全部立帳可選，請自行確認未沖；建議由 SBA 匯出本科目 FNWFRX0100 後於設定頁匯入</td></tr>`;
     const list = cands.filter(filt).filter(useHit);
+    /* 🎯 同樣打分置頂（此分支無官方未沖額，僅比立帳額＋摘要） */
+    const recs = [];
+    for (const e of list) { const s = _scoreOf(e.description, (+e.credit || +e.debit || 0), null); if (s.rec) recs.push({ score: s.score, key: keyOf(e), row: () => rowHtml(e, null, true, undefined, true) }); }
+    recs.sort((a, b) => b.score - a.score);
+    const top = recs.slice(0, 3);
+    const hotKeys = new Set(top.map(x => x.key));
+    if (top.length) html += recHeader + top.map(x => x.row()).join('');
     let lastGrp = null;
     const CAP = 400;
     html += list.slice(0, CAP).map(e => {
       const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
       let head = '';
       if (gk !== lastGrp) { lastGrp = gk; head = `<tr style="background:#dcd9cc;"><td colspan="7"><b>${isRec ? `⭐ 推薦：子目 ${esc(e.sub_account || rel)}（與本列相同）` : `子目 ${esc(e.sub_account || '（無子目）')}`}</b></td></tr>`; }
-      return head + rowHtml(e, null, true);
+      return head + rowHtml(e, null, true, undefined, hotKeys.has(keyOf(e)));
     }).join('') + (list.length > CAP ? `<tr><td colspan="7" class="small">僅顯示前 ${CAP} 筆（共 ${list.length}），請用搜尋縮小範圍</td></tr>` : '');
     if (!html) html = '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
   }
