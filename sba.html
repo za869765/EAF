@@ -379,6 +379,7 @@ const STATE = {
   dupOkKeys: new Set(),      /* 「代碼已存在→自行刪除後匯入」使用者已確認鍵集合（本次工作階段） */
   offsetOpen: null,          /* 官方立沖餘額表白名單 {at, items:[{vch,seq,left,name,desc}]}（D1 sba_offset_open） */
   entriesKeySet: new Set(),  /* D1 分錄 vch#seq 全集（判斷白名單項是否缺於 D1） */
+  usedBatch2: new Set(),     /* v5.7.6 已消耗批號 2 碼全域集（下載 ZIP 即消耗；存 D1 sba_used_batches） */
   serials: {},               /* '1152' → 已配最大流水 */
   modalCtx: null,
 };
@@ -450,6 +451,7 @@ async function boot() {
   if (config && config.sba_catov) STATE.catOv = config.sba_catov;
   if (config && Array.isArray(config.sba_payee_skip)) STATE.paySkip = new Set(config.sba_payee_skip);
   if (config && config.sba_offset_open) STATE.offsetOpen = config.sba_offset_open;
+  if (config && Array.isArray(config.sba_used_batches)) STATE.usedBatch2 = new Set(config.sba_used_batches.map(String));
   STATE.entriesKeySet = new Set(STATE.entries.map(e => String(e.voucher_no) + '#' + e.seq));
   /* v5.5.2 受款人主檔統編查找表（帳號優先、姓名後備）：F05 受款人統編 + F07 發票統編/營業人名稱
      v5.5.4 建表時即以 isValidGui 過濾（身分證/壞碼不進表，避免佔住鍵遮蔽同鍵合格統編） */
@@ -1597,19 +1599,19 @@ function existingRecnos() {
 /* SBA 已用批號（處理日期7碼+批號2碼）不可再用。種子＝使用者提供 1150728 已用清單（含工坊外直接在 SBA 端用掉的）；
    工坊自己匯出過的由匯出紀錄 batch 欄自動納入 */
 const SEED_USED_BATCHES = ['11507281A', '11507282A', '1150728AA', '1150728AB', '1150728AC'];
-function usedBatchSet() {
-  const s = new Set(SEED_USED_BATCHES);
-  for (const e of Object.values(STATE.exported)) if (e && e.batch) s.add(String(e.batch));
+/* v5.7.6 批號 2 碼全域流水（使用者指定：不分處理日期，用過即永久跳過；下載 ZIP 當下消耗） */
+function usedBatch2Set() {
+  const s = new Set(SEED_USED_BATCHES.map(b => b.slice(-2)));
+  for (const e of Object.values(STATE.exported)) if (e && e.batch) s.add(String(e.batch).slice(-2));
+  for (const b of STATE.usedBatch2) s.add(b);
   return s;
 }
-/* 依處理日期自動帶第一個未用批號（AA→AB→…→AZ→BA…；可手改，檢核仍會擋已用） */
+/* 自動帶第一個未用批號（AA→AB→…→AZ→BA…；可手改，檢核仍會擋已用） */
 function suggestBatch() {
-  const proc7 = toRoc7($('ex-date').value);
-  if (!proc7) return;
-  const used = usedBatchSet();
+  const used = usedBatch2Set();
   const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   for (const c1 of A) for (const c2 of A) {
-    if (!used.has(proc7 + c1 + c2)) { $('ex-batch').value = c1 + c2; return; }
+    if (!used.has(c1 + c2)) { $('ex-batch').value = c1 + c2; return; }
   }
 }
 function runBatchValidation() {
@@ -1645,10 +1647,10 @@ function runBatchValidation() {
     if (o && sum > +o.left) errors.push(`沖帳超額：立帳 ${k} 官方未沖 ${fmtN(+o.left)}，本批合計沖 ${fmtN(sum)}，超出 ${fmtN(sum - +o.left)}（SBA 匯入會擋）`);
     else if (openMap.size && !o) warnings.push(`立帳 ${k} 不在官方未沖清單（可能已沖畢或餘額表過舊），SBA 匯入可能擋`);
   });
-  /* 批號防重複：處理日期+批號 已用過（含 SBA 端種子清單與工坊匯出紀錄）即擋 */
-  const _proc7 = toRoc7($('ex-date').value), _batch = $('ex-batch').value.trim().toUpperCase();
-  if (_proc7 && _batch && usedBatchSet().has(_proc7 + _batch))
-    errors.push(`處理日期 ${_proc7} 批號 ${_batch} 已使用過——SBA 同日同批號會衝突，請換批號（改處理日期會自動帶建議）`);
+  /* 批號防重複（v5.7.6 全域流水）：2 碼任一處理日期用過即擋（含 SBA 端種子、匯出紀錄、下載消耗集） */
+  const _batch = $('ex-batch').value.trim().toUpperCase();
+  if (_batch && usedBatch2Set().has(_batch))
+    errors.push(`批號 ${_batch} 已使用過（全域流水不重複）——請改用建議批號`);
   box.innerHTML = errors.map(e => `<div class="vmsg err">❌ ${esc(e)}</div>`).join('')
     + warnings.map(w => `<div class="vmsg wrn">⚠️ ${esc(w)}</div>`).join('')
     + (!errors.length ? `<div class="vmsg okk">✅ 全批 ${STATE.drafts.length} 張檢核通過</div>` : '');
@@ -1662,9 +1664,9 @@ async function downloadZip() {
   const proc7 = toRoc7($('ex-date').value);
   const batch = $('ex-batch').value.trim().toUpperCase();
   if (!/^[1-9A-Z]{2}$/.test(batch)) { alert('批號須為 2 碼（1-9、A-Z）'); return; }
-  if (usedBatchSet().has(proc7 + batch)) {
+  if (usedBatch2Set().has(batch)) {
     suggestBatch();
-    alert(`批號 ${batch} 於處理日期 ${proc7} 已使用過——已自動改為建議批號 ${$('ex-batch').value}，請確認後重新下載`);
+    alert(`批號 ${batch} 已使用過（全域流水不重複）——已自動改為建議批號 ${$('ex-batch').value}，請確認後重新下載`);
     runBatchValidation();
     return;
   }
@@ -1688,6 +1690,10 @@ async function downloadZip() {
     })),
   };
   $('ex-mark').disabled = false;
+  /* v5.7.6 下載即消耗批號：寫入 D1 永久跳過（重載/跨日不重複），欄位自動帶下一個 */
+  STATE.usedBatch2.add(batch);
+  putConfig('sba_used_batches', [...STATE.usedBatch2]);
+  suggestBatch();
 }
 async function markExported() {
   if (!LAST_EXPORT) return;
