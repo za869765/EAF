@@ -1590,12 +1590,28 @@ function entrySubCode(vchrno, seq) {
 }
 function pickOffset(vchrno, seq, avail, dseq) {
   const { vi, li } = STATE.modalCtx;
-  const L = STATE.drafts[vi].lines[li];
+  const v = STATE.drafts[vi];
+  const L = v.lines[li];
   const cap = +avail || L.amt;
-  if (L.amt > cap)
-    alert(`此立帳可用餘額僅 ${fmtN(cap)}（已扣除本批其他列沖用額），本列金額 ${fmtN(L.amt)} 將只沖 ${fmtN(cap)}。一列僅能連結一筆立帳——若需足額沖銷，請將明細列拆成兩列、各自連結不同立帳`);
   /* v5.7.5 seq＝匯出用官方序號（0100）；dseq＝D1 明細列序（兩者可能位移），子目查 D1 用 dseq */
   const sub = entrySubCode(vchrno, dseq != null && dseq !== '' ? dseq : seq);
+  /* v5.7.16 一鍵拆列（使用者需求）：可用額不足時拆成「可用額列沖此立帳」＋「餘額新列」，
+     餘額列標 manual（可編輯）並接著自動開沖帳視窗選下一筆立帳 */
+  if (L.amt > cap && confirm(`此立帳可用餘額僅 ${fmtN(cap)}，本列金額 ${fmtN(L.amt)}。\n\n確定＝自動拆成兩列：本列改 ${fmtN(cap)} 沖此立帳，餘額 ${fmtN(L.amt - cap)} 成新列、接著選它的立帳。\n取消＝不拆列，整列僅沖 ${fmtN(cap)}。`)) {
+    const rest = Math.round((L.amt - cap) * 100) / 100;
+    L.amt = cap;
+    const clone = { ...L, amt: rest, manual: true };
+    delete clone.offset;
+    v.lines.splice(li + 1, 0, clone);
+    v.lines.forEach((x, i) => { x.seq = i + 1; });
+    L.offset = { year: String(vchrno).slice(0, 3), kind: String(vchrno).slice(3, 4),
+      vchrno: String(vchrno), seq, amt: cap, max: cap, sub };
+    if (sub !== null) L.relate = sub;
+    syncBankLine(v);
+    closeModal(); renderPreview();
+    openOffsetModal(vi, li + 1);   /* 接著為餘額列選沖帳立帳 */
+    return;
+  }
   L.offset = { year: String(vchrno).slice(0, 3), kind: String(vchrno).slice(3, 4),
     vchrno: String(vchrno), seq,
     amt: Math.min(L.amt, cap), max: cap, sub };
