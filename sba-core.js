@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.7.23';
+const SBA_CORE_VERSION = '5.7.24';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -115,8 +115,11 @@ const F05_FIELDS = ['fpaylist_year','fpaylist_kind','fpaylist_importrecno','fpay
 const F06_FIELDS = ['fvchtir_year','fvchtir_kind','fvchtir_importrecno','fvchtir_dtlseq',
   'fvchtir_type','fvchtir_acc_year1','fvchtir_vch_kind1','fvchtir_vchrno1','fvchtir_seq1',
   'fvchtir_amt'];
+/* v5.7.24 實測：SBA 匯入後發票「日期/金額」空白＝官方讀的是範例檔元素名 finvoice_date/amt，
+   非欄位表的 finvoice_invdate/invamt（設計文件 2.4 首批驗證項應驗）→ 兩組名稱並出（SBA 忽略不認識的元素） */
 const F07_FIELDS = ['finvoice_year','finvoice_kind','finvoice_importrecno','finvoice_dtlseq',
-  'finvoice_dtl2seq','finvoice_invno','finvoice_invdate','finvoice_invamt','finvoice_compno',
+  'finvoice_dtl2seq','finvoice_invno','finvoice_invdate','finvoice_invamt',
+  'finvoice_date','finvoice_amt','finvoice_compno',
   'finvoice_name','finvoice_distribution','finvoice_reason'];
 
 /* ═══════════════════════════════════════════════════════════
@@ -379,10 +382,13 @@ function voucherToF07Rows(v) {
         finvoice_year: v.year, finvoice_kind: v.kind, finvoice_importrecno: v.importrecno,
         finvoice_dtlseq: String(P.seq), finvoice_dtl2seq: String(i + 1),
         finvoice_invno: iv.invno || '', finvoice_invdate: iv.invdate || '',
-        finvoice_invamt: fmt2(iv.invamt || 0), finvoice_compno: iv.compno || '',
+        finvoice_invamt: fmt2(iv.invamt || 0),
+        finvoice_date: iv.invdate || '', finvoice_amt: fmt2(iv.invamt || 0),
+        finvoice_compno: iv.compno || '',
         finvoice_name: truncBig5(iv.name || (P.rev === '2' ? P.name : '') || '', 200),
         finvoice_distribution: iv.distribution || '0',
-        finvoice_reason: truncBig5(iv.reason || (gap != null && gap > 15 ? '核銷請款作業時程，發票日期與製票日相距逾15日' : ''), 1000),
+        /* v5.7.24 界線修正：採購法 73-1「15日以上」含 15 → >= 15 即自動填原因 */
+        finvoice_reason: truncBig5(iv.reason || (gap != null && gap >= 15 ? '核銷請款作業時程，發票日期與製票日相距逾15日' : ''), 1000),
       });
     });
   });
