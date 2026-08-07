@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.7.25';
+const SBA_CORE_VERSION = '5.7.26';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -213,25 +213,36 @@ function validateVoucher(v, opt) {
       E(`${lt}：科目 ${L.code} 不得帶用途別（${L.use}）——SBA 立沖/暫付科目無用途別欄，請清空（預覽改科目會自動清）`);
     /* v5.4.3 實測：支出傳票借方為 2102 立沖科目時，SBA 匯入「強制」要求沖銷資料（F06），
        未連結會整批報「沖銷資料[]-序號[0]資料不存在或已註銷」→ 工坊端提前擋 */
-    if (String(v.kind) === '2' && L.dc === 'D' && /^2102/.test(String(L.code)) && !L.offset)
+    const offs = offsetsOf(L);   /* v5.7.26 一列多筆沖抵（同 dtlseq 多筆 F06） */
+    if (String(v.kind) === '2' && L.dc === 'D' && /^2102/.test(String(L.code)) && !offs.length)
       E(`${lt}：立沖科目 ${L.code} 須連結沖帳——點該列「沖帳」選原立帳傳票貸方列（SBA 匯入必要）`);
     /* 轉帳傳票沖方立沖科目未連結先警告（kind2 借方2102實測必擋、kind3 未實測故不硬擋）：
        負債(2102)沖=借方；資產(110305應收/180705保證金)沖=貸方（借方=立帳，不需沖帳） */
-    if (String(v.kind) === '3' && !L.offset
+    if (String(v.kind) === '3' && !offs.length
       && ((L.dc === 'D' && /^2102/.test(String(L.code))) || (L.dc === 'C' && /^(110305|180705)/.test(String(L.code)))))
       W(`${lt}：轉帳傳票${L.dc === 'D' ? '借' : '貸'}方立沖科目 ${L.code} 未連結沖帳——建議於預覽點「沖帳」連結原立帳，SBA 端可能要求 F06 沖銷資料`);
-    if (L.offset) {
-      if (!/^\d{3}$/.test(L.offset.year) || !L.offset.vchrno || !(+L.offset.seq >= 1))
-        E(`${lt}：沖帳關聯資料不完整（年度/傳票號/項次）`);
-      if (L.offset.max != null && +L.offset.amt > +L.offset.max)
-        E(`${lt}：沖帳金額 ${L.offset.amt} 超過立帳可沖金額 ${L.offset.max}`);
-      if (+L.offset.amt !== +L.amt) W(`${lt}：沖帳金額(${L.offset.amt})與明細金額(${L.amt})不同（部分沖銷）`);
-      /* v5.4.9 實測：F04 沖銷科目子目(relate)須與被沖立帳列子目一致（立帳無子目則須留空），
-         否則 SBA 報「沖銷科目子目[]必須是在沖銷科目子目代碼建檔」 */
-      if (L.offset.sub != null && String(L.relate || '') !== String(L.offset.sub))
-        E(`${lt}：沖銷科目子目(${L.relate || '空'})須與被沖立帳子目(${L.offset.sub || '空'})一致——重選沖帳可自動帶入`);
-      if (L.offset.sub == null && /^2102/.test(String(L.code)))
-        W(`${lt}：被沖立帳不在 D1 歷史分錄，無法確認子目——請核對子目欄（現值「${L.relate || '空'}」）與 SBA 立帳列一致`);
+    if (offs.length) {
+      let sum = 0;
+      const subs = new Set();
+      offs.forEach((o, oi) => {
+        const tag = offs.length > 1 ? `第${oi + 1}筆(${o.vchrno}#${o.seq})` : '';
+        if (!/^\d{3}$/.test(o.year) || !o.vchrno || !(+o.seq >= 1))
+          E(`${lt}：沖帳關聯資料不完整（年度/傳票號/項次）${tag}`);
+        if (o.max != null && +o.amt > +o.max)
+          E(`${lt}：${tag}沖帳金額 ${o.amt} 超過立帳可沖金額 ${o.max}`);
+        sum += +o.amt || 0;
+        if (o.sub != null) subs.add(String(o.sub || ''));
+        /* v5.4.9 實測：F04 沖銷科目子目(relate)須與被沖立帳列子目一致（立帳無子目則須留空） */
+        if (o.sub != null && String(L.relate || '') !== String(o.sub))
+          E(`${lt}：${tag}沖銷科目子目(${L.relate || '空'})須與被沖立帳子目(${o.sub || '空'})一致——重選沖帳可自動帶入`);
+        if (o.sub == null && /^2102/.test(String(L.code)))
+          W(`${lt}：${tag}被沖立帳不在 D1 歷史分錄，無法確認子目——請核對子目欄（現值「${L.relate || '空'}」）與 SBA 立帳列一致`);
+      });
+      /* v5.7.26 一列多筆限同子目（F04 一列僅一個沖銷子目欄） */
+      if (subs.size > 1)
+        E(`${lt}：同列多筆沖帳的立帳子目不一致（${[...subs].map(s => s || '空').join('、')}）——F04 一列僅一個沖銷子目，請拆列`);
+      if (Math.round(sum * 100) / 100 !== +L.amt)
+        W(`${lt}：沖帳合計(${sum})與明細金額(${L.amt})不同（部分沖銷）`);
     }
   });
 
@@ -306,6 +317,11 @@ function guessBcode(easCode) {
 const FIXED_ASSET_CODES = ['130101','130201','130301','130401','130501','130601',
   '130701','130801','130901','130902','130903','130904'];
 
+/* v5.7.26 一列多筆沖抵：L.offsets 陣列（同 dtlseq 多筆 F06）；相容舊制單筆 L.offset */
+function offsetsOf(L) {
+  return Array.isArray(L.offsets) ? L.offsets : (L.offset ? [L.offset] : []);
+}
+
 /* ── 傳票 → 各 F 檔 rows ───────────────────────────────── */
 function voucherToF03Row(v) {
   const damt = (v.lines || []).filter((L) => L.dc === 'D').reduce((s, L) => s + (+L.amt || 0), 0);
@@ -360,13 +376,13 @@ function voucherToF05Rows(v) {
 function voucherToF06Rows(v) {
   const rows = [];
   (v.lines || []).forEach((L) => {
-    if (!L.offset) return;
-    rows.push({
+    /* v5.7.26 同 dtlseq 多筆：一列沖多個立帳各產一筆 F06（SBA 沖銷資料[]為陣列，UI 端本可多筆） */
+    for (const o of offsetsOf(L)) rows.push({
       fvchtir_year: v.year, fvchtir_kind: v.kind, fvchtir_importrecno: v.importrecno,
       fvchtir_dtlseq: String(L.seq), fvchtir_type: '2',
-      fvchtir_acc_year1: L.offset.year, fvchtir_vch_kind1: L.offset.kind,
-      fvchtir_vchrno1: L.offset.vchrno, fvchtir_seq1: String(L.offset.seq),
-      fvchtir_amt: fmt2(L.offset.amt),
+      fvchtir_acc_year1: o.year, fvchtir_vch_kind1: o.kind,
+      fvchtir_vchrno1: o.vchrno, fvchtir_seq1: String(o.seq),
+      fvchtir_amt: fmt2(o.amt),
     });
   });
   return rows;
@@ -871,7 +887,7 @@ if (typeof module !== 'undefined' && module.exports) {
     SBA_CORE_VERSION,
     rocDate7, toRoc7, big5Len, truncBig5, xmlEscape, fmt2, fmt6, buildXml,
     F03_FIELDS, F04_FIELDS, F05_FIELDS, F06_FIELDS, F07_FIELDS,
-    validateVoucher, validateBatch, guessBcode, FIXED_ASSET_CODES,
+    validateVoucher, validateBatch, guessBcode, FIXED_ASSET_CODES, offsetsOf,
     splitBank, decidePayway, mapRecordsToVouchers,
     FNWACX_SHEET, FNWACX_FUND, FNWACX_HEADERS, payeeToFnwacxRow, buildSbaPayeeIndex, payeeExistsInSba, normPayeeName,
     unzipAll, buildFnwacxFromTemplate, isValidGui, roc7DiffDays,

@@ -129,6 +129,10 @@ select.w-subj { width: 168px; }
 .off-used { font-size: 12px; color: #b26500; margin-top: 2px; }
 .off-used b.off-ok { color: #2e7d32; }
 .off-used b.off-zero { color: #c62828; }
+/* v5.7.26 一列多筆沖帳 chips */
+.off-chip { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; background: #eef3ee; border: 1px solid #a5d6a7; border-radius: 8px; padding: 1px 4px 1px 6px; margin: 1px 2px; white-space: nowrap; }
+.off-chip-x { border: none; background: none; cursor: pointer; color: #c62828; font-size: 11px; padding: 0 2px; }
+.off-chip-x:hover { font-weight: bold; }
 input.w-date { width: 84px; } input.w-memo { width: 100%; min-width: 180px; }
 .btn { padding: 5px 14px; border: none; border-radius: var(--r-md, 8px); cursor: pointer;
   font-size: 12px; font-family: inherit; background: var(--warm-sand, #e8e6dc);
@@ -430,6 +434,11 @@ for (const v of STATE.drafts) for (const L of (v.lines || []))
    ——舊草稿一併清（改科目時 updLine 也會清） */
 for (const v of STATE.drafts) for (const L of (v.lines || []))
   if (/^(2102|1807|2807)/.test(String(L.code)) && (L.use || L.pkind)) { L.use = ''; L.pkind = ''; }
+/* v5.7.26 一列多筆沖抵（使用者需求：SBA 端一列可沖多筆，免拆列後手工合併）：
+   L.offsets 陣列＝同 dtlseq 產多筆 F06（限同子目，F04 一列僅一個沖銷子目欄）；舊 L.offset 單筆自動升格。
+   offsetsOf() 由 sba-core.js 提供（先載入） */
+for (const v of STATE.drafts) for (const L of (v.lines || []))
+  if (L.offset && !L.offsets) { L.offsets = [L.offset]; delete L.offset; }
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const fmtN = (n) => (+n || 0).toLocaleString('zh-TW');
@@ -1045,8 +1054,8 @@ function generateVouchers() {
       const sub = entrySubCode(est.vch, est.ap.seq);
       L.code = est.ap.code;
       L.bcode = bcodeFor(est.ap.code);
-      L.offset = { year: est.vch.slice(0, 3), kind: est.vch.slice(3, 4), vchrno: est.vch,
-        seq: est.ap.seq, amt: +L.amt || 0, max: +L.amt || 0, sub };
+      L.offsets = [{ year: est.vch.slice(0, 3), kind: est.vch.slice(3, 4), vchrno: est.vch,
+        seq: est.ap.seq, amt: +L.amt || 0, max: +L.amt || 0, sub }];
       if (sub !== null) L.relate = sub;
       const rec = fresh.find(x => String(x.id) === String(L.srcRec));
       issues.push({ recId: L.srcRec, level: 'warn',
@@ -1135,13 +1144,15 @@ async function aiFixMemos(btn) {
   finally { if (btn) btn.disabled = false; }
 }
 function renderPreview() {
-  /* 舊草稿回填沖帳子目（v5.4.9）：offset.sub 未知者由 D1 分錄補上並同步本列子目 */
+  /* 舊草稿回填沖帳子目（v5.4.9；v5.7.26 陣列化）：sub 未知者由 D1 分錄補上並同步本列子目 */
   STATE.drafts.forEach(v => (v.lines || []).forEach(L => {
-    if (!L.offset || L.offset.sub != null) return; /* null=尚未確認，每次重繪重試（新匯 0090 後可補到） */
-    const sub = entrySubCode(L.offset.vchrno, L.offset.seq);
-    if (sub === null) return;
-    L.offset.sub = sub;
-    L.relate = sub;
+    for (const o of offsetsOf(L)) {
+      if (o.sub != null) continue; /* null=尚未確認，每次重繪重試（新匯 0090 後可補到） */
+      const sub = entrySubCode(o.vchrno, o.seq);
+      if (sub === null) continue;
+      o.sub = sub;
+      L.relate = sub;
+    }
   }));
   /* 舊草稿回填受款人統編/發票營業人資訊（v5.5.2） */
   STATE.drafts.forEach(v => (v.payees || []).forEach(P => {
@@ -1193,7 +1204,17 @@ function renderPreview() {
         <td class="num">${ro ? fmtN(L.amt) : `<input class="w-amt" value="${L.amt}" onchange="updLine(${vi},${li},'amt',this.value)">`}</td>
         <td><input class="w-memo" value="${esc(L.memo || '')}" onchange="updLine(${vi},${li},'memo',this.value)"></td>
         <td style="white-space:nowrap;">
-          ${L.dc === OFFSET_DC(L.code) && OFFSETABLE(L.code) ? `<button class="btn btn-sm${!L.offset && L.dc === 'D' && /^2102/.test(String(L.code)) ? ' btn-danger' : ''}" onclick="openOffsetModal(${vi},${li})" title="${!L.offset && L.dc === 'D' && /^2102/.test(String(L.code)) ? '立沖科目必須連結沖帳（SBA 匯入必要）' : '沖前立帳連結'}">${L.offset ? '🔗' + esc(L.offset.vchrno) + '#' + esc(String(L.offset.seq)) : '沖帳'}</button>` : ''}${L.offset ? `<button class="btn btn-sm" onclick="editOffsetSeq(${vi},${li})" title="修正沖銷序號——0090/0100 序號可能≠SBA 實際分錄序，以 SBA 傳票/未沖查詢為準">✎序</button>` : ''}
+          ${(() => {
+            if (!(L.dc === OFFSET_DC(L.code) && OFFSETABLE(L.code))) return '';
+            const offs = offsetsOf(L);
+            const linked = offs.reduce((s, o) => s + (+o.amt || 0), 0);
+            const need = Math.round(((+L.amt || 0) - linked) * 100) / 100;
+            const mustLink = !offs.length && L.dc === 'D' && /^2102/.test(String(L.code));
+            let h = `<button class="btn btn-sm${mustLink ? ' btn-danger' : ''}" onclick="openOffsetModal(${vi},${li})" title="${mustLink ? '立沖科目必須連結沖帳（SBA 匯入必要）' : offs.length ? '加沖下一筆立帳（同子目可多筆）' : '沖前立帳連結'}">${offs.length ? (need > 0 ? `＋沖帳（差 ${fmtN(need)}）` : '＋') : '沖帳'}</button>`;
+            h += offs.map((o, oi) => `<span class="off-chip" title="沖 ${esc(o.vchrno)}#${esc(String(o.seq))} $${fmtN(o.amt)}（上限 ${fmtN(o.max)}）">🔗${esc(o.vchrno)}#${esc(String(o.seq))}${offs.length > 1 ? ' $' + fmtN(o.amt) : ''}<button class="off-chip-x" onclick="removeOffsetAt(${vi},${li},${oi})" title="移除此筆沖帳連結">✕</button></span>`).join('');
+            if (offs.length === 1) h += `<button class="btn btn-sm" onclick="editOffsetSeq(${vi},${li})" title="修正沖銷序號——0090/0100 序號可能≠SBA 實際分錄序">✎序</button>`;
+            return h;
+          })()}
           <button class="btn btn-sm" onclick="delLine(${vi},${li})">✕</button>
         </td>
       </tr>`;
@@ -1359,12 +1380,14 @@ function updLine(vi, li, k, val) {
    「沖銷金額不可大於原發生傳票金額」） */
 async function editOffsetSeq(vi, li) {
   const L = STATE.drafts[vi].lines[li];
-  if (!L.offset) return;
-  const val = await promptAnim(`<b>修正沖銷序號</b> — 立帳 ${esc(L.offset.vchrno)}（現用序號 ${esc(String(L.offset.seq))}，沖 ${fmtN(L.offset.amt)}）<br><span class="small">請以 SBA「傳票查詢／未沖查詢」中該立帳列的實際序號為準；SBA 檢核報「沖銷金額不可大於原發生傳票金額」通常＝序號指到別列</span>`, L.offset.seq);
+  const offs = offsetsOf(L);
+  if (offs.length !== 1) { if (offs.length > 1) alert('多筆沖帳請先 ✕ 移除該筆後重選'); return; }
+  const o = offs[0];
+  const val = await promptAnim(`<b>修正沖銷序號</b> — 立帳 ${esc(o.vchrno)}（現用序號 ${esc(String(o.seq))}，沖 ${fmtN(o.amt)}）<br><span class="small">請以 SBA「傳票查詢／未沖查詢」中該立帳列的實際序號為準；SBA 檢核報「沖銷金額不可大於原發生傳票金額」通常＝序號指到別列</span>`, o.seq);
   if (val == null) return;
   const n = +String(val).trim();
   if (!(n >= 1)) { alert('序號不正確'); return; }
-  L.offset.seq = n;
+  o.seq = n;
   renderPreview();
 }
 function updPayee(vi, pi, k, val) {
@@ -1702,7 +1725,8 @@ function offsetAllocated(vchrno, seq, exceptVi, exceptLi) {
   let s = 0;
   STATE.drafts.forEach((v, vi) => v.lines.forEach((L, li) => {
     if (vi === exceptVi && li === exceptLi) return;
-    if (L.offset && String(L.offset.vchrno) === String(vchrno) && +L.offset.seq === +seq) s += +L.offset.amt || 0;
+    for (const o of offsetsOf(L))
+      if (String(o.vchrno) === String(vchrno) && +o.seq === +seq) s += +o.amt || 0;
   }));
   return s;
 }
@@ -1783,43 +1807,47 @@ function autoRepairOffsets() {
   const byKey = new Map(items.map(o => [o.vch + '#' + o.seq, o]));
   const used = new Map();
   const roomOf = (o) => (+o.left || 0) - (used.get(o.vch + '#' + o.seq) || 0);
-  const linkTo = (L, t, amt) => {
-    L.offset = { year: String(t.vch).slice(0, 3), kind: String(t.vch).slice(3, 4),
-      vchrno: String(t.vch), seq: t.seq, amt, max: +t.left, sub: null };
+  const mkOff = (t, amt) => {
     const sub = entrySubCode(t.vch, t.seq);
-    if (sub !== null) { L.offset.sub = sub; L.relate = sub; }
     used.set(t.vch + '#' + t.seq, (used.get(t.vch + '#' + t.seq) || 0) + amt);
+    return { year: String(t.vch).slice(0, 3), kind: String(t.vch).slice(3, 4),
+      vchrno: String(t.vch), seq: t.seq, amt, max: +t.left, sub };
+  };
+  /* 替代目標子目須與本列現有子目相容（F04 一列僅一個沖銷子目欄） */
+  const subOk = (t, L) => {
+    const s = entrySubCode(t.vch, t.seq);
+    return s === null || String(s || '') === String(L.relate || '');
   };
   const fixes = [];
   STATE.drafts.forEach((v) => {
-    for (let li = 0; li < v.lines.length; li++) {
-      const L = v.lines[li];
-      if (!L.offset) continue;
-      const k = String(L.offset.vchrno) + '#' + L.offset.seq;
-      const it = byKey.get(k);
-      if (!it) continue;   /* 不在白名單（已沖畢等）→ 匯出檢核警告處理，不自作主張 */
-      if (+L.offset.max !== +it.left) L.offset.max = +it.left;
-      const want = +L.offset.amt || 0;
-      const avail = roomOf(it);
-      if (want <= avail) { used.set(k, (used.get(k) || 0) + want); continue; }
-      const rest = Math.round((want - Math.max(avail, 0)) * 100) / 100;
-      const alt = items.filter(o => o.name === it.name && o !== it && roomOf(o) >= rest)
-        .sort((a, b) => roomOf(b) - roomOf(a))[0];
-      if (avail <= 0) {
-        if (alt) { linkTo(L, alt, want); fixes.push(`${v.importrecno} 列${L.seq}（${fmtN(want)}）：${k} 已無餘額 → 整列改沖 ${alt.vch}#${alt.seq}`); }
-        else { delete L.offset; fixes.push(`${v.importrecno} 列${L.seq}（${fmtN(want)}）：${k} 已無餘額且無同科目可用立帳，請手動選沖帳`); }
-        continue;
+    for (const L of v.lines) {
+      const offs = offsetsOf(L);
+      if (!offs.length) continue;
+      for (let oi = 0; oi < offs.length; oi++) {
+        const o = offs[oi];
+        const k = String(o.vchrno) + '#' + o.seq;
+        const it = byKey.get(k);
+        if (!it) continue;   /* 不在白名單（已沖畢等）→ 匯出檢核警告處理，不自作主張 */
+        if (+o.max !== +it.left) o.max = +it.left;
+        const want = +o.amt || 0;
+        const avail = roomOf(it);
+        if (want <= avail) { used.set(k, (used.get(k) || 0) + want); continue; }
+        const rest = Math.round((want - Math.max(avail, 0)) * 100) / 100;
+        const alt = items.filter(x => x.name === it.name && x !== it && roomOf(x) >= rest && subOk(x, L))
+          .sort((a, b) => roomOf(b) - roomOf(a))[0];
+        if (avail <= 0) {
+          /* 此標的已無餘額：整筆改連替代立帳（v5.7.26 同列改連，不再拆列） */
+          if (alt) { offs[oi] = mkOff(alt, want); fixes.push(`${v.importrecno} 列${L.seq}（${fmtN(want)}）：${k} 已無餘額 → 改沖 ${alt.vch}#${alt.seq}`); }
+          else { offs.splice(oi, 1); oi--; fixes.push(`${v.importrecno} 列${L.seq}（${fmtN(want)}）：${k} 已無餘額且無同科目同子目可用立帳，請手動加沖帳`); }
+          continue;
+        }
+        /* 本筆縮至可用額，差額同列加沖替代立帳 */
+        o.amt = avail;
+        used.set(k, +it.left);
+        if (alt) { offs.splice(oi + 1, 0, mkOff(alt, rest)); oi++; fixes.push(`${v.importrecno} 列${L.seq}：${k} 未沖僅 ${fmtN(+it.left)} → 本筆縮為 ${fmtN(avail)}，同列加沖 ${alt.vch}#${alt.seq} ${fmtN(rest)}`); }
+        else { fixes.push(`${v.importrecno} 列${L.seq}：${k} 未沖僅 ${fmtN(+it.left)} → 本筆縮為 ${fmtN(avail)}，差 ${fmtN(rest)} 請手動加沖帳`); }
       }
-      L.amt = avail; L.offset.amt = avail;
-      used.set(k, +it.left);
-      const clone = { ...L, amt: rest };
-      delete clone.offset;
-      if (alt) { linkTo(clone, alt, rest); fixes.push(`${v.importrecno} 列${L.seq}：${k} 未沖僅 ${fmtN(+it.left)} → 本列縮為 ${fmtN(avail)}，拆 ${fmtN(rest)} 改沖 ${alt.vch}#${alt.seq}`); }
-      else { fixes.push(`${v.importrecno} 列${L.seq}：${k} 未沖僅 ${fmtN(+it.left)} → 本列縮為 ${fmtN(avail)}，拆出 ${fmtN(rest)} 請手動選沖帳`); }
-      v.lines.splice(li + 1, 0, clone);
-      v.lines.forEach((x, i) => { x.seq = i + 1; });
-      syncBankLine(v);
-      li++;   /* 跳過剛插入的餘額列（已配好或留手選） */
+      L.offsets = offs; delete L.offset;
     }
   });
   if (fixes.length) saveDrafts();
@@ -1832,36 +1860,56 @@ async function pickOffset(vchrno, seq, avail, dseq) {
   const cap = +avail || L.amt;
   /* v5.7.5 seq＝匯出用官方序號（0100）；dseq＝D1 明細列序（兩者可能位移），子目查 D1 用 dseq */
   const sub = entrySubCode(vchrno, dseq != null && dseq !== '' ? dseq : seq);
-  /* v5.7.16 一鍵拆列（使用者需求）：可用額不足時拆成「可用額列沖此立帳」＋「餘額新列」，
-     接著自動開沖帳視窗選下一筆立帳。v5.7.18 餘額列繼承原列屬性（衍生列一樣唯讀檢視）、確認改動畫彈窗 */
-  if (L.amt > cap && await confirmAnim(
-    `<b>此立帳可用餘額僅 ${fmtN(cap)}</b>，本列金額 <b>${fmtN(L.amt)}</b>。<br><br>`
-    + `✂️ <b>拆列</b>＝本列改 ${fmtN(cap)} 沖此立帳，餘額 <b>${fmtN(L.amt - cap)}</b> 成新列、接著選它的立帳（可用額不夠時也可把新列科目改 180705 暫付）。<br>`
-    + `不拆＝整列僅沖 ${fmtN(cap)}。`, '✂️ 拆列', '不拆')) {
-    const rest = Math.round((L.amt - cap) * 100) / 100;
-    L.amt = cap;
-    const clone = { ...L, amt: rest };
-    delete clone.offset;
+  const offs = offsetsOf(L);
+  const linked = offs.reduce((s, o) => s + (+o.amt || 0), 0);
+  let need = Math.round(((+L.amt || 0) - linked) * 100) / 100;
+  /* v5.7.26 已沖滿 → 詢問清除重連 */
+  if (offs.length && need <= 0) {
+    if (!await confirmAnim(`本列 ${fmtN(L.amt)} 已沖滿（${offs.length} 筆連結）。要清除原連結、改用此立帳重新開始嗎？`, '清除重連', '取消')) return;
+    offs.length = 0;
+    need = +L.amt || 0;
+  }
+  /* 子目相容：F04 一列僅一個沖銷子目欄——不同子目仍須拆列（動畫彈窗確認） */
+  if (offs.length && sub !== null && String(sub || '') !== String(L.relate || '')) {
+    if (!await confirmAnim(
+      `此立帳子目（<b>${esc(sub || '空')}</b>）與本列現有沖帳子目（<b>${esc(L.relate || '空')}</b>）不同——F04 一列僅能有一個沖銷子目，須拆列。<br><br>`
+      + `✂️ <b>拆列</b>＝本列保留已沖 ${fmtN(linked)}，拆出 <b>${fmtN(need)}</b> 成新列並連結此立帳。`, '✂️ 拆列', '取消')) return;
+    L.amt = linked;
+    const clone = { ...L, amt: need, relate: '' };
+    delete clone.offsets; delete clone.offset;
+    const grant = Math.min(need, cap);
+    clone.offsets = [{ year: String(vchrno).slice(0, 3), kind: String(vchrno).slice(3, 4),
+      vchrno: String(vchrno), seq, amt: grant, max: cap, sub }];
+    if (sub !== null) clone.relate = sub;
     v.lines.splice(li + 1, 0, clone);
     v.lines.forEach((x, i) => { x.seq = i + 1; });
-    L.offset = { year: String(vchrno).slice(0, 3), kind: String(vchrno).slice(3, 4),
-      vchrno: String(vchrno), seq, amt: cap, max: cap, sub };
-    if (sub !== null) L.relate = sub;
     syncBankLine(v);
     closeModal(); renderPreview();
-    openOffsetModal(vi, li + 1);   /* 接著為餘額列選沖帳立帳 */
+    if (grant < need) openOffsetModal(vi, li + 1);   /* 還沒沖滿 → 新列續選 */
     return;
   }
-  L.offset = { year: String(vchrno).slice(0, 3), kind: String(vchrno).slice(3, 4),
-    vchrno: String(vchrno), seq,
-    amt: Math.min(L.amt, cap), max: cap, sub };
+  /* 同子目（或首筆）：本列（加）沖，一列多筆免拆列（v5.7.26，同 dtlseq 多筆 F06）；
+     可用額不足 → 先沖可用額、自動重開視窗續選下一筆 */
+  const grant = Math.min(need, cap);
+  offs.push({ year: String(vchrno).slice(0, 3), kind: String(vchrno).slice(3, 4),
+    vchrno: String(vchrno), seq, amt: grant, max: cap, sub });
+  L.offsets = offs; delete L.offset;
   /* 定案規則：F04 沖銷科目子目＝與被沖立帳列子目一致（立帳無子目則留空） */
   if (sub !== null) L.relate = sub;
   closeModal(); renderPreview();
+  if (grant < need) openOffsetModal(vi, li);   /* 差額續選（免拆列） */
+}
+function removeOffsetAt(vi, li, oi) {
+  const L = STATE.drafts[vi].lines[li];
+  const offs = offsetsOf(L);
+  offs.splice(oi, 1);
+  L.offsets = offs; delete L.offset;
+  renderPreview();
 }
 function clearOffset() {
   const { vi, li } = STATE.modalCtx;
-  delete STATE.drafts[vi].lines[li].offset;
+  const L = STATE.drafts[vi].lines[li];
+  delete L.offset; delete L.offsets;
   closeModal(); renderPreview();
 }
 function closeModal() {
@@ -2098,9 +2146,10 @@ function runBatchValidation() {
   const openMap = new Map(((STATE.offsetOpen && STATE.offsetOpen.items) || []).map(o => [o.vch + '#' + o.seq, o]));
   const alloc = new Map();
   STATE.drafts.forEach(v => v.lines.forEach(L => {
-    if (!L.offset) return;
-    const k = String(L.offset.vchrno) + '#' + L.offset.seq;
-    alloc.set(k, (alloc.get(k) || 0) + (+L.offset.amt || 0));
+    for (const o of offsetsOf(L)) {
+      const k = String(o.vchrno) + '#' + o.seq;
+      alloc.set(k, (alloc.get(k) || 0) + (+o.amt || 0));
+    }
   }));
   alloc.forEach((sum, k) => {
     const o = openMap.get(k);
