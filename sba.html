@@ -506,6 +506,12 @@ async function boot() {
   if (_offFixes.length) setTimeout(() => confirmAnim(
     `<b>🔧 沖帳自動修復（依最新 0100 未沖清單）</b><br><br>${_offFixes.map(esc).join('<br>')}`,
     '知道了', '關閉'), 400);
+  /* v5.7.23 還原 LAST_EXPORT：重整後草稿與下載時一致才恢復「標記已匯出」；不一致（含自動修復有動作）＝須重新下載 */
+  try {
+    const le = JSON.parse(localStorage.getItem('sba_last_export') || 'null');
+    if (le && le.sig === draftsSig()) { LAST_EXPORT = le; $('ex-mark').disabled = false; }
+    else if (le) localStorage.removeItem('sba_last_export');
+  } catch (_) {}
   /* v5.5.2 受款人主檔統編查找表（帳號優先、姓名後備）：F05 受款人統編 + F07 發票統編/營業人名稱
      v5.5.4 建表時即以 isValidGui 過濾（身分證/壞碼不進表，避免佔住鍵遮蔽同鍵合格統編） */
   STATE.payeeGuiMap = new Map();
@@ -2143,6 +2149,8 @@ async function downloadZip() {
     })),
   };
   $('ex-mark').disabled = false;
+  /* v5.7.23 LAST_EXPORT 持久化：重整頁面後草稿未變仍可按「標記已匯出」 */
+  try { localStorage.setItem('sba_last_export', JSON.stringify(LAST_EXPORT)); } catch (_) {}
   /* v5.7.6 下載即消耗批號：寫入 D1 永久跳過（重載/跨日不重複），欄位自動帶下一個 */
   STATE.usedBatch2.add(batch);
   putConfig('sba_used_batches', [...STATE.usedBatch2]);
@@ -2175,6 +2183,7 @@ async function markExported() {
     STATE.drafts = [];
     saveDrafts();
     LAST_EXPORT = null;
+    try { localStorage.removeItem('sba_last_export'); } catch (_) {}
     $('draft-count').textContent = '0';
     $('ex-mark').disabled = true;
     renderExportLog(); renderPickList(); suggestBatch(); runBatchValidation();
