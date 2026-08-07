@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.7.26';
+const SBA_CORE_VERSION = '5.7.27';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -228,6 +228,9 @@ function validateVoucher(v, opt) {
         const tag = offs.length > 1 ? `第${oi + 1}筆(${o.vchrno}#${o.seq})` : '';
         if (!/^\d{3}$/.test(o.year) || !o.vchrno || !(+o.seq >= 1))
           E(`${lt}：沖帳關聯資料不完整（年度/傳票號/項次）${tag}`);
+        /* v5.7.27（Codex C5d）：沖帳金額須為正的有限數 */
+        if (!(Number.isFinite(+o.amt) && +o.amt > 0))
+          E(`${lt}：${tag}沖帳金額不正確（${o.amt}），須為正數`);
         if (o.max != null && +o.amt > +o.max)
           E(`${lt}：${tag}沖帳金額 ${o.amt} 超過立帳可沖金額 ${o.max}`);
         sum += +o.amt || 0;
@@ -241,8 +244,8 @@ function validateVoucher(v, opt) {
       /* v5.7.26 一列多筆限同子目（F04 一列僅一個沖銷子目欄） */
       if (subs.size > 1)
         E(`${lt}：同列多筆沖帳的立帳子目不一致（${[...subs].map(s => s || '空').join('、')}）——F04 一列僅一個沖銷子目，請拆列`);
-      if (Math.round(sum * 100) / 100 !== +L.amt)
-        W(`${lt}：沖帳合計(${sum})與明細金額(${L.amt})不同（部分沖銷）`);
+      if (Math.round(sum * 100) / 100 !== Math.round((+L.amt || 0) * 100) / 100)   /* v5.7.27 兩側同精度比較 */
+        W(`${lt}：沖帳合計(${Math.round(sum * 100) / 100})與明細金額(${L.amt})不同（部分沖銷）`);
     }
   });
 
@@ -268,7 +271,7 @@ function validateVoucher(v, opt) {
             if (!/^\d{7}$/.test(d7) || +d7.slice(0, 3) < 100 || +d7.slice(0, 3) > 130 || roc7DiffDays(d7, d7) !== 0)
               E(`${pt}：發票 ${iv.invno || '(未填號碼)'} 日期缺漏或無效（${d7 || '空白'}，須為存在的民國7碼日期如 1150723）`);
             const gap = roc7DiffDays(iv.invdate, v.payDate);
-            if (gap != null && gap > 15 && !iv.reason)
+            if (gap != null && gap >= 15 && !iv.reason)   /* v5.7.27 與 F07 自動填原因界線一致（15日以上含15） */
               W(`${pt}：發票日期 ${iv.invdate} 距製票日逾15日（${gap}天），F07 將自動填制式原因（採購法73-1）`);
           });
         }
@@ -299,6 +302,22 @@ function validateBatch(vouchers, opt) {
     seen.add(key);
     if (existing.has(key)) errors.push(`匯入序號 ${key} 已使用過（曾匯出或已存在傳票）`);
   });
+  /* v5.7.27（Codex C5d）：同一立帳被多列/多張引用時，跨列累計不得超過該立帳可沖上限
+     （逐筆各自 ≤ max 仍可能合計超沖；上限取各引用所記 max 的最大值——皆為官方未沖額快照） */
+  const accum = new Map();   /* vch#seq → {sum, max} */
+  vouchers.forEach((v) => (v.lines || []).forEach((L) => {
+    for (const o of offsetsOf(L)) {
+      const k = String(o.vchrno) + '#' + o.seq;
+      const a = accum.get(k) || { sum: 0, max: null };
+      a.sum += +o.amt || 0;
+      if (o.max != null) a.max = a.max == null ? +o.max : Math.max(a.max, +o.max);
+      accum.set(k, a);
+    }
+  }));
+  for (const [k, a] of accum) {
+    if (a.max != null && Math.round(a.sum * 100) / 100 > a.max)
+      errors.push(`沖帳跨列累計超額：立帳 ${k} 可沖上限 ${a.max}，本批合計沖 ${Math.round(a.sum * 100) / 100}`);
+  }
   return { errors, warnings };
 }
 
@@ -317,9 +336,11 @@ function guessBcode(easCode) {
 const FIXED_ASSET_CODES = ['130101','130201','130301','130401','130501','130601',
   '130701','130801','130901','130902','130903','130904'];
 
-/* v5.7.26 一列多筆沖抵：L.offsets 陣列（同 dtlseq 多筆 F06）；相容舊制單筆 L.offset */
+/* v5.7.26 一列多筆沖抵：L.offsets 陣列（同 dtlseq 多筆 F06）；相容舊制單筆 L.offset
+   v5.7.27（Codex C5d）：空陣列不遮蔽舊制單筆 */
 function offsetsOf(L) {
-  return Array.isArray(L.offsets) ? L.offsets : (L.offset ? [L.offset] : []);
+  if (Array.isArray(L.offsets) && L.offsets.length) return L.offsets;
+  return L.offset ? [L.offset] : [];
 }
 
 /* ── 傳票 → 各 F 檔 rows ───────────────────────────────── */
