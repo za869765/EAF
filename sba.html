@@ -1154,7 +1154,8 @@ function renderPreview() {
   }));
   $('pv-empty').style.display = STATE.drafts.length ? 'none' : 'block';
   $('draft-count').textContent = STATE.drafts.length;
-  if (LAST_EXPORT && draftsSig() !== LAST_EXPORT.sig) $('ex-mark').disabled = true;
+  /* v5.7.25 有草稿即可按：無下載紀錄或已過期時走「補標記」流程（markExported 內確認批號） */
+  if (STATE.drafts.length) $('ex-mark').disabled = false;
   /* 匯出區併入預覽（v5.2.8）：有草稿即顯示並自動檢核，通過就能直接下載 */
   $('pv-export').style.display = STATE.drafts.length ? 'block' : 'none';
   if (STATE.drafts.length) { renderExportLog(); runBatchValidation(); }
@@ -2157,11 +2158,20 @@ async function downloadZip() {
   suggestBatch();
 }
 async function markExported() {
-  if (!LAST_EXPORT) return;
-  if (draftsSig() !== LAST_EXPORT.sig) {
-    alert('傳票內容在下載 ZIP 後有變動——請重新下載 ZIP 再標記，以免紀錄與檔案不符');
-    $('ex-mark').disabled = true;
-    return;
+  if (LAST_EXPORT && draftsSig() !== LAST_EXPORT.sig) {
+    LAST_EXPORT = null;
+    try { localStorage.removeItem('sba_last_export'); } catch (_) {}
+  }
+  if (!LAST_EXPORT) {
+    /* v5.7.25 補標記：無下載紀錄（下載後重整、或舊版下載未持久化）→ 確認批號後以目前草稿標記 */
+    const lastBatch = [...STATE.usedBatch2].pop() || '';
+    const b = await promptAnim(`<b>補標記已匯出</b><br><span class="small">找不到本次下載 ZIP 的紀錄（可能下載後重整過頁面）。請先確認這 ${STATE.drafts.length} 張草稿<b>確實已匯入 SBA</b>，再輸入當時使用的批號（2 碼）：</span>`, lastBatch);
+    if (b == null) return;
+    const batch = String(b).trim().toUpperCase();
+    if (!/^[1-9A-Z]{2}$/.test(batch)) { alert('批號須為 2 碼（1-9、A-Z）'); return; }
+    const proc7 = toRoc7($('ex-date').value) || rocDate7(new Date());
+    LAST_EXPORT = { proc7, batch, at: new Date().toISOString(), sig: draftsSig(),
+      snapshot: STATE.drafts.map((v) => ({ importrecno: v.importrecno, acctCode: v.acctCode, sourceIds: [...(v.sourceIds || [])] })) };
   }
   $('ex-mark').disabled = true;   /* putConfig 期間鎖鈕；失敗才解鎖重試 */
   const { batch, at, snapshot } = LAST_EXPORT;
