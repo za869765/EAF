@@ -2522,8 +2522,10 @@ function updateIncome50Row() {
         const onlyEmployee = purposeCode === '7103';
         const defVal = onlyEmployee ? '員工' : (isLecturerOrBonus ? '兼職' : '員工');
         income50Type = defVal;
+        /* v5.7.28 2713 加「衛生局加班費」：支付衛生局支援人員加班費非本所所得——出納格斜線、不列所得 */
         const opts = onlyEmployee ? ['員工'] :
-                     purposeCode === '1501' ? ['員工','兼職','費用'] : ['員工','兼職'];
+                     purposeCode === '1501' ? ['員工','兼職','費用'] :
+                     purposeCode === '2713' ? ['員工','兼職','衛生局加班費'] : ['員工','兼職'];
         document.getElementById('income50-type-btns').innerHTML =
           opts.map(o =>
             `<button class="lect-btn${o===defVal?' active':''}" onclick="setIncome50Type('${o}')">${o}</button>`
@@ -2618,7 +2620,7 @@ function updateCashierNote() {
   } else if (purposeCode === '2305') {
     note = _t92;
   } else if (INCOME_50_PURPOSES.includes(purposeCode)) {
-    note = _t50;
+    note = income50Type === '衛生局加班費' ? '' : _t50;   /* v5.7.28 衛生局加班費不列所得 */
   } else if (LECTURER_BP_CODES.includes(bpCode) && isLecturer === 'lecturer') {
     note = _t50;
   } else if (LECTURER_BP_CODES.includes(bpCode) && isLecturer === 'bonus') {
@@ -2646,7 +2648,8 @@ function updateCashierNote() {
     CASHIER_SLASH_PURPOSE.includes(purposeCode) ||
     (ACCT_TYPE_CONFIG[purposeCode] && ACCT_SLASH_TYPES.has(acctType))
   );
-  const forceSlash = purposeCode === '1501' && income50Type === '費用';
+  const forceSlash = (purposeCode === '1501' && income50Type === '費用')
+    || income50Type === '衛生局加班費';   /* v5.7.28 衛生局加班費：出納格斜線 */
   document.getElementById('sg-cashier').classList.toggle('slash', cashierSlash || forceSlash);
   const el = document.getElementById('cashier-note');
   el.textContent   = note;
