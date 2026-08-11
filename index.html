@@ -2249,8 +2249,9 @@ function onBpChange() {
   pSel.innerHTML = '';
   if (bp && bp.purposes.length > 0) {
     /* v4.4.93 依 purpose.useExpense / usePurchase 過濾；掩蔽（兩者皆 false）不出現 */
-    /* v4.9.6 排除「99 其他」不可選；用途別代碼＝名稱時只顯示一次（免出現「車輛養護費　車輛養護費」） */
-    const validPurps = bp.purposes.filter(p => _purposeAllows(p, formType) && !_isOtherPurpose(p));
+    /* v4.9.6 排除「99 其他」不可選；用途別代碼＝名稱時只顯示一次（免出現「車輛養護費　車輛養護費」）
+       v5.7.29 例外：僅 21020312 疾管科開放 99（使用者確認；21020301 公務預算及其他科目維持不給選） */
+    const validPurps = bp.purposes.filter(p => _purposeAllows(p, formType) && (!_isOtherPurpose(p) || bpCode === '21020312'));
     const _purpText = p => p.code === p.name ? p.name : (p.code + '　' + p.name);
     if (validPurps.length === 0) {
       pRow.style.display = 'none';
