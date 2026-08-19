@@ -3938,7 +3938,9 @@ function validatePayeeCards() {
   return errors;
 }
 
-/* v5.5.4 台灣公司統編加權檢核（與 sba-core isValidGui 同邏輯；index 不載 sba-core 故留複本） */
+/* v5.5.4 台灣公司統編加權檢核（與 sba-core isValidGui 同邏輯；index 不載 sba-core 故留複本）
+   v5.7.30 依財政部 112 年新制改「可被 5 整除」（舊制除 10；112/4 起釋出的新統編僅符合新制，
+   舊統編 10 的倍數必為 5 的倍數不受影響） */
 function _isValidGui(no) {
   if (!/^\d{8}$/.test(no)) return false;
   const w = [1, 2, 1, 2, 1, 2, 4, 1];
@@ -3947,7 +3949,7 @@ function _isValidGui(no) {
     const p = +no[i] * w[i];
     sum += Math.floor(p / 10) + (p % 10);
   }
-  return sum % 10 === 0 || (no[6] === '7' && (sum + 1) % 10 === 0);
+  return sum % 5 === 0 || (no[6] === '7' && (sum + 1) % 5 === 0);
 }
 
 /* ── 扣繳自動拆分（9A / 50所得） ── */
@@ -5460,9 +5462,12 @@ function _payeeCardField(i, key, val) {
   _payeeCards[i][key] = val;
 }
 
-/* v5.5.3 普通收據統一編號輸入：僅留數字、最長 8 碼 */
+/* v5.5.3 普通收據統一編號輸入：僅留數字、最長 8 碼
+   v5.7.30 全形數字（輸入法全形模式）自動轉半形——原本被 \D 直接刪掉，看起來像「打不進去」 */
 function _pcGuiInput(i, el) {
-  el.value = el.value.replace(/\D/g, '').slice(0, 8);
+  el.value = el.value
+    .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+    .replace(/\D/g, '').slice(0, 8);
   _payeeCardField(i, 'guiNo', el.value);
 }
 
