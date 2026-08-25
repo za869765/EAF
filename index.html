@@ -1190,7 +1190,12 @@ body.sb-resizing * { pointer-events: none !important; }
         <option value="10000-99999">$10,000–99,999</option>
         <option value="100000-">$100,000↑</option>
       </select>
-      <select class="sf-select" id="sf-purpose" onchange="applyHistoryFilter()"><option value="">全部用途</option></select>
+      <select class="sf-select" id="sf-payway" onchange="applyHistoryFilter()">
+        <option value="">全部領取方式</option>
+        <option value="wire">電匯（非農會）</option>
+        <option value="farm">存帳（佳里區農會）</option>
+        <option value="bill">代繳（憑繳費單）</option>
+      </select>
       <select class="sf-select" id="sf-formtype" onchange="applyHistoryFilter()">
         <option value="">全部單據</option>
         <option value="purchase">請購單</option>
@@ -2097,10 +2102,8 @@ document.addEventListener('click', () => heartbeat(), { passive: true });
 function buildFilterDropdowns() {
   /* 主科目 */
   const acctSet = new Map();
-  const purpSet = new Map();
   cachedRecords.forEach(r => {
     if (r.acctName) acctSet.set(r.acctName, (acctSet.get(r.acctName)||0)+1);
-    if (r.purposeName && !r.purposeName.includes('選擇用途別')) purpSet.set(r.purposeName, (purpSet.get(r.purposeName)||0)+1);
   });
   const acctSel = document.getElementById('sf-acct');
   const curAcct = acctSel.value;
@@ -2110,21 +2113,29 @@ function buildFilterDropdowns() {
   [...acctSet.entries()].sort((a,b)=>b[1]-a[1]).forEach(([n,c]) =>
     acctSel.appendChild(new Option(n+' ('+c+')', n)));
   acctSel.value = curAcct;
+}
 
-  /* 用途別（只列目前有用到的） */
-  const purpSel = document.getElementById('sf-purpose');
-  const curPurp = purpSel.value;
-  purpSel.innerHTML = '<option value="">全部用途</option>';
-  [...purpSet.entries()].sort((a,b)=>b[1]-a[1]).forEach(([n,c]) =>
-    purpSel.appendChild(new Option(n+' ('+c+')', n)));
-  purpSel.value = curPurp;
+/* v5.8.3 領取方式篩選：依受款人卡片歸類（bill→代繳；佳里區農會帳戶→存帳；其他→電匯）
+   佳里區農會＝本會＋四分部代碼，或銀行名含「佳里區農會」；bank 格式「7碼代號-名稱」 */
+const _FARM_BANK_CODES = ['6180069','6180416','6180427','6180438','6180449'];
+function _recPayways(r) {
+  const out = new Set();
+  const ps = Array.isArray(r.payees) && r.payees.length ? r.payees
+    : (r.payee && r.payee.type ? [r.payee] : []);
+  ps.forEach(p => {
+    if (p.type === 'bill') { out.add('bill'); return; }
+    const bank = String(p.bank || '');
+    if (_FARM_BANK_CODES.includes(bank.slice(0, 7)) || bank.includes('佳里區農會')) out.add('farm');
+    else out.add('wire');
+  });
+  return out;
 }
 
 function applyHistoryFilter() {
   const kw    = (document.getElementById('sf-keyword').value||'').trim().toLowerCase();
   const acct  = document.getElementById('sf-acct').value;
   const amt   = document.getElementById('sf-amount').value;
-  const purp  = document.getElementById('sf-purpose').value;
+  const pw    = document.getElementById('sf-payway').value;
   const ft    = document.getElementById('sf-formtype')?.value || '';
 
   let filtered = cachedRecords;
@@ -2139,7 +2150,7 @@ function applyHistoryFilter() {
   }
   if (acct === '_unclassified') filtered = filtered.filter(r => !r.acctCode);
   else if (acct) filtered = filtered.filter(r => r.acctName === acct);
-  if (purp) filtered = filtered.filter(r => r.purposeName === purp);
+  if (pw) filtered = filtered.filter(r => _recPayways(r).has(pw));
   if (ft) filtered = filtered.filter(r => r.formType === ft);
   if (amt) {
     const [lo, hi] = amt.split('-').map(Number);
@@ -2155,7 +2166,7 @@ function clearHistoryFilter() {
   document.getElementById('sf-keyword').value = '';
   document.getElementById('sf-acct').value = '';
   document.getElementById('sf-amount').value = '';
-  document.getElementById('sf-purpose').value = '';
+  document.getElementById('sf-payway').value = '';
   const ftEl = document.getElementById('sf-formtype'); if (ftEl) ftEl.value = '';
   applyHistoryFilter();
 }
