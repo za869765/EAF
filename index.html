@@ -1306,6 +1306,8 @@ body.sb-resizing * { pointer-events: none !important; }
             <label>款項類型：</label>
             <button class="lect-btn" id="cust09-overtime" onclick="setCustody09Type('overtime')">不休假加班費</button>
             <button class="lect-btn" id="cust09-vacation" onclick="setCustody09Type('vacation')">國內休假補助費</button>
+            <button class="lect-btn" id="cust09-health" onclick="setCustody09Type('health')">健康檢查補助</button>
+            <button class="lect-btn" id="cust09-child" onclick="setCustody09Type('childcare')">子女休假補助</button>
           </div>
           <!-- v5.0.3 4501 憑證類型改「房屋/車位(列計51所得) / 其它」，預設其它(出納斜線)。
                id 沿用 taxdoc-invoice(''=其它) / taxdoc-receipt('receipt'=房屋/車位) 不改，D1 舊資料值相容 -->
@@ -2338,7 +2340,7 @@ const LECTURER_BP_CODES  = ['21020311','21020312','21020313','21020321','2102032
 const XUANDAO_BP_CODES   = ['21020311','21020312','21020313','21020319','21020321','21020322'];
 let isLecturer      = '';   /* '' = 非講師費, 'lecturer' = 講師費, 'bonus' = 獎勵金 */
 let taxDocType4501  = '';   /* v5.0.3: '' = 其它(預設，出納斜線) / 'receipt' = 房屋/車位(列計51所得)。值沿用舊發票/收據語義，D1 舊資料相容 */
-let custody09Type   = '';   /* v4.4.98 21020321/09: '' = 未選 / 'overtime' = 不休假加班費 / 'vacation' = 國內休假補助費 */
+let custody09Type   = '';   /* v4.4.98 21020321/09: '' = 未選 / 'overtime' = 不休假加班費 / 'vacation' = 國內休假補助費 / v5.8.2 'health' = 健康檢查補助 / 'childcare' = 子女休假補助（後兩者比照 vacation 列計50所得） */
 
 /* 款項用途列顯示邏輯：21020321 需 purposeCode=99 才顯示 */
 function updateLecturerRow() {
@@ -2367,6 +2369,8 @@ function updateLecturerRow() {
     custody09Type = '';
     document.getElementById('cust09-overtime').classList.remove('active');
     document.getElementById('cust09-vacation').classList.remove('active');
+    document.getElementById('cust09-health').classList.remove('active');
+    document.getElementById('cust09-child').classList.remove('active');
   }
 }
 
@@ -2498,6 +2502,8 @@ function setCustody09Type(val) {
   custody09Type = (custody09Type === val) ? '' : val;
   document.getElementById('cust09-overtime').classList.toggle('active', custody09Type === 'overtime');
   document.getElementById('cust09-vacation').classList.toggle('active', custody09Type === 'vacation');
+  document.getElementById('cust09-health').classList.toggle('active', custody09Type === 'health');
+  document.getElementById('cust09-child').classList.toggle('active', custody09Type === 'childcare');
   updateCashierNote();
   _checkSubjectDirty();
 }
@@ -2606,8 +2612,10 @@ function updateCashierNote() {
   const _tOt    = getAutoText('overtime',    '當月未逾46小時得免列計所得');
   const _acctNM = { '財/社團法人':_t92, '診所/檢驗所':_t9a, '醫療門診診所/檢驗所':_t9a, 'HPV':_t9a, '個人':_t50 };
   let note = '';
-  if (bpCode === '21020321' && purposeCode === '09' && custody09Type === 'vacation') {
-    /* v4.4.98 國內休假補助費 → 列計50所得；不休假加班費('overtime') note 留空，沿用 21020321 斜線規則 */
+  if (bpCode === '21020321' && purposeCode === '09' &&
+      (custody09Type === 'vacation' || custody09Type === 'health' || custody09Type === 'childcare')) {
+    /* v4.4.98 國內休假補助費 → 列計50所得；v5.8.2 健康檢查補助/子女休假補助比照辦理；
+       不休假加班費('overtime') note 留空，沿用 21020321 斜線規則 */
     note = _t50;
   } else if (ACCT_TYPE_CONFIG[purposeCode] && acctType) {
     note = ACCT_SLASH_TYPES.has(acctType) ? '' : (_acctNM[acctType] || '');
@@ -3342,6 +3350,8 @@ function fillForm(rec) {
   custody09Type = rec.custody09Type || '';
   document.getElementById('cust09-overtime').classList.toggle('active', custody09Type === 'overtime');
   document.getElementById('cust09-vacation').classList.toggle('active', custody09Type === 'vacation');
+  document.getElementById('cust09-health').classList.toggle('active', custody09Type === 'health');
+  document.getElementById('cust09-child').classList.toggle('active', custody09Type === 'childcare');
   /* 還原帳戶類別狀態 */
   if (rec.acctType && ACCT_TYPE_CONFIG[rec.purposeCode]) {
     setAcctType(rec.acctType);   /* setAcctType 已呼叫 updateIncome50Row */
