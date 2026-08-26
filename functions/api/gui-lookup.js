@@ -5,9 +5,9 @@ const CORS = { 'Access-Control-Allow-Origin': '*' };
 export async function onRequestGet({ request }) {
   const url = new URL(request.url);
   const no = String(url.searchParams.get('no') || '').trim();
-  const json = (obj, status) => new Response(JSON.stringify(obj), {
+  const json = (obj, status, ttl) => new Response(JSON.stringify(obj), {
     status: status || 200,
-    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400', ...CORS } });
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=' + (ttl != null ? ttl : 86400), ...CORS } });
   if (!/^\d{8}$/.test(no)) return json({ error: 'bad no' }, 400);
   const tryFetch = async (u, pick) => {
     try {
@@ -26,11 +26,15 @@ export async function onRequestGet({ request }) {
   if (!name) {
     name = await tryFetch('https://company.g0v.ronny.tw/api/show/' + no, (d) => {
       const x = (d && d.data) || {};
-      let n = x['公司名稱'] || x['商業名稱'] || x['名稱'] || x['營業人名稱'] || '';
+      /* v5.9.5 財政部「營業人名稱」優先（=F07 欄位語意；分公司統編唯此欄有全名，如
+         53668663→全聯實業股份有限公司佳里中山分公司），再退公司/商業名稱、分公司名稱 */
+      const fia = x['財政部'] || {};
+      let n = fia['營業人名稱'] || x['公司名稱'] || x['商業名稱'] || x['名稱'] || x['營業人名稱'] || x['分公司名稱'] || '';
       if (Array.isArray(n)) n = n[0] || '';
       return typeof n === 'string' ? n.trim() : '';
     });
     if (name) source = 'g0v';
   }
-  return json({ no, name: String(name || '').trim() || null, source });
+  /* 查無僅短快取（來源暫時失敗/新登記者 5 分鐘後可再查）；查到快取一天 */
+  return json({ no, name: String(name || '').trim() || null, source }, 200, name ? 86400 : 300);
 }
