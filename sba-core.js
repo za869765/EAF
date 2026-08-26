@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.8.8';
+const SBA_CORE_VERSION = '5.8.9';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -131,11 +131,13 @@ const F05_FIELDS = ['fpaylist_year','fpaylist_kind','fpaylist_importrecno','fpay
 const F06_FIELDS = ['fvchtir_year','fvchtir_kind','fvchtir_importrecno','fvchtir_dtlseq',
   'fvchtir_type','fvchtir_acc_year1','fvchtir_vch_kind1','fvchtir_vchrno1','fvchtir_seq1',
   'fvchtir_amt'];
-/* v5.7.24 實測：SBA 匯入後發票「日期/金額」空白＝官方讀的是範例檔元素名 finvoice_date/amt，
-   非欄位表的 finvoice_invdate/invamt（設計文件 2.4 首批驗證項應驗）→ 兩組名稱並出（SBA 忽略不認識的元素） */
+/* v5.8.9 對齊官方現行規格（SBA作業型-匯入傳票作業說明.doc 2026-07-09 修訂版）：F07 共 12 元素，
+   日期/金額元素名＝finvoice_date/finvoice_amt（v5.7.24 實測結論與現行規格一致）。
+   v5.7.24 曾為保險並出的舊欄位表名 finvoice_invdate/invamt 已自規格移除——SBA 1150825 更新後
+   實測匯入 F07 只剩日期/金額、其餘欄位（號碼/統編/名稱/原因）全空白，疑其新解析器不容忍規格外
+   元素，故改為與官方規格逐字逐序完全一致、不再夾帶多餘元素 */
 const F07_FIELDS = ['finvoice_year','finvoice_kind','finvoice_importrecno','finvoice_dtlseq',
-  'finvoice_dtl2seq','finvoice_invno','finvoice_invdate','finvoice_invamt',
-  'finvoice_date','finvoice_amt','finvoice_compno',
+  'finvoice_dtl2seq','finvoice_invno','finvoice_date','finvoice_amt','finvoice_compno',
   'finvoice_name','finvoice_distribution','finvoice_reason'];
 
 /* ═══════════════════════════════════════════════════════════
@@ -443,8 +445,7 @@ function voucherToF07Rows(v) {
       rows.push({
         finvoice_year: v.year, finvoice_kind: v.kind, finvoice_importrecno: v.importrecno,
         finvoice_dtlseq: String(P.seq), finvoice_dtl2seq: String(i + 1),
-        finvoice_invno: iv.invno || '', finvoice_invdate: iv.invdate || '',
-        finvoice_invamt: fmt2(iv.invamt || 0),
+        finvoice_invno: iv.invno || '',
         finvoice_date: iv.invdate || '', finvoice_amt: fmt2(iv.invamt || 0),
         finvoice_compno: iv.compno || '',
         finvoice_name: truncBig5(iv.name || (P.rev === '2' ? P.name : '') || '', 200),
