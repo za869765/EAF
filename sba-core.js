@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.8.4';
+const SBA_CORE_VERSION = '5.8.5';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -44,6 +44,22 @@ function roc7DiffDays(a, b) {
   };
   const da = p(a), db = p(b);
   return da == null || db == null ? null : Math.round((db - da) / 86400000);
+}
+
+/** v5.8.5 民國7碼日期差「工作日」數（a 之翌日起算至 b，排除週六日；國定假日暫不扣＝寬鬆側提早提醒不誤放）
+ *  發票距製票日 15 日檢核用——使用者指示採購法 73-1 之 15 日為工作日非日曆日；任一無效回 null */
+function roc7WorkDays(a, b) {
+  const cal = roc7DiffDays(a, b);
+  if (cal == null) return null;
+  if (cal <= 0) return cal;
+  const m = String(a).match(/^(\d{3})(\d{2})(\d{2})$/);
+  const t0 = Date.UTC(+m[1] + 1911, +m[2] - 1, +m[3]);
+  let n = 0;
+  for (let i = 1; i <= cal; i++) {
+    const dow = new Date(t0 + i * 86400000).getUTCDay();
+    if (dow !== 0 && dow !== 6) n++;
+  }
+  return n;
 }
 
 /* ── Big5 位元組長度（SBA 為 Big5 系統，varchar 長度以 byte 計）──
@@ -270,9 +286,9 @@ function validateVoucher(v, opt) {
             const d7 = String(iv.invdate || '');
             if (!/^\d{7}$/.test(d7) || +d7.slice(0, 3) < 100 || +d7.slice(0, 3) > 130 || roc7DiffDays(d7, d7) !== 0)
               E(`${pt}：發票 ${iv.invno || '(未填號碼)'} 日期缺漏或無效（${d7 || '空白'}，須為存在的民國7碼日期如 1150723）`);
-            const gap = roc7DiffDays(iv.invdate, v.payDate);
+            const gap = roc7WorkDays(iv.invdate, v.payDate);   /* v5.8.5 使用者指示：73-1 的 15 日＝工作日（排除週六日） */
             if (gap != null && gap >= 15 && !iv.reason)   /* v5.7.27 與 F07 自動填原因界線一致（15日以上含15） */
-              W(`${pt}：發票日期 ${iv.invdate} 距製票日逾15日（${gap}天），F07 將自動填制式原因（採購法73-1）`);
+              W(`${pt}：發票日期 ${iv.invdate} 距製票日逾15工作日（${gap}工作日），F07 將自動填原因「${lateReasonOf(v)}」（採購法73-1）`);
           });
         }
       }
@@ -408,13 +424,21 @@ function voucherToF06Rows(v) {
   });
   return rows;
 }
+/* v5.8.5 逾15工作日自動原因（使用者指定，取代原制式句）：保管款(11010202)與基金分句；
+   acctCode 缺時（手動/轉帳傳票）以序1銀行專戶列代碼判別 */
+function lateReasonOf(v) {
+  const acct = String(v.acctCode
+    || (((v.lines || []).find((L) => L.dc === 'C' && /^110102/.test(String(L.code))) || {}).code) || '');
+  return acct === '11010202' ? '款項待申請經費撥補後再行付款廠商' : '廠商較晚送達發票';
+}
 function voucherToF07Rows(v) {
   const rows = [];
   (v.payees || []).forEach((P) => {
     if (P.rev !== '2') return; /* 僅統一發票受款人產 F07（rev 改回 0/1 時發票殘留不得輸出） */
     (P.invoices || []).forEach((iv, i) => {
-      /* v5.5.2 發票日期距製票日逾15日：SBA 要求填原因（採購法73-1），F07 原因欄空白疑致 SBA 剔除日期/金額待補登 */
-      const gap = roc7DiffDays(iv.invdate, v.payDate);
+      /* v5.5.2 發票日期距製票日逾15日：SBA 要求填原因（採購法73-1），F07 原因欄空白疑致 SBA 剔除日期/金額待補登
+         v5.8.5 改工作日計（使用者指示 73-1 之 15 日為工作日非日曆日） */
+      const gap = roc7WorkDays(iv.invdate, v.payDate);
       rows.push({
         finvoice_year: v.year, finvoice_kind: v.kind, finvoice_importrecno: v.importrecno,
         finvoice_dtlseq: String(P.seq), finvoice_dtl2seq: String(i + 1),
@@ -425,7 +449,7 @@ function voucherToF07Rows(v) {
         finvoice_name: truncBig5(iv.name || (P.rev === '2' ? P.name : '') || '', 200),
         finvoice_distribution: iv.distribution || '0',
         /* v5.7.24 界線修正：採購法 73-1「15日以上」含 15 → >= 15 即自動填原因 */
-        finvoice_reason: truncBig5(iv.reason || (gap != null && gap >= 15 ? '核銷請款作業時程，發票日期與製票日相距逾15日' : ''), 1000),
+        finvoice_reason: truncBig5(iv.reason || (gap != null && gap >= 15 ? lateReasonOf(v) : ''), 1000),
       });
     });
   });

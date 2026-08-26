@@ -389,6 +389,7 @@ window.addEventListener('storage', (ev) => {
   </div>
   <div class="toolbar" style="margin-top:10px;">
     <button class="btn" onclick="clearOffset()">🚫 解除沖帳連結</button>
+    <button class="btn" id="modal-split-temp" style="display:none;" onclick="splitRemainderToTemp()" title="本列縮成已沖合計（沖帳連結保留），沖不到的差額拆出新列掛 180705 暫付及待結轉（借立帳、不需沖帳）">✂️ 差額立暫付</button>
     <button class="btn" onclick="closeModal()">關閉</button>
   </div>
 </div>
@@ -1530,8 +1531,43 @@ function openOffsetModal(vi, li) {
   $('modal-hint').textContent = '';   /* v5.7.19 使用者指示：長說明移除，資訊改由各容器統計列呈現 */
   $('modal-q').value = '';
   renderOffsetList('');
+  /* v5.8.5 差額立暫付鈕：僅 2102 借方且已有沖帳連結但沖不滿時顯示（立帳沖完仍有差額→差額轉 180705） */
+  (() => {
+    const offs0 = offsetsOf(L);
+    const linked0 = Math.round(offs0.reduce((s, o) => s + (+o.amt || 0), 0) * 100) / 100;
+    const need0 = Math.round(((+L.amt || 0) - linked0) * 100) / 100;
+    $('modal-split-temp').style.display =
+      (L.dc === 'D' && /^2102/.test(code) && linked0 > 0 && need0 > 0) ? '' : 'none';
+  })();
   $('modal-mask').style.display = 'block';
   $('modal-box').style.display = 'block';
+}
+/* v5.8.5 差額立暫付：沖帳選單內一鍵拆列——本列縮成已沖合計（連結保留），差額拆出新列掛
+   180705 暫付及待結轉帳項（借立帳不需沖，公務預算款未到先墊付情境；手動列可再編輯） */
+async function splitRemainderToTemp() {
+  const { vi, li } = STATE.modalCtx || {};
+  const v = STATE.drafts[vi]; if (!v) return;
+  const L = v.lines[li]; if (!L) return;
+  const offs = offsetsOf(L);
+  const linked = Math.round(offs.reduce((s, o) => s + (+o.amt || 0), 0) * 100) / 100;
+  const need = Math.round(((+L.amt || 0) - linked) * 100) / 100;
+  if (!(linked > 0 && need > 0)) return;
+  if (!await confirmAnim(
+    `✂️ <b>差額立暫付</b><br><br>本列 <b>${esc(String(L.code))} ${esc(subjectName(L.code))}</b> 金額 ${fmtN(L.amt)}<br>`
+    + `→ 縮為已沖合計 <b>${fmtN(linked)}</b>（既有沖帳連結保留），<br>`
+    + `差額 <b>${fmtN(need)}</b> 拆出新列掛 <b>180705 暫付及待結轉帳項</b>（借立帳、不需沖帳，待公務預算款到再沖轉）。`,
+    '✂️ 拆列立暫付', '取消')) return;
+  L.amt = linked;
+  const nl = { seq: 0, dc: 'D', code: '180705', bcode: bcodeFor('180705'), use: '', pkind: '', relate: '',
+    scode1: '00001', amt: need, ttype: L.ttype || '2',
+    memo: truncBig5((String(L.memo || '').trim() ? String(L.memo || '').trim() + '｜' : '') + '差額暫付待結轉', 1000),
+    manual: true };
+  v.lines.splice(li + 1, 0, nl);
+  v.lines.forEach((x, i) => { x.seq = i + 1; });
+  syncBankLine(v);
+  saveDrafts();
+  closeModal();
+  renderPreview();
 }
 function toggleOffsetHist() {
   STATE.modalCands.showHist = !STATE.modalCands.showHist;
