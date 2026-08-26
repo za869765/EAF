@@ -248,6 +248,7 @@ window.addEventListener('storage', (ev) => {
     </div>
     <div class="toolbar" style="margin-bottom:2px;">
       <button class="btn btn-sm" onclick="clearPickSel()">✖ 清除勾選</button>
+      <button class="btn btn-sm" onclick="batchMarkExported()" title="輸入單號範圍，批次將範圍內單據標記為已出帳（反灰沉底、全選跳過）">🏷 批次註記已出帳</button>
       <span class="small" id="pk-summary">尚未勾選</span>
     </div>
     <div class="grp-grid" id="pk-groups"></div>
@@ -301,7 +302,7 @@ window.addEventListener('storage', (ev) => {
     <button class="btn" onclick="aiFixMemos(this)">✨ AI 修正摘要（Gemini）</button>
     <button class="btn btn-sm" onclick="setAllVCollapse(true)" title="全部收合成單列，方便拖拉換順序">▸ 全部收合</button>
     <button class="btn btn-sm" onclick="setAllVCollapse(false)">▾ 全部展開</button>
-    <span class="small" id="pv-ai-msg">摘要可逐張先看過、手動修改；AI 修正會改寫傳票摘要與銀行列摘要（改完仍可再編輯，匯出前都不定案）</span>
+    <span class="small" id="pv-ai-msg">AI 修正先列出「前→後」對照供逐項審核（可編輯、可不套用），按「套用」才會改寫摘要</span>
   </div>
   <div id="pv-list"></div>
   <!-- 匯出區（v5.2.8 併入預覽：有草稿即顯示、自動檢核，通過即可下載） -->
@@ -394,6 +395,18 @@ window.addEventListener('storage', (ev) => {
   </div>
 </div>
 
+<!-- v5.8.7 AI 修正摘要審核 modal（先審後改） -->
+<div id="ai-rv-mask" style="display:none; position:fixed; inset:0; background:rgba(40,30,20,.45); z-index:1500;" onclick="closeAiReview(true)"></div>
+<div id="ai-rv-box" style="display:none; position:fixed; top:4vh; left:50%; transform:translateX(-50%); width:min(880px,94vw); max-height:90vh; overflow:auto; background:#fffdf8; border:1px solid #cbbfae; border-radius:10px; padding:14px 16px; z-index:1501; box-shadow:0 12px 40px rgba(0,0,0,.25);">
+  <h3 style="margin:0 0 2px;">✨ AI 修正摘要 — 審核</h3>
+  <div class="small">逐項核對「前 → 後」，修正後文字可直接編輯；<b>取消勾選＝該項不套用</b>。⚠ 標記＝不符「名目含年月＋金額元」規則，請補齊再套用。</div>
+  <div id="ai-rv-body"></div>
+  <div class="toolbar" style="margin-top:10px; position:sticky; bottom:0; background:#fffdf8; padding:8px 0;">
+    <button class="btn btn-main" onclick="applyAiReview()">✅ 套用勾選項目</button>
+    <button class="btn" onclick="closeAiReview(true)">✖ 全部不套用</button>
+  </div>
+</div>
+
 <div id="rec-pop"></div>
 
 <script>
@@ -434,6 +447,15 @@ for (const v of STATE.drafts) for (const L of (v.lines || []))
 /* v5.8.6 差額立暫付列（v5.8.5 曾標 manual）依 v5.7.18 規則轉唯讀（以摘要標記識別） */
 for (const v of STATE.drafts) for (const L of (v.lines || []))
   if (L.manual && /^1807/.test(String(L.code)) && /差額暫付待結轉/.test(String(L.memo || ''))) delete L.manual;
+/* v5.8.7 差額暫付列補 srcRec（舊拆列未帶）：同張內以摘要前綴找來源列——單據覆蓋合計（recShortOf）靠它計算 */
+for (const v of STATE.drafts) for (const L of (v.lines || []))
+  if (!L.srcRec && /^1807/.test(String(L.code)) && /差額暫付待結轉/.test(String(L.memo || ''))) {
+    const base = String(L.memo).replace(/｜?差額暫付待結轉[\s\S]*$/, '');
+    if (base) {
+      const srcL = (v.lines || []).find(x => x !== L && x.srcRec && String(x.memo || '').startsWith(base));
+      if (srcL) L.srcRec = srcL.srcRec;
+    }
+  }
 /* v5.7.21 立沖/暫付科目不得帶用途別（SBA 實測：210205-2713「未設定於最細層級會計科目設定」整張退）
    ——舊草稿一併清（改科目時 updLine 也會清） */
 for (const v of STATE.drafts) for (const L of (v.lines || []))
@@ -1116,11 +1138,17 @@ async function aiFixMemos(btn) {
     });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
-    let n = 0;
+    /* v5.8.7 先審後改（使用者指示）：AI 結果不直接套用，整理成「前→後」對照清單開審核視窗，
+       逐項可編輯/勾選，按「套用」才寫入草稿 */
+    const props = [];
     for (const it of (j.items || [])) {
       const v = STATE.drafts[+it.id];
       if (!v) continue;
-      if (it.memo && String(it.memo).trim()) v.memo = cleanMemoText(it.memo);   /* 不先截斷：檢核警告過長，F03 寫檔時再 truncBig5(100) */
+      const p = { vi: +it.id, recno: v.importrecno, items: [] };
+      if (it.memo && String(it.memo).trim()) {
+        const after = cleanMemoText(it.memo);   /* 不先截斷：檢核警告過長，F03 寫檔時再 truncBig5(100) */
+        if (after && after !== String(v.memo || '')) p.items.push({ kind: 'main', label: '主檔摘要', before: v.memo || '', after });
+      }
       for (const ln of (it.lines || [])) {
         const L = v.lines.find(x => x.dc === 'D' && x.seq === +ln.seq);
         if (!L || !String(ln.text || '').trim()) continue;
@@ -1129,9 +1157,9 @@ async function aiFixMemos(btn) {
         /* 摘要金額須與明細金額一致：AI 漏寫時自動補上 */
         const amtStr = (+L.amt || 0).toLocaleString('en-US');
         if (!t.includes(amtStr)) t += `，計${amtStr}元`;
-        L.memo = truncBig5(t, 1000);
+        t = truncBig5(t, 1000);
+        if (t !== String(L.memo || '')) p.items.push({ kind: 'line', seq: +ln.seq, label: `明細${ln.seq}摘要`, before: L.memo || '', after: t });
       }
-      /* 受款人支出用途（F05 usedoc）同步修正 */
       for (const pn of (it.payees || [])) {
         const P = (v.payees || []).find(x => x.seq === +pn.seq);
         if (!P || !String(pn.text || '').trim()) continue;
@@ -1139,15 +1167,88 @@ async function aiFixMemos(btn) {
         if (!t) continue;
         const amtStr = (+P.amt || 0).toLocaleString('en-US');
         if (!t.includes(amtStr)) t += `，計${amtStr}元`;
-        P.usedoc = truncBig5(t, 1000);
+        t = truncBig5(t, 1000);
+        if (t !== String(P.usedoc || '')) p.items.push({ kind: 'payee', seq: +pn.seq, label: `受款人${pn.seq}支出用途`, before: P.usedoc || '', after: t });
       }
-      syncBankLine(v);
-      n++;
+      if (p.items.length) props.push(p);
     }
-    renderPreview();
-    $('pv-ai-msg').textContent = `✅ 已修正 ${n} 張（主檔=概括無金額、明細=含該列金額）——請逐張確認，仍可手動調整`;
+    if (!props.length) { $('pv-ai-msg').textContent = 'ℹ️ AI 未提出任何修改（摘要已符合規則）'; return; }
+    STATE.aiReview = props;
+    renderAiReview();
+    $('pv-ai-msg').textContent = `⏳ AI 提出 ${props.reduce((s, p) => s + p.items.length, 0)} 處修改——請於視窗逐項審核後套用`;
   } catch (e) { $('pv-ai-msg').textContent = '❌ AI 修正失敗：' + e.message; }
   finally { if (btn) btn.disabled = false; }
+}
+/* v5.8.7 摘要名目規則（使用者指示）：至少含「民國年月或年月日」與「金額元」才清楚 */
+const AI_YM_RE = /1[0-4]\d(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])?(?!\d)|1[0-4]\d[年.\/](0?[1-9]|1[0-2])月?(?!\d)/;
+const AI_AMT_RE = /\d[\d,]*(?:\.\d+)?\s*元/;
+function aiRuleTags(t) {
+  const s = String(t || ''), miss = [];
+  if (!AI_YM_RE.test(s)) miss.push('缺年月');
+  if (!AI_AMT_RE.test(s)) miss.push('缺金額(元)');
+  return miss;
+}
+function renderAiReview() {
+  const props = STATE.aiReview || [];
+  $('ai-rv-body').innerHTML = props.map((p, pi) => `
+    <div style="border:1px solid #d8cfc0; border-radius:8px; margin:8px 0; overflow:hidden;">
+      <div style="background:#efe9dd; padding:5px 10px; font-weight:700;">傳票 ${esc(p.recno)}</div>
+      ${p.items.map((x, xi) => `
+        <div style="padding:6px 10px; border-top:1px dashed #e2dacb;">
+          <label style="display:flex; gap:6px; align-items:center; font-weight:700; font-size:12px; cursor:pointer;">
+            <input type="checkbox" checked class="ai-rv-chk" data-pi="${pi}" data-xi="${xi}"> ${esc(x.label)}
+            <span class="small" id="ai-flag-${pi}-${xi}" style="color:#c62828; font-weight:700;"></span>
+          </label>
+          <div class="small" style="color:#8d6e63; margin:3px 0 2px; white-space:pre-wrap;">前：${esc(x.before)}</div>
+          <textarea id="ai-ta-${pi}-${xi}" style="width:100%; min-height:34px; font-size:12.5px; box-sizing:border-box;"
+            oninput="aiReviewFlag(${pi},${xi})">${esc(x.after)}</textarea>
+        </div>`).join('')}
+    </div>`).join('');
+  props.forEach((p, pi) => p.items.forEach((_, xi) => aiReviewFlag(pi, xi)));
+  $('ai-rv-mask').style.display = 'block';
+  $('ai-rv-box').style.display = 'block';
+}
+function aiReviewFlag(pi, xi) {
+  const ta = $(`ai-ta-${pi}-${xi}`), fl = $(`ai-flag-${pi}-${xi}`);
+  if (!ta || !fl) return;
+  const miss = aiRuleTags(ta.value);
+  fl.textContent = miss.length ? `⚠ ${miss.join('、')}` : '';
+}
+function closeAiReview(discard) {
+  $('ai-rv-mask').style.display = 'none';
+  $('ai-rv-box').style.display = 'none';
+  if (discard) { STATE.aiReview = null; $('pv-ai-msg').textContent = 'ℹ️ 已關閉審核視窗，未套用任何 AI 修改'; }
+}
+function applyAiReview() {
+  const props = STATE.aiReview || [];
+  let n = 0; const touched = new Set();
+  document.querySelectorAll('.ai-rv-chk').forEach(chk => {
+    if (!chk.checked) return;
+    const pi = +chk.dataset.pi, xi = +chk.dataset.xi;
+    const p = props[pi], x = p && p.items[xi];
+    if (!p || !x) return;
+    const v = STATE.drafts[p.vi];
+    if (!v) return;
+    const ta = $(`ai-ta-${pi}-${xi}`);
+    const val = String((ta && ta.value) || '').trim();
+    if (!val) return;
+    if (x.kind === 'main') v.memo = val;
+    else if (x.kind === 'line') {
+      const L = v.lines.find(l => l.dc === 'D' && l.seq === x.seq);
+      if (!L) return;
+      L.memo = truncBig5(val, 1000);
+    } else {
+      const P = (v.payees || []).find(pp => pp.seq === x.seq);
+      if (!P) return;
+      P.usedoc = truncBig5(val, 1000);
+    }
+    touched.add(p.vi); n++;
+  });
+  touched.forEach(vi => syncBankLine(STATE.drafts[vi]));
+  STATE.aiReview = null;
+  closeAiReview(false);
+  renderPreview();
+  $('pv-ai-msg').textContent = `✅ 已套用 ${n} 處審核通過的修改（未勾選項目維持原文）`;
 }
 function renderPreview() {
   /* 舊草稿回填沖帳子目（v5.4.9；v5.7.26 陣列化）：sub 未知者由 D1 分錄補上並同步本列子目 */
@@ -1534,26 +1635,40 @@ function openOffsetModal(vi, li) {
   $('modal-hint').textContent = '';   /* v5.7.19 使用者指示：長說明移除，資訊改由各容器統計列呈現 */
   $('modal-q').value = '';
   renderOffsetList('');
-  /* v5.8.5 差額立暫付鈕：僅 2102 借方且已有沖帳連結但沖不滿時顯示（立帳沖完仍有差額→差額轉 180705） */
+  /* v5.8.5 差額立暫付鈕：僅 2102 借方且已有沖帳連結但沖不滿時顯示（立帳沖完仍有差額→差額轉 180705）
+     v5.8.7 加救回路徑：列已縮至已沖合計但來源單據仍有短少（差額暫付列被誤刪）→ 依單據金額重拆 */
   (() => {
     const offs0 = offsetsOf(L);
     const linked0 = Math.round(offs0.reduce((s, o) => s + (+o.amt || 0), 0) * 100) / 100;
     const need0 = Math.round(((+L.amt || 0) - linked0) * 100) / 100;
     $('modal-split-temp').style.display =
-      (L.dc === 'D' && /^2102/.test(code) && linked0 > 0 && need0 > 0) ? '' : 'none';
+      (L.dc === 'D' && /^2102/.test(code) && linked0 > 0 && (need0 > 0 || recShortOf(L) > 0)) ? '' : 'none';
   })();
   $('modal-mask').style.display = 'block';
   $('modal-box').style.display = 'block';
 }
+/* v5.8.7 來源單據短少額：單據總額 − 全部草稿掛同 srcRec 列的金額合計（跨張分拆一併計入）。
+   >0 ＝有金額未入任何傳票列（如差額暫付列被誤刪、列被縮後差額遺失）→ ✂️ 可依此救回 */
+function recShortOf(L) {
+  const id = L && L.srcRec;
+  if (!id) return 0;
+  const rec = (STATE.records || []).find(x => x.id === id);
+  if (!rec) return 0;
+  let sum = 0;
+  STATE.drafts.forEach(v => (v.lines || []).forEach(x => { if (x.srcRec === id) sum += +x.amt || 0; }));
+  return Math.max(0, Math.round(((+rec.total || 0) - sum) * 100) / 100);
+}
 /* v5.8.5 差額立暫付：沖帳選單內一鍵拆列——本列縮成已沖合計（連結保留），差額拆出新列掛
-   180705 暫付及待結轉帳項（借立帳不需沖，公務預算款未到先墊付情境；手動列可再編輯） */
+   180705 暫付及待結轉帳項（借立帳不需沖，公務預算款未到先墊付情境；手動列可再編輯）
+   v5.8.7 差額＝(本列金額−已沖) ＋ 來源單據短少額：列已縮過但差額列被刪時也能重拆補回 */
 async function splitRemainderToTemp() {
   const { vi, li } = STATE.modalCtx || {};
   const v = STATE.drafts[vi]; if (!v) return;
   const L = v.lines[li]; if (!L) return;
   const offs = offsetsOf(L);
   const linked = Math.round(offs.reduce((s, o) => s + (+o.amt || 0), 0) * 100) / 100;
-  const need = Math.round(((+L.amt || 0) - linked) * 100) / 100;
+  const needRow = Math.max(0, Math.round(((+L.amt || 0) - linked) * 100) / 100);
+  const need = Math.round((needRow + recShortOf(L)) * 100) / 100;
   if (!(linked > 0 && need > 0)) return;
   if (!await confirmAnim(
     `✂️ <b>差額立暫付</b><br><br>本列 <b>${esc(String(L.code))} ${esc(subjectName(L.code))}</b> 金額 ${fmtN(L.amt)}<br>`
@@ -1565,6 +1680,7 @@ async function splitRemainderToTemp() {
   const nl = { seq: 0, dc: 'D', code: '180705', bcode: bcodeFor('180705'), use: '', pkind: '', relate: '',
     scode1: '00001', amt: need, ttype: L.ttype || '2',
     memo: truncBig5((String(L.memo || '').trim() ? String(L.memo || '').trim() + '｜' : '') + '差額暫付待結轉', 1000) };
+  if (L.srcRec) nl.srcRec = L.srcRec;
   v.lines.splice(li + 1, 0, nl);
   v.lines.forEach((x, i) => { x.seq = i + 1; });
   syncBankLine(v);
@@ -2309,6 +2425,50 @@ async function markExported() {
     alert('寫入 D1 失敗（密碼或連線問題），請重試');
     $('ex-mark').disabled = false;
   }
+}
+/* v5.8.7 批次註記已出帳（使用者：一張張勾太累）：單號範圍 → 預覽命中清單 → 確認 → 寫 D1 sba_exported。
+   標記鍵＝單據 id（與正常標記同一機制）→ 選單自動反灰沉底、全選/勾選清理全數沿用 */
+async function batchMarkExported() {
+  const inp = await promptAnim('<b>🏷 批次註記已出帳</b><br><span class="small">輸入動支/請購單「單號範圍」，範圍內尚未匯出的單據將標記為已出帳。<br>'
+    + '格式：<b>0400-0470</b>；可逗號分多段（0400-0470, 0485）；可含年度全碼 115-0400。</span>', '');
+  if (inp == null) return;
+  const defYear = String(new Date().getFullYear() - 1911);
+  const spans = [];
+  for (const tok of String(inp).split(/[,，;；]+/).map(s => s.trim()).filter(Boolean)) {
+    const m = tok.match(/^(?:(\d{3})-)?(\d{1,4})(?:\s*[-~～]\s*(?:(\d{3})-)?(\d{1,4}))?$/);
+    if (!m) { alert(`看不懂的範圍：「${tok}」\n請用 0400-0470 或 115-0400~115-0470 格式`); return; }
+    const y = m[1] || m[3] || defYear;
+    const a = +m[2], b = m[4] != null ? +m[4] : +m[2];
+    spans.push({ y, lo: Math.min(a, b), hi: Math.max(a, b) });
+  }
+  if (!spans.length) return;
+  const hit = [], already = [];
+  for (const r of (STATE.records || [])) {
+    const vm = String(r.voucherNo || '').match(/^(\d{3})-(\d{1,4})$/);
+    if (!vm || r.voided) continue;
+    if (!spans.some(s => vm[1] === s.y && +vm[2] >= s.lo && +vm[2] <= s.hi)) continue;
+    if (STATE.exported[r.id]) { already.push(r.voucherNo); continue; }
+    hit.push(r);
+  }
+  if (!hit.length) { alert(`範圍內沒有可註記的單據${already.length ? `（${already.length} 筆原本就已匯出）` : ''}`); return; }
+  hit.sort((a, b) => String(a.voucherNo).localeCompare(String(b.voucherNo)));
+  const listHtml = hit.map(r =>
+    `<div style="text-align:left; padding:1px 0;">${esc(r.voucherNo)}｜${esc(recDateIso(r))}｜$${fmtN(r.total)}｜${esc(String(r.purposeDesc || '').replace(/\s+/g, ' ').slice(0, 18))}</div>`).join('');
+  const ok = await confirmAnim(
+    `<b>將標記 ${hit.length} 筆為已出帳</b> 合計 $${fmtN(hit.reduce((s, r) => s + (+r.total || 0), 0))}`
+    + (already.length ? `<br><span class="small">（另 ${already.length} 筆原本就已匯出，略過）</span>` : '')
+    + `<div class="small" style="max-height:38vh; overflow:auto; margin-top:6px; border:1px solid #e0d9cc; border-radius:6px; padding:4px 8px;">${listHtml}</div>`
+    + `<span class="small">標記後選單反灰沉底、全選跳過；寫入 D1 後如需取消請再告知。</span>`,
+    '🏷 確認標記', '取消');
+  if (!ok) return;
+  const at = new Date().toISOString();
+  for (const r of hit) {
+    STATE.exported[r.id] = { recno: '', batch: '手動', at, src: 'manual-mark' };
+    STATE.pickSel.delete(String(r.id));
+  }
+  const okA = await putConfig('sba_exported', STATE.exported);
+  if (okA) { savePickSel(); renderExportLog(); renderPickList(); alert(`已註記 ${hit.length} 筆為已出帳`); }
+  else alert('寫入 D1 失敗（密碼或連線問題），請重試');
 }
 function renderExportLog() {
   const rows = Object.entries(STATE.exported)

@@ -4261,6 +4261,16 @@ function checkSuspicious() {
       warns.push(`用途別拆分小計 $${fmtN(splitSum)} 與動支說明總額 $${fmtN(docTotal)} 不符（差 $${fmtN(Math.abs(docTotal - splitSum))}），請確認是否已分配完`);
   }
 
+  /* v5.8.7 110404 醫療用品：發票金額低於單據總額＝疑似 KEY 錯，提醒（≥總額於存檔時逕以總額入檔不提示） */
+  if (document.getElementById('sel-bp')?.value === '110404' && Array.isArray(_payeeCards)) {
+    const inv = _payeeCards.filter(c => (c.name || c.bank || c.acctNo) && (c.receiptType === '2') && (c.invoiceAmount || '').trim());
+    if (inv.length === 1 && total > 0) {
+      const a = parseInt(String(inv[0].invoiceAmount).replace(/[^\d]/g, ''), 10);
+      if (!isNaN(a) && a < total)
+        warns.push(`發票金額 $${fmtN(a)} 小於單據總金額 $${fmtN(total)}，發票金額是否 KEY 錯？請再確認`);
+    }
+  }
+
   /* 9. 機關名稱「台」字（僅比對完整九字） */
   if (/台南市佳里區衛生所/.test(allText))
     warns.push('內容中出現「台南市佳里區衛生所」，正式全銜第一字應為「臺」（臺南市佳里區衛生所），請確認');
@@ -5933,7 +5943,7 @@ function getPayeesData() {
   const type = document.getElementById('payee-type').value;
   if (!type) return [];
   if (type === 'bill') return [{ type: 'bill' }];
-  return _payeeCards
+  const arr = _payeeCards
     .filter(c => c.name || c.bank || c.acctNo)
     .map(c => {
       const o = { type, bank: c.bank||'', acctNo: c.acctNo||'', name: c.name||'', isNew: !!c.isNew };
@@ -5949,6 +5959,16 @@ function getPayeesData() {
       if (rcpt === '1' && ['vendor','nonghui'].includes(type)) o.guiNo = (c.guiNo||'').trim();
       return o;
     });
+  /* v5.8.7 110404 醫療用品：發票面額含折讓，≥單據總額時以總額入檔（單一發票受款人時） */
+  if (document.getElementById('sel-bp')?.value === '110404') {
+    const inv = arr.filter(p => p.receiptType === '2' && (p.invoiceAmount || '').trim());
+    const t = (typeof getCurrentTotal === 'function') ? getCurrentTotal() : 0;
+    if (inv.length === 1 && t > 0) {
+      const a = parseInt(String(inv[0].invoiceAmount).replace(/[^\d]/g, ''), 10);
+      if (!isNaN(a) && a >= t) inv[0].invoiceAmount = String(t);
+    }
+  }
+  return arr;
 }
 /* 舊版相容 — 取第一筆 */
 function getPayeeData() {
