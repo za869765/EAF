@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.8.9';
+const SBA_CORE_VERSION = '5.9.1';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -291,6 +291,9 @@ function validateVoucher(v, opt) {
             const gap = roc7WorkDays(iv.invdate, v.payDate);   /* v5.8.5 使用者指示：73-1 的 15 日＝工作日（排除週六日） */
             if (gap != null && gap >= 15 && !iv.reason)   /* v5.7.27 與 F07 自動填原因界線一致（15日以上含15） */
               W(`${pt}：發票日期 ${iv.invdate} 距製票日逾15工作日（${gap}工作日），F07 將自動填原因「${lateReasonOf(v)}」（採購法73-1）`);
+            /* v5.9.1 發票統編可於預覽手填：非合格 8 碼公司統編時提醒核對（不硬擋） */
+            if (iv.compno && !isValidGui(String(iv.compno)))
+              W(`${pt}：發票統編 ${iv.compno} 非合格 8 碼公司統編，請核對發票（SBA 端可能有邏輯檢查）`);
           });
         }
       }
