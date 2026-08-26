@@ -447,13 +447,16 @@ for (const v of STATE.drafts) for (const L of (v.lines || []))
 /* v5.8.6 差額立暫付列（v5.8.5 曾標 manual）依 v5.7.18 規則轉唯讀（以摘要標記識別） */
 for (const v of STATE.drafts) for (const L of (v.lines || []))
   if (L.manual && /^1807/.test(String(L.code)) && /差額暫付待結轉/.test(String(L.memo || ''))) delete L.manual;
-/* v5.8.7 差額暫付列補 srcRec（舊拆列未帶）：同張內以摘要前綴找來源列——單據覆蓋合計（recShortOf）靠它計算 */
+/* v5.8.7 差額暫付列補 srcRec（舊拆列未帶）：同張內以摘要找來源列——單據覆蓋合計（recShortOf）靠它計算。
+   v5.8.8（Codex 3）：先求完全相等、再退唯一前綴匹配；多重匹配寧缺勿猜（接錯會讓 recShortOf 算到別的單據） */
 for (const v of STATE.drafts) for (const L of (v.lines || []))
   if (!L.srcRec && /^1807/.test(String(L.code)) && /差額暫付待結轉/.test(String(L.memo || ''))) {
     const base = String(L.memo).replace(/｜?差額暫付待結轉[\s\S]*$/, '');
     if (base) {
-      const srcL = (v.lines || []).find(x => x !== L && x.srcRec && String(x.memo || '').startsWith(base));
-      if (srcL) L.srcRec = srcL.srcRec;
+      const cands = (v.lines || []).filter(x => x !== L && x.srcRec && String(x.memo || '').startsWith(base));
+      const exact = cands.filter(x => String(x.memo || '') === base);
+      const pick = exact.length === 1 ? exact[0] : (cands.length === 1 ? cands[0] : null);
+      if (pick) L.srcRec = pick.srcRec;
     }
   }
 /* v5.7.21 立沖/暫付科目不得帶用途別（SBA 實測：210205-2713「未設定於最細層級會計科目設定」整張退）
@@ -1128,6 +1131,7 @@ async function aiFixMemos(btn) {
       .map(P => ({ seq: P.seq, text: P.usedoc, amt: +P.amt || 0 })),
   })).filter(x => (x.main && x.main.trim()) || x.lines.some(L => L.text.trim()) || x.payees.length);
   if (!items.length) { alert('無摘要可修正'); return; }
+  const reqRecnos = STATE.drafts.map(v => String(v.importrecno));   /* v5.8.8：送出當下的索引→傳票號對照 */
   if (btn) btn.disabled = true;   /* fetch 期間鎖鈕防連點重送 */
   $('pv-ai-msg').textContent = '⟳ AI 修正中…（Gemini）';
   try {
@@ -1139,12 +1143,14 @@ async function aiFixMemos(btn) {
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     /* v5.8.7 先審後改（使用者指示）：AI 結果不直接套用，整理成「前→後」對照清單開審核視窗，
-       逐項可編輯/勾選，按「套用」才寫入草稿 */
+       逐項可編輯/勾選，按「套用」才寫入草稿。
+       v5.8.8（Codex 1）：fetch 期間草稿可能被拖拉/刪除——以送出當下的 importrecno 對回傳票，不吃陣列索引 */
     const props = [];
     for (const it of (j.items || [])) {
-      const v = STATE.drafts[+it.id];
+      const rn = reqRecnos[+it.id];
+      const v = rn != null ? STATE.drafts.find(x => String(x.importrecno) === rn) : null;
       if (!v) continue;
-      const p = { vi: +it.id, recno: v.importrecno, items: [] };
+      const p = { recno: rn, items: [] };
       if (it.memo && String(it.memo).trim()) {
         const after = cleanMemoText(it.memo);   /* 不先截斷：檢核警告過長，F03 寫檔時再 truncBig5(100) */
         if (after && after !== String(v.memo || '')) p.items.push({ kind: 'main', label: '主檔摘要', before: v.memo || '', after });
@@ -1227,7 +1233,8 @@ function applyAiReview() {
     const pi = +chk.dataset.pi, xi = +chk.dataset.xi;
     const p = props[pi], x = p && p.items[xi];
     if (!p || !x) return;
-    const v = STATE.drafts[p.vi];
+    /* v5.8.8（Codex 1）：以傳票號回查，草稿被拖拉/刪除也不會套到別張 */
+    const v = STATE.drafts.find(d => String(d.importrecno) === String(p.recno));
     if (!v) return;
     const ta = $(`ai-ta-${pi}-${xi}`);
     const val = String((ta && ta.value) || '').trim();
@@ -1242,9 +1249,9 @@ function applyAiReview() {
       if (!P) return;
       P.usedoc = truncBig5(val, 1000);
     }
-    touched.add(p.vi); n++;
+    touched.add(v); n++;
   });
-  touched.forEach(vi => syncBankLine(STATE.drafts[vi]));
+  touched.forEach(v => syncBankLine(v));
   STATE.aiReview = null;
   closeAiReview(false);
   renderPreview();
@@ -2437,6 +2444,7 @@ async function batchMarkExported() {
   for (const tok of String(inp).split(/[,，;；]+/).map(s => s.trim()).filter(Boolean)) {
     const m = tok.match(/^(?:(\d{3})-)?(\d{1,4})(?:\s*[-~～]\s*(?:(\d{3})-)?(\d{1,4}))?$/);
     if (!m) { alert(`看不懂的範圍：「${tok}」\n請用 0400-0470 或 115-0400~115-0470 格式`); return; }
+    if (m[1] && m[3] && m[1] !== m[3]) { alert(`不支援跨年度範圍：「${tok}」\n請依年度分段輸入（如 114-0900~114-0999, 115-0001~115-0050）`); return; }
     const y = m[1] || m[3] || defYear;
     const a = +m[2], b = m[4] != null ? +m[4] : +m[2];
     spans.push({ y, lo: Math.min(a, b), hi: Math.max(a, b) });
@@ -2461,14 +2469,17 @@ async function batchMarkExported() {
     + `<span class="small">標記後選單反灰沉底、全選跳過；寫入 D1 後如需取消請再告知。</span>`,
     '🏷 確認標記', '取消');
   if (!ok) return;
+  /* v5.8.8（Codex 2）：先寫 D1 成功才落地本機狀態，失敗不殘留（否則重試會被誤判「已匯出」） */
   const at = new Date().toISOString();
-  for (const r of hit) {
-    STATE.exported[r.id] = { recno: '', batch: '手動', at, src: 'manual-mark' };
-    STATE.pickSel.delete(String(r.id));
-  }
-  const okA = await putConfig('sba_exported', STATE.exported);
-  if (okA) { savePickSel(); renderExportLog(); renderPickList(); alert(`已註記 ${hit.length} 筆為已出帳`); }
-  else alert('寫入 D1 失敗（密碼或連線問題），請重試');
+  const merged = { ...STATE.exported };
+  for (const r of hit) merged[r.id] = { recno: '', batch: '手動', at, src: 'manual-mark' };
+  const okA = await putConfig('sba_exported', merged);
+  if (okA) {
+    STATE.exported = merged;
+    for (const r of hit) STATE.pickSel.delete(String(r.id));
+    savePickSel(); renderExportLog(); renderPickList();
+    alert(`已註記 ${hit.length} 筆為已出帳`);
+  } else alert('寫入 D1 失敗（密碼或連線問題），本次未標記任何單據，請重試');
 }
 function renderExportLog() {
   const rows = Object.entries(STATE.exported)
