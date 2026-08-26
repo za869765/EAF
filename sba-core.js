@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.9.5';
+const SBA_CORE_VERSION = '5.9.6';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -262,7 +262,9 @@ function validateVoucher(v, opt) {
       /* v5.7.26 一列多筆限同子目（F04 一列僅一個沖銷子目欄） */
       if (subs.size > 1)
         E(`${lt}：同列多筆沖帳的立帳子目不一致（${[...subs].map(s => s || '空').join('、')}）——F04 一列僅一個沖銷子目，請拆列`);
-      if (Math.round(sum * 100) / 100 !== Math.round((+L.amt || 0) * 100) / 100)   /* v5.7.27 兩側同精度比較 */
+      if (Math.round(sum * 100) > Math.round((+L.amt || 0) * 100))   /* v5.9.6 超沖必錯（匯出展開後金額不守恆，SBA 必擋） */
+        E(`${lt}：沖帳合計(${Math.round(sum * 100) / 100})超過明細金額(${L.amt})——請移除多餘沖帳連結或調整金額`);
+      else if (Math.round(sum * 100) / 100 !== Math.round((+L.amt || 0) * 100) / 100)   /* v5.7.27 兩側同精度比較 */
         W(`${lt}：沖帳合計(${Math.round(sum * 100) / 100})與明細金額(${L.amt})不同（部分沖銷）`);
     }
   });
@@ -419,10 +421,37 @@ function voucherToF05Rows(v) {
       : (P.invamt || 0)),
   }));
 }
+/* v5.9.6 ⚠️SBA 匯入實測（115290014 首戰打臉 v5.7.26 樂觀假設）：匯入端「一明細列僅認一筆沖銷」——
+   同 dtlseq 多筆 F06 會被 SBA 加總後對「每一筆」立帳逐一比對（27,740+5,231=32,971 兩筆都報超額），
+   且明細列被按 F06 筆數重複計算（F04 借方合計灌成 248,671=215,700+32,971）。
+   沖銷資料[]陣列僅 SBA 畫面端支援。修法：匯出前把多筆沖銷列展開＝每個立帳一列（金額=各沖銷額、
+   摘要/科目/子目沿用），部分沖銷殘額保留為無沖銷列，dtlseq 全張重編；金額守恆（F03 不變）；
+   受款人（F05/F07）序號獨立不受影響。草稿與預覽畫面維持一列多筆的操作便利。 */
+function explodeMultiOffsets(v) {
+  const lines = [];
+  let changed = false;
+  for (const L of (v.lines || [])) {
+    const offs = offsetsOf(L);
+    if (offs.length <= 1) { lines.push(L); continue; }
+    changed = true;
+    let usedC = 0;
+    for (const o of offs) {
+      usedC += Math.round((+o.amt || 0) * 100);
+      lines.push({ ...L, amt: Math.round((+o.amt || 0) * 100) / 100, offsets: [o], offset: undefined });
+    }
+    const restC = Math.round((+L.amt || 0) * 100) - usedC;
+    if (restC > 0) {
+      const r = { ...L, amt: restC / 100 };
+      delete r.offsets; delete r.offset;
+      lines.push(r);
+    }
+  }
+  if (!changed) return v;
+  return { ...v, lines: lines.map((L, i) => ({ ...L, seq: i + 1 })) };
+}
 function voucherToF06Rows(v) {
   const rows = [];
   (v.lines || []).forEach((L) => {
-    /* v5.7.26 同 dtlseq 多筆：一列沖多個立帳各產一筆 F06（SBA 沖銷資料[]為陣列，UI 端本可多筆） */
     for (const o of offsetsOf(L)) rows.push({
       fvchtir_year: v.year, fvchtir_kind: v.kind, fvchtir_importrecno: v.importrecno,
       fvchtir_dtlseq: String(L.seq), fvchtir_type: '2',
@@ -473,12 +502,14 @@ function buildExportFiles(vouchers, procDate7, batchTag) {
   if (!/^[1-9A-Z]{2}$/.test(batchTag)) throw new Error('批號須為2碼（1-9、A-Z）');
   const suffix = procDate7 + batchTag;
   const f03 = [], f04 = [], f05 = [], f06 = [], f07 = [];
-  vouchers.forEach((v) => {
+  vouchers.forEach((v0) => {
+    /* v5.9.6 多筆沖銷列僅於匯出時展開（F04/F06 用展開版；F03 金額守恆、F05/F07 受款人序不受影響） */
+    const v = explodeMultiOffsets(v0);
     f03.push(voucherToF03Row(v));
     f04.push(...voucherToF04Rows(v));
-    if (['1','2','5'].includes(String(v.kind))) f05.push(...voucherToF05Rows(v));
+    if (['1','2','5'].includes(String(v0.kind))) f05.push(...voucherToF05Rows(v0));
     f06.push(...voucherToF06Rows(v));
-    if (['2','5'].includes(String(v.kind))) f07.push(...voucherToF07Rows(v));
+    if (['2','5'].includes(String(v0.kind))) f07.push(...voucherToF07Rows(v0));
   });
   const files = {};
   files[`F03${suffix}.XML`] = buildXml(`F03${suffix}`, f03, F03_FIELDS);
@@ -947,7 +978,7 @@ if (typeof module !== 'undefined' && module.exports) {
     FNWACX_SHEET, FNWACX_FUND, FNWACX_HEADERS, payeeToFnwacxRow, buildSbaPayeeIndex, payeeExistsInSba, normPayeeName,
     unzipAll, buildFnwacxFromTemplate, isValidGui, roc7DiffDays,
     resolvePayees, planGrouping, PAY_CAT_LABEL, PAY_CAT_ORDER,
-    voucherToF03Row, voucherToF04Rows, voucherToF05Rows, voucherToF06Rows, voucherToF07Rows,
+    voucherToF03Row, voucherToF04Rows, voucherToF05Rows, voucherToF06Rows, voucherToF07Rows, explodeMultiOffsets,
     buildExportFiles, crc32, buildZip,
   };
 }
