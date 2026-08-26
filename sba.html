@@ -1351,7 +1351,8 @@ function renderPreview() {
           <input class="w-date" placeholder="民國7碼" value="${esc((P.invoices && P.invoices[0] && P.invoices[0].invdate) || '')}" onchange="updInvoice(${vi},${pi},'invdate',this.value)">
           <input class="w-amt" placeholder="金額" value="${(P.invoices && P.invoices[0] && P.invoices[0].invamt) || ''}" onchange="updInvoice(${vi},${pi},'invamt',this.value)"><br>
           <input class="w-code" placeholder="統編" title="發票統一編號（F07）——受款人主檔查無時可在此補" value="${esc((P.invoices && P.invoices[0] && P.invoices[0].compno) || '')}" onchange="updInvoice(${vi},${pi},'compno',this.value)">
-          <input style="width:130px;" placeholder="營業人名稱" title="發票營業人名稱（F07）——代墊等情況可改為實際開票廠商" value="${esc((P.invoices && P.invoices[0] && P.invoices[0].name) || '')}" onchange="updInvoice(${vi},${pi},'name',this.value)">` : ''}</td>
+          <input style="width:130px;" placeholder="營業人名稱" title="發票營業人名稱（F07）——代墊等情況可改為實際開票廠商" value="${esc((P.invoices && P.invoices[0] && P.invoices[0].name) || '')}" onchange="updInvoice(${vi},${pi},'name',this.value)">` : P.rev === '1' ? `
+          <input class="w-code" placeholder="統編" title="受款人統一編號（F05）——代墊時收據開立人統編與受款人不同，可在此改" value="${esc(P.compno || '')}" onchange="updPayee(${vi},${pi},'compno',this.value)">` : ''}</td>
         <td class="small" style="color:#9e9e9e;" title="支票劃線（固定規則：自領否、其餘是）">${P.payway === '2' ? '0否' : '1是'}</td>
         <td class="small" style="color:#9e9e9e;" title="支票禁止背書轉讓（固定：是）">1是</td>
         <td><input class="w-memo" value="${esc(P.usedoc || '')}" onchange="updPayee(${vi},${pi},'usedoc',this.value)"></td>

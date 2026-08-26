@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.9.1';
+const SBA_CORE_VERSION = '5.9.2';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -274,6 +274,9 @@ function validateVoucher(v, opt) {
     payees.forEach((P) => {
       const pt = `${tag} 受款人${P.seq}`;
       if (!P.name) E(`${pt}：名稱空白（持繳費單請填入實際受款單位）`);
+      /* v5.9.2 受款人統編（F05）可於預覽手填（代墊時收據/發票為廠商開立）：非合格統編提醒核對 */
+      if (P.compno && !isValidGui(String(P.compno)))
+        W(`${pt}：受款人統編 ${P.compno} 非合格 8 碼公司統編，請核對原始憑證（SBA 端可能有邏輯檢查）`);
       psum += +P.amt || 0;
       if (P.rev === '2') {
         const invs = P.invoices || [];
