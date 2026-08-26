@@ -3939,6 +3939,8 @@ function validatePayeeCards() {
   const errors = [];
   if (typeof _payeeCards === 'undefined' || !Array.isArray(_payeeCards)) return errors;
   const _guiApplies = ['vendor','nonghui'].includes(document.getElementById('payee-type')?.value || '');
+  /* v5.9.3 代墊統編＝選填（收據為廠商開立）：有填才檢核格式，空白放行 */
+  const _guiAdvance = (document.getElementById('payee-type')?.value || '') === 'employee-advance';
   _payeeCards.forEach((c, idx) => {
     if (!(c.name || c.bank || c.acctNo)) return; // 空卡跳過
     const rcpt = c.receiptType || '1';
@@ -3949,9 +3951,9 @@ function validatePayeeCards() {
       if (!(c.invoiceDate||'').trim())   miss.push('「發票日期」');
       if (!(c.invoiceAmount||'').trim()) miss.push('「發票金額」');
       if (miss.length) errors.push(`${who}選統一發票，但 ${miss.join('、')} 未填`);
-    } else if (rcpt === '1' && _guiApplies) {
+    } else if (rcpt === '1' && (_guiApplies || _guiAdvance)) {
       const g = (c.guiNo||'').trim();
-      if (!g) errors.push(`${who}選 1.普通收據，請輸入「統一編號」，或改選 0.其他相關書據`);
+      if (!g) { if (_guiApplies) errors.push(`${who}選 1.普通收據，請輸入「統一編號」，或改選 0.其他相關書據`); }
       else if (!/^\d{8}$/.test(g)) errors.push(`${who}統一編號須為 8 碼數字`);
       else if (!_isValidGui(g)) errors.push(`${who}統一編號 ${g} 檢核碼不符，請核對收據上的統編（SBA 匯入會擋不合格統編）`);
     }
@@ -5418,8 +5420,10 @@ function renderPayeeCards() {
   const c = document.getElementById('payees-container');
   if (!c) return;
   const _isLockedForm = document.getElementById('form-page')?.classList.contains('locked') && !_payeeEditMode;
-  /* v5.5.3 統編僅廠商類適用（員工/代墊為自然人無統編） */
+  /* v5.5.3 統編僅廠商類適用（員工/代墊為自然人無統編）
+     v5.9.3 代墊改為「選填」顯示：收據/發票為廠商開立，統編與受款人不同，可照原始憑證填 */
   const _guiApplies = ['vendor','nonghui'].includes(document.getElementById('payee-type')?.value || '');
+  const _guiAdvance = (document.getElementById('payee-type')?.value || '') === 'employee-advance';
   c.innerHTML = _payeeCards.map((card, i) => {
     const hasData = card.name || card.bank || card.acctNo;
     const removable = _payeeCards.length > 1;
@@ -5460,9 +5464,10 @@ function renderPayeeCards() {
           <input class="pc-inv-amt" placeholder="發票金額 *" value="${esc(card.invoiceAmount||'')}" ${inpRO}
                  oninput="_payeeCardField(${i}, 'invoiceAmount', this.value)">
         </div>
-        <div class="pc-invoice-row" data-pc-gui="${i}" style="display:${_guiApplies && rcpt==='1'?'flex':'none'}">
-          <input class="pc-gui-no" placeholder="統一編號 *（8碼；無統編請改選 0.其他相關書據）" value="${esc(card.guiNo||'')}" ${inpRO}
+        <div class="pc-invoice-row" data-pc-gui="${i}" style="display:${(_guiApplies || _guiAdvance) && rcpt==='1'?'flex':'none'}; flex-wrap:wrap; align-items:center;">
+          <input class="pc-gui-no" placeholder="${_guiAdvance ? '統一編號（選填；填收據開立廠商的統編）' : '統一編號 *（8碼；無統編請改選 0.其他相關書據）'}" value="${esc(card.guiNo||'')}" ${inpRO}
                  oninput="_pcGuiInput(${i}, this)">
+          <span class="pc-gui-name" data-pc-gui-name="${i}" style="font-size:12px; color:#2e7d32; font-weight:600;">${esc(_guiNameHint(card.guiNo))}</span>
         </div>
       </div>`;
     }
@@ -5494,12 +5499,28 @@ function _payeeCardField(i, key, val) {
 }
 
 /* v5.5.3 普通收據統一編號輸入：僅留數字、最長 8 碼
-   v5.7.30 全形數字（輸入法全形模式）自動轉半形——原本被 \D 直接刪掉，看起來像「打不進去」 */
+   v5.7.30 全形數字（輸入法全形模式）自動轉半形——原本被 \D 直接刪掉，看起來像「打不進去」
+   v5.9.3 輸入滿 8 碼即從受款人資料庫反查廠商名稱顯示於旁（打錯統編當場看得出） */
 function _pcGuiInput(i, el) {
   el.value = el.value
     .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
     .replace(/\D/g, '').slice(0, 8);
   _payeeCardField(i, 'guiNo', el.value);
+  const hint = document.querySelector(`[data-pc-gui-name="${i}"]`);
+  if (hint) {
+    const h = _guiNameHint(el.value);
+    hint.textContent = h;
+    hint.style.color = h.startsWith('✓') ? '#2e7d32' : '#e65100';
+  }
+}
+/* v5.9.3 統編→廠商名稱反查（受款人資料庫 PAYEES 的 code 欄=統編） */
+function _guiNameHint(gui) {
+  const g = String(gui || '').trim();
+  if (g.length !== 8) return '';
+  if (!_isValidGui(g)) return '✗ 檢核碼不符，請核對';
+  const hit = (typeof PAYEES !== 'undefined' && Array.isArray(PAYEES))
+    ? PAYEES.find(p => String(p.code || '').trim() === g) : null;
+  return hit ? `✓ ${hit.name}` : '？資料庫查無此統編（新廠商可存）';
 }
 
 /* v4.4.86 民國日期 onblur 自動 normalize
@@ -5955,8 +5976,8 @@ function getPayeesData() {
         o.invoiceDate = (c.invoiceDate||'').trim();
         o.invoiceAmount = (c.invoiceAmount||'').trim();
       }
-      /* v5.5.3 普通收據統編（僅廠商類；自然人無統編不儲存） */
-      if (rcpt === '1' && ['vendor','nonghui'].includes(type)) o.guiNo = (c.guiNo||'').trim();
+      /* v5.5.3 普通收據統編（廠商類必填；v5.9.3 代墊選填＝收據開立廠商統編） */
+      if (rcpt === '1' && ['vendor','nonghui','employee-advance'].includes(type)) o.guiNo = (c.guiNo||'').trim();
       return o;
     });
   /* v5.8.7 110404 醫療用品：發票面額含折讓，≥單據總額時以總額入檔（單一發票受款人時） */

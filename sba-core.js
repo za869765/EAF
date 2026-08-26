@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.9.2';
+const SBA_CORE_VERSION = '5.9.3';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -762,8 +762,9 @@ function resolvePayees(rec, ctx) {
     /* ctx.catOverride[recId]＝sba.html 六大格手動移組覆寫（整單強制同一付款類別） */
     const payway = (ctx.catOverride && ctx.catOverride[rec.id]) || decidePayway(p, ctx.farmCodes);
     /* v5.5.2 統一編號：由受款人主檔查（帳號優先、姓名後備；僅合格公司統編）→ F05 受款人統編 + F07 發票統編
-       v5.5.3：廠商類＋普通收據時，EAF 單上填的統編（p.guiNo）優先於主檔（其餘情境忽略殘值） */
-    const rawGui = rev === '1' && ['vendor','nonghui'].includes(String(p.type || ''))
+       v5.5.3：廠商類＋普通收據時，EAF 單上填的統編（p.guiNo）優先於主檔（其餘情境忽略殘值）
+       v5.9.3：代墊（employee-advance）＋普通收據亦同——收據為廠商開立，單上選填的廠商統編進 F05 */
+    const rawGui = rev === '1' && ['vendor','nonghui','employee-advance'].includes(String(p.type || ''))
       ? String(p.guiNo || '').trim() : '';
     const gui = isValidGui(rawGui) ? rawGui : (ctx.payeeGuiFor ? String(ctx.payeeGuiFor(p) || '') : '');
     const payee = {
