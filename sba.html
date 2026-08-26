@@ -1054,6 +1054,8 @@ function generateVouchers() {
       const sub = entrySubCode(est.vch, est.ap.seq);
       L.code = est.ap.code;
       L.bcode = bcodeFor(est.ap.code);
+      /* v5.8.4 改掛立沖/暫付科目須同步清用途別與 pkind（v5.7.21 規則；原漏此路徑致 210205 帶用途別報錯） */
+      if (/^(2102|1807|2807)/.test(String(L.code))) { L.use = ''; L.pkind = ''; }
       L.offsets = [{ year: est.vch.slice(0, 3), kind: est.vch.slice(3, 4), vchrno: est.vch,
         seq: est.ap.seq, amt: +L.amt || 0, max: +L.amt || 0, sub }];
       if (sub !== null) L.relate = sub;
