@@ -553,7 +553,8 @@ async function boot() {
   /* v5.5.2 受款人主檔統編查找表（帳號優先、姓名後備）：F05 受款人統編 + F07 發票統編/營業人名稱
      v5.5.4 建表時即以 isValidGui 過濾（身分證/壞碼不進表，避免佔住鍵遮蔽同鍵合格統編） */
   STATE.payeeGuiMap = new Map();
-  STATE.guiNameMap = new Map();   /* v5.9.3 統編→廠商名稱反查（F07 統編輸入自動帶營業人名稱） */
+  STATE.guiNameMap = new Map();   /* v5.9.3 統編→戶名反查（F07 後備帶名；官方登記名稱優先走 /api/gui-lookup） */
+  const _gnFrozen = new Set();    /* v5.9.4（Codex）：現役戶優先，凍結戶僅當後備不遮蔽 */
   for (const p of STATE.payees) {
     const code = String(p.code || '').trim();
     if (!code || !isValidGui(code)) continue;
@@ -562,7 +563,10 @@ async function boot() {
     if (bk && ac && !STATE.payeeGuiMap.has(bk + '|' + ac)) STATE.payeeGuiMap.set(bk + '|' + ac, code);
     const nm = String(p.name || '').replace(/\s/g, '').toUpperCase();
     if (nm && !STATE.payeeGuiMap.has('n:' + nm)) STATE.payeeGuiMap.set('n:' + nm, code);
-    if (String(p.name || '').trim() && !STATE.guiNameMap.has(code)) STATE.guiNameMap.set(code, String(p.name).trim());
+    if (String(p.name || '').trim() && (!STATE.guiNameMap.has(code) || (_gnFrozen.has(code) && !p.frozen))) {
+      STATE.guiNameMap.set(code, String(p.name).trim());
+      if (p.frozen) _gnFrozen.add(code); else _gnFrozen.delete(code);
+    }
   }
   /* 勾選集合開機清理：單已不存在/作廢/已匯出者移除 */
   for (const id of [...STATE.pickSel]) {
@@ -1523,12 +1527,28 @@ function updInvoice(vi, pi, k, val) {
   const P = STATE.drafts[vi].payees[pi];
   if (!P.invoices || !P.invoices.length) P.invoices = [{ invno: '', invdate: '', invamt: 0 }];
   P.invoices[0][k] = k === 'invamt' ? (+String(val).replace(/,/g, '') || 0) : val.trim();
-  /* v5.9.3 輸入合格統編→受款人資料庫反查自動帶入營業人名稱（查無則不動） */
+  /* v5.9.3 輸入合格統編→自動帶入營業人名稱；v5.9.4（使用者指定+Codex）：
+     ①官方登記全名（/api/gui-lookup）優先，受款人資料庫戶名僅為即時後備
+     ②只填「空值/預設受款人名/先前自動帶入」——手動打過的名稱不覆蓋（_nameAuto 標記，手改即清） */
   if (k === 'compno') {
-    const g = P.invoices[0].compno;
-    const nm = (isValidGui(g) && STATE.guiNameMap) ? STATE.guiNameMap.get(g) : '';
-    if (nm) P.invoices[0].name = nm;
+    const iv = P.invoices[0];
+    const g = iv.compno;
+    const canFill = () => {
+      const cur = String(iv.name || '').trim();
+      return !cur || cur === String(P.name || '').trim() || !!iv._nameAuto;
+    };
+    if (isValidGui(g) && canFill()) {
+      const local = STATE.guiNameMap && STATE.guiNameMap.get(g);
+      if (local) { iv.name = local; iv._nameAuto = true; }
+      fetch('/api/gui-lookup?no=' + g).then(r => r.json()).then(d => {
+        if (d && d.name && String(iv.compno) === String(g) && canFill()) {
+          iv.name = d.name; iv._nameAuto = true;
+          saveDrafts(); renderPreview();
+        }
+      }).catch(() => {});
+    }
   }
+  if (k === 'name') delete P.invoices[0]._nameAuto;
   renderPreview();
 }
 function addLine(vi) {

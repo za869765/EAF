@@ -5511,16 +5511,35 @@ function _pcGuiInput(i, el) {
     const h = _guiNameHint(el.value);
     hint.textContent = h;
     hint.style.color = h.startsWith('✓') ? '#2e7d32' : '#e65100';
+    _guiOfficialLookup(el.value, hint);   /* v5.9.4 官方登記全名查詢（戶名僅為後備） */
   }
 }
-/* v5.9.3 統編→廠商名稱反查（受款人資料庫 PAYEES 的 code 欄=統編） */
+/* v5.9.4 統編→官方登記名稱（使用者指定：提示要的是官方統編登記公司全名，受款人資料庫只是銀行戶名）
+   非同步查 /api/gui-lookup（經濟部 GCIS＋g0v 後備）；成功即覆蓋提示，失敗保留戶名提示不打擾 */
+let _guiLookupSeq = 0;
+async function _guiOfficialLookup(gui, hintEl) {
+  const g = String(gui || '').trim();
+  if (g.length !== 8 || !_isValidGui(g)) return;
+  const seq = ++_guiLookupSeq;
+  try {
+    const r = await fetch('/api/gui-lookup?no=' + g);
+    const d = await r.json();
+    if (seq !== _guiLookupSeq || !hintEl.isConnected) return;   /* 已再輸入/卡片重繪→丟棄過期結果 */
+    if (d && d.name) { hintEl.textContent = `✓ 官方登記：${d.name}`; hintEl.style.color = '#2e7d32'; }
+    else if ((hintEl.textContent || '').startsWith('？')) hintEl.textContent = '？查無登記資料，請核對統編';
+  } catch (_) { /* 連線失敗→保留原提示 */ }
+}
+/* v5.9.3 統編→戶名反查（受款人資料庫 PAYEES 的 code 欄=統編）
+   v5.9.4：⚠️戶名≠營業人登記名稱（使用者指正，戶名可能帶負責人名）——標示「戶名」僅供核對打字；
+   現役（未凍結）優先於凍結戶 */
 function _guiNameHint(gui) {
   const g = String(gui || '').trim();
   if (g.length !== 8) return '';
   if (!_isValidGui(g)) return '✗ 檢核碼不符，請核對';
-  const hit = (typeof PAYEES !== 'undefined' && Array.isArray(PAYEES))
-    ? PAYEES.find(p => String(p.code || '').trim() === g) : null;
-  return hit ? `✓ ${hit.name}` : '？資料庫查無此統編（新廠商可存）';
+  const all = (typeof PAYEES !== 'undefined' && Array.isArray(PAYEES))
+    ? PAYEES.filter(p => String(p.code || '').trim() === g) : [];
+  const hit = all.find(p => !p.frozen) || all[0];
+  return hit ? `✓ 戶名：${hit.name}` : '？資料庫查無此統編（新廠商可存）';
 }
 
 /* v4.4.86 民國日期 onblur 自動 normalize
@@ -5551,7 +5570,8 @@ function _togglePcInvoice(i, type) {
   /* v5.5.3 普通收據（僅廠商類）→ 顯示統一編號格；切離時清空避免殘留 */
   const grow = c?.querySelector(`.pc-invoice-row[data-pc-gui="${i}"]`);
   if (grow) {
-    const guiOn = type === '1' && ['vendor','nonghui'].includes(document.getElementById('payee-type')?.value || '');
+    /* v5.9.4（Codex）：代墊也適用統編格——切走再切回不再消失 */
+    const guiOn = type === '1' && ['vendor','nonghui','employee-advance'].includes(document.getElementById('payee-type')?.value || '');
     grow.style.display = guiOn ? 'flex' : 'none';
     if (!guiOn) {
       if (_payeeCards[i]) _payeeCards[i].guiNo = '';
