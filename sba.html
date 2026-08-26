@@ -431,6 +431,9 @@ const STATE = {
    舊拆列已連結沖帳或摘要含「(分攤)」者視為衍生列，清 manual 回復唯讀檢視（真正手動加的空白列不受影響） */
 for (const v of STATE.drafts) for (const L of (v.lines || []))
   if (L.manual && (L.offset || /\(分攤\)/.test(String(L.memo || '')))) delete L.manual;
+/* v5.8.6 差額立暫付列（v5.8.5 曾標 manual）依 v5.7.18 規則轉唯讀（以摘要標記識別） */
+for (const v of STATE.drafts) for (const L of (v.lines || []))
+  if (L.manual && /^1807/.test(String(L.code)) && /差額暫付待結轉/.test(String(L.memo || ''))) delete L.manual;
 /* v5.7.21 立沖/暫付科目不得帶用途別（SBA 實測：210205-2713「未設定於最細層級會計科目設定」整張退）
    ——舊草稿一併清（改科目時 updLine 也會清） */
 for (const v of STATE.drafts) for (const L of (v.lines || []))
@@ -1558,10 +1561,10 @@ async function splitRemainderToTemp() {
     + `差額 <b>${fmtN(need)}</b> 拆出新列掛 <b>180705 暫付及待結轉帳項</b>（借立帳、不需沖帳，待公務預算款到再沖轉）。`,
     '✂️ 拆列立暫付', '取消')) return;
   L.amt = linked;
+  /* v5.8.6 依 v5.7.18 規則：拆列衍生列唯讀檢視、不標 manual（v5.8.5 曾誤標致出現輸入框） */
   const nl = { seq: 0, dc: 'D', code: '180705', bcode: bcodeFor('180705'), use: '', pkind: '', relate: '',
     scode1: '00001', amt: need, ttype: L.ttype || '2',
-    memo: truncBig5((String(L.memo || '').trim() ? String(L.memo || '').trim() + '｜' : '') + '差額暫付待結轉', 1000),
-    manual: true };
+    memo: truncBig5((String(L.memo || '').trim() ? String(L.memo || '').trim() + '｜' : '') + '差額暫付待結轉', 1000) };
   v.lines.splice(li + 1, 0, nl);
   v.lines.forEach((x, i) => { x.seq = i + 1; });
   syncBankLine(v);
@@ -1929,6 +1932,24 @@ async function pickOffset(vchrno, seq, avail, dseq) {
   /* 同子目（或首筆）：本列（加）沖，一列多筆免拆列（v5.7.26，同 dtlseq 多筆 F06）；
      可用額不足 → 先沖可用額、自動重開視窗續選下一筆 */
   const grant = Math.min(need, cap);
+  /* v5.8.6 同列重複選同一立帳 → 合併並以可沖上限封頂（原本直接 push 疊加，差額續選連點兩次
+     同一筆會超沖，匯出才被跨列累計檢核擋下） */
+  const dup = offs.find(o => String(o.vchrno) === String(vchrno) && +o.seq === +seq);
+  if (dup) {
+    const capMax = +dup.max || cap || 0;
+    const room = Math.round((capMax - (+dup.amt || 0)) * 100) / 100;
+    if (room <= 0) {
+      closeModal(); renderPreview();
+      await confirmAnim(`此立帳 <b>${esc(String(vchrno))}#${esc(String(seq))}</b> 本列已沖至上限 ${fmtN(capMax)}，不可重複加沖。<br>差額請改沖其他立帳，或用「✂️ 差額立暫付」轉 180705。`, '知道了', '關閉');
+      return;
+    }
+    const add = Math.min(need, room);
+    dup.amt = Math.round(((+dup.amt || 0) + add) * 100) / 100;
+    L.offsets = offs; delete L.offset;
+    closeModal(); renderPreview();
+    if (add < need) openOffsetModal(vi, li);
+    return;
+  }
   offs.push({ year: String(vchrno).slice(0, 3), kind: String(vchrno).slice(3, 4),
     vchrno: String(vchrno), seq, amt: grant, max: cap, sub });
   L.offsets = offs; delete L.offset;

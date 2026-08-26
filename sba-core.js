@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '5.8.5';
+const SBA_CORE_VERSION = '5.8.6';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -320,19 +320,20 @@ function validateBatch(vouchers, opt) {
   });
   /* v5.7.27（Codex C5d）：同一立帳被多列/多張引用時，跨列累計不得超過該立帳可沖上限
      （逐筆各自 ≤ max 仍可能合計超沖；上限取各引用所記 max 的最大值——皆為官方未沖額快照） */
-  const accum = new Map();   /* vch#seq → {sum, max} */
+  const accum = new Map();   /* vch#seq → {sum, max, refs[]} */
   vouchers.forEach((v) => (v.lines || []).forEach((L) => {
     for (const o of offsetsOf(L)) {
       const k = String(o.vchrno) + '#' + o.seq;
-      const a = accum.get(k) || { sum: 0, max: null };
+      const a = accum.get(k) || { sum: 0, max: null, refs: [] };
       a.sum += +o.amt || 0;
       if (o.max != null) a.max = a.max == null ? +o.max : Math.max(a.max, +o.max);
+      a.refs.push(`傳票${v.importrecno} 序${L.seq} 沖${+o.amt || 0}`);   /* v5.8.6 點名引用列，方便定位多餘連結 */
       accum.set(k, a);
     }
   }));
   for (const [k, a] of accum) {
     if (a.max != null && Math.round(a.sum * 100) / 100 > a.max)
-      errors.push(`沖帳跨列累計超額：立帳 ${k} 可沖上限 ${a.max}，本批合計沖 ${Math.round(a.sum * 100) / 100}`);
+      errors.push(`沖帳跨列累計超額：立帳 ${k} 可沖上限 ${a.max}，本批合計沖 ${Math.round(a.sum * 100) / 100}（${a.refs.join('、')}）——請於點名列 ✕ 移除多餘沖帳連結`);
   }
   return { errors, warnings };
 }
