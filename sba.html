@@ -247,8 +247,9 @@ window.addEventListener('storage', (ev) => {
       <span class="small" id="pk-hitinfo" style="font-weight:700; color:#a84e2f;"></span>
     </div>
     <div class="toolbar" style="margin-bottom:2px;">
-      <button class="btn btn-sm" onclick="clearPickSel()">✖ 清除勾選</button>
-      <button class="btn btn-sm" onclick="batchMarkExported()" title="將已勾選的單據批次標記為已出帳（反灰沉底、全選跳過）；未勾選時可改輸入單號範圍">🏷 批次註記已出帳</button>
+      <button class="btn btn-sm" id="pk-clear-sel" onclick="clearPickSel()" style="display:none;">✖ 清除勾選</button>
+      <button class="btn btn-sm" onclick="batchMarkExported()" title="將已勾選的單據批次標記為已出帳（反灰沉底、全選跳過）；未勾選時可改輸入單號範圍">🏷 註記已出帳</button>
+      <button class="btn btn-sm" onclick="batchUnmarkExported()" title="將已勾選的已出帳（反灰）單據還原為未出帳；未勾選時可改輸入單號範圍">↩️ 還原未出帳</button>
       <span class="small" id="pk-summary">尚未勾選</span>
     </div>
     <div class="grp-grid" id="pk-groups"></div>
@@ -810,9 +811,10 @@ function renderPickList() {
       .sort((a, b) => PAY_CAT_ORDER.indexOf(a) - PAY_CAT_ORDER.indexOf(b));
     const effCat = cats[0] || '2';
     const key = (r.acctCode || '') + '|' + effCat;
-    if (!byKey.has(key)) byKey.set(key, { recs: [], sum: 0 });
+    if (!byKey.has(key)) byKey.set(key, { recs: [], sum: 0, liveN: 0 });
     byKey.get(key).recs.push({ r, effCat });
-    byKey.get(key).sum += +r.total || 0;
+    /* v5.9.8 卡片頭筆數/金額只計未出帳（使用者指定；已匯出反灰列仍列於表內） */
+    if (!STATE.exported[r.id]) { byKey.get(key).sum += +r.total || 0; byKey.get(key).liveN++; }
     if (!STATE.exported[r.id]) for (const p of ps) {
       const nm = String(p.name || '').replace(/\s/g, '');
       if (nm && catPayees[p.payway] && !ownAcctRe.test(nm)) catPayees[p.payway].add(nm);
@@ -829,7 +831,7 @@ function renderPickList() {
     : '';
   $('pk-groups').innerHTML = PAY_CAT_ORDER.map(cat => accts.map(acct => {
     const key = acct + '|' + cat;
-    const g = byKey.get(key) || { recs: [], sum: 0 };
+    const g = byKey.get(key) || { recs: [], sum: 0, liveN: 0 };
     /* 已匯出(反灰)恆墊底，其餘依表頭選定欄位排序 */
     g.recs.sort((a, b) => ((STATE.exported[a.r.id] ? 1 : 0) - (STATE.exported[b.r.id] ? 1 : 0)) || pickCmp(a.r, b.r));
     const open = openAll ? g.recs.length > 0 : STATE.openGrp === key;
@@ -853,7 +855,7 @@ function renderPickList() {
         <span class="chip exp">${esc(PAY_CAT_LABEL[cat])}</span>
         ${pcnt}
         <span class="chip pk-selcount" data-grp="${esc(key)}" style="display:none;"></span>
-        <span class="gcard-n">${g.recs.length} 筆 <b>$${fmtN(g.sum)}</b></span>
+        <span class="gcard-n">${g.liveN} 筆 <b>$${fmtN(g.sum)}</b></span>
         <span class="gcard-arrow">${open ? '▾ 收合' : '▸ 展開'}</span>
       </div>
       <div class="gcard-body">${body}</div>
@@ -973,17 +975,23 @@ function togglePickRec(cb) {
   const tr = cb.closest('tr'); if (tr) tr.classList.toggle('row-sel', cb.checked);
   savePickSel(); updatePickSummary();
 }
-/* 全選此組一律跳過已匯出（反灰）列 */
+/* 全選此組一律跳過已匯出（反灰）列；整組皆已匯出時改作用於反灰列（v5.9.8，供「還原未出帳」勾選）。
+   v5.9.8 動作改依「列實況」決定（有未勾的→全勾；已全勾→全取消），不依賴全選框自身 checked 狀態，
+   任何狀態不同步都不會出現「點了沒反應」 */
 function toggleGroupPick(cb) {
   /* 用 JS 過濾而非把 dataset 值內插進選擇器：acctCode 來自 /api/records（無認證可寫），
      值含引號會讓 querySelectorAll 拋 SyntaxError、整個勾選功能中斷 */
-  [...document.querySelectorAll('.pk-cb')]
-    .filter(x => x.dataset.grp === cb.dataset.grp && !x.hasAttribute('data-exported'))
-    .forEach(x => {
-      x.checked = cb.checked;
-      if (cb.checked) STATE.pickSel.add(String(x.value)); else STATE.pickSel.delete(String(x.value));
-      const tr = x.closest('tr'); if (tr) tr.classList.toggle('row-sel', cb.checked);
-    });
+  const all = [...document.querySelectorAll('.pk-cb')].filter(x => x.dataset.grp === cb.dataset.grp);
+  let rows = all.filter(x => !x.hasAttribute('data-exported'));
+  if (!rows.length) rows = all;
+  if (!rows.length) return;
+  const target = rows.some(x => !x.checked);
+  rows.forEach(x => {
+    x.checked = target;
+    if (target) STATE.pickSel.add(String(x.value)); else STATE.pickSel.delete(String(x.value));
+    const tr = x.closest('tr'); if (tr) tr.classList.toggle('row-sel', target);
+  });
+  cb.checked = target; cb.indeterminate = false;
   savePickSel(); updatePickSummary();
 }
 function clearPickSel() {
@@ -1034,25 +1042,37 @@ function updatePickSummary() {
     /* 「全選」框依實況重算：部分勾選＝半選，避免取消個別列後表頭仍顯示全選而誤導 */
     const gcb = [...document.querySelectorAll('.grp-cb')].find(c => c.dataset.grp === elm.dataset.grp);
     if (gcb) {
-      const sel2 = mine.filter(c => !c.hasAttribute('data-exported'));   /* 全選此組跳過已匯出，基準一致 */
+      let sel2 = mine.filter(c => !c.hasAttribute('data-exported'));   /* 全選此組跳過已匯出，基準一致 */
+      if (!sel2.length) sel2 = mine;   /* 整組已匯出：以反灰列為基準（還原未出帳勾選） */
       const on = sel2.filter(c => c.checked).length;
       gcb.checked = sel2.length > 0 && on === sel2.length;
       gcb.indeterminate = on > 0 && on < sel2.length;
     }
   });
   const sel = selectedRecords();
+  /* v5.9.8 清除勾選鈕：有勾選才顯示 */
+  const clrBtn = $('pk-clear-sel');
+  if (clrBtn) clrBtn.style.display = sel.length ? '' : 'none';
   if (!sel.length) { $('pk-summary').textContent = '尚未勾選'; return; }
+  /* v5.9.8 已出帳（反灰）勾選＝僅供「還原未出帳」，不進製票摘要與產傳票 */
+  const live = sel.filter(r => !STATE.exported[r.id]);
+  const expN = sel.length - live.length;
+  if (!live.length) {
+    $('pk-summary').innerHTML = `<div class="sel-banner"><b>✔ 已勾選 ${expN} 筆已出帳單據</b>｜<span class="small">可按「↩️ 還原未出帳」取消註記；已出帳單據不會產生傳票</span></div>`;
+    return;
+  }
   /* 依「將產生的每張支出傳票」分組顯示各自的單號/筆數/金額；重建節點觸發動畫 */
-  const plan = planGrouping(sel, mapCtx());
-  const recById = new Map(sel.map(r => [r.id, r]));
+  const plan = planGrouping(live, mapCtx());
+  const recById = new Map(live.map(r => [r.id, r]));
   const lines = plan.map(g => {
     const nos = [...g.recIds].map(id => (recById.get(id) || {}).voucherNo).filter(Boolean);
     const shown = nos.slice(0, 10).join('、') + (nos.length > 10 ? `…等${nos.length}筆` : '');
     return `<div class="sel-line"><span class="chip ${g.acct === '11010202' ? 'cust' : 'fund'}">${esc(subjectName(g.acct) || g.acct)}</span>
       <span class="chip exp">${esc(g.catLabel)}</span> ${g.n} 筆 <b>$${fmtN(g.sum)}</b>｜<span class="small">${esc(shown)}</span></div>`;
   }).join('');
-  const total = sel.reduce((s, r) => s + (+r.total || 0), 0);
-  $('pk-summary').innerHTML = `<div class="sel-banner"><b>✔ 已勾選 ${sel.length} 筆・合計 $${fmtN(total)} → 將產生 ${plan.length} 張支出傳票</b>${lines}</div>`;
+  const total = live.reduce((s, r) => s + (+r.total || 0), 0);
+  const expNote = expN ? `<div class="sel-line small">另勾 ${expN} 筆已出帳（僅供還原未出帳，不製票）</div>` : '';
+  $('pk-summary').innerHTML = `<div class="sel-banner"><b>✔ 已勾選 ${live.length} 筆・合計 $${fmtN(total)} → 將產生 ${plan.length} 張支出傳票</b>${lines}${expNote}</div>`;
 }
 function nextRecnoFor(kind, year) {
   year = year || rocYearNow();   /* 序號年段與傳票年度一致（validateVoucher 檢核 importrecno 前4碼＝year+kind） */
@@ -1066,8 +1086,11 @@ function nextRecnoFor(kind, year) {
   return pfx + String(base + 1).padStart(5, '0');
 }
 function generateVouchers() {
-  const sel = selectedRecords();
-  if (!sel.length) { alert('請先勾選單據'); return; }
+  /* v5.9.8 已出帳（反灰）勾選只供還原未出帳，製票一律排除，防重複入帳 */
+  const sel = selectedRecords().filter(r => !STATE.exported[r.id]);
+  if (!sel.length) { alert('請先勾選未出帳的單據'); return; }
+  /* v5.9.8 明細順序＝選單製票畫面當下排序（pickCmp＋日期新→舊墊底），預覽與 SBA 匯出檔同步沿用 */
+  sel.sort((a, b) => pickCmp(a, b) || (recDateIso(b) || '').localeCompare(recDateIso(a) || ''));
   const payIso = $('pk-paydate').value;
   if (!payIso) { alert('請選製票日期'); return; }
   /* 防重複產票（v5.7.8）：已產過草稿的單據自動略過、只產未重複的；要重產請先刪舊草稿 */
@@ -2464,6 +2487,26 @@ async function markExported() {
     $('ex-mark').disabled = false;
   }
 }
+/* 單號範圍字串 → spans（共用：註記已出帳／還原未出帳）；格式錯誤 alert 後回 null */
+function parseVoucherSpans(inp) {
+  const defYear = String(new Date().getFullYear() - 1911);
+  const spans = [];
+  for (const tok of String(inp).split(/[,，;；]+/).map(s => s.trim()).filter(Boolean)) {
+    const m = tok.match(/^(?:(\d{3})-)?(\d{1,4})(?:\s*[-~～]\s*(?:(\d{3})-)?(\d{1,4}))?$/);
+    if (!m) { alert(`看不懂的範圍：「${tok}」\n請用 0400-0470 或 115-0400~115-0470 格式`); return null; }
+    if (m[1] && m[3] && m[1] !== m[3]) { alert(`不支援跨年度範圍：「${tok}」\n請依年度分段輸入（如 114-0900~114-0999, 115-0001~115-0050）`); return null; }
+    const y = m[1] || m[3] || defYear;
+    const a = +m[2], b = m[4] != null ? +m[4] : +m[2];
+    spans.push({ y, lo: Math.min(a, b), hi: Math.max(a, b) });
+  }
+  return spans;
+}
+function recsInSpans(spans) {
+  return (STATE.records || []).filter(r => {
+    const vm = String(r.voucherNo || '').match(/^(\d{3})-(\d{1,4})$/);
+    return vm && !r.voided && spans.some(s => vm[1] === s.y && +vm[2] >= s.lo && +vm[2] <= s.hi);
+  });
+}
 /* v5.8.7 批次註記已出帳（使用者：一張張勾太累）：預覽命中清單 → 確認 → 寫 D1 sba_exported。
    v5.9.7 以勾選為準（使用者：條件應是介面上批次勾選，不是彈窗輸入）：選單有勾選 → 直接以勾選單據為對象；
    完全沒勾選才退回「單號範圍」輸入當後備（大量歷史單免逐筆勾）。
@@ -2479,25 +2522,13 @@ async function batchMarkExported() {
     }
     if (!hit.length) { alert(`勾選的單據沒有可註記的${already.length ? `（${already.length} 筆原本就已匯出）` : ''}`); return; }
   } else {
-    const inp = await promptAnim('<b>🏷 批次註記已出帳</b><br><span class="small">未勾選任何單據，改以「單號範圍」註記：範圍內尚未匯出的單據將標記為已出帳。<br>'
+    const inp = await promptAnim('<b>🏷 註記已出帳</b><br><span class="small">未勾選任何單據，改以「單號範圍」註記：範圍內尚未匯出的單據將標記為已出帳。<br>'
       + '（也可先取消，回選單勾選要註記的單據再按此鈕）<br>'
       + '格式：<b>0400-0470</b>；可逗號分多段（0400-0470, 0485）；可含年度全碼 115-0400。</span>', '');
     if (inp == null) return;
-    const defYear = String(new Date().getFullYear() - 1911);
-    const spans = [];
-    for (const tok of String(inp).split(/[,，;；]+/).map(s => s.trim()).filter(Boolean)) {
-      const m = tok.match(/^(?:(\d{3})-)?(\d{1,4})(?:\s*[-~～]\s*(?:(\d{3})-)?(\d{1,4}))?$/);
-      if (!m) { alert(`看不懂的範圍：「${tok}」\n請用 0400-0470 或 115-0400~115-0470 格式`); return; }
-      if (m[1] && m[3] && m[1] !== m[3]) { alert(`不支援跨年度範圍：「${tok}」\n請依年度分段輸入（如 114-0900~114-0999, 115-0001~115-0050）`); return; }
-      const y = m[1] || m[3] || defYear;
-      const a = +m[2], b = m[4] != null ? +m[4] : +m[2];
-      spans.push({ y, lo: Math.min(a, b), hi: Math.max(a, b) });
-    }
-    if (!spans.length) return;
-    for (const r of (STATE.records || [])) {
-      const vm = String(r.voucherNo || '').match(/^(\d{3})-(\d{1,4})$/);
-      if (!vm || r.voided) continue;
-      if (!spans.some(s => vm[1] === s.y && +vm[2] >= s.lo && +vm[2] <= s.hi)) continue;
+    const spans = parseVoucherSpans(inp);
+    if (!spans || !spans.length) return;
+    for (const r of recsInSpans(spans)) {
       if (STATE.exported[r.id]) { already.push(r.voucherNo); continue; }
       hit.push(r);
     }
@@ -2524,6 +2555,49 @@ async function batchMarkExported() {
     savePickSel(); renderExportLog(); renderPickList();
     alert(`已註記 ${hit.length} 筆為已出帳`);
   } else alert('寫入 D1 失敗（密碼或連線問題），本次未標記任何單據，請重試');
+}
+/* v5.9.8 還原未出帳（勾選方式比照註記已出帳）：勾選的已出帳（反灰）單據 → 預覽確認 → 自 D1 sba_exported 移除註記；
+   完全沒勾選才退回「單號範圍」輸入當後備。還原後單據恢復可勾選製票 */
+async function batchUnmarkExported() {
+  const hit = [], skipped = [];
+  const picked = selectedRecords();
+  if (picked.length) {
+    for (const r of picked) {
+      if (STATE.exported[r.id]) hit.push(r); else skipped.push(r.voucherNo);
+    }
+    if (!hit.length) { alert('勾選的單據都不是已出帳，無可還原\n（要還原請勾選反灰的已出帳單據）'); return; }
+  } else {
+    const inp = await promptAnim('<b>↩️ 還原未出帳</b><br><span class="small">未勾選任何單據，改以「單號範圍」還原：範圍內已出帳的單據將取消註記、恢復可勾選製票。<br>'
+      + '（也可先取消，回選單勾選反灰的已出帳單據再按此鈕）<br>'
+      + '格式：<b>0400-0470</b>；可逗號分多段（0400-0470, 0485）；可含年度全碼 115-0400。</span>', '');
+    if (inp == null) return;
+    const spans = parseVoucherSpans(inp);
+    if (!spans || !spans.length) return;
+    for (const r of recsInSpans(spans)) if (STATE.exported[r.id]) hit.push(r);
+    if (!hit.length) { alert('範圍內沒有已出帳的單據'); return; }
+  }
+  hit.sort((a, b) => String(a.voucherNo).localeCompare(String(b.voucherNo)));
+  const listHtml = hit.map(r => {
+    const e = STATE.exported[r.id] || {};
+    return `<div style="text-align:left; padding:1px 0;">${esc(r.voucherNo)}｜${esc(recDateIso(r))}｜$${fmtN(r.total)}｜${esc(e.recno ? `已匯出 ${e.recno}（批 ${e.batch || ''}）` : '手動註記')}</div>`;
+  }).join('');
+  const ok = await confirmAnim(
+    `<b>將還原 ${hit.length} 筆為未出帳</b> 合計 $${fmtN(hit.reduce((s, r) => s + (+r.total || 0), 0))}`
+    + (skipped.length ? `<br><span class="small">（另 ${skipped.length} 筆本來就未出帳，略過）</span>` : '')
+    + `<div class="small" style="max-height:38vh; overflow:auto; margin-top:6px; border:1px solid #e0d9cc; border-radius:6px; padding:4px 8px;">${listHtml}</div>`
+    + `<span class="small">僅取消系統內註記，已匯入 SBA 的傳票不受影響；列「已匯出」批次者請先確認 SBA 端未入帳再還原，以免重複製票。</span>`,
+    '↩️ 確認還原', '取消');
+  if (!ok) return;
+  /* 比照 v5.8.8：先寫 D1 成功才落地本機狀態，失敗零殘留 */
+  const merged = { ...STATE.exported };
+  for (const r of hit) delete merged[r.id];
+  const okA = await putConfig('sba_exported', merged);
+  if (okA) {
+    STATE.exported = merged;
+    for (const r of hit) STATE.pickSel.delete(String(r.id));
+    savePickSel(); renderExportLog(); renderPickList();
+    alert(`已還原 ${hit.length} 筆為未出帳`);
+  } else alert('寫入 D1 失敗（密碼或連線問題），本次未還原任何單據，請重試');
 }
 function renderExportLog() {
   const rows = Object.entries(STATE.exported)
