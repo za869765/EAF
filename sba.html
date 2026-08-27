@@ -248,7 +248,7 @@ window.addEventListener('storage', (ev) => {
     </div>
     <div class="toolbar" style="margin-bottom:2px;">
       <button class="btn btn-sm" onclick="clearPickSel()">✖ 清除勾選</button>
-      <button class="btn btn-sm" onclick="batchMarkExported()" title="輸入單號範圍，批次將範圍內單據標記為已出帳（反灰沉底、全選跳過）">🏷 批次註記已出帳</button>
+      <button class="btn btn-sm" onclick="batchMarkExported()" title="將已勾選的單據批次標記為已出帳（反灰沉底、全選跳過）；未勾選時可改輸入單號範圍">🏷 批次註記已出帳</button>
       <span class="small" id="pk-summary">尚未勾選</span>
     </div>
     <div class="grp-grid" id="pk-groups"></div>
@@ -2464,32 +2464,45 @@ async function markExported() {
     $('ex-mark').disabled = false;
   }
 }
-/* v5.8.7 批次註記已出帳（使用者：一張張勾太累）：單號範圍 → 預覽命中清單 → 確認 → 寫 D1 sba_exported。
+/* v5.8.7 批次註記已出帳（使用者：一張張勾太累）：預覽命中清單 → 確認 → 寫 D1 sba_exported。
+   v5.9.7 以勾選為準（使用者：條件應是介面上批次勾選，不是彈窗輸入）：選單有勾選 → 直接以勾選單據為對象；
+   完全沒勾選才退回「單號範圍」輸入當後備（大量歷史單免逐筆勾）。
    標記鍵＝單據 id（與正常標記同一機制）→ 選單自動反灰沉底、全選/勾選清理全數沿用 */
 async function batchMarkExported() {
-  const inp = await promptAnim('<b>🏷 批次註記已出帳</b><br><span class="small">輸入動支/請購單「單號範圍」，範圍內尚未匯出的單據將標記為已出帳。<br>'
-    + '格式：<b>0400-0470</b>；可逗號分多段（0400-0470, 0485）；可含年度全碼 115-0400。</span>', '');
-  if (inp == null) return;
-  const defYear = String(new Date().getFullYear() - 1911);
-  const spans = [];
-  for (const tok of String(inp).split(/[,，;；]+/).map(s => s.trim()).filter(Boolean)) {
-    const m = tok.match(/^(?:(\d{3})-)?(\d{1,4})(?:\s*[-~～]\s*(?:(\d{3})-)?(\d{1,4}))?$/);
-    if (!m) { alert(`看不懂的範圍：「${tok}」\n請用 0400-0470 或 115-0400~115-0470 格式`); return; }
-    if (m[1] && m[3] && m[1] !== m[3]) { alert(`不支援跨年度範圍：「${tok}」\n請依年度分段輸入（如 114-0900~114-0999, 115-0001~115-0050）`); return; }
-    const y = m[1] || m[3] || defYear;
-    const a = +m[2], b = m[4] != null ? +m[4] : +m[2];
-    spans.push({ y, lo: Math.min(a, b), hi: Math.max(a, b) });
-  }
-  if (!spans.length) return;
   const hit = [], already = [];
-  for (const r of (STATE.records || [])) {
-    const vm = String(r.voucherNo || '').match(/^(\d{3})-(\d{1,4})$/);
-    if (!vm || r.voided) continue;
-    if (!spans.some(s => vm[1] === s.y && +vm[2] >= s.lo && +vm[2] <= s.hi)) continue;
-    if (STATE.exported[r.id]) { already.push(r.voucherNo); continue; }
-    hit.push(r);
+  const picked = selectedRecords();
+  if (picked.length) {
+    for (const r of picked) {
+      if (r.voided) continue;
+      if (STATE.exported[r.id]) { already.push(r.voucherNo); continue; }
+      hit.push(r);
+    }
+    if (!hit.length) { alert(`勾選的單據沒有可註記的${already.length ? `（${already.length} 筆原本就已匯出）` : ''}`); return; }
+  } else {
+    const inp = await promptAnim('<b>🏷 批次註記已出帳</b><br><span class="small">未勾選任何單據，改以「單號範圍」註記：範圍內尚未匯出的單據將標記為已出帳。<br>'
+      + '（也可先取消，回選單勾選要註記的單據再按此鈕）<br>'
+      + '格式：<b>0400-0470</b>；可逗號分多段（0400-0470, 0485）；可含年度全碼 115-0400。</span>', '');
+    if (inp == null) return;
+    const defYear = String(new Date().getFullYear() - 1911);
+    const spans = [];
+    for (const tok of String(inp).split(/[,，;；]+/).map(s => s.trim()).filter(Boolean)) {
+      const m = tok.match(/^(?:(\d{3})-)?(\d{1,4})(?:\s*[-~～]\s*(?:(\d{3})-)?(\d{1,4}))?$/);
+      if (!m) { alert(`看不懂的範圍：「${tok}」\n請用 0400-0470 或 115-0400~115-0470 格式`); return; }
+      if (m[1] && m[3] && m[1] !== m[3]) { alert(`不支援跨年度範圍：「${tok}」\n請依年度分段輸入（如 114-0900~114-0999, 115-0001~115-0050）`); return; }
+      const y = m[1] || m[3] || defYear;
+      const a = +m[2], b = m[4] != null ? +m[4] : +m[2];
+      spans.push({ y, lo: Math.min(a, b), hi: Math.max(a, b) });
+    }
+    if (!spans.length) return;
+    for (const r of (STATE.records || [])) {
+      const vm = String(r.voucherNo || '').match(/^(\d{3})-(\d{1,4})$/);
+      if (!vm || r.voided) continue;
+      if (!spans.some(s => vm[1] === s.y && +vm[2] >= s.lo && +vm[2] <= s.hi)) continue;
+      if (STATE.exported[r.id]) { already.push(r.voucherNo); continue; }
+      hit.push(r);
+    }
+    if (!hit.length) { alert(`範圍內沒有可註記的單據${already.length ? `（${already.length} 筆原本就已匯出）` : ''}`); return; }
   }
-  if (!hit.length) { alert(`範圍內沒有可註記的單據${already.length ? `（${already.length} 筆原本就已匯出）` : ''}`); return; }
   hit.sort((a, b) => String(a.voucherNo).localeCompare(String(b.voucherNo)));
   const listHtml = hit.map(r =>
     `<div style="text-align:left; padding:1px 0;">${esc(r.voucherNo)}｜${esc(recDateIso(r))}｜$${fmtN(r.total)}｜${esc(String(r.purposeDesc || '').replace(/\s+/g, ' ').slice(0, 18))}</div>`).join('');
