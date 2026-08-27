@@ -6883,9 +6883,16 @@ function _fitPrintLayout() {
         let rules; try { rules = sheet.cssRules; } catch (e) { continue; }
         if (!rules) continue;
         for (const r of rules) {
-          if (r.type === CSSRule.MEDIA_RULE && /print/.test(r.media.mediaText) && !/screen/.test(r.media.mediaText)) {
-            flipped.push([r, r.media.mediaText]);
+          if (r.type !== CSSRule.MEDIA_RULE) continue;
+          const mt = r.media.mediaText;
+          if (/print/.test(mt) && !/screen/.test(mt)) {
+            flipped.push([r, mt]);
             try { r.media.mediaText = 'all'; } catch (e) {}
+          } else if (/screen/.test(mt) && !/print/.test(mt)) {
+            /* v6.1.1 screen-only 規則（如 #delivery-fields 螢幕拉寬 50mm）量測時也要關閉，
+               否則量到的版面比真實列印寬/窄（用途說明被 50mm 交貨欄擠到剩 11px → 縮字誤判） */
+            flipped.push([r, mt]);
+            try { r.media.mediaText = 'not all'; } catch (e) {}
           }
         }
       }
@@ -6906,6 +6913,19 @@ function _fitPrintLayout() {
   try { updatePayeePrintLine(false); } catch (e) {}
   try {
     setMeasureMode(true);
+    /* v6.1.1 用途說明替身實測縮字：字數階梯按動支單寬度校準，請購單被交貨欄(28mm)擠窄後
+       每行字數變少、行數被低估 → max-height 24mm overflow:hidden 吃字；
+       量測模式下裝不下就逐級縮字直到塞進（階梯值當初始值；螢幕 display:none 時量到 0 不進迴圈） */
+    const _pdp = document.getElementById('purpose-desc-print');
+    if (_pdp && _pdp.textContent) {
+      let _fz = parseFloat(_pdp.style.fontSize) || 13.5;
+      void _pdp.offsetHeight;
+      while (_fz > 6 && _pdp.scrollHeight > _pdp.clientHeight + 1) {
+        _fz -= 0.5;
+        _pdp.style.fontSize = _fz + 'px';
+        void _pdp.offsetHeight;
+      }
+    }
     let fit = false;
     for (const lv of ['', '1', '2', '3']) {
       if (lv) fp.setAttribute('data-fit', lv); else fp.removeAttribute('data-fit');
