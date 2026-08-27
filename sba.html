@@ -249,7 +249,7 @@ window.addEventListener('storage', (ev) => {
     <div class="toolbar" style="margin-bottom:2px;">
       <button class="btn btn-sm" id="pk-clear-sel" onclick="clearPickSel()" style="display:none;">✖ 清除勾選</button>
       <button class="btn btn-sm" onclick="batchMarkExported()" title="將已勾選的單據批次標記為已出帳（反灰沉底、全選跳過）；未勾選時可改輸入單號範圍">🏷 註記已出帳</button>
-      <button class="btn btn-sm" onclick="batchUnmarkExported()" title="將已勾選的已出帳（反灰）單據還原為未出帳；未勾選時可改輸入單號範圍">↩️ 還原未出帳</button>
+      <button class="btn btn-sm" id="pk-unmark-btn" onclick="batchUnmarkExported()" style="display:none;" title="將已勾選的已出帳（反灰）單據還原為未出帳">↩️ 還原未出帳</button>
       <span class="small" id="pk-summary">尚未勾選</span>
     </div>
     <div class="grp-grid" id="pk-groups"></div>
@@ -1050,9 +1050,11 @@ function updatePickSummary() {
     }
   });
   const sel = selectedRecords();
-  /* v5.9.8 清除勾選鈕：有勾選才顯示 */
+  /* v5.9.8 清除勾選鈕：有勾選才顯示；v5.9.9 還原未出帳鈕：有勾選「已出帳」列才顯示 */
   const clrBtn = $('pk-clear-sel');
   if (clrBtn) clrBtn.style.display = sel.length ? '' : 'none';
+  const unmarkBtn = $('pk-unmark-btn');
+  if (unmarkBtn) unmarkBtn.style.display = sel.some(r => STATE.exported[r.id]) ? '' : 'none';
   if (!sel.length) { $('pk-summary').textContent = '尚未勾選'; return; }
   /* v5.9.8 已出帳（反灰）勾選＝僅供「還原未出帳」，不進製票摘要與產傳票 */
   const live = sel.filter(r => !STATE.exported[r.id]);
@@ -2556,26 +2558,14 @@ async function batchMarkExported() {
     alert(`已註記 ${hit.length} 筆為已出帳`);
   } else alert('寫入 D1 失敗（密碼或連線問題），本次未標記任何單據，請重試');
 }
-/* v5.9.8 還原未出帳（勾選方式比照註記已出帳）：勾選的已出帳（反灰）單據 → 預覽確認 → 自 D1 sba_exported 移除註記；
-   完全沒勾選才退回「單號範圍」輸入當後備。還原後單據恢復可勾選製票 */
+/* v5.9.8 還原未出帳：勾選的已出帳（反灰）單據 → 預覽確認 → 自 D1 sba_exported 移除註記，恢復可勾選製票。
+   v5.9.9 按鈕改「有勾選已出帳列」才顯示（使用者指定）→ 移除單號範圍後備 */
 async function batchUnmarkExported() {
   const hit = [], skipped = [];
-  const picked = selectedRecords();
-  if (picked.length) {
-    for (const r of picked) {
-      if (STATE.exported[r.id]) hit.push(r); else skipped.push(r.voucherNo);
-    }
-    if (!hit.length) { alert('勾選的單據都不是已出帳，無可還原\n（要還原請勾選反灰的已出帳單據）'); return; }
-  } else {
-    const inp = await promptAnim('<b>↩️ 還原未出帳</b><br><span class="small">未勾選任何單據，改以「單號範圍」還原：範圍內已出帳的單據將取消註記、恢復可勾選製票。<br>'
-      + '（也可先取消，回選單勾選反灰的已出帳單據再按此鈕）<br>'
-      + '格式：<b>0400-0470</b>；可逗號分多段（0400-0470, 0485）；可含年度全碼 115-0400。</span>', '');
-    if (inp == null) return;
-    const spans = parseVoucherSpans(inp);
-    if (!spans || !spans.length) return;
-    for (const r of recsInSpans(spans)) if (STATE.exported[r.id]) hit.push(r);
-    if (!hit.length) { alert('範圍內沒有已出帳的單據'); return; }
+  for (const r of selectedRecords()) {
+    if (STATE.exported[r.id]) hit.push(r); else skipped.push(r.voucherNo);
   }
+  if (!hit.length) { alert('勾選的單據都不是已出帳，無可還原\n（要還原請勾選反灰的已出帳單據）'); return; }
   hit.sort((a, b) => String(a.voucherNo).localeCompare(String(b.voucherNo)));
   const listHtml = hit.map(r => {
     const e = STATE.exported[r.id] || {};
