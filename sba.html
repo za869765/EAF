@@ -1137,8 +1137,9 @@ function generateVouchers() {
 
 /* ═══════════════ 🧾 傳票預覽/編輯 ═══════════════ */
 const KIND_NAMES = { '1': '收入傳票', '2': '支出傳票', '3': '轉帳傳票' };
-const OFFSETABLE = (code) => /^(2102|210205|210202|110305|180705|280705)/.test(code);
-/* 立沖科目「沖帳」方向依科目性質：負債(2102 應付/代收)＝貸立帳借沖；資產(110305 應收/180705 保證金)＝借立帳貸沖 */
+const OFFSETABLE = (code) => /^(2102|210205|210202|110305|110306|180705|280705)/.test(code);
+/* 立沖科目「沖帳」方向依科目性質：負債(2102 應付/代收)＝貸立帳借沖；資產(110305 應收/180705 保證金)＝借立帳貸沖；
+   v6.1.2 資產減項 110306 備抵醫療折讓（官方 0100 實證為立沖科目）＝貸立帳(提列)借沖(追扣)，同負債方向 */
 const OFFSET_DC = (code) => /^(110305|180705)/.test(String(code)) ? 'C' : 'D';
 /* AI 回傳後再保險清一次：擬支付/支付開頭贅詞、檢附…整句、條列編號 */
 function cleanMemoText(t) {
@@ -2885,6 +2886,7 @@ async function importOffsetOpen(files) {
   if (!files || !files.length) return;
   try {
     const items = [];
+    const names = new Set();   /* v6.1.2 本次檔案涵蓋的科目名稱（含未沖=0 的區塊）→ 只重建這些科目，其餘科目既有白名單保留 */
     for (const f of files) {
       const wb = XLSX.read(await f.arrayBuffer());
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: true, defval: '' });
@@ -2892,6 +2894,7 @@ async function importOffsetOpen(files) {
         if (String(rows[r][0] || '') !== '會計年度') continue;
         const d = rows[r + 1] || [];
         if (!d[3]) continue;
+        if (d[5]) names.add(String(d[5]));
         const left = +String(d[7] || '0').replace(/,/g, '') || 0;
         if (left <= 0) continue;
         let desc = '';
@@ -2904,11 +2907,14 @@ async function importOffsetOpen(files) {
       }
     }
     const seen = new Set();
-    const uniq = items.filter(o => { const k = o.vch + '#' + o.seq; if (seen.has(k)) return false; seen.add(k); return true; });
-    if (!uniq.length) { alert('未解析到任何未沖立帳——請確認為 FNWFRX0100 立沖帳明細表'); return; }
+    const fresh = items.filter(o => { const k = o.vch + '#' + o.seq; if (seen.has(k)) return false; seen.add(k); return true; });
+    if (!names.size) { alert('未解析到任何立沖區塊——請確認為 FNWFRX0100 立沖帳明細表'); return; }
+    /* v6.1.2 按科目合併（SBA 一次只匯出一個科目的 0100）：本次檔案涵蓋的科目整組重建，其他科目沿用既有白名單 */
+    const kept = (((STATE.offsetOpen && STATE.offsetOpen.items) || [])).filter(o => !names.has(String(o.name || '')) && !seen.has(o.vch + '#' + o.seq));
+    const uniq = [...kept, ...fresh];
     STATE.offsetOpen = { at: todayIso(), items: uniq };
     const ok = await putConfig('sba_offset_open', STATE.offsetOpen);
-    alert(`${ok ? '✅ 已更新現行未沖清單（寫入 D1）' : '⚠️ 已載入但 D1 寫入失敗（僅本次生效）'}：${uniq.length} 筆，未沖合計 $${fmtN(uniq.reduce((s, o) => s + o.left, 0))}`);
+    alert(`${ok ? '✅ 已更新現行未沖清單（寫入 D1）' : '⚠️ 已載入但 D1 寫入失敗（僅本次生效）'}：重建科目「${[...names].join('、')}」${fresh.length} 筆（未沖合計 $${fmtN(fresh.reduce((s, o) => s + o.left, 0))}）＋保留其他科目 ${kept.length} 筆，共 ${uniq.length} 筆`);
     renderSettings();
   } catch (e) { alert('解析失敗：' + e.message); }
 }

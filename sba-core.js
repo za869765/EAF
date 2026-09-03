@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '6.1.1';
+const SBA_CORE_VERSION = '6.1.2';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -235,9 +235,10 @@ function validateVoucher(v, opt) {
     if (String(v.kind) === '2' && L.dc === 'D' && /^2102/.test(String(L.code)) && !offs.length)
       E(`${lt}：立沖科目 ${L.code} 須連結沖帳——點該列「沖帳」選原立帳傳票貸方列（SBA 匯入必要）`);
     /* 轉帳傳票沖方立沖科目未連結先警告（kind2 借方2102實測必擋、kind3 未實測故不硬擋）：
-       負債(2102)沖=借方；資產(110305應收/180705保證金)沖=貸方（借方=立帳，不需沖帳） */
+       負債(2102)沖=借方；資產(110305應收/180705保證金)沖=貸方（借方=立帳，不需沖帳）；
+       v6.1.2 資產減項 110306 備抵醫療折讓（0100 實證立沖）＝貸立帳(提列)借沖(追扣) */
     if (String(v.kind) === '3' && !offs.length
-      && ((L.dc === 'D' && /^2102/.test(String(L.code))) || (L.dc === 'C' && /^(110305|180705)/.test(String(L.code)))))
+      && ((L.dc === 'D' && /^(2102|110306)/.test(String(L.code))) || (L.dc === 'C' && /^(110305|180705)/.test(String(L.code)))))
       W(`${lt}：轉帳傳票${L.dc === 'D' ? '借' : '貸'}方立沖科目 ${L.code} 未連結沖帳——建議於預覽點「沖帳」連結原立帳，SBA 端可能要求 F06 沖銷資料`);
     if (offs.length) {
       let sum = 0;
