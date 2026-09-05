@@ -6000,16 +6000,41 @@ function getPayeesData() {
       if (rcpt === '1' && ['vendor','nonghui','employee-advance'].includes(type)) o.guiNo = (c.guiNo||'').trim();
       return o;
     });
-  /* v5.8.7 110404 醫療用品：發票面額含折讓，≥單據總額時以總額入檔（單一發票受款人時） */
+  /* v5.8.7 110404 醫療用品：發票面額含折讓，≥單據總額時以總額入檔（單一發票受款人時）
+     v6.1.4 多張發票：面額＝動支說明同品名毛額（正數列合計）→ 靜默改為該品名淨額（含折讓列），不擋 */
   if (document.getElementById('sel-bp')?.value === '110404') {
     const inv = arr.filter(p => p.receiptType === '2' && (p.invoiceAmount || '').trim());
     const t = (typeof getCurrentTotal === 'function') ? getCurrentTotal() : 0;
+    const _n = s => parseInt(String(s).replace(/[^\d]/g, ''), 10);
     if (inv.length === 1 && t > 0) {
-      const a = parseInt(String(inv[0].invoiceAmount).replace(/[^\d]/g, ''), 10);
+      const a = _n(inv[0].invoiceAmount);
       if (!isNaN(a) && a >= t) inv[0].invoiceAmount = String(t);
+    } else if (inv.length > 1) {
+      const groups = _itemNetByName();
+      inv.forEach(p => {
+        const a = _n(p.invoiceAmount);
+        const g = groups.find(x => !x.used && x.gross === a);
+        if (g) { g.used = true; p.invoiceAmount = String(g.net); }
+      });
     }
   }
   return arr;
+}
+/* v6.1.4 動支說明依品名分組：gross＝正數列合計（發票面額）、net＝含折讓列合計（實付） */
+function _itemNetByName() {
+  const groups = [];
+  for (let i = 0; i < rowCount; i++) {
+    const name = (qv(i, 'name') || '').trim();
+    if (!name) continue;
+    const amt = formType === 'purchase'
+      ? Math.round((parseFloat(qv(i, 'qty')) || 0) * (parseFloat(qv(i, 'price')) || 0))
+      : Math.round(parseFloat(qv(i, 'price')) || 0);
+    let g = groups.find(x => x.name === name);
+    if (!g) { g = { name, gross: 0, net: 0, used: false }; groups.push(g); }
+    if (amt > 0) g.gross += amt;
+    g.net += amt;
+  }
+  return groups;
 }
 /* 舊版相容 — 取第一筆 */
 function getPayeeData() {
