@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '6.1.9';
+const SBA_CORE_VERSION = '6.2.1';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -772,23 +772,32 @@ function resolvePayees(rec, ctx) {
   }
   /* 多受款人：items[].name ↔ payees[].name 對映金額（price 為字串） */
   let amtByName = null;
+  let dupName = false;   /* v6.2.1 同名受款人（同一廠商多張發票）：品名對映會把同一筆重複算給每人，改走發票金額 */
   if (ps.length > 1) {
     amtByName = {};
     for (const it of rec.items || []) {
       const nm = String(it.name || '').trim();
       amtByName[nm] = (amtByName[nm] || 0) + (+String(it.price || '').replace(/,/g, '') || 0);
     }
+    const names = ps.map((p) => String(p.name || '').trim());
+    dupName = new Set(names).size < names.length;
   }
+  const invAmtOf = (p) => +String(p.invoiceAmount || '').replace(/,/g, '') || 0;
   const payees = ps.map((p) => {
     const bk = splitBank(p.bank);
     let amt;
     if (ps.length === 1) amt = recAmt;
     else {
-      amt = amtByName[String(p.name || '').trim()];
+      amt = dupName ? null : amtByName[String(p.name || '').trim()];
       if (amt == null) {
-        issues.push({ recId: rec.id, level: 'error',
-          msg: `${rec.voucherNo}：受款人「${p.name || '(未命名)'}」金額無法自動比對，請於預覽填入` });
-        amt = 0;
+        /* v6.2.1 品名對不到（藥品採購品名≠受款人）或同名多受款人 → 以各受款人發票金額為準（存檔時已換算折讓淨額） */
+        const ia = invAmtOf(p);
+        if (ia > 0) amt = ia;
+        else {
+          issues.push({ recId: rec.id, level: 'error',
+            msg: `${rec.voucherNo}：受款人「${p.name || '(未命名)'}」金額無法自動比對，請於預覽填入` });
+          amt = 0;
+        }
       }
     }
     const rev = p.receiptType != null && p.receiptType !== '' ? String(p.receiptType) : '0';
