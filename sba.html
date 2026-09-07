@@ -129,6 +129,16 @@ select.w-subj { width: 168px; }
 .off-used { font-size: 12px; color: #b26500; margin-top: 2px; }
 .off-used b.off-ok { color: #2e7d32; }
 .off-used b.off-zero { color: #c62828; }
+/* v6.2.5 沖帳明細列（有連結的分錄下方整列） */
+.off-detail td { background: #eef6ea !important; padding: 4px 10px 6px 34px !important; border-top: none !important; }
+.off-d-head { font-size: 11px; font-weight: 700; color: #3f5f30; margin-bottom: 3px; }
+.off-d-head .off-zero { color: #c62828; }
+.off-d-head .off-ok { color: #2e7d32; }
+.off-d-tbl { border-collapse: collapse; font-size: 11px; }
+.off-d-tbl th, .off-d-tbl td { padding: 2px 8px; border: 1px solid #cfe3cc; background: #fff; white-space: nowrap; }
+.off-d-tbl th { background: #dcebd8; font-weight: 600; color: #3f5f30; }
+.off-d-tbl td.num, .off-d-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.off-d-tbl td.desc { white-space: normal; max-width: 360px; }
 /* v5.7.26 一列多筆沖帳 chips */
 .off-chip { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; background: #eef3ee; border: 1px solid #a5d6a7; border-radius: 8px; padding: 1px 4px 1px 6px; margin: 1px 2px; white-space: nowrap; }
 .off-chip-x { border: none; background: none; cursor: pointer; color: #c62828; font-size: 11px; padding: 0 2px; }
@@ -1393,13 +1403,14 @@ function renderPreview() {
             const need = Math.round(((+L.amt || 0) - linked) * 100) / 100;
             const mustLink = !offs.length && L.dc === 'D' && /^2102/.test(String(L.code));
             let h = `<button class="btn btn-sm${mustLink ? ' btn-danger' : ''}" onclick="openOffsetModal(${vi},${li})" title="${mustLink ? '立沖科目必須連結沖帳（SBA 匯入必要）' : offs.length ? '加沖下一筆立帳（同子目可多筆）' : '沖前立帳連結'}">${offs.length ? (need > 0 ? `＋沖帳（差 ${fmtN(need)}）` : '＋') : '沖帳'}</button>`;
-            h += offs.map((o, oi) => `<span class="off-chip" title="沖 ${esc(o.vchrno)}#${esc(String(o.seq))} $${fmtN(o.amt)}（上限 ${fmtN(o.max)}）">🔗${esc(o.vchrno)}#${esc(String(o.seq))}${offs.length > 1 ? ' $' + fmtN(o.amt) : ''}<button class="off-chip-x" onclick="removeOffsetAt(${vi},${li},${oi})" title="移除此筆沖帳連結">✕</button></span>`).join('');
+            /* v6.2.5 連結明細改列在分錄下方整列（offDetailHtml），此處只留筆數提示 */
+            if (offs.length) h += ` <span class="small" style="color:#3f5f30;font-weight:600;">🔗 ${offs.length} 筆↓</span>`;
             if (offs.length === 1) h += `<button class="btn btn-sm" onclick="editOffsetSeq(${vi},${li})" title="修正沖銷序號——0090/0100 序號可能≠SBA 實際分錄序">✎序</button>`;
             return h;
           })()}
           <button class="btn btn-sm" onclick="delLine(${vi},${li})">✕</button>
         </td>
-      </tr>`;
+      </tr>${offDetailHtml(L, vi, li)}`;
     }).join('');
     const payeesHtml = (v.payees || []).map((P, pi) => `
       <tr${P.needsInput ? ' style="background:#fdf3e7;"' : ''}>
@@ -1685,10 +1696,15 @@ function openOffsetModal(vi, li) {
     return true;
   });
   const subOf = (e) => String(e.sub_account || '').slice(0, 2);
+  /* v6.2.5 科目＋子目兩層（使用者：子目 99 其他各科混在一起難辨識）：本科同子目 → 本科 → 他科同子目 → 其他 */
+  const subjOf = (e) => String(e.subject || '').split(' ')[0];
+  const rankOf = (e) => (subjOf(e) === code ? 0 : 2) + (rel && subOf(e) === rel ? 0 : 1);
   cands.sort((a, b) => {
-    const am = rel && subOf(a) === rel ? 0 : 1, bm = rel && subOf(b) === rel ? 0 : 1;
-    if (am !== bm) return am - bm;                                        /* 本列子目相同者置頂（推薦） */
-    const s = subOf(a).localeCompare(subOf(b));                           /* 其餘依子目分組 */
+    const ra = rankOf(a), rb = rankOf(b);
+    if (ra !== rb) return ra - rb;
+    const c = subjOf(a).localeCompare(subjOf(b));                         /* 科目分組 */
+    if (c) return c;
+    const s = subOf(a).localeCompare(subOf(b));                           /* 再依子目分組 */
     if (s) return s;
     return String(b.voucher_no).localeCompare(String(a.voucher_no));      /* 組內新到舊 */
   });
@@ -1802,6 +1818,7 @@ function renderOffsetList(q) {
   const hit = (s) => !kw || String(s).includes(kw);
   const useHit = (e) => !(useFilter && lineUse) || e._use === lineUse;
   const subOf = (e) => String(e.sub_account || '').slice(0, 2);
+  const subjOf = (e) => String(e.subject || '').split(' ')[0];   /* v6.2.5 科目代碼（分組用） */
   const keyOf = (e) => String(e.voucher_no) + '#' + e.seq;
   const ctx = STATE.modalCtx || {};
   /* v5.7.5 家族白名單＝有配對命中或有同科目 synth 項才算；否則此科目視同未匯 0100 → 全部可選不鎖 */
@@ -1825,7 +1842,7 @@ function renderOffsetList(q) {
       : `<button class="btn btn-sm off-pick" data-vno="${esc(e.voucher_no)}" data-seq="${xseq}" data-dseq="${+e.seq || 0}" data-avail="${avail}">選此列</button>`;
     return `
     <tr${selectable ? '' : ' class="row-exported"'}${hot ? ' style="background:#f6e7dc;"' : ''}><td>${esc(e.voucher_no)}</td><td>${esc(String(xseq))}${oseq != null && +oseq !== (+e.seq || 0) ? `<span class="small" title="0100 官方序號與 D1 明細列序不同（0090 無序號欄），匯出以官方序號為準">（D1#${esc(String(e.seq))}）</span>` : ''}</td><td>${esc(e.post_date || e.make_date || '')}</td>
-    <td>${esc(e.sub_account || '')}</td><td style="max-width:280px;">${hot ? '🎯 ' : ''}${esc(String(e.description || '').slice(0, 40))}</td>
+    <td>${esc(e.sub_account || '')}${e.subject ? `<br><span class="small code-zh" title="${esc(String(e.subject))}">${esc(String(e.subject).split(' ').slice(1).join(' ').slice(0, 8))}</span>` : ''}</td><td style="max-width:280px;">${hot ? '🎯 ' : ''}${esc(String(e.description || '').slice(0, 40))}</td>
     <td class="num">${amtHtml}</td>
     <td style="white-space:nowrap;">${btn}${okey && selectable ? ` <button class="btn btn-sm off-edit" data-okey="${esc(okey)}" title="修改官方未沖額（0100 過時時手動校正）">✏️</button><button class="btn btn-sm off-done" data-okey="${esc(okey)}" title="標記已沖畢（自未沖清單移除）">✔</button>` : ''}</td></tr>`;
   };
@@ -1844,8 +1861,8 @@ function renderOffsetList(q) {
     const sim = descSim(String(_line.memo || ''), String(desc || ''));
     return { rec: amtEq ? sim >= 0.15 : sim >= 0.6, score: (amtEq ? 1 : 0) + sim };
   };
-  const filt = (e) => hit(String(e.description || '') + String(e.voucher_no || '') + String(e.sub_account || ''));
-  const recHeader = `<tr class="off-h off-h-rec"><td colspan="7"><b>🎯 高機率吻合（金額/摘要與本列相符，請確認後選用）</b></td></tr>`;
+  const filt = (e) => hit(String(e.description || '') + String(e.voucher_no || '') + String(e.sub_account || '') + String(e.subject || ''));   /* v6.2.5 可搜科名 */
+  /* v6.2.5 recHeader 已移除（命中列改留在群組內） */
   const sortAmt = !!(STATE.modalCands && STATE.modalCands.sortAmt);
   const amtOfE = (e) => +e.credit || +e.debit || 0;
   let html = '';
@@ -1873,7 +1890,7 @@ function renderOffsetList(q) {
     recs.sort((a, b) => b.score - a.score);
     const top = recs.slice(0, 3);
     const hotKeys = new Set(top.map(x => x.key));
-    if (top.length) html += recHeader + top.map(x => x.row()).join('');
+    /* v6.2.5 不再另列「高機率吻合」區（同一筆出現兩次會被誤認重複）：命中列留在群組內 🎯 標示、群組排最前 */
     if (synth.length) {
       const synthS = sortAmt ? [...synth].sort((a, b) => (+b.left || 0) - (+a.left || 0)) : synth;
       html += grpHeader('off-h-syn', '🆕 現行未沖・D1 無對應列（依官方餘額表，可選）',
@@ -1889,13 +1906,14 @@ function renderOffsetList(q) {
       const grps = [];
       let g = null;
       for (const e of currentS) {
-        const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
-        if (!g || g.gk !== gk) { g = { gk, isRec, subAcc: e.sub_account, rows: [] }; grps.push(g); }
+        const sub = subOf(e), sj = subjOf(e), isRec = rel && sub === rel && sj === code, gk = (isRec ? '★' : '') + sj + '|' + sub;
+        if (!g || g.gk !== gk) { g = { gk, isRec, subAcc: e.sub_account, subj: String(e.subject || sj), rows: [] }; grps.push(g); }
         g.rows.push(e);
       }
+      grps.sort((a, b) => (b.rows.some(e => hotKeys.has(keyOf(e))) ? 1 : 0) - (a.rows.some(e => hotKeys.has(keyOf(e))) ? 1 : 0));   /* v6.2.5 含 🎯 的群組排最前 */
       for (const gr of grps) {
         html += grpHeader(gr.isRec ? 'off-h-rec' : 'off-h-cur',
-          gr.isRec ? `⭐ 推薦：子目 ${esc(gr.subAcc || rel)}（與本列相同）` : `✅ 未沖・子目 ${esc(gr.subAcc || '（無子目）')}`,
+          gr.isRec ? `⭐ 推薦：${esc(gr.subj)}・子目 ${esc(gr.subAcc || rel)}（與本列相同）` : `✅ 未沖・${esc(gr.subj)}・子目 ${esc(gr.subAcc || '（無子目）')}`,
           curSt(gr.rows));
         html += gr.rows.map(curRow).join('');
       }
@@ -1921,7 +1939,7 @@ function renderOffsetList(q) {
     recs.sort((a, b) => b.score - a.score);
     const top = recs.slice(0, 3);
     const hotKeys = new Set(top.map(x => x.key));
-    if (top.length) html += recHeader + top.map(x => x.row()).join('');
+    /* v6.2.5 不再另列「高機率吻合」區（同一筆出現兩次會被誤認重複）：命中列留在群組內 🎯 標示、群組排最前 */
     const CAP = 400;
     const listS = (sortAmt ? [...list].sort((a, b) => amtOfE(b) - amtOfE(a)) : list).slice(0, CAP);
     const eSt = (arr) => arr.map(e => ({ base: amtOfE(e), used: usedOfK(e.voucher_no, +e.seq || 0) }));
@@ -1932,13 +1950,14 @@ function renderOffsetList(q) {
       const grps = [];
       let g = null;
       for (const e of listS) {
-        const sub = subOf(e), isRec = rel && sub === rel, gk = (isRec ? '★' : '') + sub;
-        if (!g || g.gk !== gk) { g = { gk, isRec, subAcc: e.sub_account, rows: [] }; grps.push(g); }
+        const sub = subOf(e), sj = subjOf(e), isRec = rel && sub === rel && sj === code, gk = (isRec ? '★' : '') + sj + '|' + sub;
+        if (!g || g.gk !== gk) { g = { gk, isRec, subAcc: e.sub_account, subj: String(e.subject || sj), rows: [] }; grps.push(g); }
         g.rows.push(e);
       }
+      grps.sort((a, b) => (b.rows.some(e => hotKeys.has(keyOf(e))) ? 1 : 0) - (a.rows.some(e => hotKeys.has(keyOf(e))) ? 1 : 0));   /* v6.2.5 */
       for (const gr of grps) {
         html += grpHeader(gr.isRec ? 'off-h-rec' : 'off-h-cur',
-          gr.isRec ? `⭐ 推薦：子目 ${esc(gr.subAcc || rel)}（與本列相同）` : `子目 ${esc(gr.subAcc || '（無子目）')}`,
+          gr.isRec ? `⭐ 推薦：${esc(gr.subj)}・子目 ${esc(gr.subAcc || rel)}（與本列相同）` : `${esc(gr.subj)}・子目 ${esc(gr.subAcc || '（無子目）')}`,
           eSt(gr.rows));
         html += gr.rows.map(eRow).join('');
       }
@@ -2212,6 +2231,48 @@ async function pickOffset(vchrno, seq, avail, dseq) {
   if (sub !== null) L.relate = sub;
   closeModal(); renderPreview();
   if (grant < need) openOffsetModal(vi, li);   /* 差額續選（免拆列） */
+}
+/* v6.2.5 沖帳明細列（使用者：已勾選沖帳要更明顯詳細——沖了哪筆多少）
+   每筆連結一行：立帳傳票#序、立帳日期、子目、立帳摘要（0100 白名單摘要優先；D1 列以同傳票同摘要配，退而以序號配）、
+   立帳額、官方未沖、本列沖、上限、✕移除；列頭寫「本列＝已沖＋差額」 */
+function offDetailHtml(L, vi, li) {
+  if (!(L.dc === OFFSET_DC(L.code) && OFFSETABLE(L.code))) return '';
+  const offs = offsetsOf(L);
+  if (!offs.length) return '';
+  const linked = Math.round(offs.reduce((s, o) => s + (+o.amt || 0), 0) * 100) / 100;
+  const need = Math.round(((+L.amt || 0) - linked) * 100) / 100;
+  const wl = new Map(((STATE.offsetOpen && STATE.offsetOpen.items) || []).map(o => [o.vch + '#' + o.seq, o]));
+  const rows = offs.map((o, oi) => {
+    const k = String(o.vchrno) + '#' + o.seq;
+    const w = wl.get(k);
+    const sameV = STATE.entries.filter(x => String(x.voucher_no) === String(o.vchrno));
+    let e = w ? sameV.find(x => String(x.description || '').trim() === String(w.desc || '').trim()) : null;
+    if (!e) e = sameV.find(x => +x.seq === +o.seq) || null;
+    const date = e ? (e.post_date || e.make_date || '') : '';
+    const sub = e ? (e.sub_account || '') : (o.sub ? String(o.sub) : '');
+    const subj = e ? String(e.subject || '').split(' ').slice(1).join(' ') : (w ? String(w.name || '') : '');
+    const desc = (w && w.desc) || (e && e.description) || '';
+    const base = e ? (+e.credit || +e.debit || 0) : null;
+    const left = w ? (+w.left || 0) : null;
+    return `<tr>
+      <td>${esc(String(o.vchrno))}#${esc(String(o.seq))}</td>
+      <td>${esc(date)}</td>
+      <td>${esc(sub)}${subj ? ` <span class="small">${esc(subj.slice(0, 8))}</span>` : ''}</td>
+      <td class="desc">${esc(String(desc).slice(0, 60)) || '<span class="small">（找不到立帳資料：請匯入該月 0090 或 0100）</span>'}</td>
+      <td class="num">${base != null ? fmtN(base) : '—'}</td>
+      <td class="num">${left != null ? fmtN(left) : '—'}</td>
+      <td class="num"><b>${fmtN(o.amt)}</b></td>
+      <td class="num">${o.max != null ? fmtN(o.max) : '—'}</td>
+      <td><button class="off-chip-x" onclick="removeOffsetAt(${vi},${li},${oi})" title="移除此筆沖帳連結">✕ 移除</button></td>
+    </tr>`;
+  }).join('');
+  const st = need > 0 ? `<span class="off-zero">差 ${fmtN(need)} 未沖</span>`
+    : need < 0 ? `<span class="off-zero">超沖 ${fmtN(-need)}</span>`
+    : '<span class="off-ok">✔ 已沖滿</span>';
+  return `<tr class="off-detail"><td colspan="99">
+    <div class="off-d-head">🔗 沖帳明細　本列 ${fmtN(L.amt)}　＝　已沖 ${fmtN(linked)}（${offs.length} 筆）　${st}</div>
+    <table class="off-d-tbl"><thead><tr><th>立帳傳票#序</th><th>立帳日期</th><th>子目</th><th>立帳摘要</th><th class="num">立帳額</th><th class="num">官方未沖</th><th class="num">本列沖</th><th class="num">上限</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table></td></tr>`;
 }
 function removeOffsetAt(vi, li, oi) {
   const L = STATE.drafts[vi].lines[li];
