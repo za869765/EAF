@@ -654,7 +654,7 @@ window.addEventListener('storage', (ev) => {
     <div class="r-card rc-teal">
       <div class="r-num" id="rc-inv-total">—</div>
       <div class="r-label">📦 110404 醫療用品</div>
-      <div class="r-sub" style="font-size:10px;">傳票＝官方明細表　｜　手動 💊<span id="rc-drug">—</span> 🩹<span id="rc-supply">—</span>（參考）</div>
+      <div class="r-sub" style="font-size:10px;">傳票 110404＝官方醫療用品明細表</div>
       <div class="r-sub" style="font-size:9px;color:#90a4ae;margin-top:2px;">資料至 <span id="rc-inv-date">—</span></div>
     </div>
     <div class="r-card rc-blue">
@@ -721,264 +721,58 @@ window.addEventListener('storage', (ev) => {
 </div>
 
 <!-- ══════════════════════════════════════════
-     TAB 3：醫療用品庫存
+     TAB 3：醫療用品（110404，傳票推導）
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-inventory">
   <div class="balance-banner">
     <div class="bb-item">
-      <div class="bb-num" id="inv-drug-bal">98,733</div>
-      <div class="bb-label">💊 藥品結存（元）</div>
+      <div class="bb-num" id="inv-total">—</div>
+      <div class="bb-label">📦 110404 醫療用品 期末結存（元）</div>
     </div>
     <div class="bb-divider"></div>
     <div class="bb-item">
-      <div class="bb-num" id="inv-supply-bal">2,472</div>
-      <div class="bb-label">🩹 衛材結存（元）</div>
+      <div class="bb-num" id="inv-open">—</div>
+      <div class="bb-label">年初結轉</div>
     </div>
-    <div class="bb-divider"></div>
     <div class="bb-item">
-      <div class="bb-num" id="inv-total-bal">101,205</div>
-      <div class="bb-label">合計結存（元）</div>
+      <div class="bb-num" style="color:#a5d6a7;" id="inv-in">—</div>
+      <div class="bb-label">＋ 本年增加（進貨／盤盈）</div>
+    </div>
+    <div class="bb-item">
+      <div class="bb-num" style="color:#ef9a9a;" id="inv-out">—</div>
+      <div class="bb-label">− 本年減少（領用／報廢／盤損）</div>
     </div>
   </div>
-
-  <!-- 藥品衛材庫存月報表（DPReport3）匯入：依官方盤點結存自動校正明細帳 -->
-  <div style="display:flex; align-items:center; gap:8px; margin:0 0 10px; flex-wrap:wrap;">
-    <input type="file" id="inv-report-upload" accept=".xls,.xlsx" multiple onchange="onInvReportUpload(this)" style="display:none;">
-    <button class="btn btn-blue" style="font-size:12px;" onclick="document.getElementById('inv-report-upload').click()">📊 匯入庫存月報表（校正結存）</button>
-    <span style="font-size:11px; color:#78909c;">上傳 DPReport3 藥品／衛材庫存月報表，自動把明細帳每月結存校正為官方盤點數（可一次多選、跨月份）</span>
-  </div>
-  <div id="inv-report-result" style="display:none; margin:0 0 12px; font-size:12px;"></div>
-
-  <div id="inv-recon" style="margin:0 0 12px;"></div>
-
-  <div class="inventory-cols">
-    <!-- 藥品 -->
-    <div class="card">
-      <div class="card-hd hd-purple">💊 藥品 明細帳</div>
-      <div class="card-bd" style="padding:0;">
-        <!-- 年度期初 -->
-        <div style="padding:6px 14px 6px; border-bottom:1px solid #ede7f6; background:#f9f5ff; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-          <span style="font-size:11px; color:#6a1b9a; font-weight:700;">年度期初結存</span>
-          <input id="drug-init-inp" class="fi num-in" type="text" inputmode="numeric" placeholder="0" readonly
-            style="width:110px; text-align:right; font-size:13px; font-weight:700; color:#4a148c; background:#f3e5f5; cursor:default;"
-            onblur="saveInvInit('drug',this.value)"
-            onkeydown="if(event.key==='Enter')this.blur()">
-          <button id="drug-init-lock-btn" class="lock-btn locked" onclick="toggleInvInitLock('drug')" style="font-size:11px;">🔒 鎖定</button>
-          <span style="font-size:10px; color:#9e9e9e;">前年度結轉至本年度1月1日帳面庫存</span>
-        </div>
-        <div class="table-wrap">
-        <table class="ledger-table" id="drug-ledger">
-          <thead>
-            <tr>
-              <th style="width:90px;">年月</th>
-              <th style="width:80px; text-align:right;">金額</th>
-              <th style="width:90px; text-align:right;">結存</th>
-              <th style="width:130px; max-width:130px;">摘要</th>
-              <th style="width:36px;"></th>
-            </tr>
-          </thead>
-          <tbody id="drug-tbody"></tbody>
-        </table>
-        </div>
-        <div style="padding:8px 14px; display:flex; gap:8px;">
-          <button class="btn btn-gray" style="font-size:11px;" onclick="addInvEntry('drug')">＋ 補登</button>
-          <button class="btn btn-green" style="font-size:11px;" onclick="exportInvExcel('drug')">📥 匯出</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 衛材 -->
-    <div class="card">
-      <div class="card-hd hd-teal">🩹 衛材 明細帳</div>
-      <div class="card-bd" style="padding:0;">
-        <!-- 年度期初 -->
-        <div style="padding:6px 14px 6px; border-bottom:1px solid #e0f2f1; background:#f4fffe; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-          <span style="font-size:11px; color:#00695c; font-weight:700;">年度期初結存</span>
-          <input id="supply-init-inp" class="fi num-in" type="text" inputmode="numeric" placeholder="0" readonly
-            style="width:110px; text-align:right; font-size:13px; font-weight:700; color:#004d40; background:#e0f2f1; cursor:default;"
-            onblur="saveInvInit('supply',this.value)"
-            onkeydown="if(event.key==='Enter')this.blur()">
-          <button id="supply-init-lock-btn" class="lock-btn locked" onclick="toggleInvInitLock('supply')" style="font-size:11px;">🔒 鎖定</button>
-          <span style="font-size:10px; color:#9e9e9e;">前年度結轉至本年度1月1日帳面庫存</span>
-        </div>
-        <div class="table-wrap">
-        <table class="ledger-table" id="supply-ledger">
-          <thead>
-            <tr>
-              <th style="width:90px;">年月</th>
-              <th style="width:80px; text-align:right;">金額</th>
-              <th style="width:90px; text-align:right;">結存</th>
-              <th style="width:130px; max-width:130px;">摘要</th>
-              <th style="width:36px;"></th>
-            </tr>
-          </thead>
-          <tbody id="supply-tbody"></tbody>
-        </table>
-        </div>
-        <div style="padding:8px 14px; display:flex; gap:8px;">
-          <button class="btn btn-gray" style="font-size:11px;" onclick="addInvEntry('supply')">＋ 補登</button>
-          <button class="btn btn-green" style="font-size:11px;" onclick="exportInvExcel('supply')">📥 匯出</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 動支單進貨核對 -->
-  <div class="card">
-    <div class="card-hd hd-dark">📋 動支單「醫療用品」科目進貨核對 <span style="font-size:10px; font-weight:400; color:#90a4ae; margin-left:6px;">可人工勾選校正藥品/衛材分類</span></div>
-    <div class="card-bd" style="padding:0;">
-      <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:#f5f5f5;border-bottom:1px solid #e0e0e0;flex-wrap:wrap;">
-        <button class="btn btn-gray" style="font-size:11px;padding:3px 10px;" onclick="medSelectAll()">全選</button>
-        <button class="btn btn-gray" style="font-size:11px;padding:3px 10px;" onclick="medDeselectAll()">取消勾選</button>
-        <button class="btn btn-green" id="med-confirm-btn" style="font-size:11px;padding:3px 14px;" onclick="confirmMedPosted()">✓ 確定入帳（0）</button>
-        <span style="font-size:11px;color:#78909c;">勾選後按確定 → 移入上方明細帳，不再顯示於此</span>
-      </div>
-      <div class="table-wrap">
-      <table class="voucher-table" id="eaf-medical-table">
-        <thead>
-          <tr>
-            <th style="width:44px;">勾選</th>
-            <th style="width:55px;">申請月</th>
-            <th style="width:88px;">動支編號</th>
-            <th>摘要</th>
-            <th style="width:75px; text-align:right;">金額</th>
-            <th style="width:88px;">入帳月份</th>
-            <th style="width:68px;">分類</th>
-            <th style="width:55px;">狀態</th>
-            <th style="width:32px;"></th>
-          </tr>
-        </thead>
-        <tbody id="eaf-medical-tbody">
-          <tr><td colspan="9" style="text-align:center;color:#90a4ae;padding:16px;font-size:12px;">載入中…</td></tr>
-        </tbody>
-      </table>
-      </div>
-      <div id="eaf-excluded-section" style="padding:0 14px 10px;"></div>
-    </div>
-  </div>
+  <div style="font-size:11px;color:#78909c;margin:0 0 8px;">📌 全部由匯入傳票 110404 推導＝官方醫療用品明細表　<span id="inventory-cutoff-hint"></span></div>
+  <div id="inventory-sections"></div>
 </div><!-- /tab-inventory -->
 
 
 <!-- ══════════════════════════════════════════
-     TAB 4：財產管理
+     TAB 4：財產管理（130x，傳票推導）
 ══════════════════════════════════════════ -->
 <div class="tab-pane" id="tab-property">
   <div class="balance-banner">
     <div class="bb-item">
-      <div class="bb-num" id="prop-balance">80,626</div>
-      <div class="bb-label" id="prop-cur-label">🏚️ 3月期末淨值（元）</div>
+      <div class="bb-num" id="prop-balance">—</div>
+      <div class="bb-label" id="prop-cur-label">🏚️ 期末帳面淨值（元）</div>
     </div>
     <div class="bb-divider"></div>
     <div class="bb-item">
-      <div class="bb-num" style="color:#ef9a9a;" id="prop-accum-depr">239,931</div>
+      <div class="bb-num" style="color:#80cbc4;" id="prop-cost">—</div>
+      <div class="bb-label">🏗️ 原始成本（元）</div>
+    </div>
+    <div class="bb-item">
+      <div class="bb-num" style="color:#ef9a9a;" id="prop-accum-depr">—</div>
       <div class="bb-label">📉 累積折舊（元）</div>
     </div>
-    <div class="bb-divider"></div>
     <div class="bb-item">
-      <div class="bb-num" style="color:#80cbc4;">320,557</div>
-      <div class="bb-label">🏗️ 什項設備原始成本（元）</div>
-    </div>
-    <div class="bb-divider"></div>
-    <div class="bb-item">
-      <div class="bb-num" id="prop-depr">2,193</div>
-      <div class="bb-label">每月折舊額（元）</div>
+      <div class="bb-num" id="prop-depr">—</div>
+      <div class="bb-label" id="prop-depr-label">本月折舊（元）</div>
     </div>
   </div>
-
-  <!-- 財產分類量值統計表匯入（v4.7.7）：什項設備逐月官方結存成為權威 -->
-  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0;">
-    <input type="file" id="prop-report-upload" accept=".xls,.xlsx" multiple onchange="onPropReportUpload(this)" style="display:none;">
-    <button class="btn btn-blue" style="font-size:12px;" onclick="document.getElementById('prop-report-upload').click()">📊 匯入財產分類量值統計表（官方結存）</button>
-    <span style="font-size:11px; color:#78909c;">上傳財產分類量值統計表，什項設備逐月結存成為權威值（存摺帳面淨值優先讀官方、缺月用計算；可一次多選、跨月份）</span>
-    <button class="btn btn-gray" style="font-size:11px;margin-left:auto;" onclick="clearPropOfficial()">🗑️ 清除官方資料</button>
-  </div>
-  <div id="prop-report-result" style="display:none; margin:0 0 12px; font-size:12px;"></div>
-
-  <div class="card">
-    <div class="card-hd hd-dark">⚙️ 每月折舊額設定</div>
-    <div class="card-bd" style="padding:12px 16px;">
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;">
-        <label>基準值：<input id="depr-base-input" type="number" min="0" style="width:90px;padding:3px 6px;" value="2193"></label>
-        <span style="color:#78909c;font-size:11px;">（未設定變更點時，每月都用此金額）</span>
-        <button class="btn btn-gray" style="font-size:11px;padding:3px 10px;" onclick="saveDeprSchedule(this)">💾 儲存</button>
-      </div>
-      <div style="margin-top:10px;">
-        <div style="font-size:12px;color:#cfd8dc;margin-bottom:6px;">📅 變更點（自該年月起生效，可疊加多筆）</div>
-        <div id="depr-change-list" style="display:flex;flex-direction:column;gap:4px;"></div>
-        <div style="display:flex;gap:6px;margin-top:8px;align-items:center;font-size:12px;">
-          <input id="depr-new-ym" placeholder="年月 如 11506" maxlength="5" style="width:100px;padding:3px 6px;">
-          <input id="depr-new-val" type="number" min="0" placeholder="新金額" style="width:100px;padding:3px 6px;">
-          <button class="btn btn-gray" style="font-size:11px;padding:3px 10px;" onclick="addDeprChange()">＋ 新增變更點</button>
-          <span id="depr-current-hint" style="margin-left:12px;color:#80cbc4;font-size:11px;"></span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-hd hd-dark">
-      🏚️ 財產折舊存摺
-      <span style="margin-left:auto;">
-        <button class="lock-btn locked" id="prop-lock-btn" onclick="togglePropLock()" style="font-size:11px;">🔒 鎖定</button>
-        <button class="btn btn-gray" style="font-size:11px; padding:3px 10px; margin-left:6px;" onclick="exportPropExcel()">📥 匯出</button>
-      </span>
-    </div>
-    <div class="card-bd" style="padding:0;">
-      <div class="table-wrap">
-      <table class="ledger-table" id="prop-ledger">
-        <thead>
-          <tr>
-            <th style="width:60px;">年月</th>
-            <th style="width:110px; text-align:right;">什項設備原始成本</th>
-            <th style="width:90px; text-align:right;">本期折舊</th>
-            <th style="width:110px; text-align:right;">累積折舊</th>
-            <th style="width:110px; text-align:right;">帳面淨值</th>
-            <th>摘要</th>
-            <th style="width:60px;"></th>
-          </tr>
-        </thead>
-        <tbody id="prop-tbody">
-          <tr>
-            <td>期初</td>
-            <td style="text-align:right; color:#546e7a;">320,557</td>
-            <td style="text-align:right;">-</td>
-            <td style="text-align:right; color:#ef9a9a;">233,352</td>
-            <td class="balance-cell" style="text-align:right;">87,205</td>
-            <td style="font-size:11px; color:#546e7a;">115年1月1日帳面淨值（115300001年結轉）</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>11501</td>
-            <td style="text-align:right; color:#546e7a;">320,557</td>
-            <td class="debit-cell" style="text-align:right;">-2,193</td>
-            <td style="text-align:right; color:#ef9a9a;">235,545</td>
-            <td class="balance-cell" style="text-align:right;">85,012</td>
-            <td style="font-size:11px; color:#546e7a;">11501雜項設備折舊2,193元（115300002）</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>11502</td>
-            <td style="text-align:right; color:#546e7a;">320,557</td>
-            <td class="debit-cell" style="text-align:right;">-2,193</td>
-            <td style="text-align:right; color:#ef9a9a;">237,738</td>
-            <td class="balance-cell" style="text-align:right;">82,819</td>
-            <td style="font-size:11px; color:#546e7a;">11502雜項設備折舊2,193元（115300004）</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td>11503</td>
-            <td style="text-align:right; color:#546e7a;">320,557</td>
-            <td class="debit-cell" style="text-align:right;">-2,193</td>
-            <td style="text-align:right; color:#ef9a9a;">239,931</td>
-            <td class="balance-cell" style="text-align:right;">80,626</td>
-            <td style="font-size:11px; color:#546e7a;">11503雜項設備折舊2,193元（115300005）</td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
-      </div>
-    </div>
-  </div>
+  <div style="font-size:11px;color:#78909c;margin:0 0 8px;">📌 全部由匯入傳票 130x01（原始成本）／130x03（累積折舊）推導＝官方財產分類統計表　<span id="property-cutoff-hint"></span></div>
+  <div id="property-sections"></div>
 </div><!-- /tab-property -->
 
 
@@ -1731,8 +1525,8 @@ async function switchTab(name, btn){
     payacct:   ()=> renderPayAcct(),
     surplus:   ()=> renderSurplusTab(),
     public:    ()=> renderPublicTab(),
-    inventory: ()=>{ renderInvLedger('drug'); renderInvLedger('supply'); renderInvVoucherRecon(); },
-    property:  ()=>{ updateDeprBalance(); renderDeprSchedule(); },
+    inventory: ()=> renderInventoryTab(),
+    property:  ()=> renderPropertyTab(),
     income:    ()=> renderImportedVouchers('收入'),
     expense:   ()=> renderImportedVouchers('支出'),
     voucher:   ()=> renderImportedVouchers('轉帳'),
@@ -1753,16 +1547,14 @@ function onYmChange(){
   if(globalLabel) globalLabel.textContent = `${label}`;
   const workTitle = document.getElementById('work-month-title');
   if(workTitle) workTitle.textContent = `${label} 月底結算`;
-  updateDeprBalance();
+  renderPropertyTab();
   updatePrevMonthLabels();
   // 傳票頁同步（改讀匯入版轉帳傳票）
   renderImportedVouchers('轉帳');
   // 公務預算分頁（年度切換時重新渲染）
   renderPublicTab();
   // 其他顯示分頁同步（截至選定月份的累計資料）
-  renderInvLedger('drug');
-  renderInvLedger('supply');
-  renderInvVoucherRecon();
+  renderInventoryTab();
   renderAllowLedger();
   renderPayable();
   renderCustodial();
@@ -3092,8 +2884,7 @@ async function saveVouchers(){
   }
   /* 傳票 → 各分頁同步（每次產製都全部刷新） */
   syncInvFromVoucher(ym, STATE.vouchers);
-  renderInvLedger('drug');
-  renderInvLedger('supply');
+  renderInventoryTab();
   renderPayable();
   renderCustodial();
   renderPayAcct();
@@ -6799,6 +6590,123 @@ function renderCustodial(){
     </div>`).join('');
 }
 
+/* ════ v6.1.7 醫療用品 110404／財產 130x：比照代收款，全部由匯入傳票推導（取代手動明細帳／折舊排程／官方結存匯入） ════ */
+function _d1Rows(subjectPrefix, y, ym){
+  const all = (window.AccV2 && AccV2.entries) ? AccV2.entries({ yearPrefix:String(y), subjectPrefix }) : [];
+  return all.filter(e => String(e.ym||'').startsWith(String(y)) && (!e.ym || String(e.ym) <= ym));
+}
+function _d1VtChip(vno){
+  const t = {'1':'收入','2':'支出','3':'轉帳'}[String(vno||'').charAt(3)] || '';
+  return t ? `<span class="acc-chip vt">${t}</span>` : '';
+}
+function _d1Sec(title, list, positive){
+  const sum = list.reduce((s,e)=>s+Math.abs(e.amt),0);
+  const rows = list.length
+    ? [...list].sort((a,b)=>String(b.ym||'').localeCompare(String(a.ym||'')) || String(b.voucher_no||'').localeCompare(String(a.voucher_no||'')) || ((b.seq||0)-(a.seq||0)))
+      .map((e,i)=>`<tr style="${i%2?'background:var(--ivory,#faf9f5);':''}">
+        <td style="padding:4px 10px;color:var(--olive-gray,#5e5d59);white-space:nowrap;">${e.post_date||e.ym||''}</td>
+        <td style="padding:4px 10px;color:var(--terracotta,#c96442);font-size:11px;white-space:nowrap;">${e.voucher_no||''}#${e.seq||''}</td>
+        <td style="padding:4px 10px;color:var(--near-black,#333);font-size:11px;">${_d1VtChip(e.voucher_no)}${String(e.description||'').replace(/</g,'&lt;')}</td>
+        <td style="padding:4px 10px;text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;color:${(positive ? e.amt>=0 : e.amt<=0)?'#466934':'#8a2f2a'};font-weight:600;">${e.amt<0&&positive?'−':''}${fmt(Math.abs(e.amt))}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="4" style="padding:6px 10px;color:var(--ink-3,#c8ccd0);text-align:center;">（無）</td></tr>`;
+  return `
+    <div style="background:${positive?'#eef4e8':'#f6ece9'};padding:4px 12px;font-size:11px;font-weight:700;color:${positive?'#3f5f30':'#8a2f2a'};">
+      ${title}<span style="float:right;font-variant-numeric:tabular-nums;">${fmt(sum)}（${list.length}筆）</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;">
+      <colgroup><col style="width:80px;"><col style="width:110px;"><col><col style="width:110px;"></colgroup>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+function _d1Card(o){
+  return `
+    <div class="card">
+      <div class="card-hd ${o.color}">
+        ${o.icon||'🏦'} ${o.code}　${o.name}
+        <span style="margin-left:auto;font-size:13px;font-weight:500;">${o.headerRight}</span>
+      </div>
+      ${o.note?`<div style="font-size:11px;padding:6px 12px;color:var(--olive-gray,#5e5d59);background:var(--border-cream,#f0eee6);border-bottom:1px solid var(--border-warm,#e8e6dc);">💡 ${o.note}</div>`:''}
+      ${o.secs.map(s=>_d1Sec(s.title, s.list, s.positive)).join('')}
+    </div>`;
+}
+function _d1Empty(msg){
+  return `<div class="card"><div class="card-bd" style="text-align:center;padding:32px;color:#78909c;">📭 ${msg}</div></div>`;
+}
+/* 醫療用品 110404：期初結轉 ＋ 借方（進貨／盤盈）− 貸方（領用／報廢／盤損）＝ 結存（＝官方醫療用品明細表） */
+function renderInventoryTab(){
+  const {y, m, ym} = getYm();
+  const hint = document.getElementById('inventory-cutoff-hint');
+  if(hint) hint.textContent = `截至 ${y} 年 ${m} 月`;
+  const rows = _d1Rows('110404', y, ym).map(e => ({ ...e, amt:(+e.debit||0)-(+e.credit||0) }));
+  const openRows = rows.filter(e => isYearOpeningVoucher(e.voucher_no));
+  const body = rows.filter(e => !isYearOpeningVoucher(e.voucher_no));
+  const open = openRows.reduce((s,e)=>s+e.amt,0);
+  const inc = body.filter(e => e.amt > 0), dec = body.filter(e => e.amt < 0);
+  const incSum = inc.reduce((s,e)=>s+e.amt,0), decSum = dec.reduce((s,e)=>s+Math.abs(e.amt),0);
+  const total = open + incSum - decSum;
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent = v; };
+  set('inv-total', fmt(total)); set('inv-open', fmt(open)); set('inv-in', fmt(incSum)); set('inv-out', fmt(decSum));
+  const sec = document.getElementById('inventory-sections');
+  if(!sec) return;
+  if(!rows.length){ sec.innerHTML = _d1Empty('此年度尚無 110404 醫療用品分錄 —— 請匯入傳票明細（FNWFRX0090）。'); return; }
+  sec.innerHTML = _d1Card({
+    code:'110404', name:'醫療用品', color:'hd-green', icon:'📦',
+    headerRight:`期初 ${fmt(open)}　＋　增加 ${fmt(incSum)}　−　減少 ${fmt(decSum)}　＝　結存 ${fmt(total)}`,
+    note:'傳票未分藥品／衛材，採合計層級；藥品／衛材分項以官方 DPReport3 庫存月報表為準。',
+    secs:[
+      { title:'＋ 增加（借方：進貨／盤盈）', list:inc, positive:true },
+      { title:'− 減少（貸方：領用／報廢／盤損）', list:dec, positive:false },
+    ],
+  });
+}
+/* 財產 130x：各類別 原始成本（130x01 借餘）− 累積折舊（130x03 貸餘）＝ 帳面淨值（＝官方財產分類統計表） */
+const PROP_CATS_DEF = [
+  { code:'1304', name:'機械及設備',     color:'hd-teal'   },
+  { code:'1305', name:'交通及運輸設備', color:'hd-blue'   },
+  { code:'1306', name:'什項設備',       color:'hd-purple' },
+];
+function renderPropertyTab(){
+  const {y, m, ym} = getYm();
+  const hint = document.getElementById('property-cutoff-hint');
+  if(hint) hint.textContent = `截至 ${y} 年 ${m} 月`;
+  const set = (id,v)=>{ const el=document.getElementById(id); if(el) el.textContent = v; };
+  let tCost = 0, tAcc = 0, tDepr = 0, cards = '', any = false;
+  PROP_CATS_DEF.forEach(c => {
+    const costRows = _d1Rows(c.code+'01', y, ym).map(e => ({ ...e, amt:(+e.debit||0)-(+e.credit||0) }));
+    const deprRows = _d1Rows(c.code+'03', y, ym).map(e => ({ ...e, amt:-((+e.credit||0)-(+e.debit||0)) }));   /* 折舊列以負值顯示（減項） */
+    if(!costRows.length && !deprRows.length) return;
+    any = true;
+    const openCost = costRows.filter(e=>isYearOpeningVoucher(e.voucher_no)).reduce((s,e)=>s+e.amt,0);
+    const openAcc  = deprRows.filter(e=>isYearOpeningVoucher(e.voucher_no)).reduce((s,e)=>s-e.amt,0);
+    const chg  = costRows.filter(e=>!isYearOpeningVoucher(e.voucher_no));
+    const depr = deprRows.filter(e=>!isYearOpeningVoucher(e.voucher_no));
+    const cost = openCost + chg.reduce((s,e)=>s+e.amt,0);
+    const acc  = openAcc + depr.reduce((s,e)=>s-e.amt,0);
+    const net  = cost - acc;
+    tCost += cost; tAcc += acc;
+    tDepr += depr.filter(e=>String(e.ym)===String(ym)).reduce((s,e)=>s-e.amt,0);
+    cards += _d1Card({
+      code:c.code, name:c.name, color:c.color, icon:'🏚️',
+      headerRight:`原始成本 ${fmt(cost)}　−　累積折舊 ${fmt(acc)}　＝　淨值 ${fmt(net)}`,
+      note:`年初結轉：原始成本 ${fmt(openCost)}／累積折舊 ${fmt(openAcc)}（${y}300001）`,
+      secs:[
+        { title:`＋ 財產增減（${c.code}01）`, list:chg,  positive:true  },
+        { title:`− 本年折舊（${c.code}03）`, list:depr, positive:false },
+      ],
+    });
+  });
+  set('prop-balance', any ? fmt(tCost - tAcc) : '—');
+  set('prop-cost', any ? fmt(tCost) : '—');
+  set('prop-accum-depr', any ? fmt(tAcc) : '—');
+  set('prop-depr', any ? fmt(tDepr) : '—');
+  set('prop-cur-label', `🏚️ ${m}月期末帳面淨值（元）`);
+  set('prop-depr-label', `${m}月折舊（元）`);
+  const sec = document.getElementById('property-sections');
+  if(!sec) return;
+  sec.innerHTML = any ? cards : _d1Empty('此年度尚無 130x 財產分錄 —— 請匯入傳票明細（FNWFRX0090）。');
+}
+
 /* ════ 累積賸餘 330101 明細帳 ════ */
 function renderSurplusTab(){
   const {y} = getYm();
@@ -7242,6 +7150,7 @@ function saveInvLedger(type){
 function recalcInvLedger(type){
   /* 只需更新新增輸入列的餘額欄，鎖定列的餘額已在 renderInvLedger 算好 */
   const tbody = document.getElementById(type+'-tbody');
+  if(!tbody) return;   /* v6.1.7 手動明細帳 DOM 已移除 */
   let bal = getInvInit(type);
   tbody.querySelectorAll('tr').forEach(tr=>{
     const voided = tr.dataset.voided==='1';
@@ -7351,6 +7260,7 @@ function renderInvLedger(type){
   // 只顯示截至選定月份的資料（ym≤filterYm 或 type=期初）
   const data = allData.filter(r => !r.ym || r.ym <= filterYm);
   const tbody = document.getElementById(type+'-tbody');
+  if(!tbody) return;   /* v6.1.7 手動明細帳 DOM 已移除 */
   let bal = getInvInit(type);
   tbody.innerHTML = data.map(r=>{
     const voided = !!r.voided;
@@ -7693,6 +7603,7 @@ function medRestore(id){
 
 async function loadEafMedical(){
   const tbody = document.getElementById('eaf-medical-tbody');
+  if(!tbody) return;   /* v6.1.7 動支單進貨核對 UI 已隨手動明細帳移除 */
   try {
     const resp = await fetch('/api/records',{headers:{'Content-Type':'application/json'}});
     if(!resp.ok) throw new Error('API error');
