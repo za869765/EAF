@@ -545,6 +545,11 @@ async function boot() {
   if (_offFixes.length) setTimeout(() => confirmAnim(
     `<b>🔧 沖帳自動修復（依最新 0100 未沖清單）</b><br><br>${_offFixes.map(esc).join('<br>')}`,
     '知道了', '關閉'), 400);
+  /* v6.2.3 修正前（<6.2.1）產生的草稿：同名受款人金額對映失敗存成 0 → 受款人補回發票金額、來源單借方列補回受款人合計、銀行列重算 */
+  const _amtFixes = repairZeroAmounts();
+  if (_amtFixes.length) { saveDrafts(); setTimeout(() => confirmAnim(
+    `<b>🔧 金額 0 自動修復（受款人依發票金額、分錄依受款人合計）</b><br><br>${_amtFixes.map(esc).join('<br>')}`,
+    '知道了', '關閉'), _offFixes.length ? 900 : 400); }
   /* v5.7.23 還原 LAST_EXPORT：重整後草稿與下載時一致才恢復「標記已匯出」；不一致（含自動修復有動作）＝須重新下載 */
   try {
     const le = JSON.parse(localStorage.getItem('sba_last_export') || 'null');
@@ -2025,6 +2030,34 @@ async function offsetItemDone(okey) {
 /* v5.7.22 沖帳自動修復：草稿所有沖帳連結對最新 0100 白名單重驗（冪等，boot 時執行）。
    ①offset.max 同步官方未沖額 ②依草稿順序逐標的累計：超額列縮至可用額＋餘額拆新列、
    標的用光的整列改連——替代目標＝同科目「剩餘最大」的立帳（子目自 D1 帶）；無可用→留紅沖帳鈕手選 */
+/* v6.2.3 草稿金額 0 修復：受款人 amt 0 且統一發票金額 > 0 → amt＝發票金額；同來源單據（payee.srcRec＝單號 ↔ line.srcRec＝id）
+   的借方列 amt 0 → 該單受款人合計；銀行列 syncBankLine 重算。只碰 0 值，其餘一律不動 */
+function repairZeroAmounts() {
+  const fixes = [];
+  const idByNo = new Map((STATE.records || []).map(r => [String(r.voucherNo || ''), r.id]));
+  for (const v of STATE.drafts || []) {
+    const touched = new Map();   /* recId → Σ 補回金額 */
+    for (const p of v.payees || []) {
+      if ((+p.amt || 0) !== 0) continue;
+      const ia = Math.round((+(p.invoices && p.invoices[0] && p.invoices[0].invamt) || 0) * 100) / 100;
+      if (ia <= 0) continue;
+      p.amt = ia;
+      fixes.push(`${v.importrecno} 受款人#${p.seq} ${p.name}：0 → ${fmtN(ia)}`);
+      const rid = idByNo.get(String(p.srcRec || ''));
+      if (rid != null) touched.set(rid, Math.round(((touched.get(rid) || 0) + ia) * 100) / 100);
+    }
+    if (!touched.size) continue;
+    for (const L of v.lines || []) {
+      if (L.dc !== 'D' || (+L.amt || 0) !== 0) continue;
+      const sum = touched.get(L.srcRec);
+      if (!sum) continue;
+      L.amt = sum;
+      fixes.push(`${v.importrecno} 序號${L.seq} ${L.code}：0 → ${fmtN(sum)}`);
+    }
+    syncBankLine(v);
+  }
+  return fixes;
+}
 function autoRepairOffsets() {
   const items = (STATE.offsetOpen && STATE.offsetOpen.items) || [];
   if (!items.length || !STATE.drafts.length) return [];
