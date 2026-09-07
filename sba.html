@@ -598,6 +598,7 @@ async function boot() {
   $('ex-date').value = todayIso();
   suggestBatch();
   buildAcctFilter();
+  restorePickFilters();   /* v6.2.4 */
   buildTrCopyOptions();
   renderPickList();
   addTrLine(); addTrLine();
@@ -761,13 +762,16 @@ function pickFiltered() {
     if (r.voided) return false;
     if (PICK_SKIP_ACCTS.has(r.acctCode)) return false;
     if (!['expense', 'purchase'].includes(r.formType)) return false;
-    if (onlyPrinted && !r.printed) return false;
-    if (onlyUnexp && STATE.exported[r.id]) return false;
-    if (ft && r.formType !== ft) return false;
-    if (acct && r.acctCode !== acct) return false;
-    const d = recDateIso(r);
-    if (from && d && d < from) return false;
-    if (to && d && d > to) return false;
+    /* v6.2.4 已勾選的單一律顯示（使用者指定：不因期間／僅已列印／僅未匯出／類型／專戶改變而消失或取消勾選）；搜尋關鍵字仍套用 */
+    if (!STATE.pickSel.has(String(r.id))) {
+      if (onlyPrinted && !r.printed) return false;
+      if (onlyUnexp && STATE.exported[r.id]) return false;
+      if (ft && r.formType !== ft) return false;
+      if (acct && r.acctCode !== acct) return false;
+      const d = recDateIso(r);
+      if (from && d && d < from) return false;
+      if (to && d && d > to) return false;
+    }
     if (q) {
       const hay = [r.voucherNo, r.purposeDesc, r.bpLabel,
         ...(r.payees || []).map(p => p.name)].join(' ');
@@ -805,7 +809,31 @@ function pickRowHtml(r, effCat, key) {
     <td>${st}</td>
     <td style="white-space:nowrap;">${mv}</td></tr>`;
 }
+/* v6.2.4 篩選設定（期間／僅已列印／僅未匯出／類型／專戶）記在瀏覽器，重整後還原，不再跳回近 35 天預設 */
+const PICK_FILTER_KEY = 'sba_pick_filters';
+function savePickFilters() {
+  try {
+    localStorage.setItem(PICK_FILTER_KEY, JSON.stringify({
+      from: $('pk-from').value, to: $('pk-to').value,
+      printed: $('pk-printed').checked, unexp: $('pk-unexported').checked,
+      type: $('pk-type').value, acct: $('pk-acct').value,
+    }));
+  } catch (_) {}
+}
+function restorePickFilters() {
+  let f = null;
+  try { f = JSON.parse(localStorage.getItem(PICK_FILTER_KEY) || 'null'); } catch (_) { f = null; }
+  if (!f || typeof f !== 'object') return false;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(f.from || ''))) $('pk-from').value = f.from;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(f.to || ''))) $('pk-to').value = f.to;
+  $('pk-printed').checked = !!f.printed;
+  $('pk-unexported').checked = !!f.unexp;
+  if ([...$('pk-type').options].some(o => o.value === String(f.type || ''))) $('pk-type').value = String(f.type || '');
+  if ([...$('pk-acct').options].some(o => o.value === String(f.acct || ''))) $('pk-acct').value = String(f.acct || '');
+  return true;
+}
 function renderPickList() {
+  savePickFilters();
   const rows = pickFiltered();
   const ctx = mapCtx();
   const q = $('pk-q').value.trim();
