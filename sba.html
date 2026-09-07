@@ -736,9 +736,11 @@ function apEstFor(id) {
 }
 
 /* ═══════════════ 📋 選單製票 ═══════════════ */
+/* v6.1.9 勾單頁忽略健保款暫存專戶（使用者指定「請勿顯示」）：六大格／專戶下拉／勾選摘要皆不出現 */
+const PICK_SKIP_ACCTS = new Set(['11010203']);
 function buildAcctFilter() {
   const sel = $('pk-acct');
-  const accts = [...new Set(STATE.records.map(r => r.acctCode).filter(Boolean))].sort();
+  const accts = [...new Set(STATE.records.map(r => r.acctCode).filter(a => a && !PICK_SKIP_ACCTS.has(a)))].sort();
   for (const a of accts) {
     const o = document.createElement('option');
     o.value = a; o.textContent = `${a} ${subjectName(a)}`;
@@ -752,6 +754,7 @@ function pickFiltered() {
   const q = $('pk-q').value.trim();
   return STATE.records.filter(r => {
     if (r.voided) return false;
+    if (PICK_SKIP_ACCTS.has(r.acctCode)) return false;
     if (!['expense', 'purchase'].includes(r.formType)) return false;
     if (onlyPrinted && !r.printed) return false;
     if (onlyUnexp && STATE.exported[r.id]) return false;
@@ -801,7 +804,7 @@ function renderPickList() {
   const rows = pickFiltered();
   const ctx = mapCtx();
   const q = $('pk-q').value.trim();
-  const accts = [...new Set(STATE.records.map(r => r.acctCode).filter(Boolean))].sort();
+  const accts = [...new Set(STATE.records.map(r => r.acctCode).filter(a => a && !PICK_SKIP_ACCTS.has(a)))].sort();
   const byKey = new Map();                       /* 'acct|cat' → {recs:[{r,effCat}], sum} */
   const catPayees = { '1': new Set(), '6': new Set() }; /* 未出帳不重複受款人（兩專戶合計） */
   const ownAcctRe = /(保管款|醫療基金|醫療作業基金)專戶/;  /* 本所兩專戶不算受款人 */
