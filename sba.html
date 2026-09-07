@@ -2093,6 +2093,17 @@ async function pickOffset(vchrno, seq, avail, dseq) {
     offs.length = 0;
     need = +L.amt || 0;
   }
+  /* v6.2.2 選此列改可填沖帳金額（SBA 沖帳作業本可部分沖）：預設＝本列剩餘與可沖額取小，可改小；差額由既有續選機制接手 */
+  const auto = Math.round(Math.min(need, cap) * 100) / 100;
+  const raw = await promptAnim(
+    `<b>沖帳金額</b> — 立帳 ${esc(String(vchrno))}#${esc(String(seq))}<br>`
+    + `<span class="small">本列剩餘 <b>${fmtN(need)}</b>，此立帳可沖 <b>${fmtN(cap)}</b>；可改小，差額會再開選單續選其他立帳</span>`, auto);
+  if (raw == null) return;
+  const want = Math.round((+String(raw).replace(/,/g, '') || 0) * 100) / 100;
+  if (!(want > 0) || want > auto) {
+    await confirmAnim(`沖帳金額須介於 0 ～ ${fmtN(auto)}（輸入：${esc(String(raw))}）`, '知道了', '關閉');
+    return;
+  }
   /* 子目相容：F04 一列僅一個沖銷子目欄——不同子目仍須拆列（動畫彈窗確認） */
   if (offs.length && sub !== null && String(sub || '') !== String(L.relate || '')) {
     if (!await confirmAnim(
@@ -2101,7 +2112,7 @@ async function pickOffset(vchrno, seq, avail, dseq) {
     L.amt = linked;
     const clone = { ...L, amt: need, relate: '' };
     delete clone.offsets; delete clone.offset;
-    const grant = Math.min(need, cap);
+    const grant = want;   /* v6.2.2 使用者填的沖帳金額 */
     clone.offsets = [{ year: String(vchrno).slice(0, 3), kind: String(vchrno).slice(3, 4),
       vchrno: String(vchrno), seq, amt: grant, max: cap, sub }];
     if (sub !== null) clone.relate = sub;
@@ -2114,7 +2125,7 @@ async function pickOffset(vchrno, seq, avail, dseq) {
   }
   /* 同子目（或首筆）：本列（加）沖，一列多筆免拆列（v5.7.26，同 dtlseq 多筆 F06）；
      可用額不足 → 先沖可用額、自動重開視窗續選下一筆 */
-  const grant = Math.min(need, cap);
+  const grant = want;   /* v6.2.2 使用者填的沖帳金額 */
   /* v5.8.6 同列重複選同一立帳 → 合併並以可沖上限封頂（原本直接 push 疊加，差額續選連點兩次
      同一筆會超沖，匯出才被跨列累計檢核擋下） */
   const dup = offs.find(o => String(o.vchrno) === String(vchrno) && +o.seq === +seq);
@@ -2126,7 +2137,7 @@ async function pickOffset(vchrno, seq, avail, dseq) {
       await confirmAnim(`此立帳 <b>${esc(String(vchrno))}#${esc(String(seq))}</b> 本列已沖至上限 ${fmtN(capMax)}，不可重複加沖。<br>差額請改沖其他立帳，或用「✂️ 差額立暫付」轉 180705。`, '知道了', '關閉');
       return;
     }
-    const add = Math.min(need, room);
+    const add = Math.min(want, room);   /* v6.2.2 */
     dup.amt = Math.round(((+dup.amt || 0) + add) * 100) / 100;
     L.offsets = offs; delete L.offset;
     closeModal(); renderPreview();
