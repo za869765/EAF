@@ -1897,9 +1897,20 @@ function renderOffsetList(q) {
         synthS.map(o => ({ base: +o.left || 0, used: usedOfK(o.vch, +o.seq || 0) })));
       html += synthS.map(o => rowHtml({ voucher_no: o.vch, seq: o.seq, post_date: '', sub_account: o.name, description: o.desc }, o.left, true, undefined, hotKeys.has(o.vch + '#' + o.seq), o.vch + '#' + o.seq)).join('');
     }
-    const currentS = sortAmt ? [...current].sort((a, b) => (+matchOf.get(keyOf(b)).left || 0) - (+matchOf.get(keyOf(a)).left || 0)) : current;
-    const curRow = (e) => { const o = matchOf.get(keyOf(e)); return rowHtml(e, o.left, true, +o.seq || 0, hotKeys.has(keyOf(e)), o.vch + '#' + o.seq); };
-    const curSt = (arr) => arr.map(e => { const o = matchOf.get(keyOf(e)); return { base: +o.left || 0, used: usedOfK(e.voucher_no, +o.seq || 0) }; });
+    /* v6.2.6 「晚於餘額表的新立帳」不再獨立成區（使用者：直接放回原本科目）：與現行未沖混排，依 cands 既有排序併入各科目＋子目群組；
+       新立帳無官方未沖額 → 仍以立帳額為上限（rowHtml left=null） */
+    const isNew = (e) => newerKeys.has(keyOf(e));
+    const mixed = cands.filter(e => matchOf.has(keyOf(e)) || newerKeys.has(keyOf(e))).filter(filt).filter(useHit);
+    const leftOf = (e) => isNew(e) ? amtOfE(e) : (+matchOf.get(keyOf(e)).left || 0);
+    const currentS = sortAmt ? [...mixed].sort((a, b) => leftOf(b) - leftOf(a)) : mixed;
+    const curRow = (e) => {
+      if (isNew(e)) return rowHtml(e, null, true, undefined, hotKeys.has(keyOf(e)));
+      const o = matchOf.get(keyOf(e)); return rowHtml(e, o.left, true, +o.seq || 0, hotKeys.has(keyOf(e)), o.vch + '#' + o.seq);
+    };
+    const curSt = (arr) => arr.map(e => {
+      if (isNew(e)) return { base: amtOfE(e), used: usedOfK(e.voucher_no, +e.seq || 0) };
+      const o = matchOf.get(keyOf(e)); return { base: +o.left || 0, used: usedOfK(e.voucher_no, +o.seq || 0) };
+    });
     if (sortAmt) {
       if (currentS.length) html += grpHeader('off-h-cur', '✅ 現行未沖（金額大→小）', curSt(currentS)) + currentS.map(curRow).join('');
     } else {
@@ -1918,12 +1929,7 @@ function renderOffsetList(q) {
         html += gr.rows.map(curRow).join('');
       }
     }
-    if (newer.length) {
-      const newerS = sortAmt ? [...newer].sort((a, b) => amtOfE(b) - amtOfE(a)) : newer;
-      html += grpHeader('off-h-new', '🕓 晚於餘額表的新立帳（官方未沖額未知，請確認未在 SBA 端沖過）',
-        newerS.map(e => ({ base: amtOfE(e), used: usedOfK(e.voucher_no, +e.seq || 0) })));
-      html += newerS.map(e => rowHtml(e, null, true, undefined, hotKeys.has(keyOf(e)))).join('');
-    }
+    /* v6.2.6 newer 已併入上方群組，不再獨立區塊 */
     html += `<tr class="off-h off-h-hist"><td colspan="7"><button class="btn btn-sm" onclick="toggleOffsetHist()">👁 ${showHist ? '隱藏' : '顯示'}歷史/已沖畢立帳（${hist.length} 筆，不可選）</button></td></tr>`;
     if (showHist) html += hist.slice(0, 400).map(e => rowHtml(e, null, false)).join('')
       + (hist.length > 400 ? `<tr><td colspan="7" class="small">歷史僅顯示前 400 筆（共 ${hist.length}），請用搜尋</td></tr>` : '');
