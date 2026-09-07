@@ -1192,6 +1192,14 @@ window.addEventListener('storage', (ev) => {
       <div class="bb-label">21020312 疾管科</div>
     </div>
     <div class="bb-item">
+      <div class="bb-num" id="cust-313">0</div>
+      <div class="bb-label">21020313 心健科</div>
+    </div>
+    <div class="bb-item">
+      <div class="bb-num" id="cust-319">0</div>
+      <div class="bb-label">21020319 秘書室</div>
+    </div>
+    <div class="bb-item">
       <div class="bb-num" id="cust-322">0</div>
       <div class="bb-label">21020322 長照科</div>
     </div>
@@ -6610,6 +6618,7 @@ const CUST_GROUPS_DEF = [
   { code:'21020311', name:'國健科',             color:'hd-green',  note:'國民健康署業務補助款代收保管' },
   { code:'21020312', name:'疾管科',             color:'hd-purple', note:'疾病管制署業務補助款代收保管' },
   { code:'21020313', name:'心健科',             color:'hd-green',  note:'心理健康科業務補助款代收保管' },
+  { code:'21020319', name:'秘書室',             color:'hd-blue',   note:'秘書室業務補助款代收保管' },
   { code:'21020322', name:'長照科',             color:'hd-teal',   note:'長期照護科業務補助款代收保管' },
   { code:'21020321', name:'代收款（薪資相關）', color:'hd-amber',  note:'依保險別自動分卡：公保/退撫/公健/勞健/勞保/勞退' }
 ];
@@ -6731,7 +6740,7 @@ function renderCustodial(){
     const lastDay = new Date(Number(y)+1911, Number(m), 0).getDate();
     hintEl.textContent = `截至 ${y} 年 ${m} 月 ${lastDay} 日`;
   }
-  const ID_MAP = {'21020301':'cust-301','21020302':'cust-302','21020311':'cust-311','21020312':'cust-312','21020322':'cust-322','21020321':'cust-321'};
+  const ID_MAP = {'21020301':'cust-301','21020302':'cust-302','21020311':'cust-311','21020312':'cust-312','21020313':'cust-313','21020319':'cust-319','21020322':'cust-322','21020321':'cust-321'};
   data.groups.forEach(g=>{ const el=document.getElementById(ID_MAP[g.code]); if(el) el.textContent=fmt(g.subtotal||0); });
   const sec = document.getElementById('custodial-sections');
   if(!sec) return;
