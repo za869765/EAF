@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '6.1.7';
+const SBA_CORE_VERSION = '6.1.8';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -481,7 +481,8 @@ function voucherToF07Rows(v) {
       rows.push({
         finvoice_year: v.year, finvoice_kind: v.kind, finvoice_importrecno: v.importrecno,
         finvoice_dtlseq: String(P.seq), finvoice_dtl2seq: String(i + 1),
-        finvoice_invno: iv.invno || '',
+        /* v6.1.8 SBA 不接受發票號碼含「-」：匯出時去掉連字號與空白並轉大寫（FS-18786498 → FS18786498），畫面輸入原樣保留 */
+        finvoice_invno: String(iv.invno || '').replace(/[-\s]/g, '').toUpperCase(),
         finvoice_date: iv.invdate || '', finvoice_amt: fmt2(iv.invamt || 0),
         finvoice_compno: iv.compno || '',
         finvoice_name: truncBig5(iv.name || (P.rev === '2' ? P.name : '') || '', 200),
