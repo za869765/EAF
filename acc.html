@@ -8121,6 +8121,9 @@ function updateDeprBalance(){
   if(curLabel)  curLabel.textContent  = `🏚️ ${m}月期末（元）` + (balance == null ? '｜待官方結存' : (curIsOff ? '｜官方' : '｜計算'));
   if(prevLabel) prevLabel.textContent = `${prevM}月期末（元）`;
   if(curBal)    curBal.textContent    = balance == null ? '—' : fmt(balance);      /* null 不可餵 fmt（會顯示成 0 的假餘額） */
+  /* v6.1.6：累積折舊卡原為寫死 239,931（3月值）；改＝什項設備原始成本 320,557 − 期末淨值（8月＝249,910，與傳票 130603 一致） */
+  const accumEl = document.getElementById('prop-accum-depr');
+  if(accumEl)   accumEl.textContent   = balance == null ? '—' : fmt(320557 - balance);
   if(prevBal)   prevBal.textContent   = prevBalDyn == null ? '—' : fmt(prevBalDyn);
   /* v4.7.4：首頁卡 rc-property 改由 updateHomeDashboard 以傳票值(130x01−130x03)設定，此處不再覆寫 */
   /* v4.4.64：折舊存摺自動延伸到選定月份 */
