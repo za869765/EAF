@@ -1601,7 +1601,7 @@ body.sb-resizing * { pointer-events: none !important; }
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
         <label style="width:90px; font-size:15px; font-weight:600; color:#333; flex-shrink:0;">戶名</label>
         <input id="np-name" type="text" style="flex:1; height:42px; padding:8px 14px; border:1.5px solid #ccc; border-radius:6px; font-size:15px;">
-        <!-- v6.2.7 中信受託專戶每月虛擬帳號不同：一鍵帶入戶名/銀行/代號，只需填新帳號 -->
+        <!-- v6.2.7 中信受託專戶每月虛擬帳號不同：一鍵帶入戶名/銀行/代號，只需填新帳號（v6.2.8 新建後自動凍結舊帳號） -->
         <button type="button" onclick="fillCtbcTrustPayee()" title="帶入中國信託受託信託財產專戶的戶名／銀行／代號，只需填當月虛擬帳號" style="padding:10px 14px; background:#546e7a; color:#fff; border:none; border-radius:6px; font-size:14px; cursor:pointer; white-space:nowrap;">中信受託專戶</button>
       </div>
 
@@ -5610,13 +5610,18 @@ function renderPayeeCardList(i) {
         || (p.bank||'').toLowerCase().includes(kw)
         || (p.acctNo||'').toLowerCase().includes(kw);
   }).slice(0, 60);
+  /* v6.2.8 中信受託專戶每月換帳號：關鍵字命中即置頂捷徑，一鍵開新建（戶名/銀行/代號已帶好） */
+  const quick = (kw.length >= 2 && (CTBC_TRUST_NAME.toLowerCase().includes(kw) || '中信受託專戶'.includes(kw)))
+    ? `<div class="payee-item" style="background:#e8f5e9; border-left:4px solid #2e7d32;" onclick="openCtbcTrustPayeeForCard(${i})">
+        <div><span class="pi-name" style="color:#1b5e20;">＋ 新建中信受託專戶本月帳號</span><span style="font-size:11px; color:#555;">戶名／銀行／代號自動帶入，只填新虛擬帳號；舊帳號自動凍結</span></div>
+      </div>` : '';
   if (!list.length) {
-    box.innerHTML = '<div style="padding:10px; color:#888; text-align:center; font-size:12px;">無符合資料（可按「＋ 新建」加入）</div>';
+    box.innerHTML = quick + '<div style="padding:10px; color:#888; text-align:center; font-size:12px;">無符合資料（可按「＋ 新建」加入）</div>';
     box.style.display = '';
     box._filtered = [];
     return;
   }
-  box.innerHTML = list.map((p, k) => {
+  box.innerHTML = quick + list.map((p, k) => {
     if (p._frozen) {
       return `<div class="payee-item payee-item-frozen">
         <div><span class="pi-name">${esc(p.name||'—')}</span><span class="pi-bank">${esc(p.bank||'—')}</span><span class="pi-acct">${esc(p.acctNo||'—')}</span>　<span style="font-size:11px; color:#888;">🧊 已作廢</span></div>
@@ -5793,6 +5798,11 @@ function autoFillEmployeePayees() {
 }
 
 /* v4.2.23 指定由哪張卡呼叫新建 */
+/* v6.2.8 受款人卡捷徑：開新建彈窗並帶入中信受託專戶 */
+function openCtbcTrustPayeeForCard(i) {
+  openNewPayeeModalForCard(i);
+  fillCtbcTrustPayee();
+}
 function openNewPayeeModalForCard(i, prefillName) {
   _npTargetCardIdx = i;
   openNewPayeeModal(prefillName);
@@ -5975,8 +5985,23 @@ async function submitNewPayee() {
       body: JSON.stringify(newPayee)
     });
     if (r.ok) {
+      /* v6.2.8 中信受託專戶：舊虛擬帳號用過即失效 → 新建成功後自動凍結同戶名其他現役帳號 */
+      let frozenN = 0;
+      if (name === CTBC_TRUST_NAME) {
+        const olds = PAYEES.filter(p => p.name === CTBC_TRUST_NAME && !p.frozen && p.acctNo !== acct);
+        for (const o of olds) {
+          try {
+            const fr = await fetch('/api/payees', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: o.name, acctNo: o.acctNo, bank: o.bank, frozen: true })
+            });
+            if (fr.ok) frozenN++;
+          } catch(_) {}
+        }
+      }
       await loadPayees();
-      showToast('✓ 已新建受款人');
+      showToast(frozenN ? `✓ 已新建中信受託專戶帳號，舊帳號 ${frozenN} 筆已凍結` : '✓ 已新建受款人');
     } else {
       /* 權限不足：本地暫加（僅當前 session）
          v4.2.25 bug#8：暫存進 PAYEES 時 isNew=false，避免下次存檔被誤標「★新受款人★」；
