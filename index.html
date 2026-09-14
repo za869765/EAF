@@ -5888,6 +5888,9 @@ function _jialieAcctFilter(el) {
   const bankCode = (document.getElementById('np-bank').value || '').split('-')[0];
   if (bankCode === '6180069') {
     el.value = el.value.replace(/\D/g, '').slice(0, 9);
+  } else if (_isCtbcTrustModal()) {
+    /* v6.2.9 中信受託專戶虛擬帳號：純數字、最多 14 碼 */
+    el.value = el.value.replace(/\D/g, '').slice(0, CTBC_TRUST_ACCT_LEN);
   }
   _checkPayeeDup();
 }
@@ -5904,21 +5907,26 @@ function closeNewPayeeModal() {
   document.getElementById('new-payee-modal').style.display = 'none';
   closeBankSearchModal();
 }
-/* v6.2.7 中國信託受託信託財產專戶：每月虛擬帳號不同，戶名/銀行/代號固定 */
+/* v6.2.7 中國信託受託信託財產專戶：每月虛擬帳號不同，戶名/銀行/代號固定
+   v6.2.9 三者改固定常數（舊帳號全數凍結後無現役可抄）；虛擬帳號限 14 碼數字 */
 const CTBC_TRUST_NAME = '中國信託商業銀行股份有限公司受託信託財產專戶';
+const CTBC_TRUST_BANK = '8220901-中國信託商業銀行營業部';
+const CTBC_TRUST_CODE = '03077208';
+const CTBC_TRUST_ACCT_LEN = 14;
+function _isCtbcTrustModal() {
+  return document.getElementById('np-name').value.trim() === CTBC_TRUST_NAME;
+}
 function fillCtbcTrustPayee() {
-  const ref = PAYEES.filter(p => p.name === CTBC_TRUST_NAME)
-                    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0];
   document.getElementById('np-name').value = CTBC_TRUST_NAME;
-  const bank = (ref && ref.bank) || '8220901-中國信託商業銀行營業部';
-  document.getElementById('np-bank').value = bank;
-  document.getElementById('np-bank-text').textContent = bank;
+  document.getElementById('np-bank').value = CTBC_TRUST_BANK;
+  document.getElementById('np-bank-text').textContent = CTBC_TRUST_BANK;
   document.getElementById('np-bank-text').style.color = '#1b5e20';
   const npCode = document.getElementById('np-code');
-  if (npCode && ref && ref.code) npCode.value = ref.code;
+  if (npCode) npCode.value = CTBC_TRUST_CODE;
   const acctEl = document.getElementById('np-acct');
-  acctEl.removeAttribute('maxLength');
-  acctEl.placeholder = '填當月虛擬帳號';
+  acctEl.maxLength = CTBC_TRUST_ACCT_LEN;
+  acctEl.placeholder = `填當月虛擬帳號（${CTBC_TRUST_ACCT_LEN} 碼數字）`;
+  acctEl.value = acctEl.value.replace(/\D/g, '').slice(0, CTBC_TRUST_ACCT_LEN);
   _checkPayeeDup();
   setTimeout(() => acctEl.focus(), 30);
 }
@@ -5953,6 +5961,11 @@ async function submitNewPayee() {
   /* v4.5.1 佳里區農會（6180069）帳號限 9 碼數字 */
   if (bank.startsWith('6180069') && !/^\d{9}$/.test(acct)) {
     showToast('✗ 佳里區農會帳號限 9 碼數字');
+    return;
+  }
+  /* v6.2.9 中信受託專戶虛擬帳號限 14 碼數字 */
+  if (name === CTBC_TRUST_NAME && !/^\d{14}$/.test(acct)) {
+    showToast(`✗ 中信受託專戶虛擬帳號須為 ${CTBC_TRUST_ACCT_LEN} 碼數字（目前 ${acct.length} 碼）`);
     return;
   }
   /* v4.4.86 受款人代號必填 + 格式檢查（統編 8 碼 / 身分證或居留證 10 碼） */
