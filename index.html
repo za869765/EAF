@@ -1601,6 +1601,8 @@ body.sb-resizing * { pointer-events: none !important; }
       <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">
         <label style="width:90px; font-size:15px; font-weight:600; color:#333; flex-shrink:0;">戶名</label>
         <input id="np-name" type="text" style="flex:1; height:42px; padding:8px 14px; border:1.5px solid #ccc; border-radius:6px; font-size:15px;">
+        <!-- v6.2.7 中信受託專戶每月虛擬帳號不同：一鍵帶入戶名/銀行/代號，只需填新帳號 -->
+        <button type="button" onclick="fillCtbcTrustPayee()" title="帶入中國信託受託信託財產專戶的戶名／銀行／代號，只需填當月虛擬帳號" style="padding:10px 14px; background:#546e7a; color:#fff; border:none; border-radius:6px; font-size:14px; cursor:pointer; white-space:nowrap;">中信受託專戶</button>
       </div>
 
       <!-- 4) v4.4.86 受款人代號（必填）：統編 8 碼 或 身分證 10 碼 -->
@@ -5892,13 +5894,33 @@ function closeNewPayeeModal() {
   document.getElementById('new-payee-modal').style.display = 'none';
   closeBankSearchModal();
 }
+/* v6.2.7 中國信託受託信託財產專戶：每月虛擬帳號不同，戶名/銀行/代號固定 */
+const CTBC_TRUST_NAME = '中國信託商業銀行股份有限公司受託信託財產專戶';
+function fillCtbcTrustPayee() {
+  const ref = PAYEES.filter(p => p.name === CTBC_TRUST_NAME)
+                    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))[0];
+  document.getElementById('np-name').value = CTBC_TRUST_NAME;
+  const bank = (ref && ref.bank) || '8220901-中國信託商業銀行營業部';
+  document.getElementById('np-bank').value = bank;
+  document.getElementById('np-bank-text').textContent = bank;
+  document.getElementById('np-bank-text').style.color = '#1b5e20';
+  const npCode = document.getElementById('np-code');
+  if (npCode && ref && ref.code) npCode.value = ref.code;
+  const acctEl = document.getElementById('np-acct');
+  acctEl.removeAttribute('maxLength');
+  acctEl.placeholder = '填當月虛擬帳號';
+  _checkPayeeDup();
+  setTimeout(() => acctEl.focus(), 30);
+}
 function _checkPayeeDup() {
   const name = document.getElementById('np-name').value.trim();
   const acct = document.getElementById('np-acct').value.trim();
   const warn = document.getElementById('np-dup-warn');
   if (!name && !acct) { warn.style.display = 'none'; return; }
+  /* v6.2.7 中信受託專戶每月虛擬帳號不同、同戶名屬常態：不比戶名，只比帳號 */
+  const skipName = name === CTBC_TRUST_NAME;
   const dups = PAYEES.filter(p =>
-    (name && p.name === name) || (acct && p.acctNo === acct)
+    (name && !skipName && p.name === name) || (acct && p.acctNo === acct)
   );
   if (dups.length) {
     warn.style.display = '';
