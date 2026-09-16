@@ -2893,7 +2893,7 @@ function renderPayeeDiff() {
       <td style="white-space:nowrap;">${recent}</td>
       <td>${waySel}</td>
       ${(!x.skip && farmAcctBad(r))
-        ? `<td><input class="w-code" style="background:#fff3b0;" value="${esc(r[5])}" title="農會存入帳戶帳號應為9碼" onchange="piUpd(${i},5,this.value)"></td>`
+        ? `<td><input class="w-code" style="background:#fff3b0;" value="${esc(r[5])}" title="農會存入帳戶帳號應為9碼（公庫5碼）" onchange="piUpd(${i},5,this.value)"></td>`
         : `<td style="font-family:monospace;">${esc(r[5])}</td>`}
       <td>${esc(r[7])}</td>
       <td>${revSel}</td>
@@ -2903,7 +2903,7 @@ function renderPayeeDiff() {
         : dupCode
         ? '⚠️代碼已存在 SBA——請選擇右側「不匯入」或「自行刪除後匯入」（未刪舊檔就匯，該筆起會報「代碼重複」中止）'
         : [r[0] ? '' : '請補代碼後匯出（SBA 現況每筆皆有統編/身分證）',
-        farmAcctBad(r) ? '農會帳號應為9碼，請修正（公庫 94275/65012 除外）' : '',
+        farmAcctBad(r) ? '農會帳號應為9碼或公庫5碼，請修正' : '',
         (r[7] && !STATE.bankByCode.has(r[7])) ? '⚠️分行代號不在SBA金融機構檔（官方手冊：必須已建檔）' : ''].filter(Boolean).join('；')}</td>
       <td style="white-space:nowrap;">${x.skip
         ? `<button class="btn btn-sm" onclick="piSkip(${i},false)" title="恢復列入匯出">↩ 恢復</button>`
@@ -2933,9 +2933,9 @@ function piSkip(i, on) {
   putConfig('sba_payee_skip', [...STATE.paySkip]);
 }
 function piUpd(i, col, v) { PI_ROWS[i].row[col] = String(v || '').trim(); }
-/* 佳里區農會「1 存入帳戶」帳號應為 9 碼；公庫 94275／65012 兩戶除外（使用者規則） */
+/* 佳里區農會「1 存入帳戶」帳號應為 9 碼；v6.3.0 公庫戶一律 5 碼亦可（使用者規則） */
 function farmAcctBad(r) {
-  return r[4] === '1' && !/^\d{9}$/.test(r[5]) && !/(94275|65012)$/.test(r[5]);
+  return r[4] === '1' && !/^(\d{5}|\d{9})$/.test(r[5]) && !/(94275|65012)$/.test(r[5]);
 }
 /* 受款人代碼：填一格自動勾選；統編欄僅在值為合格 8 碼公司統編時同步（SBA 統編欄有邏輯檢查，身分證不可放） */
 function piUpdCode(i, v) {
@@ -2983,7 +2983,7 @@ async function downloadFnwacx() {
   const missing = sel.filter(x => !x.row[0]).length;
   if (missing && !confirm(`${missing} 筆缺受款人代碼（SBA 現況每筆皆有代碼，可能拒收），仍要匯出？`)) return;
   const badFarm = sel.filter(x => farmAcctBad(x.row));
-  if (badFarm.length && !confirm(`${badFarm.length} 筆農會存入帳戶帳號非9碼（公庫 94275/65012 除外）：\n`
+  if (badFarm.length && !confirm(`${badFarm.length} 筆農會存入帳戶帳號非9碼/公庫5碼：\n`
     + badFarm.map(x => `　${x.row[1]}：${x.row[5] || '(空)'}`).join('\n') + '\n仍要匯出？')) return;
   const badBank = sel.filter(x => x.row[7] && !STATE.bankByCode.has(x.row[7]));
   if (badBank.length && !confirm(`${badBank.length} 筆分行代號不在 SBA 金融機構檔（官方手冊要求必須已建檔，匯入恐失敗）：\n`
