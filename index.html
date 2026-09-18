@@ -852,7 +852,25 @@ body.sb-resizing * { pointer-events: none !important; }
 /* 列印專用單行受款人 (v4.2.22) */
 #payee-print-line { display: none; }
 #payee-print-line-page2 { display: none; }
+/* v6.3.1 品項續頁（第二頁，供剪下浮貼）＋第一頁頁碼：螢幕隱藏 */
+#items-print-page2, #print-page-no { display: none; }
 @media print {
+  #items-body tr.print-moved { display: none !important; }
+  #items-body tr.print-cont-hint td { text-align: center; font-size: 10.5px; height: 5mm; padding: 0.3mm 2mm !important; }
+  #print-page-no { display: block !important; position: absolute; right: 0; bottom: 0; font-size: 11px; }
+  #print-page-no:empty { display: none !important; }
+  html #form-page[data-split] #print-footer { height: 5mm !important; }
+  #items-print-page2 { display: none !important; }
+  #items-print-page2:not(:empty) {
+    display: block !important;
+    page-break-before: always !important; break-before: page !important;
+    padding: 8mm 0 0;
+    font-family: "標楷體","DFKai-SB","BiauKai","KaiTi",serif;
+  }
+  #items-print-page2 .ip2-title { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 2mm; }
+  #items-print-page2 table.it { table-layout: fixed; }
+  #items-print-page2 .it tbody td { font-size: 12px; white-space: pre-wrap; word-break: break-all; }
+
   #payee-section, #new-payee-modal { display: none !important; }
   #payee-print-line {
     display: block !important;
@@ -1121,13 +1139,13 @@ body.sb-resizing * { pointer-events: none !important; }
      由 beforeprint 實測列印版面後動態套用；空白填充列維持 print-compact 不放大 */
   #form-page[data-fit="1"] .bs tr.sig-box td { height: 22mm !important; }
   #form-page[data-fit="1"] #print-footer { height: 8mm !important; }
-  #form-page[data-fit="2"] .bs tr.sig-box td { height: 16mm !important; }
+  #form-page[data-fit="2"] .bs tr.sig-box td { height: 22mm !important; }   /* v6.3.1 簽核框下限 22mm（原 16mm） */
   #form-page[data-fit="2"] #print-footer { height: 4mm !important; }
   #form-page[data-fit="2"] .it tbody tr:not(.print-compact) { min-height: 7mm !important; height: 7mm !important; }
   #form-page[data-fit="2"] .it tbody tr:not(.print-compact) td { padding: 0.5mm 2mm !important; line-height: 1.2 !important; }
   #form-page[data-fit="2"] .it tbody tr:not(.print-compact) textarea,
   #form-page[data-fit="2"] .it tbody tr:not(.print-compact) input { min-height: 5mm !important; line-height: 1.2 !important; }
-  #form-page[data-fit="3"] .bs tr.sig-box td { height: 14mm !important; }
+  #form-page[data-fit="3"] .bs tr.sig-box td { height: 22mm !important; }   /* v6.3.1 簽核框下限 22mm（原 14mm） */
   #form-page[data-fit="3"] #print-footer { height: 2mm !important; }
   #form-page[data-fit="3"] .it tbody tr:not(.print-compact) { min-height: 5.5mm !important; height: 5.5mm !important; }
   #form-page[data-fit="3"] .it tbody tr:not(.print-compact) td { padding: 0.3mm 2mm !important; line-height: 1.15 !important; }
@@ -1570,10 +1588,14 @@ body.sb-resizing * { pointer-events: none !important; }
 
     <!-- 頁尾留白（僅列印顯示）：供手寫備註 -->
     <div id="print-footer"></div>
+    <!-- v6.3.1 品項分頁時的第一頁頁碼（僅列印） -->
+    <div id="print-page-no"></div>
 
   </div><!-- /#form-page -->
 
   <!-- v4.4.86 受款人多到放不下時的第二頁明細（form-page 外，可換頁） -->
+  <!-- v6.3.1 品項放不下時的續表（第二頁，供剪下浮貼；排在受款人第二頁之前） -->
+  <div id="items-print-page2"></div>
   <div id="payee-print-line-page2"></div>
 
   <!-- 新建受款人 Modal (v4.2.31 放大版，銀行搜尋拆分獨立彈窗) -->
@@ -6986,14 +7008,20 @@ function _fitPrintLayout() {
       flipped.length = 0;
     }
   };
+  /* v6.3.1 量測目標＝頁尾留白(#print-footer)頂端＝其上所有內容（簽核框／受款人行）的底；
+     原本只量受款人行，無受款人時回 0 → 不壓縮 → 品項多的請購單底部簽核框被裁掉。
+     （#lower-section 是 flex:1 會撐滿，不能拿它的底當內容高；有受款人時 footer 頂＝受款人行底，與舊判定等價） */
+  const _footer = document.getElementById('print-footer');
   const payeeBottomMM = () => {
     void fp.offsetHeight;            // 強制 reflow，讓量測反映目前壓縮級
-    const line = document.getElementById('payee-print-line');
-    if (!line || !line.innerHTML) return 0;   // 無受款人資料 → 不需壓縮
-    const r = line.getBoundingClientRect();
-    if (!r.height) return 0;
-    return (r.bottom - fp.getBoundingClientRect().top) * PX2MM;
+    return (_footer.getBoundingClientRect().top - fp.getBoundingClientRect().top) * PX2MM;
   };
+  /* 整頁（含頁尾留白）是否完全裝得下：品項分頁用，頁尾要留給右下角頁碼 */
+  const overflowMM = () => {
+    void fp.offsetHeight;
+    return (_footer.getBoundingClientRect().bottom - fp.getBoundingClientRect().bottom) * PX2MM;
+  };
+  _clearItemsSplit();
   fp.removeAttribute('data-fit');
   try { updatePayeePrintLine(false); } catch (e) {}
   try {
@@ -7016,14 +7044,71 @@ function _fitPrintLayout() {
       if (lv) fp.setAttribute('data-fit', lv); else fp.removeAttribute('data-fit');
       if (payeeBottomMM() <= BUDGET_MM) { fit = true; break; }
     }
+    const _rows = [...document.querySelectorAll('#items-body tr')];
     if (!fit) {
-      /* 連最高壓縮級仍放不下（品項過多或大量換行）→ 受款人明細移到第二頁，保證完整列印；
+      /* v6.3.1 ①全空白列先藏起來（所有欄位皆空才算） */
+      _rows.forEach(tr => {
+        if (![...tr.querySelectorAll('[data-c]')].some(el => (el.value || '').trim())) tr.classList.add('print-moved');
+      });
+      fit = payeeBottomMM() <= BUDGET_MM;
+    }
+    if (!fit) {
+      /* ②連最高壓縮級仍放不下（品項過多或大量換行）→ 受款人明細移到第二頁，保證完整列印；
          第一頁維持最高壓縮級並只留受款人摘要短行 */
       try { updatePayeePrintLine(true); } catch (e) {}
+      fit = payeeBottomMM() <= BUDGET_MM;
+    }
+    if (!fit) {
+      /* v6.3.1 ③仍放不下 → 尾端品項逐列移到第二頁續表（供剪下浮貼），第一頁保住簽核框（≥22mm）與合計；
+         data-split 把頁尾留白固定 5mm 給右下角頁碼 */
+      fp.setAttribute('data-split', '1');
+      const filled = _rows.filter(tr => !tr.classList.contains('print-moved'));
+      const colW = filled.length ? [...filled[0].cells].map(td => td.getBoundingClientRect().width) : [];
+      const hint = document.createElement('tr');
+      hint.className = 'print-cont-hint';
+      hint.innerHTML = '<td colspan="99"></td>';
+      document.getElementById('items-body').appendChild(hint);
+      const moved = [];
+      while (filled.length > 1 && overflowMM() > 0.3) {
+        const tr = filled.pop();
+        tr.classList.add('print-moved');
+        moved.unshift(tr);
+        hint.firstChild.textContent = `以下 ${moved.length} 項詳第二頁（合計含全部品項）`;
+      }
+      if (!moved.length) { hint.remove(); fp.removeAttribute('data-split'); }
+      else _buildItemsPage2(moved, colW);
     }
   } finally {
     setMeasureMode(false);
   }
+}
+
+/* v6.3.1 品項分頁：清理（beforeprint 開頭與 afterprint 都呼叫，防 afterprint 未觸發） */
+function _clearItemsSplit() {
+  document.querySelectorAll('#items-body tr.print-cont-hint').forEach(tr => tr.remove());
+  document.querySelectorAll('#items-body tr.print-moved').forEach(tr => tr.classList.remove('print-moved'));
+  const _fp = document.getElementById('form-page'); if (_fp) _fp.removeAttribute('data-split');
+  ['items-print-page2', 'print-page-no'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = ''; });
+}
+/* v6.3.1 品項續表（第二頁）：以純文字重建被移走的列；欄寬沿用第一頁實測值，剪下浮貼可對齊；不印合計與簽核框 */
+function _buildItemsPage2(moved, colW) {
+  const box = document.getElementById('items-print-page2');
+  if (!box) return;
+  const isExp = formType === 'expense';
+  const v = (tr, c) => { const el = tr.querySelector(`[data-c="${c}"]`); return esc(el ? el.value : ''); };
+  const p2 = document.getElementById('payee-print-line-page2');
+  const total = 2 + (p2 && p2.innerHTML ? 1 : 0);
+  const vno = (document.getElementById('voucher-no').value || '').trim();
+  const thead = isExp ? '<tr><th>動支說明</th><th>金額</th></tr>' : document.getElementById('items-thead').innerHTML;
+  const body = moved.map(tr => isExp
+    ? `<tr><td class="td-name">${v(tr,'name')}</td><td class="td-r" style="padding-right:2mm;">${v(tr,'price')}</td></tr>`
+    : `<tr><td class="td-name">${v(tr,'name')}</td><td class="td-spec">${v(tr,'spec')}</td><td class="td-r">${v(tr,'qty')}</td><td>${v(tr,'unit')}</td><td class="td-r">${v(tr,'price')}</td><td class="td-r" style="padding-right:3mm;">${esc(tr.cells[5] ? tr.cells[5].textContent : '')}</td></tr>`
+  ).join('');
+  const w = colW.reduce((a, b) => a + b, 0);
+  box.innerHTML =
+    `<div class="ip2-title" style="width:${w}px;"><span>${vno ? '憑證編號 ' + esc(vno) + '｜' : ''}${isExp ? '動支說明' : '採購品名'}續表（供剪下浮貼）</span><span>2/${total} 頁</span></div>` +
+    `<table class="it" style="width:${w}px;"><colgroup>${colW.map(x => `<col style="width:${x}px">`).join('')}</colgroup><thead>${thead}</thead><tbody>${body}</tbody></table>`;
+  document.getElementById('print-page-no').textContent = `1/${total} 頁`;
 }
 
 /* 啟動時載入 payees + 員工名單 */
@@ -7117,6 +7202,7 @@ window.addEventListener('afterprint', () => {
     _formPage.classList.remove('print-tight', 'print-very-tight');
     _formPage.removeAttribute('data-fit');   /* v4.6.9 還原自適應壓縮級 */
   }
+  _clearItemsSplit();   /* v6.3.1 還原品項分頁 */
   /* v4.4.92 還原受款人渲染（解除強制 overflow，恢復即時邏輯） */
   try { updatePayeePrintLine(false); } catch (_e) {}
   /* v4.4.38 還原 採購品名/規格 textarea 字體（替身 div 不需 reset，螢幕 display:none） */
