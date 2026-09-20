@@ -6993,6 +6993,8 @@ function _fitPrintLayout() {
   if (!fp) return;
   const BUDGET_MM = 283;            // 一頁可用 285mm（297−上下各6mm），留 2mm 安全邊
   const PX2MM = 25.4 / 96;
+  /* v6.3.6 容差：最高壓縮級頁尾 2mm，內容剛好放得下時頁尾頂端恰＝283mm，浮點誤差會誤判成放不下（動支單 15 筆有大片空白仍被分頁） */
+  const FIT_TOL = 0.3;
   const flipped = [];
   const setMeasureMode = on => {
     if (on) {
@@ -7047,7 +7049,7 @@ function _fitPrintLayout() {
     let fit = false;
     for (const lv of ['', '1', '2', '3']) {
       if (lv) fp.setAttribute('data-fit', lv); else fp.removeAttribute('data-fit');
-      if (payeeBottomMM() <= BUDGET_MM) { fit = true; break; }
+      if (payeeBottomMM() <= BUDGET_MM + FIT_TOL) { fit = true; break; }
     }
     const _rows = [...document.querySelectorAll('#items-body tr')];
     if (!fit) {
@@ -7055,13 +7057,13 @@ function _fitPrintLayout() {
       _rows.forEach(tr => {
         if (![...tr.querySelectorAll('[data-c]')].some(el => (el.value || '').trim())) tr.classList.add('print-moved');
       });
-      fit = payeeBottomMM() <= BUDGET_MM;
+      fit = payeeBottomMM() <= BUDGET_MM + FIT_TOL;
     }
     if (!fit) {
       /* ②連最高壓縮級仍放不下（品項過多或大量換行）→ 受款人明細移到第二頁，保證完整列印；
          第一頁維持最高壓縮級並只留受款人摘要短行 */
       try { updatePayeePrintLine(true); } catch (e) {}
-      fit = payeeBottomMM() <= BUDGET_MM;
+      fit = payeeBottomMM() <= BUDGET_MM + FIT_TOL;
     }
     if (!fit) {
       /* v6.3.1 ③仍放不下 → 尾端品項逐列移到第二頁續表（供剪下浮貼），第一頁保住簽核框（≥22mm）與合計；
