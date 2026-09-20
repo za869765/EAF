@@ -7075,8 +7075,9 @@ function _fitPrintLayout() {
       hint.innerHTML = '<td colspan="99"></td>';
       document.getElementById('items-body').appendChild(hint);
       const moved = [];
-      /* v6.3.2 要分頁時第一頁固定留 10 項（好記）；10 項仍放不下（品名多行）才再往下減 */
-      const PAGE1_MAX = 10;
+      /* v6.3.2 要分頁時第一頁固定留 10 項（好記）；10 項仍放不下（品名多行）才再往下減
+         v6.3.7 動支單沒有底部簽核框，上限 20 筆；受款人行優先保住，放不下自動再減（帶受款人行實測約 18 筆）；放得下就不分頁 */
+      const PAGE1_MAX = formType === 'expense' ? 20 : 10;
       while (filled.length > PAGE1_MAX) { const tr = filled.pop(); tr.classList.add('print-moved'); moved.unshift(tr); }
       if (moved.length) hint.firstChild.textContent = `第${filled.length + 1}項次以後詳見附件共1頁（合計為全部品項總金額）`;
       /* 判定用「整頁含頁尾是否溢出」＋0.3mm 容差：不溢出時頁尾頂端恰好貼齊 283mm，拿 283 當門檻會因浮點誤差誤判而把品項移光 */
