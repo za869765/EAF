@@ -1030,9 +1030,17 @@ body.sb-resizing * { pointer-events: none !important; }
   /* 切割線：黑色、加粗字型（高度、字寬各加倍） */
   .cut-line {
     color: #000 !important; font-weight: bold !important;
-    font-size: 22px !important; letter-spacing: 10px;
+    /* v6.3.4 原 22px＋字距 10px 共 31 字寬 992px > 頁寬 733px，「貼線」被右側裁掉 → 18px＋5px 才完整 */
+    font-size: 18px !important; letter-spacing: 5px;
     margin: 4mm 0 !important;
+    /* v6.3.4 #form-page 是 flex column，版面擠時本列（overflow:hidden → min-height 0）會被壓扁到 2mm、字整個被裁掉 */
+    flex-shrink: 0 !important;
   }
+  #form-page[data-fit="2"] .cut-line { margin: 2.5mm 0 !important; }
+  #form-page[data-fit="3"] .cut-line { margin: 1mm 0 !important; line-height: 1.1 !important; }
+  /* v6.3.4 最高壓縮級回收表頭與提示列高度，補回粘貼線佔掉的空間（第一頁維持 10 項） */
+  #form-page[data-fit="3"] .it thead th { padding-top: 0.3mm !important; padding-bottom: 0.3mm !important; line-height: 1.15 !important; }
+  #form-page[data-fit="3"] #items-body tr.print-cont-hint td { height: 4mm !important; line-height: 1.1 !important; }
 
   /* 下拉選單：隱藏框線與背景，純文字黑色 */
   .fsel {
