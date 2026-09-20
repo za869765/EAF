@@ -7068,7 +7068,7 @@ function _fitPrintLayout() {
       /* v6.3.2 要分頁時第一頁固定留 10 項（好記）；10 項仍放不下（品名多行）才再往下減 */
       const PAGE1_MAX = 10;
       while (filled.length > PAGE1_MAX) { const tr = filled.pop(); tr.classList.add('print-moved'); moved.unshift(tr); }
-      if (moved.length) hint.firstChild.textContent = `第${filled.length}項之後詳見附件共1頁（合計為全部品項總金額）`;
+      if (moved.length) hint.firstChild.textContent = `第${filled.length + 1}項次以後詳見附件共1頁（合計為全部品項總金額）`;
       /* 判定用「整頁含頁尾是否溢出」＋0.3mm 容差：不溢出時頁尾頂端恰好貼齊 283mm，拿 283 當門檻會因浮點誤差誤判而把品項移光 */
       const overflowMM = () => {
         void fp.offsetHeight;
@@ -7078,7 +7078,7 @@ function _fitPrintLayout() {
         const tr = filled.pop();
         tr.classList.add('print-moved');
         moved.unshift(tr);
-        hint.firstChild.textContent = `第${filled.length}項之後詳見附件共1頁（合計為全部品項總金額）`;
+        hint.firstChild.textContent = `第${filled.length + 1}項次以後詳見附件共1頁（合計為全部品項總金額）`;
       }
       if (!moved.length) hint.remove();
       else _buildItemsPage2(moved, colW);
