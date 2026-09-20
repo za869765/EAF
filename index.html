@@ -7116,7 +7116,7 @@ function _buildItemsPage2(moved, colW) {
   ).join('');
   const w = colW.reduce((a, b) => a + b, 0);
   box.innerHTML =
-    `<div class="ip2-title" style="width:${w}px;"><span>${vno ? '憑證編號 ' + esc(vno) + '｜' : ''}${isExp ? '動支說明' : '採購品名'}附件（供剪下浮貼）</span><span>2/2</span></div>` +
+    `<div class="ip2-title" style="width:${w}px;"><span>${vno ? '憑證編號 ' + esc(vno) + '｜' : ''}${esc(document.getElementById('lower-title').textContent)}</span><span>2/2</span></div>` +
     `<table class="it" style="width:${w}px;"><colgroup>${colW.map(x => `<col style="width:${x}px">`).join('')}</colgroup><thead>${thead}</thead><tbody>${body}</tbody></table>`;
   document.getElementById('print-page-no').textContent = '1/2';
 }
