@@ -6753,7 +6753,11 @@ async function recoverPayeesFromRecords() {
         const k = `${name}||${acctNo}||${bank}`;
         if (!fromRecords.has(k)) {
           const dt = rec.applyDateRoc || rec.applyDate || (rec.savedAt||'').substring(0,10);
-          fromRecords.set(k, { name, acctNo, bank, createdAt: dt });
+          /* v6.3.8 建立日統一民國7碼（原照抄單據格式 → 出現 2026-06-11 / 115年5月6日 混雜） */
+          const m = String(dt).match(/^(\d{2,4})[\/年.\-](\d{1,2})[\/月.\-](\d{1,2})/);
+          const y = m ? (+m[1] > 1911 ? +m[1] - 1911 : +m[1]) : 0;
+          const dt7 = m ? String(y).padStart(3,'0') + String(+m[2]).padStart(2,'0') + String(+m[3]).padStart(2,'0') : dt;
+          fromRecords.set(k, { name, acctNo, bank, createdAt: dt7 });
         }
       }
     }
