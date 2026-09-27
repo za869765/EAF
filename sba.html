@@ -253,7 +253,7 @@ window.addEventListener('storage', (ev) => {
         <select id="pk-acct" onchange="renderPickList()"><option value="">全部</option></select>
       </label>
       <input type="search" id="pk-q" placeholder="搜尋 摘要/受款人；單號末3碼可多筆(空格分隔)" style="width:230px;" oninput="renderPickList()">
-      <button class="btn btn-sm" onclick="renderPickList()">🔍 重新整理</button>
+      <button class="btn btn-sm" onclick="reloadPickList(this)">🔍 重新整理</button>
       <span class="small" id="pk-hitinfo" style="font-weight:700; color:#a84e2f;"></span>
     </div>
     <div class="toolbar" style="margin-bottom:2px;">
@@ -754,6 +754,32 @@ function apEstFor(id) {
 /* ═══════════════ 📋 選單製票 ═══════════════ */
 /* v6.1.9 勾單頁忽略健保款暫存專戶（使用者指定「請勿顯示」）：六大格／專戶下拉／勾選摘要皆不出現 */
 const PICK_SKIP_ACCTS = new Set(['11010203']);
+/* v6.3.9 重新整理改為重抓 /api/records：原僅以開機快取重繪，EAF 改主科目（如基金→保管款）後工坊分組不變 */
+async function reloadPickList(btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const r = await fetch('/api/records');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const records = await r.json();
+    if (!Array.isArray(records)) throw new Error('回應格式錯誤');
+    STATE.records = records;
+    _apEstMap = null;
+    for (const id of [...STATE.pickSel]) {
+      const x = STATE.records.find(y => String(y.id) === id);
+      if (!x || x.voided || STATE.exported[id] || STATE.exported[x.id]) STATE.pickSel.delete(id);
+    }
+    savePickSel();
+    const sel = $('pk-acct'), cur = sel.value;
+    sel.length = 1;   /* 保留「全部」 */
+    buildAcctFilter();
+    if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+  } catch (e) {
+    alert('重新載入單據失敗：' + e.message);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+  renderPickList();
+}
 function buildAcctFilter() {
   const sel = $('pk-acct');
   const accts = [...new Set(STATE.records.map(r => r.acctCode).filter(a => a && !PICK_SKIP_ACCTS.has(a)))].sort();
