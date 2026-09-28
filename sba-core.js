@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '6.4.1';
+const SBA_CORE_VERSION = '6.4.2';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -781,6 +781,16 @@ function resolvePayees(rec, ctx) {
     }
     const names = ps.map((p) => String(p.name || '').trim());
     dupName = new Set(names).size < names.length;
+    /* v6.4.2 品名＝「受款人名＋括號/分隔註記」（如「黃品耀(服務時間07:30至11:00)」）：精確對不到時以前綴歸戶加總；
+       前綴後須接括號/分隔符（避免「王聖」吃到「王聖捷」），多名皆符取最長者 */
+    const uniq = [...new Set(names.filter(Boolean))];
+    for (const it of rec.items || []) {
+      const nm = String(it.name || '').trim();
+      if (uniq.includes(nm)) continue;
+      const hit = uniq.filter((pn) => nm.startsWith(pn) && /^[\s(（\[【\-－:：,，、\/]/.test(nm.slice(pn.length)))
+        .sort((a, b) => b.length - a.length)[0];
+      if (hit) amtByName[hit] = (amtByName[hit] || 0) + (+String(it.price || '').replace(/,/g, '') || 0);
+    }
   }
   const invAmtOf = (p) => +String(p.invoiceAmount || '').replace(/,/g, '') || 0;
   const payees = ps.map((p) => {
