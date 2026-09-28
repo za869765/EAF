@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '6.3.9';
+const SBA_CORE_VERSION = '6.3.10';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -914,7 +914,7 @@ function mapRecordsToVouchers(records, ctx) {
     const v = {
       year: ctx.year, kind: '2', importrecno: ctx.nextRecno(),
       mvchno: ctx.mvchno || '', payDate: ctx.payDate7, postDate: ctx.postDate7 || ctx.payDate7,
-      memo: '', rnum: 0, urgent: '', scode1: '1',
+      memo: '', rnum: items.length /* v6.3.10 單據張數預設＝本張勾選單數 */, urgent: '', scode1: '1',
       lines: [], payees: [], sourceIds: items.map((it) => it.rec.id),
       acctCode: acct, acctName: (ctx.acctNames && ctx.acctNames[acct]) || acct,
       payCat: cat, payCatLabel: PAY_CAT_LABEL[cat] || cat,
