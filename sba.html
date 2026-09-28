@@ -410,7 +410,7 @@ window.addEventListener('storage', (ev) => {
 <div id="ai-rv-mask" style="display:none; position:fixed; inset:0; background:rgba(40,30,20,.45); z-index:1500;" onclick="closeAiReview(true)"></div>
 <div id="ai-rv-box" style="display:none; position:fixed; top:4vh; left:50%; transform:translateX(-50%); width:min(880px,94vw); max-height:90vh; overflow:auto; background:#fffdf8; border:1px solid #cbbfae; border-radius:10px; padding:14px 16px; z-index:1501; box-shadow:0 12px 40px rgba(0,0,0,.25);">
   <h3 style="margin:0 0 2px;">✨ AI 修正摘要 — 審核</h3>
-  <div class="small">逐項核對「前 → 後」，修正後文字可直接編輯；<b>取消勾選＝該項不套用</b>。⚠ 標記＝不符「名目含年月＋金額元」規則，請補齊再套用。</div>
+  <div class="small">逐項核對「前 → 後」，修正後文字可直接編輯；<b>取消勾選＝該項不套用</b>。⚠ 標記＝不符規則（主檔：年月＋名目、不含金額；明細／受款人：年月＋名目＋金額元），請修正再套用。</div>
   <div id="ai-rv-body"></div>
   <div class="toolbar" style="margin-top:10px; position:sticky; bottom:0; background:#fffdf8; padding:8px 0;">
     <button class="btn btn-main" onclick="applyAiReview()">✅ 套用勾選項目</button>
@@ -1256,7 +1256,7 @@ async function aiFixMemos(btn) {
       if (!v) continue;
       const p = { recno: rn, items: [] };
       if (it.memo && String(it.memo).trim()) {
-        const after = cleanMemoText(it.memo);   /* 不先截斷：檢核警告過長，F03 寫檔時再 truncBig5(100) */
+        const after = stripMemoAmounts(cleanMemoText(it.memo));   /* 不先截斷：檢核警告過長，F03 寫檔時再 truncBig5(100) */
         if (after && after !== String(v.memo || '')) p.items.push({ kind: 'main', label: '主檔摘要', before: v.memo || '', after });
       }
       for (const ln of (it.lines || [])) {
@@ -1292,11 +1292,19 @@ async function aiFixMemos(btn) {
 /* v5.8.7 摘要名目規則（使用者指示）：至少含「民國年月或年月日」與「金額元」才清楚 */
 const AI_YM_RE = /1[0-4]\d(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])?(?!\d)|1[0-4]\d[年.\/](0?[1-9]|1[0-2])月?(?!\d)/;
 const AI_AMT_RE = /\d[\d,]*(?:\.\d+)?\s*元/;
-function aiRuleTags(t) {
+/* v6.4.1 主檔摘要不含金額（使用者指示）；明細/受款人仍須含金額 */
+function aiRuleTags(t, kind) {
   const s = String(t || ''), miss = [];
   if (!AI_YM_RE.test(s)) miss.push('缺年月');
-  if (!AI_AMT_RE.test(s)) miss.push('缺金額(元)');
+  if (kind === 'main') { if (AI_AMT_RE.test(s)) miss.push('主檔不應含金額'); }
+  else if (!AI_AMT_RE.test(s)) miss.push('缺金額(元)');
   return miss;
+}
+/* AI 主檔摘要保險：剝除「（總計/共計）N元」金額片段 */
+function stripMemoAmounts(t) {
+  return String(t || '')
+    .replace(/[，,]?\s*(?:總計|共計|合計|計|共)?\s*\d[\d,]*(?:\.\d+)?\s*元/g, '')
+    .replace(/[，、;；\s]+$/, '').trim();
 }
 function renderAiReview() {
   const props = STATE.aiReview || [];
@@ -1321,7 +1329,8 @@ function renderAiReview() {
 function aiReviewFlag(pi, xi) {
   const ta = $(`ai-ta-${pi}-${xi}`), fl = $(`ai-flag-${pi}-${xi}`);
   if (!ta || !fl) return;
-  const miss = aiRuleTags(ta.value);
+  const x = (STATE.aiReview || [])[pi]?.items[xi];
+  const miss = aiRuleTags(ta.value, x && x.kind);
   fl.textContent = miss.length ? `⚠ ${miss.join('、')}` : '';
 }
 function closeAiReview(discard) {
