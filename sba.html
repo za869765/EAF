@@ -1227,12 +1227,24 @@ function cleanMemoText(t) {
 async function aiFixMemos(btn) {
   if (btn && btn.disabled) return;
   if (!STATE.drafts.length) { alert('尚無傳票草稿'); return; }
+  /* v6.4.3 參考日期（原文抓不到年月時的預設）：來源單「交貨日期」優先、否則「申請日期」，民國 115.9.22 格式 */
+  const refOf = (rec) => {
+    if (!rec) return '';
+    const dd = String(rec.deliveryDate || '');
+    const iso = /^\d{4}-\d{2}-\d{2}/.test(dd) ? dd.slice(0, 10) : recDateIso(rec);
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-').map(Number);
+    return `${y - 1911}.${m}.${d}（${iso === dd.slice(0, 10) ? '交貨日期' : '申請日期'}）`;
+  };
+  const recById = (id) => STATE.records.find(r => String(r.id) === String(id));
+  const recByNo = (no) => STATE.records.find(r => String(r.voucherNo) === String(no));
   const items = STATE.drafts.map((v, i) => ({
     id: String(i),
     main: v.memo || (v.lines[0] && v.lines[0].memo) || '',
-    lines: v.lines.filter(L => L.dc === 'D').map(L => ({ seq: L.seq, text: L.memo || '', amt: +L.amt || 0 })),
+    ref: refOf(recById((v.sourceIds || [])[0])),
+    lines: v.lines.filter(L => L.dc === 'D').map(L => ({ seq: L.seq, text: L.memo || '', amt: +L.amt || 0, ref: refOf(recById(L.srcRec)) })),
     payees: (v.payees || []).filter(P => String(P.usedoc || '').trim())
-      .map(P => ({ seq: P.seq, text: P.usedoc, amt: +P.amt || 0 })),
+      .map(P => ({ seq: P.seq, text: P.usedoc, amt: +P.amt || 0, ref: refOf(recByNo(P.srcRec)) })),
   })).filter(x => (x.main && x.main.trim()) || x.lines.some(L => L.text.trim()) || x.payees.length);
   if (!items.length) { alert('無摘要可修正'); return; }
   const reqRecnos = STATE.drafts.map(v => String(v.importrecno));   /* v5.8.8：送出當下的索引→傳票號對照 */
