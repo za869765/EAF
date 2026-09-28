@@ -1871,8 +1871,10 @@ function renderOffsetList(q) {
   const ctx = STATE.modalCtx || {};
   /* v5.7.5 家族白名單＝有配對命中或有同科目 synth 項才算；否則此科目視同未匯 0100 → 全部可選不鎖 */
   const subjName = subjectName(code);
+  /* v6.4.5 0100 科目名稱可能只寫子目短名（21020311 應付代收款-國健科 → 「國健科」）：完全相同或以「-短名」結尾皆算同科目 */
+  const sameSubj = (n) => n === subjName || subjName.endsWith('-' + n);
   const famSynth = [...openMap.values()].filter(o => !itemMatched.has(o.vch + '#' + o.seq))
-    .filter(o => !o.name || !subjName || o.name === subjName);
+    .filter(o => !o.name || !subjName || sameSubj(String(o.name)));
   const useWhitelist = (cands.some(e => matchOf.has(keyOf(e))) || famSynth.length > 0);
   const rowHtml = (e, left, selectable, oseq, hot, okey) => {
     /* 估扣：可用＝未沖（或立帳額，依科目性質取貸/借方）− 本批其他列已沖同一立帳的合計，避免超額匯入被 SBA 擋
