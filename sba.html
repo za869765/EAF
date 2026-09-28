@@ -1230,7 +1230,8 @@ async function aiFixMemos(btn) {
   /* v6.4.3 參考日期（原文抓不到年月時的預設）：來源單「交貨日期」優先、否則「申請日期」，民國 115.9.22 格式 */
   const refOf = (rec) => {
     if (!rec) return '';
-    const dd = String(rec.deliveryDate || '');
+    /* v6.4.4 交貨日期僅請購單有效：動支單無此欄但可能殘留舊值（複製單據帶入）→ 會誤抓成其他月份 */
+    const dd = rec.formType === 'purchase' ? String(rec.deliveryDate || '') : '';
     const iso = /^\d{4}-\d{2}-\d{2}/.test(dd) ? dd.slice(0, 10) : recDateIso(rec);
     if (!iso) return '';
     const [y, m, d] = iso.split('-').map(Number);
