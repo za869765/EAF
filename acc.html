@@ -3665,7 +3665,7 @@ function _pubBudgetSectionHTML(){
       </tr></tfoot>
     </table></div>
     <div class="pub-foot" style="justify-content:flex-start;">
-      <span style="font-size:11px;color:#78909c;font-weight:400;">💡「累計核銷」＝已勾選核銷的動支；「全部已動支」含尚未勾核銷者（標＊表兩者不同，需回下方動支清單勾選核銷）。分配數即官方年度分配數，可直接編輯。</span>
+      <span style="font-size:11px;color:#78909c;font-weight:400;">💡「累計核銷」＝已勾選核銷的動支；「全部已動支」含尚未勾核銷者（標＊表兩者不同，需回下方動支清單勾選核銷）。分配數即官方年度分配數，可直接編輯。<br>⛔ 116 年度起 EAF 填新單依此表開放：各用途「分配數 − 全部已動支」有剩才可選，未設定＝0＝不開放（115 年度另定：只剩電動車電池租金每張 ≤1,797、10~12 月最多 3 張）。</span>
     </div></div>`;
 }
 function renderPubBudgetSection(){ const host=document.getElementById('pub-budget-host'); if(host) host.innerHTML=_pubBudgetSectionHTML(); }

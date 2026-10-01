@@ -2872,9 +2872,115 @@ function _pub21Purposes() {
   return [];
 }
 function pubPurposeOptions(sel) {
-  /* v4.8.5 A6：option value 用 p.name（非 code），避免「其他」被存成代碼「99」 */
+  /* v4.8.5 A6：option value 用 p.name（非 code），避免「其他」被存成代碼「99」
+     v6.4.7 新單只列「仍有額度」的用途別（舊單照列全部） */
+  const allow = _pubAllowedNames();
   return '<option value="">──用途別──</option>' +
-    _pub21Purposes().map(p => `<option value="${p.name}"${sel === p.name ? ' selected' : ''}>${p.name}</option>`).join('');
+    _pub21Purposes().filter(p => !allow || allow.includes(p.name))
+      .map(p => `<option value="${p.name}"${sel === p.name ? ' selected' : ''}>${p.name}</option>`).join('');
+}
+
+/* ══ v6.4.7 公務預算填單額度把關（僅新單；舊單開啟/列印/更新科目不受影響）══
+   115 年度：預算已用罄，只剩電動車電池租金（每張 ≤ 1,797、10~12 月最多 3 張）。
+   116 年度起：依後台 ACC「年度預算分配（依用途別）」分配數 − 全部已動支 開放；未設定＝0＝不開放。 */
+const PUB115_RULE = { purpose: '電動車電池租金', maxAmt: 1797, maxCount: 3, fromMonth: 10 };
+const _pubAllocCache = {};   /* ROC 年 → ACC 分配數 {官方欄位:金額}（null＝未設定） */
+/* 與 acc.html mapPurposeToOfficial 一致：EAF 用途別 → ACC 官方預算欄位 */
+function _pubOfficialCat(name) {
+  const n = String(name || '');
+  if (/電池|電動車租/.test(n))            return '電動車租金';
+  if (/油料|汽油|柴油|加油|機油/.test(n)) return '油料';
+  if (/車輛養護|車輛|汽車保養/.test(n))    return '車輛養護費';
+  if (/稅捐|規費/.test(n))                return '稅捐及規費';
+  if (/土地租/.test(n))                   return '土地租金';
+  if (/太陽能/.test(n))                   return '太陽能獎勵金';
+  if (/保險費|強制險/.test(n))             return '保險費';
+  return '業務費';
+}
+function _pubFormYear() {
+  const v = document.getElementById('apply-date-input')?.value || localIsoDate();
+  return String((+v.slice(0, 4) || new Date().getFullYear()) - 1911);
+}
+function _pubRecYear(r) {
+  const m = String(r.applyDateRaw || '').match(/^(\d{4})/);
+  if (m) return String(+m[1] - 1911);
+  const v = String(r.voucherNo || '').match(/^(\d{3})-/);
+  return v ? v[1] : '';
+}
+/* 同年度、非作廢/封存、21020301 的既有單（排除目前這張） */
+function _pubYearRecords(records, y) {
+  return (records || []).filter(r => r.bpCode === '21020301' && !r.voided && !r.archived &&
+    r.id !== currentId && _pubRecYear(r) === y);
+}
+function _pubRecSplits(r) {
+  if (Array.isArray(r.purposeSplits) && r.purposeSplits.length) return r.purposeSplits;
+  return [{ name: r.purposeName || '', amt: r.total || 0 }];
+}
+/* 各官方欄位剩餘額度＝ACC 分配數 − 全部已動支 */
+function _pubRemainByCat(records, y, alloc) {
+  const out = {};
+  Object.entries(alloc || {}).forEach(([k, v]) => out[k] = Math.max(0, +v || 0));
+  _pubYearRecords(records, y).forEach(r => _pubRecSplits(r).forEach(s => {
+    const k = _pubOfficialCat(s.name); out[k] = (out[k] || 0) - (+s.amt || 0);
+  }));
+  return out;
+}
+/* 新單可選用途別名單；null＝不限制（舊單／115 以前） */
+function _pubAllowedNames() {
+  if (currentId) return null;
+  const y = _pubFormYear();
+  if (+y < 115) return null;
+  if (y === '115') return [PUB115_RULE.purpose];
+  if (!(y in _pubAllocCache)) { _pubLoadAlloc(y).then(_pubRefreshOptions); return []; }
+  const rem = _pubRemainByCat(cachedRecords, y, _pubAllocCache[y]);
+  return _pub21Purposes().map(p => p.name).filter(n => (rem[_pubOfficialCat(n)] || 0) > 0);
+}
+async function _pubLoadAlloc(y) {
+  try {
+    const r = await fetch('/api/acc?key=' + encodeURIComponent('acc_pub_budget_cat_' + y));
+    const v = r.ok ? await r.json() : null;
+    _pubAllocCache[y] = (v && typeof v === 'object') ? v : (typeof v === 'string' ? JSON.parse(v) : null);
+  } catch (_) { _pubAllocCache[y] = null; }
+  return _pubAllocCache[y];
+}
+/* 額度載入後重畫各列下拉（保留已選值，不在名單內則清空） */
+function _pubRefreshOptions() {
+  document.querySelectorAll('#pub-split-rows .pub-split-purpose').forEach(s => {
+    const v = s.value; s.innerHTML = pubPurposeOptions(v);
+  });
+}
+/* 存檔把關：回傳錯誤訊息（null＝放行） */
+async function _pubQuotaError(splits, total) {
+  if (currentId) return null;
+  const y = _pubFormYear();
+  if (+y < 115) return null;
+  let records;
+  try { records = await apiGet(); } catch (_) { return '無法連線取得公務預算已動支資料，請稍後再試。'; }
+  if (y === '115') {
+    const R = PUB115_RULE;
+    if (splits.some(s => s.name !== R.purpose))
+      return `115 年度公務預算已用罄，只剩「<b>${R.purpose}</b>」可申請。`;
+    if (total > R.maxAmt)
+      return `115 年度${R.purpose}每張上限 <b>$${fmtN(R.maxAmt)}</b>（本單 $${fmtN(total)}）。`;
+    const used = _pubYearRecords(records, y).filter(r =>
+      +String(r.applyDateRaw || '').slice(5, 7) >= R.fromMonth &&
+      _pubRecSplits(r).some(s => s.name === R.purpose));
+    if (used.length >= R.maxCount)
+      return `115 年度${R.purpose}（${R.fromMonth}~12 月）已開 <b>${used.length}</b> 張，達上限 ${R.maxCount} 張：<br>` +
+        used.map(r => esc(r.voucherNo || '')).join('、');
+    return null;
+  }
+  const alloc = await _pubLoadAlloc(y);
+  if (!alloc || !Object.values(alloc).some(v => +v > 0))
+    return `${y} 年度公務預算尚未在後台 ACC 設定分配數，暫不開放申請。`;
+  const rem = _pubRemainByCat(records, y, alloc);
+  const need = {};
+  splits.forEach(s => { const k = _pubOfficialCat(s.name); need[k] = (need[k] || 0) + (+s.amt || 0); });
+  const over = Object.entries(need).filter(([k, v]) => v > (rem[k] || 0));
+  if (over.length)
+    return `${y} 年度公務預算額度不足：<br>` +
+      over.map(([k, v]) => `${esc(k)}：剩 $${fmtN(Math.max(0, rem[k] || 0))}，本單 $${fmtN(v)}`).join('<br>');
+  return null;
 }
 /* 切換是否公務預算：21020301 顯示「用途別拆分」區、隱藏單一用途別下拉；反之亦然 */
 function syncPubBudgetMode() {
@@ -3259,6 +3365,7 @@ function updateRocDate() {
   if (!v) { el.textContent = ''; return; }
   const d = new Date(v+'T00:00:00');
   el.textContent = (d.getFullYear()-1911)+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
+  if (typeof isPubBudgetExpense === 'function' && isPubBudgetExpense()) _pubRefreshOptions();   /* v6.4.7 換年度→重算可選用途別 */
   /* 使用者手動選擇時：距今超過 6 個月則彈窗提醒（不阻擋） */
   if (!_suppressAutoFill) {
     const today = new Date(); today.setHours(0,0,0,0);
@@ -3513,12 +3620,20 @@ function validatePayeeBeforeSave(data) {
 
 /* v4.9.1 公務預算(21020301)用途別拆分把關：拆分合計必須＝本單金額（動支說明加總），
    未分配（少分）或超出（多分）一律擋存檔；作廢／非公務預算單放行。 */
-function validatePubSplitBeforeSave(data) {
+async function validatePubSplitBeforeSave(data) {
   if (data.voided) return true;                          /* 作廢單例外 */
   if (!isPubBudgetExpense()) return true;                /* 僅公務預算(21020301)動支單 */
-  const docTotal = _pubDocTotal();                       /* 動支說明加總＝本單金額 */
-  if (docTotal <= 0) return true;                        /* 尚無金額可分配，交給其他把關 */
   const splits = Array.isArray(data.purposeSplits) ? data.purposeSplits : [];
+  /* v6.4.7 強制選用途別：沒有任何用途別、或有列沒選 → 擋存檔 */
+  if (!splits.length || _pubItems().some(it => !it.querySelector('.pub-split-purpose').value)) {
+    showAlert('公務預算動支單必須選擇「用途別」，請選擇後再存檔。', '⚠️');
+    return false;
+  }
+  const docTotal = _pubDocTotal();                       /* 動支說明加總＝本單金額 */
+  /* v6.4.7 新單額度把關（115 只剩電動車電池租金／116 起依 ACC 分配數） */
+  const _qErr = await _pubQuotaError(splits, docTotal);
+  if (_qErr) { showAlert(_qErr, '⛔'); return false; }
+  if (docTotal <= 0) return true;                        /* 尚無金額可分配，交給其他把關 */
   /* v4.9.8 有金額卻沒選「用途別」的拆分列要擋下（放加總檢查前，才擋得到 sum 剛好相等的情況），
      否則存檔後列印會印出「用途別： 金額」缺名稱 */
   const _nameless = splits.filter(s => (Number(s.amt) || 0) > 0 && !String(s.name || '').trim());
@@ -3576,7 +3691,7 @@ async function saveRecord() {
     return;
   }
   /* v4.9.1 公務預算用途別拆分未分配/超出 → 擋存檔（拆分合計須＝本單金額） */
-  if (!validatePubSplitBeforeSave(_preData)) {
+  if (!(await validatePubSplitBeforeSave(_preData))) {
     setSyncStatus('● 已連線', 'ok');
     _saveDone();
     return;
@@ -4691,6 +4806,7 @@ function newForm(type, opts) {
   _editingSaved = false;
   currentId = null;
   rowCount = 10;
+  for (const k in _pubAllocCache) delete _pubAllocCache[k];   /* v6.4.7 開新單重抓 ACC 公務預算分配數 */
   isLecturer = '';
   income50Type = '';
   itemType = 'consumable';
