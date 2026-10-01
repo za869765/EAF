@@ -2881,9 +2881,9 @@ function pubPurposeOptions(sel) {
 }
 
 /* ══ v6.4.7 公務預算填單額度把關（僅新單；舊單開啟/列印/更新科目不受影響）══
-   115 年度：預算已用罄，只剩電動車電池租金（每張 ≤ 1,797、10~12 月最多 3 張）。
+   115 年度：預算已用罄，只剩電動車電池租金 10~12 月總額 5,391（1,797×3；作廢單不計，總額控管）。
    116 年度起：依後台 ACC「年度預算分配（依用途別）」分配數 − 全部已動支 開放；未設定＝0＝不開放。 */
-const PUB115_RULE = { purpose: '電動車電池租金', maxAmt: 1797, maxCount: 3, fromMonth: 10 };
+const PUB115_RULE = { purpose: '電動車電池租金', cap: 1797 * 3, fromMonth: 10 };
 const _pubAllocCache = {};   /* ROC 年 → ACC 分配數 {官方欄位:金額}（null＝未設定） */
 /* 與 acc.html mapPurposeToOfficial 一致：EAF 用途別 → ACC 官方預算欄位 */
 function _pubOfficialCat(name) {
@@ -2960,14 +2960,15 @@ async function _pubQuotaError(splits, total) {
     const R = PUB115_RULE;
     if (splits.some(s => s.name !== R.purpose))
       return `115 年度公務預算已用罄，只剩「<b>${R.purpose}</b>」可申請。`;
-    if (total > R.maxAmt)
-      return `115 年度${R.purpose}每張上限 <b>$${fmtN(R.maxAmt)}</b>（本單 $${fmtN(total)}）。`;
     const used = _pubYearRecords(records, y).filter(r =>
       +String(r.applyDateRaw || '').slice(5, 7) >= R.fromMonth &&
       _pubRecSplits(r).some(s => s.name === R.purpose));
-    if (used.length >= R.maxCount)
-      return `115 年度${R.purpose}（${R.fromMonth}~12 月）已開 <b>${used.length}</b> 張，達上限 ${R.maxCount} 張：<br>` +
-        used.map(r => esc(r.voucherNo || '')).join('、');
+    const usedAmt = used.reduce((a, r) => a + _pubRecSplits(r).filter(s => s.name === R.purpose)
+      .reduce((b, s) => b + (+s.amt || 0), 0), 0);
+    if (usedAmt + total > R.cap)
+      return `115 年度${R.purpose}（${R.fromMonth}~12 月）總額上限 <b>$${fmtN(R.cap)}</b>：<br>` +
+        `已動支 $${fmtN(usedAmt)}（${used.map(r => esc(r.voucherNo || '')).join('、') || '無'}），` +
+        `剩 <b>$${fmtN(Math.max(0, R.cap - usedAmt))}</b>，本單 $${fmtN(total)}。`;
     return null;
   }
   const alloc = await _pubLoadAlloc(y);
