@@ -128,6 +128,11 @@ select.w-subj { width: 168px; }
 .off-tag-done { display: inline-block; font-size: 11px; background: #fdecea; color: #c62828; border: 1px solid #ef9a9a; border-radius: 8px; padding: 1px 7px; white-space: nowrap; }
 .off-used { font-size: 12px; color: #b26500; margin-top: 2px; }
 .off-used b.off-ok { color: #2e7d32; }
+.off-done-amt { color: #b26500; }
+.off-tag-part { display: inline-block; font-size: 11px; background: #fff3e0; color: #b26500; border: 1px solid #ffcc80; border-radius: 8px; padding: 0 6px; }
+.off-left-amt { color: #2e7d32; }
+.off-own { font-size: 12px; color: #1565c0; margin-top: 2px; }
+.off-tag-own { display: inline-block; font-size: 11px; background: #e3eefb; color: #1565c0; border: 1px solid #90caf9; border-radius: 8px; padding: 1px 7px; white-space: nowrap; }
 .off-used b.off-zero { color: #c62828; }
 /* v6.2.5 沖帳明細列（有連結的分錄下方整列） */
 .off-detail td { background: #eef6ea !important; padding: 4px 10px 6px 34px !important; border-top: none !important; }
@@ -396,7 +401,7 @@ window.addEventListener('storage', (ev) => {
   <div class="small" id="modal-hint"></div>
   <input type="search" id="modal-q" placeholder="🔍 搜尋 摘要/傳票號/子目（如：周轉金）" style="width:320px;margin-top:8px;" oninput="renderOffsetList(this.value)">
   <div class="scroll-x" style="max-height:52vh;overflow-y:auto;margin-top:8px;">
-    <table class="grid"><thead><tr><th>傳票號</th><th>序</th><th>日期</th><th>子目</th><th>摘要</th><th class="num">立帳金額</th><th></th></tr></thead>
+    <table class="grid"><thead><tr><th>傳票號</th><th>序</th><th>日期</th><th>子目</th><th>摘要</th><th class="num">立帳額</th><th class="num">已沖</th><th class="num">未沖</th><th></th></tr></thead>
     <tbody id="modal-body"></tbody></table>
   </div>
   <div class="toolbar" style="margin-top:10px;">
@@ -1883,25 +1888,38 @@ function renderOffsetList(q) {
     const base = left != null ? left : (+e.credit || +e.debit || 0);
     const used = selectable ? offsetAllocated(e.voucher_no, xseq, ctx.vi, ctx.li) : 0;
     const avail = base - used;
-    const amtHtml = `<b>${fmtN(base)}</b>` + (left != null ? ' <span class="off-tag-open">未沖</span>' : '')
-      + (used > 0 ? `<div class="off-used">−本批已扣 ${fmtN(used)} → 可用 <b class="${avail <= 0 ? 'off-zero' : 'off-ok'}">${fmtN(avail)}</b></div>` : '');
+    /* v6.4.9 金額拆三欄（使用者：已沖/未沖不明顯）：立帳額＝D1 原分錄額；已沖＝立帳額−官方未沖（0100 已沖部分）；
+       未沖＝可沖額。本列自己的連結（offsetAllocated 排除本列）另標 🔗 並計入容器統計 */
+    const orig = +e.credit || +e.debit || 0;
+    const offDone = left != null && orig > 0 ? Math.round((orig - left) * 100) / 100 : 0;
+    const _ownL = ((STATE.drafts[ctx.vi] || {}).lines || [])[ctx.li];
+    const ownO = selectable && _ownL ? offsetsOf(_ownL).find(o => String(o.vchrno) === String(e.voucher_no) && +o.seq === +xseq) : null;
+    const own = ownO ? (+ownO.amt || 0) : 0;
+    const room = Math.min(avail, ownO && +ownO.max ? +ownO.max : avail) - own;
+    const origHtml = orig > 0 ? `<span class="small">${fmtN(orig)}</span>` : '<span class="small">—</span>';
+    const doneHtml = offDone > 0 ? `<span class="off-done-amt">${fmtN(offDone)}</span><br><span class="off-tag-part">部分沖</span>` : '<span class="small">—</span>';
+    const amtHtml = `<b class="off-left-amt">${fmtN(base)}</b>` + (left != null ? ' <span class="off-tag-open">未沖</span>' : '')
+      + (used > 0 ? `<div class="off-used">−本批已扣 ${fmtN(used)} → 可用 <b class="${avail <= 0 ? 'off-zero' : 'off-ok'}">${fmtN(avail)}</b></div>` : '')
+      + (own > 0 ? `<div class="off-own">🔗 本列已沖 <b>${fmtN(own)}</b></div>` : '');
     const btn = !selectable ? '<span class="small">歷史</span>'
+      : own > 0 && room <= 0 ? '<span class="off-tag-own">本列已選</span>'
       : avail <= 0 ? '<span class="off-tag-done">已扣完</span>'
+      : own > 0 ? `<button class="btn btn-sm off-pick" data-vno="${esc(e.voucher_no)}" data-seq="${xseq}" data-dseq="${+e.seq || 0}" data-avail="${avail}">加沖</button>`
       /* 傳票號走 data-* 不內插進 inline handler：HTML 屬性會先解碼字元參照再編譯 JS，
          esc() 的 &#39; 到那時已還原成 '，單引號仍可跳脫字串（故改事件委派） */
       : `<button class="btn btn-sm off-pick" data-vno="${esc(e.voucher_no)}" data-seq="${xseq}" data-dseq="${+e.seq || 0}" data-avail="${avail}">選此列</button>`;
     return `
-    <tr${selectable ? '' : ' class="row-exported"'}${hot ? ' style="background:#f6e7dc;"' : ''}><td>${esc(e.voucher_no)}</td><td>${esc(String(xseq))}${oseq != null && +oseq !== (+e.seq || 0) ? `<span class="small" title="0100 官方序號與 D1 明細列序不同（0090 無序號欄），匯出以官方序號為準">（D1#${esc(String(e.seq))}）</span>` : ''}</td><td>${esc(e.post_date || e.make_date || '')}</td>
+    <tr${selectable ? '' : ' class="row-exported"'}${own > 0 ? ' style="background:#e3eefb;"' : hot ? ' style="background:#f6e7dc;"' : ''}><td>${esc(e.voucher_no)}</td><td>${esc(String(xseq))}${oseq != null && +oseq !== (+e.seq || 0) ? `<span class="small" title="0100 官方序號與 D1 明細列序不同（0090 無序號欄），匯出以官方序號為準">（D1#${esc(String(e.seq))}）</span>` : ''}</td><td>${esc(e.post_date || e.make_date || '')}</td>
     <td>${esc(e.sub_account || '')}${e.subject ? `<br><span class="small code-zh" title="${esc(String(e.subject))}">${esc(String(e.subject).split(' ').slice(1).join(' ').slice(0, 8))}</span>` : ''}</td><td style="max-width:280px;">${hot ? '🎯 ' : ''}${esc(String(e.description || '').slice(0, 40))}</td>
-    <td class="num">${amtHtml}</td>
+    <td class="num">${origHtml}</td><td class="num">${doneHtml}</td><td class="num">${amtHtml}</td>
     <td style="white-space:nowrap;">${btn}${okey && selectable ? ` <button class="btn btn-sm off-edit" data-okey="${esc(okey)}" title="修改官方未沖額（0100 過時時手動校正）">✏️</button><button class="btn btn-sm off-done" data-okey="${esc(okey)}" title="標記已沖畢（自未沖清單移除）">✔</button>` : ''}</td></tr>`;
   };
   /* v5.7.19 容器統計列（使用者指示）：每桶標題直接顯示 總額／本批已沖 n 筆／剩餘 */
-  const usedOfK = (vno, xseq) => offsetAllocated(vno, xseq, ctx.vi, ctx.li);
+  const usedOfK = (vno, xseq) => offsetAllocated(vno, xseq);   /* v6.4.9 統計含本列自己的連結（與背景沖帳明細一致） */
   const grpHeader = (cls, title, st) => {
     const t = st.reduce((s, x) => s + (+x.base || 0), 0), u = st.reduce((s, x) => s + (+x.used || 0), 0);
     const n = st.filter(x => x.used > 0).length;
-    return `<tr class="off-h ${cls}"><td colspan="7"><b>${title}</b><span class="off-stats"><span class="off-st">總額 <b>${fmtN(t)}</b></span><span class="off-st st-used">本批已沖 ${n} 筆 <b>${fmtN(u)}</b></span><span class="off-st st-left">剩餘 <b>${fmtN(t - u)}</b></span></span></td></tr>`;
+    return `<tr class="off-h ${cls}"><td colspan="9"><b>${title}</b><span class="off-stats"><span class="off-st">總額 <b>${fmtN(t)}</b></span><span class="off-st st-used">本批已沖 ${n} 筆 <b>${fmtN(u)}</b></span><span class="off-st st-left">剩餘 <b>${fmtN(t - u)}</b></span></span></td></tr>`;
   };
   /* v5.7.14 高機率吻合（使用者需求：金額名目相近難挑）：本列金額＝立帳額或官方未沖額，
      且摘要 bigram 相似（金額同→門檻低 0.15；金額不同→需高相似 0.6）→ 🎯 置頂建議＋原列淡橘醒目 */
@@ -1980,14 +1998,14 @@ function renderOffsetList(q) {
       }
     }
     /* v6.2.6 newer 已併入上方群組，不再獨立區塊 */
-    html += `<tr class="off-h off-h-hist"><td colspan="7"><button class="btn btn-sm" onclick="toggleOffsetHist()">👁 ${showHist ? '隱藏' : '顯示'}歷史/已沖畢立帳（${hist.length} 筆，不可選）</button></td></tr>`;
+    html += `<tr class="off-h off-h-hist"><td colspan="9"><button class="btn btn-sm" onclick="toggleOffsetHist()">👁 ${showHist ? '隱藏' : '顯示'}歷史/已沖畢立帳（${hist.length} 筆，不可選）</button></td></tr>`;
     if (showHist) html += hist.slice(0, 400).map(e => rowHtml(e, null, false)).join('')
-      + (hist.length > 400 ? `<tr><td colspan="7" class="small">歷史僅顯示前 400 筆（共 ${hist.length}），請用搜尋</td></tr>` : '');
-    if (!html) html = '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
+      + (hist.length > 400 ? `<tr><td colspan="9" class="small">歷史僅顯示前 400 筆（共 ${hist.length}），請用搜尋</td></tr>` : '');
+    if (!html) html = '<tr><td colspan="9" class="small">無候選立帳列</td></tr>';
   } else {
     /* 未匯入餘額表（或 v5.7.5 此科目家族無任何白名單項）：維持全部可選 */
     if (openMap.size > 0)
-      html += `<tr><td colspan="7" class="small">此科目無立沖餘額表資料（0100 未涵蓋）——全部立帳可選，請自行確認未沖；建議由 SBA 匯出本科目 FNWFRX0100 後於設定頁匯入</td></tr>`;
+      html += `<tr><td colspan="9" class="small">此科目無立沖餘額表資料（0100 未涵蓋）——全部立帳可選，請自行確認未沖；建議由 SBA 匯出本科目 FNWFRX0100 後於設定頁匯入</td></tr>`;
     const list = cands.filter(filt).filter(useHit);
     /* 🎯 同樣打分置頂（此分支無官方未沖額，僅比立帳額＋摘要） */
     const recs = [];
@@ -2018,15 +2036,15 @@ function renderOffsetList(q) {
         html += gr.rows.map(eRow).join('');
       }
     }
-    html += (list.length > CAP ? `<tr><td colspan="7" class="small">僅顯示前 ${CAP} 筆（共 ${list.length}），請用搜尋縮小範圍</td></tr>` : '');
-    if (!html) html = '<tr><td colspan="7" class="small">無候選立帳列</td></tr>';
+    html += (list.length > CAP ? `<tr><td colspan="9" class="small">僅顯示前 ${CAP} 筆（共 ${list.length}），請用搜尋縮小範圍</td></tr>` : '');
+    if (!html) html = '<tr><td colspan="9" class="small">無候選立帳列</td></tr>';
   }
   /* v5.7.4 用途別預設過濾＋v5.7.18 金額排序：工具列恆顯示 */
   const tb = [];
   if (lineUse && cands.some(e => e._use === lineUse))
     tb.push(`<label style="cursor:pointer;"><input type="checkbox"${useFilter ? ' checked' : ''} onchange="toggleOffsetUse()"> 只看用途別 ${esc(lineUse)}（同傳票同額對向列反查）</label>`);
   tb.push(`<label style="cursor:pointer;"><input type="checkbox"${sortAmt ? ' checked' : ''} onchange="toggleOffsetSort()"> 立帳金額大→小</label>`);
-  html = `<tr class="off-toolbar"><td colspan="7">${tb.join('　')}</td></tr>` + html;
+  html = `<tr class="off-toolbar"><td colspan="9">${tb.join('　')}</td></tr>` + html;
   $('modal-body').innerHTML = html;
   bindOffsetPick();
 }
