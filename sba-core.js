@@ -7,7 +7,7 @@
 'use strict';
 
 /* 版本＝EAF 全站版號（index/acc/admin/sba 同步）；sba.html 開機會核對，防快取新舊錯配 */
-const SBA_CORE_VERSION = '6.4.9';
+const SBA_CORE_VERSION = '6.5.0';
 
 /* ── 民國日期工具 ─────────────────────────────────────────── */
 /** Date → 民國7碼 YYYMMDD（如 1150131） */
@@ -291,6 +291,11 @@ function validateVoucher(v, opt) {
           invs.forEach((iv) => {
             /* F07 發票日期必填且須為「存在的」民國7碼日期（年段 100~130）：缺漏、漏打 1（0260723）、
                或不存在日期（1150231/1151332，用 roc7DiffDays 自比對驗曆法）SBA 匯入會被拒 */
+            /* v6.5.0 發票號碼格式＝2 英文＋8 數字（匯出同樣去「-」空白轉大寫後比對）：1151006AM/AN 批實證——
+               多打一碼（EE332016503）SBA 只回「檢核有錯！處理失敗」且轉入情形全空，故此處硬擋 */
+            const ivn = String(iv.invno || '').replace(/[-\s]/g, '').toUpperCase();
+            if (!/^[A-Z]{2}\d{8}$/.test(ivn))
+              E(`${pt}：發票號碼「${iv.invno || '空白'}」格式錯誤（${ivn.length} 碼），須為 2 英文＋8 數字共 10 碼（如 EE33201650）——SBA 匯入會整批失敗`);
             const d7 = String(iv.invdate || '');
             if (!/^\d{7}$/.test(d7) || +d7.slice(0, 3) < 100 || +d7.slice(0, 3) > 130 || roc7DiffDays(d7, d7) !== 0)
               E(`${pt}：發票 ${iv.invno || '(未填號碼)'} 日期缺漏或無效（${d7 || '空白'}，須為存在的民國7碼日期如 1150723）`);
