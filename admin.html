@@ -2766,14 +2766,14 @@ function renderBudgetChart() {
   ];
 
   items.forEach(item => {
+    /* v6.5.1 留下組成明細（憑證編號清單＋預覽用） */
+    item.recs = active.filter(r => item.isTotal ? r.purposeCode === '2807'
+      : (r.purposeCode === item.code && (item.acctType === null || r.acctType === item.acctType)));
     if (item.isTotal) return;
-    item.spent = active
-      .filter(r => r.purposeCode === item.code &&
-                   (item.acctType === null || r.acctType === item.acctType))
-      .reduce((sum, r) => sum + (Number(r.total)||0), 0);
+    item.spent = item.recs.reduce((sum, r) => sum + (Number(r.total)||0), 0);
   });
 
-  wrap.innerHTML = items.map(item => {
+  wrap.innerHTML = items.map((item, idx) => {
     const pct    = item.budget > 0 ? item.spent / item.budget * 100 : 0;
     const barPct = Math.min(pct, 100);
     const color  = pct >= 100 ? '#c62828' : pct >= 80 ? '#e65100' : '#2e7d32';
@@ -2783,9 +2783,31 @@ function renderBudgetChart() {
       : `<span style="color:#c62828;">超支 $${fmtN(-remain)}</span>`;
     const rowStyle  = item.isTotal ? 'background:#f0f4ff; border-radius:5px; padding:4px 6px; margin-bottom:6px;' : '';
     const labelStyle= item.isTotal ? 'font-weight:700; color:#1e2a38;' : '';
+    const key = item.label.trim();
+    const open = _budgetOpen.has(key);
+    const recs = item.recs.slice().sort((a, b) => String(a.voucherNo||'').localeCompare(String(b.voucherNo||'')));
+    const detail = `
+      <div class="budget-detail" style="display:${open?'block':'none'}; margin:-6px 0 14px 20px;">
+        ${recs.length ? `<table class="rec-table" style="font-size:12px;">
+          <thead><tr><th>憑證編號</th><th>申請日期</th><th>受款人</th><th>用途說明</th><th class="td-r-admin">金額</th></tr></thead>
+          <tbody>${recs.map(r => {
+            const pys = Array.isArray(r.payees) ? r.payees : (r.payee ? [r.payee] : []);
+            const pyTxt = pys.map(p => p && p.name).filter(Boolean).join('、');
+            const desc = String(r.purposeDesc||'');
+            return `<tr data-rid="${esc(r.id||'')}" style="cursor:default;">
+              <td style="white-space:nowrap;">${esc(r.voucherNo||'—')}</td>
+              <td style="white-space:nowrap;">${esc(r.applyDateRoc||'')}</td>
+              <td>${esc(pyTxt.length > 20 ? pyTxt.slice(0,20)+'…' : pyTxt)}</td>
+              <td>${esc(desc.length > 40 ? desc.slice(0,40)+'…' : desc)}</td>
+              <td class="td-r-admin">$${fmtN(r.total||0)}</td></tr>`;
+          }).join('')}
+          <tr style="font-weight:700; background:#f5f7fa;"><td colspan="4">合計 ${recs.length} 筆</td>
+            <td class="td-r-admin">$${fmtN(item.spent)}</td></tr></tbody>
+        </table>` : '<p style="color:#888; font-size:12px; padding:4px 0;">無計入單據。</p>'}
+      </div>`;
     return `
-      <div class="budget-row" style="${rowStyle}">
-        <div class="budget-label" style="${labelStyle}">${esc(item.label)}</div>
+      <div class="budget-row" style="${rowStyle} cursor:pointer;" data-bkey="${esc(key)}" title="點擊展開／收合組成單據">
+        <div class="budget-label" style="${labelStyle}">${open?'▾':'▸'} ${esc(item.label)}</div>
         <div class="budget-bar-wrap" title="${pct.toFixed(1)}%">
           <div class="budget-bar" style="width:${barPct}%; background:${color};"></div>
         </div>
@@ -2794,11 +2816,34 @@ function renderBudgetChart() {
           &nbsp;<strong style="color:${color};">${pct.toFixed(1)}%</strong>
           &nbsp;${remainTxt}
         </div>
-      </div>`;
+      </div>${detail}`;
   }).join('');
   wrap.innerHTML = noBudgetWarn + wrap.innerHTML;
+  wrap.querySelectorAll('.budget-row[data-bkey]').forEach(row => {
+    row.onclick = () => {
+      const key = row.dataset.bkey, det = row.nextElementSibling;
+      const open = !_budgetOpen.has(key);
+      open ? _budgetOpen.add(key) : _budgetOpen.delete(key);
+      det.style.display = open ? 'block' : 'none';
+      const lbl = row.querySelector('.budget-label');
+      lbl.textContent = (open ? '▾' : '▸') + lbl.textContent.slice(1);
+    };
+  });
+  _bindBudgetPreview(wrap);
 
   renderBudgetRecList(rocYear, availYears);
+}
+
+/* v6.5.1 預算執行率：展開狀態＋明細列 hover 預覽（沿用動支單報表 showRecPreview） */
+const _budgetOpen = new Set();
+function _bindBudgetPreview(root) {
+  root.querySelectorAll('tr[data-rid]').forEach(tr => {
+    const rec = _rptRecords.find(r => String(r.id) === tr.dataset.rid);
+    if (!rec) return;
+    tr.addEventListener('mouseenter', e => showRecPreview(e, rec));
+    tr.addEventListener('mousemove',  e => positionPreview(e));
+    tr.addEventListener('mouseleave', () => hideRecPreview());
+  });
 }
 
 function renderBudgetRecList(year, availYears) {
@@ -2816,7 +2861,7 @@ function renderBudgetRecList(year, availYears) {
     const badge = isManual
       ? `<span style="font-size:10px; background:#e3f2fd; color:#1565c0; border-radius:3px; padding:1px 4px;">手動 ✎</span>`
       : `<span style="font-size:10px; background:#f5f5f5; color:#78909c; border-radius:3px; padding:1px 4px;">申請日</span>`;
-    return `<tr>
+    return `<tr data-rid="${esc(r.id||'')}">
       <td><input type="checkbox" class="budget-rec-chk" data-id="${esc(r.id||'')}"></td>
       <td>${esc(r.voucherNo||'—')}</td>
       <td>${r.formType==='expense'?'動支':'採購'}</td>
@@ -2844,6 +2889,7 @@ function renderBudgetRecList(year, availYears) {
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
+  _bindBudgetPreview(listEl);
 
   document.getElementById('budget-rec-sel-all').onchange = function() {
     document.querySelectorAll('.budget-rec-chk').forEach(c => c.checked = this.checked);
